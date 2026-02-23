@@ -1,0 +1,133 @@
+{
+  "identity": "E1: The Anti-AI Designer",
+  "theme_name": "The Workshop (Industrial Utility)",
+  "emotional_tone": "Rugged, Precise, Reliable, Heavy-Duty",
+  "typography": {
+    "headings": {
+      "font_family": "Barlow Condensed, sans-serif",
+      "weights": ["600", "700", "800"],
+      "usage": "All section titles, modal headers, and key metric numbers. Transform to uppercase for top-level headers."
+    },
+    "body": {
+      "font_family": "Manrope, sans-serif",
+      "weights": ["400", "500", "600"],
+      "usage": "General text, inputs, table data, and descriptions."
+    },
+    "mono": {
+      "font_family": "JetBrains Mono, monospace",
+      "usage": "SKUs, Order IDs, Pricing, and Inventory Counts."
+    }
+  },
+  "colors": {
+    "primary": {
+      "name": "Industrial Slate",
+      "hex": "#0f172a",
+      "tailwind": "slate-900",
+      "usage": "Main navigation, heavy text, primary borders."
+    },
+    "accent": {
+      "name": "Safety Orange",
+      "hex": "#f97316",
+      "tailwind": "orange-500",
+      "usage": "Primary CTAs (Add to Cart, Checkout), Alerts, Active States."
+    },
+    "background": {
+      "name": "Concrete White",
+      "hex": "#f8fafc",
+      "tailwind": "slate-50",
+      "usage": "App background, dashboard canvas."
+    },
+    "surface": {
+      "name": "Clean White",
+      "hex": "#ffffff",
+      "tailwind": "white",
+      "usage": "Cards, input fields, modal backgrounds."
+    },
+    "border": {
+      "name": "Steel Grey",
+      "hex": "#cbd5e1",
+      "tailwind": "slate-300",
+      "usage": "Component borders, dividers."
+    },
+    "status": {
+      "success": "#15803d",
+      "warning": "#fbbf24",
+      "error": "#dc2626"
+    }
+  },
+  "visual_enhancers": {
+    "borders": "2px solid slate-300 (border-2). No hairline 1px borders. Things need to look durable.",
+    "shadows": "None or 'Hard' shadows only (e.g., shadow-[4px_4px_0px_0px_rgba(15,23,42,1)]). Avoid soft diffuse shadows.",
+    "rounded": "rounded-sm (2px) or rounded-md (4px). Avoid fully rounded 'pill' shapes unless it's a status tag.",
+    "textures": "Subtle noise overlay on the sidebar or header to simulate 'grit'."
+  },
+  "component_rules": {
+    "buttons": {
+      "primary": "bg-orange-500 hover:bg-orange-600 text-white font-bold uppercase tracking-wider rounded-sm shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-y-[1px] active:shadow-none transition-all",
+      "secondary": "bg-white border-2 border-slate-900 text-slate-900 font-bold hover:bg-slate-100 rounded-sm"
+    },
+    "cards": {
+      "style": "bg-white border-2 border-slate-200 rounded-md p-6. Header sections should have a bottom border.",
+      "hover": "hover:border-orange-500 transition-colors duration-200"
+    },
+    "inputs": {
+      "style": "h-12 border-2 border-slate-300 bg-white focus:border-orange-500 focus:ring-0 rounded-sm text-lg font-manrope placeholder:text-slate-400"
+    },
+    "pos_grid": {
+      "item": "Aspect ratio 1/1 or 4/3. Image takes up 60%. Title and Price heavily emphasized below. Big 'Add' button overlay."
+    }
+  },
+  "layout_strategies": {
+    "pos_screen": {
+      "type": "Split View",
+      "left_panel": "Cart/Order Summary. Fixed width (e.g., w-1/3). High contrast background (white).",
+      "right_panel": "Product Grid. Scrollable. Search bar fixed at top. Grid cols 3 or 4 depending on screen.",
+      "mobile_adapt": "Stack panels. Tabs to switch between 'Scan/Search' and 'Cart'."
+    },
+    "dashboard": {
+      "type": "Bento Grid (Mode A)",
+      "gap": "gap-6",
+      "widgets": "Sales Overview (Large), Low Stock Alert (Tall), Top Sellers (Square)."
+    },
+    "inventory_list": {
+      "type": "Dense Table",
+      "style": "Zebra striping optional. Monospace font for Numbers. Status badges solid colors."
+    }
+  },
+  "image_urls": {
+    "tools": [
+      "https://images.unsplash.com/photo-1510016290251-68aaad49723e",
+      "https://images.unsplash.com/photo-1519520104014-df63821cb6f9"
+    ],
+    "lumber": [
+      "https://images.unsplash.com/photo-1766148891408-af4013825cb7",
+      "https://images.pexels.com/photos/12278585/pexels-photo-12278585.jpeg"
+    ],
+    "plumbing": [
+      "https://images.pexels.com/photos/28169591/pexels-photo-28169591.jpeg",
+      "https://images.pexels.com/photos/3721272/pexels-photo-3721272.jpeg"
+    ],
+    "general_store": [
+      "https://images.pexels.com/photos/11871774/pexels-photo-11871774.jpeg"
+    ]
+  },
+  "motion": {
+    "reduced_motion": "Respect prefers-reduced-motion",
+    "micro_interactions": "Buttons press down (scale-95) on click. List items slide in from bottom (staggered).",
+    "page_transition": "Opacity fade + slight Y-axis slide (10px)."
+  },
+  "instructions_to_main_agent": {
+    "font_setup": "Import 'Barlow Condensed' and 'Manrope' from Google Fonts immediately in index.css.",
+    "theme_setup": "Extend tailwind.config.js with the 'workshop' color palette and border widths.",
+    "component_usage": "Use Shadcn components but OVERRIDE the default 'radius-lg' and 'border-border' to match the industrial 2px border style. Do not use the default soft look.",
+    "pos_logic": "Ensure the POS cart updates instantly. Use optimisitic UI. No loading spinners for adding items.",
+    "testing": "Add data-testid to every interactive element (buttons, inputs, grid items). format: 'section-element-action' (e.g., 'pos-product-card-add')."
+  },
+  "UNIVERSAL_GUIDELINES": [
+    "Do not use gradients for backgrounds. Use solid colors or subtle noise.",
+    "Avoid 'SaaS Blue' (#3b82f6). Use 'Industrial Slate' (#0f172a) instead.",
+    "Make text larger than usual. Store environments have distractions.",
+    "Inputs must be large (h-12 minimum) for touch targets.",
+    "Use Sonner for toasts, positioned top-center for visibility."
+  ]
+}
