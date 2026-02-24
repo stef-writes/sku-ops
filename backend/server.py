@@ -1144,6 +1144,192 @@ async def import_receipt_products(products: List[ExtractedProduct], department_i
     
     return {"imported": len(imported), "products": imported}
 
+# ==================== STRIPE PAYMENTS ====================
+
+class CreatePaymentRequest(BaseModel):
+    withdrawal_id: str
+    origin_url: str
+
+@api_router.post("/payments/create-checkout")
+async def create_payment_checkout(data: CreatePaymentRequest, request: Request, current_user: dict = Depends(get_current_user)):
+    """Create a Stripe checkout session for a withdrawal"""
+    
+    # Fetch the withdrawal
+    withdrawal = await db.withdrawals.find_one({"id": data.withdrawal_id}, {"_id": 0})
+    if not withdrawal:
+        raise HTTPException(status_code=404, detail="Withdrawal not found")
+    
+    # Only allow payment for unpaid withdrawals
+    if withdrawal.get("payment_status") == "paid":
+        raise HTTPException(status_code=400, detail="This withdrawal is already paid")
+    
+    stripe_api_key = os.environ.get("STRIPE_API_KEY")
+    if not stripe_api_key:
+        raise HTTPException(status_code=500, detail="Stripe not configured")
+    
+    # Build URLs using the origin provided by frontend
+    origin = data.origin_url.rstrip("/")
+    success_url = f"{origin}/pos?payment=success&session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{origin}/pos?payment=cancelled"
+    
+    # Initialize Stripe
+    host_url = str(request.base_url)
+    webhook_url = f"{host_url}api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
+    
+    # Create checkout session - amount is from the server (withdrawal total), not from frontend
+    amount = float(withdrawal.get("total", 0))
+    
+    metadata = {
+        "withdrawal_id": data.withdrawal_id,
+        "contractor_id": withdrawal.get("contractor_id", ""),
+        "job_id": withdrawal.get("job_id", ""),
+        "user_id": current_user["id"]
+    }
+    
+    checkout_request = CheckoutSessionRequest(
+        amount=amount,
+        currency="usd",
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata=metadata
+    )
+    
+    try:
+        session: CheckoutSessionResponse = await stripe_checkout.create_checkout_session(checkout_request)
+        
+        # Create payment transaction record
+        payment_record = {
+            "id": str(uuid.uuid4()),
+            "session_id": session.session_id,
+            "withdrawal_id": data.withdrawal_id,
+            "user_id": current_user["id"],
+            "contractor_id": withdrawal.get("contractor_id", ""),
+            "amount": amount,
+            "currency": "usd",
+            "metadata": metadata,
+            "payment_status": "pending",
+            "status": "initiated",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.payment_transactions.insert_one(payment_record)
+        
+        return {
+            "checkout_url": session.url,
+            "session_id": session.session_id
+        }
+    except Exception as e:
+        logger.error(f"Stripe checkout error: {e}")
+        raise HTTPException(status_code=500, detail=f"Payment processing error: {str(e)}")
+
+@api_router.get("/payments/status/{session_id}")
+async def get_payment_status(session_id: str, request: Request, current_user: dict = Depends(get_current_user)):
+    """Check the status of a payment session and update records"""
+    
+    stripe_api_key = os.environ.get("STRIPE_API_KEY")
+    if not stripe_api_key:
+        raise HTTPException(status_code=500, detail="Stripe not configured")
+    
+    host_url = str(request.base_url)
+    webhook_url = f"{host_url}api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
+    
+    try:
+        status: CheckoutStatusResponse = await stripe_checkout.get_checkout_status(session_id)
+        
+        # Find the payment transaction
+        payment = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+        
+        if payment and status.payment_status == "paid" and payment.get("payment_status") != "paid":
+            # Update payment transaction
+            await db.payment_transactions.update_one(
+                {"session_id": session_id},
+                {"$set": {
+                    "payment_status": "paid",
+                    "status": "complete",
+                    "paid_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            
+            # Update the withdrawal
+            if payment.get("withdrawal_id"):
+                await db.withdrawals.update_one(
+                    {"id": payment["withdrawal_id"]},
+                    {"$set": {
+                        "payment_status": "paid",
+                        "paid_at": datetime.now(timezone.utc).isoformat(),
+                        "stripe_session_id": session_id
+                    }}
+                )
+        elif status.status == "expired":
+            await db.payment_transactions.update_one(
+                {"session_id": session_id},
+                {"$set": {
+                    "payment_status": "expired",
+                    "status": "expired"
+                }}
+            )
+        
+        return {
+            "status": status.status,
+            "payment_status": status.payment_status,
+            "amount_total": status.amount_total,
+            "currency": status.currency,
+            "withdrawal_id": payment.get("withdrawal_id") if payment else None
+        }
+    except Exception as e:
+        logger.error(f"Payment status check error: {e}")
+        raise HTTPException(status_code=500, detail=f"Error checking payment status: {str(e)}")
+
+@api_router.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhooks"""
+    stripe_api_key = os.environ.get("STRIPE_API_KEY")
+    if not stripe_api_key:
+        raise HTTPException(status_code=500, detail="Stripe not configured")
+    
+    try:
+        body = await request.body()
+        signature = request.headers.get("Stripe-Signature")
+        
+        host_url = str(request.base_url)
+        webhook_url = f"{host_url}api/webhook/stripe"
+        stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
+        
+        webhook_response = await stripe_checkout.handle_webhook(body, signature)
+        
+        if webhook_response.payment_status == "paid":
+            session_id = webhook_response.session_id
+            
+            # Update payment transaction
+            payment = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+            
+            if payment and payment.get("payment_status") != "paid":
+                await db.payment_transactions.update_one(
+                    {"session_id": session_id},
+                    {"$set": {
+                        "payment_status": "paid",
+                        "status": "complete",
+                        "paid_at": datetime.now(timezone.utc).isoformat()
+                    }}
+                )
+                
+                # Update withdrawal
+                if payment.get("withdrawal_id"):
+                    await db.withdrawals.update_one(
+                        {"id": payment["withdrawal_id"]},
+                        {"$set": {
+                            "payment_status": "paid",
+                            "paid_at": datetime.now(timezone.utc).isoformat(),
+                            "stripe_session_id": session_id
+                        }}
+                    )
+        
+        return {"received": True}
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return {"received": True, "error": str(e)}
+
 # ==================== SEED DATA ====================
 
 @api_router.post("/seed/departments")
