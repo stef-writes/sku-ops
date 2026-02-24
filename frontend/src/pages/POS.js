@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "sonner";
+import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -10,28 +12,45 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import {
   Search,
   Plus,
   Minus,
   Trash2,
-  CreditCard,
-  Banknote,
   ShoppingCart,
   Check,
+  HardHat,
+  MapPin,
+  FileText,
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const POS = () => {
+  const { user } = useAuth();
   const [products, setProducts] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [contractors, setContractors] = useState([]);
   const [cart, setCart] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedDept, setSelectedDept] = useState("");
   const [loading, setLoading] = useState(true);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [processing, setProcessing] = useState(false);
+
+  // Checkout form
+  const [selectedContractor, setSelectedContractor] = useState("");
+  const [jobId, setJobId] = useState("");
+  const [serviceAddress, setServiceAddress] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const isContractor = user?.role === "contractor";
 
   useEffect(() => {
     fetchData();
@@ -43,11 +62,22 @@ const POS = () => {
 
   const fetchData = async () => {
     try {
-      const [deptRes] = await Promise.all([
+      const [deptRes, productsRes] = await Promise.all([
         axios.get(`${API}/departments`),
+        axios.get(`${API}/products`),
       ]);
       setDepartments(deptRes.data);
-      await fetchProducts();
+      setProducts(productsRes.data.filter((p) => p.quantity > 0));
+
+      // Fetch contractors for warehouse manager/admin
+      if (!isContractor) {
+        try {
+          const contractorsRes = await axios.get(`${API}/contractors`);
+          setContractors(contractorsRes.data.filter((c) => c.is_active !== false));
+        } catch (e) {
+          // May not have permission
+        }
+      }
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -60,9 +90,9 @@ const POS = () => {
       const params = new URLSearchParams();
       if (search) params.append("search", search);
       if (selectedDept) params.append("department_id", selectedDept);
-      
+
       const response = await axios.get(`${API}/products?${params}`);
-      setProducts(response.data.filter(p => p.quantity > 0));
+      setProducts(response.data.filter((p) => p.quantity > 0));
     } catch (error) {
       console.error("Error fetching products:", error);
     }
@@ -70,7 +100,7 @@ const POS = () => {
 
   const addToCart = (product) => {
     const existing = cart.find((item) => item.product_id === product.id);
-    
+
     if (existing) {
       if (existing.quantity >= product.quantity) {
         toast.error("Not enough stock");
@@ -95,6 +125,7 @@ const POS = () => {
           sku: product.sku,
           name: product.name,
           price: product.price,
+          cost: product.cost || 0,
           quantity: 1,
           subtotal: product.price,
           max_quantity: product.quantity,
@@ -139,33 +170,68 @@ const POS = () => {
   const tax = subtotal * 0.08;
   const total = subtotal + tax;
 
-  const handleCheckout = async () => {
+  const openCheckout = () => {
     if (cart.length === 0) {
       toast.error("Cart is empty");
+      return;
+    }
+    // Pre-fill contractor if user is contractor
+    if (isContractor) {
+      setSelectedContractor(user.id);
+    }
+    setCheckoutOpen(true);
+  };
+
+  const handleCheckout = async () => {
+    if (!jobId.trim()) {
+      toast.error("Job ID is required");
+      return;
+    }
+    if (!serviceAddress.trim()) {
+      toast.error("Service address is required");
+      return;
+    }
+    if (!isContractor && !selectedContractor) {
+      toast.error("Please select a contractor");
       return;
     }
 
     setProcessing(true);
     try {
-      const saleData = {
-        items: cart.map(({ product_id, sku, name, quantity, price, subtotal }) => ({
+      const withdrawalData = {
+        items: cart.map(({ product_id, sku, name, quantity, price, cost, subtotal }) => ({
           product_id,
           sku,
           name,
           quantity,
           price,
+          cost,
           subtotal,
         })),
-        payment_method: paymentMethod,
+        job_id: jobId.trim(),
+        service_address: serviceAddress.trim(),
+        notes: notes.trim() || null,
       };
 
-      await axios.post(`${API}/sales`, saleData);
-      toast.success("Sale completed!");
+      if (isContractor) {
+        await axios.post(`${API}/withdrawals`, withdrawalData);
+      } else {
+        await axios.post(
+          `${API}/withdrawals/for-contractor?contractor_id=${selectedContractor}`,
+          withdrawalData
+        );
+      }
+
+      toast.success("Material withdrawal logged!");
       setCart([]);
       setCheckoutOpen(false);
+      setJobId("");
+      setServiceAddress("");
+      setNotes("");
+      setSelectedContractor("");
       fetchProducts();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Checkout failed");
+      toast.error(error.response?.data?.detail || "Withdrawal failed");
     } finally {
       setProcessing(false);
     }
@@ -175,7 +241,7 @@ const POS = () => {
     return (
       <div className="p-8 flex items-center justify-center min-h-screen">
         <div className="text-slate-600 font-heading text-xl uppercase tracking-wider">
-          Loading POS...
+          Loading...
         </div>
       </div>
     );
@@ -184,12 +250,15 @@ const POS = () => {
   return (
     <div className="flex h-screen" data-testid="pos-page">
       {/* Cart Panel - Left Side */}
-      <div className="w-1/3 bg-white border-r-2 border-slate-200 flex flex-col" data-testid="cart-panel">
+      <div
+        className="w-1/3 bg-white border-r-2 border-slate-200 flex flex-col"
+        data-testid="cart-panel"
+      >
         {/* Cart Header */}
         <div className="p-6 border-b-2 border-slate-200">
           <div className="flex items-center justify-between">
             <h2 className="font-heading font-bold text-xl text-slate-900 uppercase tracking-wider">
-              Current Order
+              {isContractor ? "My Withdrawal" : "Material Withdrawal"}
             </h2>
             {cart.length > 0 && (
               <button
@@ -201,6 +270,11 @@ const POS = () => {
               </button>
             )}
           </div>
+          {isContractor && (
+            <p className="text-sm text-slate-500 mt-1">
+              {user?.company || "Independent"}
+            </p>
+          )}
         </div>
 
         {/* Cart Items */}
@@ -209,7 +283,7 @@ const POS = () => {
             <div className="text-center py-12 text-slate-400">
               <ShoppingCart className="w-16 h-16 mx-auto mb-4 opacity-50" />
               <p className="font-medium">Cart is empty</p>
-              <p className="text-sm">Add products to start a sale</p>
+              <p className="text-sm">Select materials to withdraw</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -279,13 +353,13 @@ const POS = () => {
             </div>
           </div>
           <Button
-            onClick={() => setCheckoutOpen(true)}
+            onClick={openCheckout}
             disabled={cart.length === 0}
             className="w-full btn-primary h-14 text-lg"
             data-testid="checkout-btn"
           >
-            <CreditCard className="w-5 h-5 mr-2" />
-            Checkout
+            <FileText className="w-5 h-5 mr-2" />
+            Log Withdrawal
           </Button>
         </div>
       </div>
@@ -299,7 +373,7 @@ const POS = () => {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <Input
                 type="text"
-                placeholder="Search products by name, SKU, or barcode..."
+                placeholder="Search materials by name, SKU, or barcode..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="input-workshop pl-12 w-full"
@@ -326,8 +400,8 @@ const POS = () => {
         <div className="flex-1 overflow-auto p-6" data-testid="products-grid">
           {products.length === 0 ? (
             <div className="text-center py-12 text-slate-400">
-              <p className="font-medium">No products found</p>
-              <p className="text-sm">Add products in Inventory to see them here</p>
+              <p className="font-medium">No materials found</p>
+              <p className="text-sm">Add products in Inventory</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -345,7 +419,10 @@ const POS = () => {
                   </div>
                   <div className="p-4">
                     <p className="font-mono text-xs text-slate-500">{product.sku}</p>
-                    <p className="font-semibold text-slate-900 truncate" title={product.name}>
+                    <p
+                      className="font-semibold text-slate-900 truncate"
+                      title={product.name}
+                    >
                       {product.name}
                     </p>
                     <div className="flex items-center justify-between mt-2">
@@ -366,56 +443,101 @@ const POS = () => {
 
       {/* Checkout Dialog */}
       <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
-        <DialogContent className="sm:max-w-md" data-testid="checkout-dialog">
+        <DialogContent className="sm:max-w-lg" data-testid="checkout-dialog">
           <DialogHeader>
             <DialogTitle className="font-heading font-bold text-xl uppercase tracking-wider">
-              Complete Sale
+              Log Material Withdrawal
             </DialogTitle>
           </DialogHeader>
 
-          <div className="py-4">
-            <p className="text-sm text-slate-600 mb-4">Select Payment Method</p>
-            
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <button
-                onClick={() => setPaymentMethod("cash")}
-                className={`p-4 border-2 rounded-sm flex flex-col items-center gap-2 transition-colors ${
-                  paymentMethod === "cash"
-                    ? "border-orange-500 bg-orange-50"
-                    : "border-slate-200 hover:border-slate-300"
-                }`}
-                data-testid="payment-cash-btn"
-              >
-                <Banknote className={`w-8 h-8 ${paymentMethod === "cash" ? "text-orange-500" : "text-slate-400"}`} />
-                <span className={`font-semibold ${paymentMethod === "cash" ? "text-orange-500" : "text-slate-600"}`}>
-                  Cash
-                </span>
-              </button>
-              <button
-                onClick={() => setPaymentMethod("card")}
-                className={`p-4 border-2 rounded-sm flex flex-col items-center gap-2 transition-colors ${
-                  paymentMethod === "card"
-                    ? "border-orange-500 bg-orange-50"
-                    : "border-slate-200 hover:border-slate-300"
-                }`}
-                data-testid="payment-card-btn"
-              >
-                <CreditCard className={`w-8 h-8 ${paymentMethod === "card" ? "text-orange-500" : "text-slate-400"}`} />
-                <span className={`font-semibold ${paymentMethod === "card" ? "text-orange-500" : "text-slate-600"}`}>
-                  Card
-                </span>
-              </button>
+          <div className="space-y-4 pt-4">
+            {/* Contractor Selection (for warehouse manager/admin) */}
+            {!isContractor && (
+              <div>
+                <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
+                  Contractor *
+                </Label>
+                <Select
+                  value={selectedContractor}
+                  onValueChange={setSelectedContractor}
+                >
+                  <SelectTrigger
+                    className="input-workshop mt-2"
+                    data-testid="select-contractor"
+                  >
+                    <SelectValue placeholder="Select contractor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {contractors.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        <div className="flex items-center gap-2">
+                          <HardHat className="w-4 h-4" />
+                          {c.name} ({c.company || "Independent"})
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Job ID */}
+            <div>
+              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
+                <FileText className="w-4 h-4 inline mr-1" />
+                Job ID *
+              </Label>
+              <Input
+                value={jobId}
+                onChange={(e) => setJobId(e.target.value)}
+                placeholder="Enter job ID or reference number"
+                className="input-workshop mt-2"
+                data-testid="job-id-input"
+              />
             </div>
 
+            {/* Service Address */}
+            <div>
+              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
+                <MapPin className="w-4 h-4 inline mr-1" />
+                Service Address *
+              </Label>
+              <Input
+                value={serviceAddress}
+                onChange={(e) => setServiceAddress(e.target.value)}
+                placeholder="Where are these materials going?"
+                className="input-workshop mt-2"
+                data-testid="service-address-input"
+              />
+            </div>
+
+            {/* Notes */}
+            <div>
+              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
+                Notes (Optional)
+              </Label>
+              <Input
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Any additional notes..."
+                className="input-workshop mt-2"
+                data-testid="notes-input"
+              />
+            </div>
+
+            {/* Summary */}
             <div className="bg-slate-50 p-4 rounded-sm border-2 border-slate-200">
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total Amount</span>
+              <div className="flex justify-between text-lg font-bold mb-2">
+                <span>Total Value</span>
                 <span className="font-mono">${total.toFixed(2)}</span>
               </div>
+              <p className="text-xs text-slate-500">
+                Charged to {isContractor ? user?.billing_entity || user?.company : "contractor"} account
+              </p>
             </div>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 pt-4">
             <Button
               variant="outline"
               onClick={() => setCheckoutOpen(false)}
@@ -431,7 +553,7 @@ const POS = () => {
               data-testid="checkout-confirm-btn"
             >
               <Check className="w-5 h-5 mr-2" />
-              {processing ? "Processing..." : "Complete Sale"}
+              {processing ? "Processing..." : "Confirm Withdrawal"}
             </Button>
           </div>
         </DialogContent>
