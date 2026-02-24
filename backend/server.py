@@ -627,9 +627,6 @@ IMPORTANT RULES:
         response = await chat.send_message(user_message)
         
         # Parse the JSON response
-        import json
-        import re
-        
         json_match = re.search(r'\{[\s\S]*\}', response)
         if json_match:
             extracted_data = json.loads(json_match.group())
