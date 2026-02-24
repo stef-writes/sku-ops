@@ -272,15 +272,37 @@ const POS = () => {
         notes: notes.trim() || null,
       };
 
+      let withdrawal;
       if (isContractor) {
-        await axios.post(`${API}/withdrawals`, withdrawalData);
+        const res = await axios.post(`${API}/withdrawals`, withdrawalData);
+        withdrawal = res.data;
       } else {
-        await axios.post(
+        const res = await axios.post(
           `${API}/withdrawals/for-contractor?contractor_id=${selectedContractor}`,
           withdrawalData
         );
+        withdrawal = res.data;
       }
 
+      // If Pay Now, redirect to Stripe
+      if (paymentMethod === "pay_now") {
+        try {
+          const paymentRes = await axios.post(`${API}/payments/create-checkout`, {
+            withdrawal_id: withdrawal.id,
+            origin_url: window.location.origin
+          });
+          
+          // Redirect to Stripe checkout
+          window.location.href = paymentRes.data.checkout_url;
+          return;
+        } catch (paymentError) {
+          // If payment creation fails, the withdrawal is still logged as unpaid
+          toast.error("Could not initiate payment. Withdrawal logged as 'Charge to Account'.");
+          console.error("Payment error:", paymentError);
+        }
+      }
+
+      // Success for Charge to Account or fallback
       toast.success("Material withdrawal logged!");
       setCart([]);
       setCheckoutOpen(false);
@@ -288,6 +310,7 @@ const POS = () => {
       setServiceAddress("");
       setNotes("");
       setSelectedContractor("");
+      setPaymentMethod("charge");
       fetchProducts();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Withdrawal failed");
