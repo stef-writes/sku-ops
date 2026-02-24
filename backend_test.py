@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 import uuid
 
 class HardwareStoreAPITester:
-    def __init__(self, base_url="https://sku-central.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://hardware-pos-stripe.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.token = None
         self.user = None
