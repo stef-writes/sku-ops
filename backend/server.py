@@ -560,6 +560,9 @@ async def extract_receipt(file: UploadFile = File(...), current_user: dict = Dep
 @api_router.post("/vendors/{vendor_id}/import-pdf")
 async def import_vendor_pdf(vendor_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     """Extract product information from vendor invoice PDF using Gemini 3 Flash and auto-assign to departments"""
+    import tempfile
+    temp_file_path = None
+    
     try:
         # Verify vendor exists
         vendor = await db.vendors.find_one({"id": vendor_id}, {"_id": 0})
@@ -567,7 +570,11 @@ async def import_vendor_pdf(vendor_id: str, file: UploadFile = File(...), curren
             raise HTTPException(status_code=404, detail="Vendor not found")
         
         contents = await file.read()
-        pdf_base64 = base64.b64encode(contents).decode('utf-8')
+        
+        # Save to temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+            temp_file.write(contents)
+            temp_file_path = temp_file.name
         
         from emergentintegrations.llm.chat import LlmChat, UserMessage, FileContentWithMimeType
         
@@ -613,9 +620,9 @@ IMPORTANT RULES:
 6. SKU should be the original vendor SKU if visible"""
         ).with_model("gemini", "gemini-3-flash-preview")
         
-        # Create file content for PDF
+        # Create file content for PDF using file path
         file_content = FileContentWithMimeType(
-            file_base64=pdf_base64,
+            file_path=temp_file_path,
             mime_type="application/pdf"
         )
         
