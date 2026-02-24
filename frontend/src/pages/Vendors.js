@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
@@ -10,16 +10,45 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
-import { Plus, Edit2, Trash2, Users, Mail, Phone, MapPin } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Users,
+  Mail,
+  Phone,
+  MapPin,
+  FileUp,
+  Loader2,
+  CheckCircle,
+  Package,
+  FileText,
+} from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const Vendors = () => {
   const [vendors, setVendors] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  // PDF Import State
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [selectedVendor, setSelectedVendor] = useState(null);
+  const [pdfFile, setPdfFile] = useState(null);
+  const [extracting, setExtracting] = useState(false);
+  const [extractedProducts, setExtractedProducts] = useState([]);
+  const [importing, setImporting] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -30,8 +59,24 @@ const Vendors = () => {
   });
 
   useEffect(() => {
-    fetchVendors();
+    fetchData();
   }, []);
+
+  const fetchData = async () => {
+    try {
+      const [vendorRes, deptRes] = await Promise.all([
+        axios.get(`${API}/vendors`),
+        axios.get(`${API}/departments`),
+      ]);
+      setVendors(vendorRes.data);
+      setDepartments(deptRes.data);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast.error("Failed to load data");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchVendors = async () => {
     try {
@@ -39,9 +84,6 @@ const Vendors = () => {
       setVendors(response.data);
     } catch (error) {
       console.error("Error fetching vendors:", error);
-      toast.error("Failed to load vendors");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -106,6 +148,119 @@ const Vendors = () => {
     }
   };
 
+  // PDF Import Functions
+  const openImportDialog = (vendor) => {
+    setSelectedVendor(vendor);
+    setPdfFile(null);
+    setExtractedProducts([]);
+    setImportDialogOpen(true);
+  };
+
+  const handlePdfChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type !== "application/pdf") {
+        toast.error("Please select a PDF file");
+        return;
+      }
+      setPdfFile(file);
+      setExtractedProducts([]);
+    }
+  };
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      if (file.type !== "application/pdf") {
+        toast.error("Please select a PDF file");
+        return;
+      }
+      setPdfFile(file);
+      setExtractedProducts([]);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+  }, []);
+
+  const extractFromPdf = async () => {
+    if (!pdfFile || !selectedVendor) return;
+
+    setExtracting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", pdfFile);
+
+      const response = await axios.post(
+        `${API}/vendors/${selectedVendor.id}/import-pdf`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      const products = response.data.products.map((p, idx) => ({
+        ...p,
+        id: idx,
+        selected: true,
+      }));
+
+      setExtractedProducts(products);
+      toast.success(`Extracted ${products.length} products from PDF`);
+    } catch (error) {
+      console.error("PDF extraction error:", error);
+      toast.error(error.response?.data?.detail || "Failed to extract from PDF");
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const updateExtractedProduct = (id, field, value) => {
+    setExtractedProducts(
+      extractedProducts.map((p) =>
+        p.id === id ? { ...p, [field]: value } : p
+      )
+    );
+  };
+
+  const toggleProduct = (id) => {
+    setExtractedProducts(
+      extractedProducts.map((p) =>
+        p.id === id ? { ...p, selected: !p.selected } : p
+      )
+    );
+  };
+
+  const importProducts = async () => {
+    if (!selectedVendor) return;
+
+    const productsToImport = extractedProducts.filter((p) => p.selected);
+    if (productsToImport.length === 0) {
+      toast.error("No products selected");
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const response = await axios.post(
+        `${API}/vendors/${selectedVendor.id}/import-products`,
+        productsToImport
+      );
+
+      toast.success(`Imported ${response.data.imported} products!`);
+      if (response.data.errors > 0) {
+        toast.warning(`${response.data.errors} products failed to import`);
+      }
+
+      setImportDialogOpen(false);
+      fetchVendors();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to import products");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center min-h-screen">
@@ -161,6 +316,14 @@ const Vendors = () => {
                 </div>
                 <div className="flex gap-1">
                   <button
+                    onClick={() => openImportDialog(vendor)}
+                    className="p-2 text-slate-600 hover:text-green-500 hover:bg-green-50 rounded-sm transition-colors"
+                    title="Import PDF Invoice"
+                    data-testid={`import-pdf-${vendor.id}`}
+                  >
+                    <FileUp className="w-4 h-4" />
+                  </button>
+                  <button
                     onClick={() => openDialog(vendor)}
                     className="p-2 text-slate-600 hover:text-orange-500 hover:bg-orange-50 rounded-sm transition-colors"
                     data-testid={`edit-vendor-${vendor.id}`}
@@ -206,10 +369,18 @@ const Vendors = () => {
                 )}
               </div>
 
-              <div className="mt-4 pt-4 border-t border-slate-200">
+              <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between">
                 <span className="text-xs text-slate-400 uppercase tracking-wide">
                   {vendor.product_count || 0} products
                 </span>
+                <button
+                  onClick={() => openImportDialog(vendor)}
+                  className="text-xs text-orange-500 hover:text-orange-600 font-semibold flex items-center gap-1"
+                  data-testid={`import-btn-${vendor.id}`}
+                >
+                  <FileText className="w-3 h-3" />
+                  Import PDF
+                </button>
               </div>
             </div>
           ))}
@@ -312,6 +483,223 @@ const Vendors = () => {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* PDF Import Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="import-pdf-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-heading font-bold text-xl uppercase tracking-wider">
+              Import from PDF - {selectedVendor?.name}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6 pt-4">
+            {/* Upload Section */}
+            {!pdfFile ? (
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onClick={() => document.getElementById("pdf-input").click()}
+                className="border-2 border-dashed border-slate-300 rounded-md p-8 text-center hover:border-orange-400 transition-colors cursor-pointer"
+                data-testid="pdf-dropzone"
+              >
+                <FileUp className="w-12 h-12 mx-auto mb-3 text-slate-400" />
+                <p className="text-slate-600 font-medium">
+                  Drop vendor invoice PDF here or click to browse
+                </p>
+                <p className="text-slate-400 text-sm mt-1">
+                  Supports invoices from Home Depot, Lowes, and other suppliers
+                </p>
+                <input
+                  id="pdf-input"
+                  type="file"
+                  accept=".pdf"
+                  onChange={handlePdfChange}
+                  className="hidden"
+                  data-testid="pdf-file-input"
+                />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-sm border-2 border-slate-200">
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-8 h-8 text-orange-500" />
+                    <div>
+                      <p className="font-medium text-slate-900">{pdfFile.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {(pdfFile.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setPdfFile(null);
+                      setExtractedProducts([]);
+                    }}
+                    className="text-slate-400 hover:text-red-500"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {extractedProducts.length === 0 && (
+                  <Button
+                    onClick={extractFromPdf}
+                    disabled={extracting}
+                    className="w-full btn-primary h-12"
+                    data-testid="extract-pdf-btn"
+                  >
+                    {extracting ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Analyzing PDF with AI...
+                      </>
+                    ) : (
+                      <>
+                        <Package className="w-5 h-5 mr-2" />
+                        Extract Products
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Extracted Products */}
+            {extractedProducts.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-heading font-bold text-lg text-slate-900 uppercase tracking-wider">
+                    Extracted Products ({extractedProducts.filter((p) => p.selected).length}/{extractedProducts.length})
+                  </h3>
+                </div>
+
+                <div className="space-y-3 max-h-[400px] overflow-auto" data-testid="extracted-products">
+                  {extractedProducts.map((product) => (
+                    <div
+                      key={product.id}
+                      className={`p-4 border-2 rounded-sm transition-colors ${
+                        product.selected
+                          ? "border-orange-300 bg-orange-50"
+                          : "border-slate-200 bg-slate-50 opacity-60"
+                      }`}
+                      data-testid={`extracted-product-${product.id}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <button
+                          onClick={() => toggleProduct(product.id)}
+                          className={`mt-1 w-5 h-5 rounded-sm border-2 flex items-center justify-center flex-shrink-0 ${
+                            product.selected
+                              ? "bg-orange-500 border-orange-500 text-white"
+                              : "border-slate-300"
+                          }`}
+                        >
+                          {product.selected && <CheckCircle className="w-4 h-4" />}
+                        </button>
+
+                        <div className="flex-1 space-y-3">
+                          <div>
+                            <Input
+                              value={product.name}
+                              onChange={(e) =>
+                                updateExtractedProduct(product.id, "name", e.target.value)
+                              }
+                              className="input-workshop h-10"
+                              placeholder="Product name"
+                            />
+                            {product.original_sku && (
+                              <p className="text-xs text-slate-400 mt-1">
+                                Original SKU: {product.original_sku}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-4 gap-2">
+                            <div>
+                              <Label className="text-xs text-slate-500">Qty</Label>
+                              <Input
+                                type="number"
+                                value={product.quantity}
+                                onChange={(e) =>
+                                  updateExtractedProduct(product.id, "quantity", e.target.value)
+                                }
+                                className="input-workshop h-10 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-slate-500">Price</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={product.price}
+                                onChange={(e) =>
+                                  updateExtractedProduct(product.id, "price", e.target.value)
+                                }
+                                className="input-workshop h-10 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-slate-500">Cost</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={product.cost || ""}
+                                onChange={(e) =>
+                                  updateExtractedProduct(product.id, "cost", e.target.value)
+                                }
+                                className="input-workshop h-10 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-slate-500">Dept</Label>
+                              <Select
+                                value={product.suggested_department || "HDW"}
+                                onValueChange={(value) =>
+                                  updateExtractedProduct(product.id, "suggested_department", value)
+                                }
+                              >
+                                <SelectTrigger className="input-workshop h-10 text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {departments.map((dept) => (
+                                    <SelectItem key={dept.code} value={dept.code}>
+                                      {dept.code}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <Button
+                  onClick={importProducts}
+                  disabled={importing || extractedProducts.filter((p) => p.selected).length === 0}
+                  className="w-full btn-primary h-12"
+                  data-testid="import-products-btn"
+                >
+                  {importing ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      Import {extractedProducts.filter((p) => p.selected).length} Products to Inventory
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
