@@ -17,6 +17,7 @@ import {
   Calendar as CalendarIcon,
   AlertTriangle,
   ShoppingCart,
+  Download,
 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -35,6 +36,13 @@ import {
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const COLORS = ["#f97316", "#0f172a", "#15803d", "#3b82f6", "#8b5cf6", "#ec4899"];
+
+const DATE_PRESETS = [
+  { label: "Today", getValue: () => { const d = new Date(); return { from: d, to: d }; } },
+  { label: "Last 7 days", getValue: () => { const end = new Date(); const start = new Date(end); start.setDate(start.getDate() - 6); return { from: start, to: end }; } },
+  { label: "This month", getValue: () => { const end = new Date(); const start = new Date(end.getFullYear(), end.getMonth(), 1); return { from: start, to: end }; } },
+  { label: "All time", getValue: () => ({ from: null, to: null }) },
+];
 
 const Reports = () => {
   const [activeTab, setActiveTab] = useState("sales");
@@ -76,12 +84,49 @@ const Reports = () => {
     }
   };
 
-  const paymentChartData = salesReport?.by_payment_method
-    ? Object.entries(salesReport.by_payment_method).map(([name, value]) => ({
+  const paymentChartData = salesReport?.by_payment_status
+    ? Object.entries(salesReport.by_payment_status).map(([name, value]) => ({
         name: name.charAt(0).toUpperCase() + name.slice(1),
         value: parseFloat(value.toFixed(2)),
       }))
     : [];
+
+  const handleExportCSV = () => {
+    const rows = [];
+    if (activeTab === "sales" && salesReport) {
+      rows.push(["Report", "Sales Report"]);
+      rows.push(["Date Range", dateRange.from ? (dateRange.to ? `${format(dateRange.from, "yyyy-MM-dd")} to ${format(dateRange.to, "yyyy-MM-dd")}` : format(dateRange.from, "yyyy-MM-dd")) : "All time"]);
+      rows.push([]);
+      rows.push(["Metric", "Value"]);
+      rows.push(["Total Revenue", salesReport.total_revenue]);
+      rows.push(["Total Transactions", salesReport.total_transactions]);
+      rows.push(["Average Transaction", salesReport.average_transaction]);
+      rows.push(["Total Tax", salesReport.total_tax]);
+      if (salesReport.top_products?.length) {
+        rows.push([]);
+        rows.push(["Top Products", "Name", "Revenue", "Quantity"]);
+        salesReport.top_products.forEach((p) => rows.push([p.name, p.revenue, p.quantity]));
+      }
+    } else if (activeTab === "inventory" && inventoryReport) {
+      rows.push(["Report", "Inventory Report"]);
+      rows.push([]);
+      rows.push(["Metric", "Value"]);
+      rows.push(["Total Products", inventoryReport.total_products]);
+      rows.push(["Retail Value", inventoryReport.total_retail_value]);
+      rows.push(["Cost Value", inventoryReport.total_cost_value]);
+      rows.push(["Potential Profit", inventoryReport.potential_profit]);
+      rows.push(["Low Stock Count", inventoryReport.low_stock_count]);
+      rows.push(["Out of Stock Count", inventoryReport.out_of_stock_count]);
+    }
+    const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `report-${activeTab}-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const departmentChartData = inventoryReport?.by_department
     ? Object.entries(inventoryReport.by_department).map(([name, data]) => ({
@@ -112,8 +157,21 @@ const Reports = () => {
           <p className="text-slate-600 mt-1">Sales and inventory analytics</p>
         </div>
 
-        {/* Date Range Picker */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Date Presets */}
+          <div className="flex gap-1">
+            {DATE_PRESETS.map((preset) => (
+              <Button
+                key={preset.label}
+                variant="outline"
+                size="sm"
+                onClick={() => setDateRange(preset.getValue())}
+              >
+                {preset.label}
+              </Button>
+            ))}
+          </div>
+          {/* Date Range Picker */}
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" className="btn-secondary h-12 px-4" data-testid="date-range-btn">
@@ -150,6 +208,10 @@ const Reports = () => {
               Clear
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={handleExportCSV} data-testid="export-csv-btn">
+            <Download className="w-4 h-4 mr-2" />
+            Export CSV
+          </Button>
         </div>
       </div>
 
@@ -228,10 +290,10 @@ const Reports = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Payment Methods Chart */}
+            {/* Payment Status Chart */}
             <div className="card-workshop p-6">
               <h3 className="font-heading font-bold text-lg text-slate-900 uppercase tracking-wider mb-4">
-                Sales by Payment Method
+                Sales by Payment Status
               </h3>
               {paymentChartData.length > 0 ? (
                 <div className="h-[300px]">

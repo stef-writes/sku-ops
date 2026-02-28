@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
@@ -25,21 +26,38 @@ import {
   Package,
   AlertTriangle,
   X,
+  History,
+  SlidersHorizontal,
+  Sparkles,
 } from "lucide-react";
+import { StockHistoryModal } from "../components/StockHistoryModal";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+const UOM_OPTIONS = [
+  "each", "case", "box", "pack", "bag", "roll", "gallon", "quart", "pint",
+  "liter", "pound", "ounce", "foot", "meter", "yard", "sqft", "kit",
+];
+
 const Inventory = () => {
+  const [searchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [search, setSearch] = useState("");
   const [filterDept, setFilterDept] = useState("");
-  const [filterLowStock, setFilterLowStock] = useState(false);
+  const [filterLowStock, setFilterLowStock] = useState(searchParams.get("low_stock") === "1");
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [stockHistoryProduct, setStockHistoryProduct] = useState(null);
+  const [adjustProduct, setAdjustProduct] = useState(null);
+  const [adjustDelta, setAdjustDelta] = useState("");
+  const [adjustReason, setAdjustReason] = useState("correction");
+  const [adjusting, setAdjusting] = useState(false);
+  const [suggestingUom, setSuggestingUom] = useState(false);
+  const suggestUomTimeout = useRef(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -51,6 +69,9 @@ const Inventory = () => {
     department_id: "",
     vendor_id: "",
     barcode: "",
+    base_unit: "each",
+    sell_uom: "each",
+    pack_qty: "1",
   });
 
   useEffect(() => {
@@ -60,6 +81,12 @@ const Inventory = () => {
   useEffect(() => {
     fetchProducts();
   }, [search, filterDept, filterLowStock]);
+
+  useEffect(() => {
+    return () => {
+      if (suggestUomTimeout.current) clearTimeout(suggestUomTimeout.current);
+    };
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -91,6 +118,31 @@ const Inventory = () => {
     }
   };
 
+  const suggestUnit = useCallback(async () => {
+    if (!form.name?.trim()) {
+      toast.error("Enter a product name first");
+      return;
+    }
+    setSuggestingUom(true);
+    try {
+      const { data } = await axios.post(`${API}/products/suggest-uom`, {
+        name: form.name.trim(),
+        description: form.description?.trim() || undefined,
+      });
+      setForm((f) => ({
+        ...f,
+        base_unit: data.base_unit || "each",
+        sell_uom: data.sell_uom || "each",
+        pack_qty: String(data.pack_qty ?? 1),
+      }));
+      toast.success("Unit suggested");
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Could not suggest unit");
+    } finally {
+      setSuggestingUom(false);
+    }
+  }, [form.name, form.description]);
+
   const openDialog = (product = null) => {
     if (product) {
       setEditingProduct(product);
@@ -104,6 +156,9 @@ const Inventory = () => {
         department_id: product.department_id,
         vendor_id: product.vendor_id || "",
         barcode: product.barcode || "",
+        base_unit: product.base_unit || "each",
+        sell_uom: product.sell_uom || "each",
+        pack_qty: String(product.pack_qty ?? 1),
       });
     } else {
       setEditingProduct(null);
@@ -117,6 +172,9 @@ const Inventory = () => {
         department_id: "",
         vendor_id: "",
         barcode: "",
+        base_unit: "each",
+        sell_uom: "each",
+        pack_qty: "1",
       });
     }
     setDialogOpen(true);
@@ -141,6 +199,9 @@ const Inventory = () => {
         department_id: form.department_id,
         vendor_id: form.vendor_id || null,
         barcode: form.barcode || null,
+        base_unit: form.base_unit || "each",
+        sell_uom: form.sell_uom || "each",
+        pack_qty: parseInt(form.pack_qty) || 1,
       };
 
       if (editingProduct) {
@@ -172,11 +233,38 @@ const Inventory = () => {
     }
   };
 
+  const handleAdjust = async (e) => {
+    e.preventDefault();
+    const delta = parseInt(adjustDelta, 10);
+    if (isNaN(delta) || delta === 0) {
+      toast.error("Enter a non-zero quantity delta");
+      return;
+    }
+    if (!adjustProduct) return;
+    setAdjusting(true);
+    try {
+      await axios.post(`${API}/products/${adjustProduct.id}/adjust`, {
+        quantity_delta: delta,
+        reason: adjustReason,
+      });
+      toast.success("Stock adjusted");
+      setAdjustProduct(null);
+      setAdjustDelta("");
+      setAdjustReason("correction");
+      fetchProducts();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to adjust stock");
+    } finally {
+      setAdjusting(false);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="p-8 flex items-center justify-center min-h-screen">
-        <div className="text-slate-600 font-heading text-xl uppercase tracking-wider">
-          Loading Inventory...
+      <div className="p-8 flex items-center justify-center min-h-[50vh]">
+        <div className="flex items-center gap-3 text-slate-500">
+          <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+          <span className="font-medium">Loading inventory…</span>
         </div>
       </div>
     );
@@ -187,10 +275,10 @@ const Inventory = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="font-heading font-bold text-3xl text-slate-900 uppercase tracking-wider">
+          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
             Inventory
           </h1>
-          <p className="text-slate-600 mt-1">{products.length} products</p>
+          <p className="text-slate-500 mt-1 text-sm">{products.length} products</p>
         </div>
         <Button
           onClick={() => openDialog()}
@@ -203,7 +291,7 @@ const Inventory = () => {
       </div>
 
       {/* Filters */}
-      <div className="card-workshop p-4 mb-6" data-testid="inventory-filters">
+      <div className="card-elevated p-5 mb-6" data-testid="inventory-filters">
         <div className="flex flex-wrap gap-4">
           <div className="flex-1 min-w-[250px] relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -231,10 +319,10 @@ const Inventory = () => {
           </select>
           <button
             onClick={() => setFilterLowStock(!filterLowStock)}
-            className={`h-12 px-4 border-2 rounded-sm flex items-center gap-2 transition-colors ${
+            className={`h-11 px-4 border rounded-lg flex items-center gap-2 transition-all ${
               filterLowStock
-                ? "border-orange-500 bg-orange-50 text-orange-700"
-                : "border-slate-300 hover:border-slate-400"
+                ? "border-amber-400 bg-amber-50 text-amber-700"
+                : "border-slate-200 hover:border-slate-300"
             }`}
             data-testid="inventory-low-stock-filter"
           >
@@ -245,13 +333,14 @@ const Inventory = () => {
       </div>
 
       {/* Products Table */}
-      <div className="card-workshop overflow-hidden" data-testid="inventory-table">
+      <div className="card-elevated overflow-hidden rounded-xl" data-testid="inventory-table">
         <table className="w-full table-workshop">
           <thead>
             <tr>
               <th>SKU</th>
               <th>Product Name</th>
               <th>Department</th>
+              <th>Unit</th>
               <th>Price</th>
               <th>Cost</th>
               <th>Quantity</th>
@@ -262,7 +351,7 @@ const Inventory = () => {
           <tbody>
             {products.length === 0 ? (
               <tr>
-                <td colSpan="8" className="text-center py-12 text-slate-400">
+                <td colSpan="9" className="text-center py-12 text-slate-400">
                   <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
                   <p>No products found</p>
                 </td>
@@ -282,6 +371,10 @@ const Inventory = () => {
                     </div>
                   </td>
                   <td>{product.department_name}</td>
+                  <td className="text-sm text-slate-600">
+                    {product.sell_uom || "each"}
+                    {(product.pack_qty || 1) > 1 ? ` ×${product.pack_qty}` : ""}
+                  </td>
                   <td className="font-mono">${product.price.toFixed(2)}</td>
                   <td className="font-mono text-slate-500">
                     ${(product.cost || 0).toFixed(2)}
@@ -299,8 +392,26 @@ const Inventory = () => {
                   <td>
                     <div className="flex gap-2">
                       <button
+                        onClick={() => setStockHistoryProduct(product)}
+                        className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-sm transition-colors"
+                        title="Stock history"
+                      >
+                        <History className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setAdjustProduct(product);
+                          setAdjustDelta("");
+                          setAdjustReason("correction");
+                        }}
+                        className="p-2 text-slate-600 hover:text-green-600 hover:bg-green-50 rounded-sm transition-colors"
+                        title="Adjust stock"
+                      >
+                        <SlidersHorizontal className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => openDialog(product)}
-                        className="p-2 text-slate-600 hover:text-orange-500 hover:bg-orange-50 rounded-sm transition-colors"
+                        className="p-2 text-slate-600 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                         data-testid={`edit-product-${product.sku}`}
                       >
                         <Edit2 className="w-4 h-4" />
@@ -323,30 +434,47 @@ const Inventory = () => {
 
       {/* Product Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-lg" data-testid="product-dialog">
+        <DialogContent className="sm:max-w-lg rounded-2xl" data-testid="product-dialog">
           <DialogHeader>
-            <DialogTitle className="font-heading font-bold text-xl uppercase tracking-wider">
-              {editingProduct ? "Edit Product" : "Add New Product"}
+            <DialogTitle className="text-lg font-semibold">
+              {editingProduct ? "Edit product" : "Add new product"}
             </DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4 pt-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
-                <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
-                  Product Name *
+                <Label className="text-slate-600 font-medium text-sm">
+                  Product name *
                 </Label>
                 <Input
                   value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="e.g., 2x4 Pine Board"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setForm({ ...form, name: v });
+                    if (suggestUomTimeout.current) clearTimeout(suggestUomTimeout.current);
+                    if (!editingProduct && v.trim().length >= 3) {
+                      suggestUomTimeout.current = setTimeout(() => {
+                        axios.post(`${API}/products/suggest-uom`, { name: v.trim() })
+                          .then(({ data }) => setForm((f) => ({
+                            ...f,
+                            base_unit: data.base_unit || "each",
+                            sell_uom: data.sell_uom || "each",
+                            pack_qty: String(data.pack_qty ?? 1),
+                          })))
+                          .catch(() => {});
+                        suggestUomTimeout.current = null;
+                      }, 600);
+                    }
+                  }}
+                  placeholder="e.g., 2x4 Pine Board, 5 Gal Paint"
                   className="input-workshop mt-2"
                   data-testid="product-name-input"
                 />
               </div>
 
               <div className="col-span-2">
-                <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
+                <Label className="text-slate-600 font-medium text-sm">
                   Description
                 </Label>
                 <Input
@@ -359,7 +487,7 @@ const Inventory = () => {
               </div>
 
               <div>
-                <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
+                <Label className="text-slate-600 font-medium text-sm">
                   Department *
                 </Label>
                 <Select
@@ -380,7 +508,7 @@ const Inventory = () => {
               </div>
 
               <div>
-                <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
+                <Label className="text-slate-600 font-medium text-sm">
                   Vendor
                 </Label>
                 <Select
@@ -402,7 +530,7 @@ const Inventory = () => {
               </div>
 
               <div>
-                <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
+                <Label className="text-slate-600 font-medium text-sm">
                   Price *
                 </Label>
                 <Input
@@ -417,7 +545,7 @@ const Inventory = () => {
               </div>
 
               <div>
-                <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
+                <Label className="text-slate-600 font-medium text-sm">
                   Cost
                 </Label>
                 <Input
@@ -432,7 +560,7 @@ const Inventory = () => {
               </div>
 
               <div>
-                <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
+                <Label className="text-slate-600 font-medium text-sm">
                   Quantity
                 </Label>
                 <Input
@@ -446,8 +574,8 @@ const Inventory = () => {
               </div>
 
               <div>
-                <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
-                  Min Stock Level
+                <Label className="text-slate-600 font-medium text-sm">
+                  Min stock level
                 </Label>
                 <Input
                   type="number"
@@ -459,17 +587,48 @@ const Inventory = () => {
                 />
               </div>
 
+              <div className="col-span-3 flex items-end gap-2 flex-wrap">
+                <div className="flex-1 min-w-[100px]">
+                  <Label className="text-slate-600 font-medium text-sm">Base Unit</Label>
+                  <Select value={form.base_unit} onValueChange={(v) => setForm({ ...form, base_unit: v })}>
+                    <SelectTrigger className="input-workshop mt-2"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {UOM_OPTIONS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex-1 min-w-[100px]">
+                  <Label className="text-slate-600 font-medium text-sm">Sell Unit</Label>
+                  <Select value={form.sell_uom} onValueChange={(v) => setForm({ ...form, sell_uom: v })}>
+                    <SelectTrigger className="input-workshop mt-2"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {UOM_OPTIONS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="min-w-[80px]">
+                  <Label className="text-slate-600 font-medium text-sm">Pack Qty</Label>
+                  <Input type="number" min="1" value={form.pack_qty} onChange={(e) => setForm({ ...form, pack_qty: e.target.value })} className="input-workshop mt-2" />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={suggestUnit}
+                  disabled={suggestingUom || !form.name?.trim()}
+                  className="h-11 px-3 border-slate-200 mt-2"
+                  title="Use AI to suggest unit from product name"
+                >
+                  {suggestingUom ? (
+                    <span className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin block" />
+                  ) : (
+                    <Sparkles className="w-5 h-5 text-amber-500" />
+                  )}
+                  <span className="ml-2 text-sm">Suggest unit</span>
+                </Button>
+              </div>
               <div className="col-span-2">
-                <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
-                  Barcode
-                </Label>
-                <Input
-                  value={form.barcode}
-                  onChange={(e) => setForm({ ...form, barcode: e.target.value })}
-                  placeholder="Optional barcode"
-                  className="input-workshop mt-2"
-                  data-testid="product-barcode-input"
-                />
+                <Label className="text-slate-600 font-medium text-sm">Barcode</Label>
+                <Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} placeholder="Optional barcode" className="input-workshop mt-2" data-testid="product-barcode-input" />
               </div>
             </div>
 
@@ -490,6 +649,58 @@ const Inventory = () => {
                 data-testid="product-save-btn"
               >
                 {saving ? "Saving..." : editingProduct ? "Update Product" : "Create Product"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <StockHistoryModal
+        product={stockHistoryProduct}
+        open={!!stockHistoryProduct}
+        onOpenChange={(open) => !open && setStockHistoryProduct(null)}
+      />
+
+      <Dialog open={!!adjustProduct} onOpenChange={(open) => !open && setAdjustProduct(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Adjust Stock</DialogTitle>
+            {adjustProduct && (
+              <p className="text-sm text-slate-500">{adjustProduct.sku} — {adjustProduct.name}</p>
+            )}
+          </DialogHeader>
+          <form onSubmit={handleAdjust} className="space-y-4 pt-4">
+            <div>
+              <Label>Quantity delta (positive to add, negative to remove)</Label>
+              <Input
+                type="number"
+                value={adjustDelta}
+                onChange={(e) => setAdjustDelta(e.target.value)}
+                placeholder="e.g. 5 or -3"
+                className="input-workshop mt-2"
+              />
+            </div>
+            <div>
+              <Label>Reason</Label>
+              <Select value={adjustReason} onValueChange={setAdjustReason}>
+                <SelectTrigger className="input-workshop mt-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="correction">Correction</SelectItem>
+                  <SelectItem value="count">Count</SelectItem>
+                  <SelectItem value="damage">Damage</SelectItem>
+                  <SelectItem value="theft">Theft</SelectItem>
+                  <SelectItem value="return">Return</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setAdjustProduct(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={adjusting}>
+                {adjusting ? "Adjusting..." : "Adjust"}
               </Button>
             </div>
           </form>

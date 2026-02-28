@@ -1,0 +1,134 @@
+"""
+AI-powered UOM classification for hardware/building-supply products.
+Uses Google Gemini (google-generativeai) to infer base_unit, sell_uom, pack_qty.
+"""
+from typing import List, Optional
+import asyncio
+import json
+import re
+import logging
+
+from services.llm import generate_text
+
+logger = logging.getLogger(__name__)
+
+ALLOWED_UNITS = [
+    "each", "case", "box", "pack", "bag", "roll", "kit",
+    "gallon", "quart", "pint", "liter",
+    "pound", "ounce",
+    "foot", "meter", "yard",
+    "sqft",
+]
+
+
+def _normalize_unit(raw: str) -> str:
+    """Map LLM output to allowed unit, default to each."""
+    if not raw or not isinstance(raw, str):
+        return "each"
+    v = raw.lower().strip()
+    # Common LLM variations
+    mapping = {
+        "gal": "gallon", "gals": "gallon", "gallons": "gallon",
+        "qts": "quart", "quarts": "quart", "qt": "quart",
+        "pt": "pint", "pints": "pint", "pts": "pint",
+        "lbs": "pound", "lb": "pound", "pounds": "pound",
+        "oz": "ounce", "ozs": "ounce", "ounces": "ounce",
+        "ft": "foot", "feet": "foot", "lf": "foot", "lnft": "foot",
+        "m": "meter", "meters": "meter", "metres": "meter",
+        "yd": "yard", "yards": "yard", "yds": "yard",
+        "sq ft": "sqft", "sqft": "sqft", "square feet": "sqft",
+        "ea": "each", "pc": "each", "pcs": "each", "piece": "each", "pieces": "each",
+    }
+    v = mapping.get(v, v)
+    return v if v in ALLOWED_UNITS else "each"
+
+
+def _normalize_pack_qty(val) -> int:
+    """Ensure pack_qty is valid positive int."""
+    if val is None:
+        return 1
+    try:
+        n = int(val)
+        return max(1, n)
+    except (ValueError, TypeError):
+        return 1
+
+
+async def classify_uom(product_name: str, description: Optional[str] = None) -> dict:
+    """
+    Use AI to classify UOM for a single product.
+    Returns {"base_unit": str, "sell_uom": str, "pack_qty": int}.
+    """
+    units_str = ", ".join(ALLOWED_UNITS)
+    prompt = f"""Classify the unit of measure for this hardware/building-supply product.
+Product name: {product_name}
+{f'Description: {description}' if description else ''}
+
+Allowed units: {units_str}
+
+Consider: "5 Gal Paint" -> gallon, pack_qty 5; "2x4x8" -> foot; "Nail Box" -> box; "Pipe Fitting" -> each.
+Return ONLY valid JSON: {{"base_unit": "...", "sell_uom": "...", "pack_qty": 1}}"""
+
+    try:
+        response = await asyncio.to_thread(
+            generate_text,
+            prompt,
+            system_instruction="You are a UOM classifier. Return only valid JSON.",
+        )
+        if response:
+            json_match = re.search(r"\{[^{}]*\}", response)
+            if json_match:
+                data = json.loads(json_match.group())
+                return {
+                    "base_unit": _normalize_unit(data.get("base_unit")),
+                    "sell_uom": _normalize_unit(data.get("sell_uom", data.get("base_unit"))),
+                    "pack_qty": _normalize_pack_qty(data.get("pack_qty")),
+                }
+    except Exception as e:
+        logger.warning(f"UOM classification failed: {e}")
+    return {"base_unit": "each", "sell_uom": "each", "pack_qty": 1}
+
+
+async def classify_uom_batch(products: List[dict]) -> List[dict]:
+    """
+    Batch classify UOM for multiple products in one LLM call.
+    products: list of {"name": str, "quantity": int?, "price": float?, ...}
+    Returns same list with base_unit, sell_uom, pack_qty added to each item.
+    """
+    if not products:
+        return []
+
+    for p in products:
+        p.setdefault("base_unit", "each")
+        p.setdefault("sell_uom", "each")
+        p.setdefault("pack_qty", 1)
+
+    units_str = ", ".join(ALLOWED_UNITS)
+    names = [p.get("name", "Unknown") for p in products]
+    prompt = f"""Classify unit of measure for each hardware/building-supply product.
+Allowed units: {units_str}
+
+Products:
+{chr(10).join(f'- "{n}"' for n in names)}
+
+For each product, infer base_unit, sell_uom, pack_qty from the name (e.g. "5 Gal Paint" -> gallon/gallon/5, "2x4x8" -> foot/foot/8).
+Return ONLY a JSON array, one object per product in same order: [{{"base_unit":"...","sell_uom":"...","pack_qty":1}}, ...]"""
+
+    try:
+        response = await asyncio.to_thread(
+            generate_text,
+            prompt,
+            system_instruction="You are a UOM classifier. Return only a valid JSON array.",
+        )
+        if response:
+            json_match = re.search(r"\[[\s\S]*\]", response)
+            if json_match:
+                results = json.loads(json_match.group())
+                for i, p in enumerate(products):
+                    r = results[i] if i < len(results) else {}
+                    p["base_unit"] = _normalize_unit(r.get("base_unit"))
+                    p["sell_uom"] = _normalize_unit(r.get("sell_uom", r.get("base_unit")))
+                    p["pack_qty"] = _normalize_pack_qty(r.get("pack_qty"))
+    except Exception as e:
+        logger.warning(f"Batch UOM classification failed: {e}")
+    return products

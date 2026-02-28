@@ -1,301 +1,130 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Query, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import asyncio
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Request
 from fastapi.responses import StreamingResponse
-from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
-from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
-import uuid
-from datetime import datetime, timezone, timedelta
-import jwt
-import bcrypt
-import base64
 import json
 import re
 import csv
 import io
+import uuid
+from datetime import datetime, timezone, timedelta
+from typing import List, Optional, Tuple
 
-# Stripe integration
-from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
+from pydantic import BaseModel
 
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+# Stripe integration (optional - not on public PyPI; used in Emergent builds)
+try:
+    from emergentintegrations.payments.stripe.checkout import (
+        StripeCheckout,
+        CheckoutSessionResponse,
+        CheckoutStatusResponse,
+        CheckoutSessionRequest,
+    )
+    HAS_EMERGENT_STRIPE = True
+except ImportError:
+    StripeCheckout = CheckoutSessionResponse = CheckoutStatusResponse = CheckoutSessionRequest = None
+    HAS_EMERGENT_STRIPE = False
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
-
-# JWT Settings
-JWT_SECRET = os.environ.get('JWT_SECRET', 'hardware-store-secret-key')
-JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 24
+from db import init_db, close_db
+from repositories import (
+    user_repo,
+    department_repo,
+    vendor_repo,
+    product_repo,
+    withdrawal_repo,
+    payment_repo,
+    sku_repo,
+)
+from auth import (
+    hash_password,
+    verify_password,
+    create_token,
+    get_current_user,
+    require_role,
+)
+from models import (
+    ROLES,
+    User,
+    UserCreate,
+    UserUpdate,
+    UserLogin,
+    Department,
+    DepartmentCreate,
+    Vendor,
+    VendorCreate,
+    Product,
+    ProductCreate,
+    ProductUpdate,
+    ExtractedProduct,
+    MaterialWithdrawal,
+    MaterialWithdrawalCreate,
+)
+from models.product import ALLOWED_BASE_UNITS
+from services.uom_classifier import classify_uom, classify_uom_batch
+from services.inventory import (
+    process_withdrawal_stock_changes,
+    process_import_stock_changes,
+    get_stock_history,
+    InsufficientStockError,
+)
 
 # Create the main app
 app = FastAPI()
-
-# Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-security = HTTPBearer()
-
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-# ==================== MODELS ====================
-
-# Roles: admin, warehouse_manager, contractor
-ROLES = ["admin", "warehouse_manager", "contractor"]
-
-class UserCreate(BaseModel):
-    email: str
-    password: str
-    name: str
-    role: str = "warehouse_manager"
-    # Contractor specific fields
-    company: Optional[str] = None  # e.g., "On Point", "Stone & Timber"
-    billing_entity: Optional[str] = None
-    phone: Optional[str] = None
-
-class UserUpdate(BaseModel):
-    name: Optional[str] = None
-    company: Optional[str] = None
-    billing_entity: Optional[str] = None
-    phone: Optional[str] = None
-    is_active: Optional[bool] = None
-
-class UserLogin(BaseModel):
-    email: str
-    password: str
-
-class User(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    email: str
-    name: str
-    role: str = "warehouse_manager"
-    company: Optional[str] = None
-    billing_entity: Optional[str] = None
-    phone: Optional[str] = None
-    is_active: bool = True
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-
-class DepartmentCreate(BaseModel):
-    name: str
-    code: str
-    description: Optional[str] = ""
-
-class Department(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
-    code: str
-    description: str = ""
-    product_count: int = 0
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-
-class VendorCreate(BaseModel):
-    name: str
-    contact_name: Optional[str] = ""
-    email: Optional[str] = ""
-    phone: Optional[str] = ""
-    address: Optional[str] = ""
-
-class Vendor(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
-    contact_name: str = ""
-    email: str = ""
-    phone: str = ""
-    address: str = ""
-    product_count: int = 0
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-
-class ProductCreate(BaseModel):
-    name: str
-    description: Optional[str] = ""
-    price: float
-    cost: float = 0.0
-    quantity: int = 0
-    min_stock: int = 5
-    department_id: str
-    vendor_id: Optional[str] = None
-    original_sku: Optional[str] = None
-    barcode: Optional[str] = None
-
-class ProductUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    price: Optional[float] = None
-    cost: Optional[float] = None
-    quantity: Optional[int] = None
-    min_stock: Optional[int] = None
-    department_id: Optional[str] = None
-    vendor_id: Optional[str] = None
-    barcode: Optional[str] = None
-
-class Product(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    sku: str
-    name: str
-    description: str = ""
-    price: float
-    cost: float = 0.0
-    quantity: int = 0
-    min_stock: int = 5
-    department_id: str
-    department_name: str = ""
-    vendor_id: Optional[str] = None
-    vendor_name: str = ""
-    original_sku: Optional[str] = None
-    barcode: Optional[str] = None
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-
-class WithdrawalItem(BaseModel):
-    product_id: str
-    sku: str
-    name: str
-    quantity: int
-    price: float
-    cost: float = 0.0
-    subtotal: float
-
-class MaterialWithdrawalCreate(BaseModel):
-    items: List[WithdrawalItem]
-    job_id: str  # Free text job ID
-    service_address: str
-    notes: Optional[str] = None
-
-class MaterialWithdrawal(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    items: List[WithdrawalItem]
-    job_id: str
-    service_address: str
-    notes: Optional[str] = None
-    # Financial tracking
-    subtotal: float
-    tax: float
-    total: float
-    cost_total: float  # Total cost for margin tracking
-    # Contractor info
-    contractor_id: str
-    contractor_name: str = ""
-    contractor_company: str = ""
-    billing_entity: str = ""
-    # Status
-    payment_status: str = "unpaid"  # unpaid, paid, invoiced
-    invoice_id: Optional[str] = None
-    paid_at: Optional[str] = None
-    # Audit
-    processed_by_id: str  # Warehouse manager who processed
-    processed_by_name: str = ""
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-
-class ExtractedProduct(BaseModel):
-    name: str
-    quantity: int = 1
-    price: float
-    original_sku: Optional[str] = None
-
-# ==================== AUTH HELPERS ====================
-
-def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
-def verify_password(password: str, hashed: str) -> bool:
-    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
-
-def create_token(user_id: str, email: str, role: str) -> str:
-    payload = {
-        "user_id": user_id,
-        "email": email,
-        "role": role,
-        "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    try:
-        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        user = await db.users.find_one({"id": payload["user_id"]}, {"_id": 0, "password": 0})
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
-        if not user.get("is_active", True):
-            raise HTTPException(status_code=401, detail="User account is disabled")
-        return user
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-def require_role(*roles):
-    async def role_checker(current_user: dict = Depends(get_current_user)):
-        if current_user.get("role") not in roles:
-            raise HTTPException(status_code=403, detail="Insufficient permissions")
-        return current_user
-    return role_checker
 
 # ==================== SKU GENERATOR ====================
 
 async def generate_sku(department_code: str) -> str:
-    counter = await db.sku_counters.find_one_and_update(
-        {"department_code": department_code},
-        {"$inc": {"counter": 1}},
-        upsert=True,
-        return_document=True
-    )
-    number = counter.get("counter", 1)
+    number = await sku_repo.increment_and_get(department_code)
     return f"{department_code}-{str(number).zfill(5)}"
 
 # ==================== AUTH ROUTES ====================
 
 @api_router.post("/auth/register")
 async def register(data: UserCreate):
-    existing = await db.users.find_one({"email": data.email})
+    existing = await user_repo.get_by_email(data.email)
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
-    
+
     if data.role not in ROLES:
         raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {ROLES}")
-    
+
     user = User(
         email=data.email,
         name=data.name,
         role=data.role,
         company=data.company,
         billing_entity=data.billing_entity,
-        phone=data.phone
+        phone=data.phone,
     )
     user_dict = user.model_dump()
     user_dict["password"] = hash_password(data.password)
-    
-    await db.users.insert_one(user_dict)
-    
+
+    await user_repo.insert(user_dict)
+
     token = create_token(user.id, user.email, user.role)
     return {"token": token, "user": user.model_dump()}
 
+
 @api_router.post("/auth/login")
 async def login(data: UserLogin):
-    user = await db.users.find_one({"email": data.email})
+    user = await user_repo.get_by_email(data.email)
     if not user or not verify_password(data.password, user.get("password", "")):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if not user.get("is_active", True):
         raise HTTPException(status_code=401, detail="Account is disabled")
-    
+
     token = create_token(user["id"], user["email"], user["role"])
-    user_response = {k: v for k, v in user.items() if k not in ["_id", "password"]}
+    user_response = {k: v for k, v in user.items() if k not in ["password"]}
     return {"token": token, "user": user_response}
 
 @api_router.get("/auth/me")
@@ -306,53 +135,46 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 
 @api_router.get("/contractors")
 async def get_contractors(current_user: dict = Depends(require_role("admin", "warehouse_manager"))):
-    contractors = await db.users.find(
-        {"role": "contractor"},
-        {"_id": 0, "password": 0}
-    ).to_list(1000)
-    return contractors
+    return await user_repo.list_contractors()
+
 
 @api_router.post("/contractors")
 async def create_contractor(data: UserCreate, current_user: dict = Depends(require_role("admin"))):
-    existing = await db.users.find_one({"email": data.email})
+    existing = await user_repo.get_by_email(data.email)
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
-    
+
     contractor = User(
         email=data.email,
         name=data.name,
         role="contractor",
         company=data.company or "Independent",
         billing_entity=data.billing_entity or data.company or "Independent",
-        phone=data.phone
+        phone=data.phone,
     )
     contractor_dict = contractor.model_dump()
     contractor_dict["password"] = hash_password(data.password)
-    
-    await db.users.insert_one(contractor_dict)
-    
+
+    await user_repo.insert(contractor_dict)
+
     return {k: v for k, v in contractor_dict.items() if k != "password"}
+
 
 @api_router.put("/contractors/{contractor_id}")
 async def update_contractor(contractor_id: str, data: UserUpdate, current_user: dict = Depends(require_role("admin"))):
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
-    
-    result = await db.users.find_one_and_update(
-        {"id": contractor_id, "role": "contractor"},
-        {"$set": update_data},
-        return_document=True
-    )
-    if not result:
+    contractor = await user_repo.get_by_id(contractor_id)
+    if not contractor or contractor.get("role") != "contractor":
         raise HTTPException(status_code=404, detail="Contractor not found")
-    
-    result.pop("_id", None)
-    result.pop("password", None)
-    return result
+
+    result = await user_repo.update(contractor_id, update_data)
+    return {k: v for k, v in result.items() if k != "password"}
+
 
 @api_router.delete("/contractors/{contractor_id}")
 async def delete_contractor(contractor_id: str, current_user: dict = Depends(require_role("admin"))):
-    result = await db.users.delete_one({"id": contractor_id, "role": "contractor"})
-    if result.deleted_count == 0:
+    deleted = await user_repo.delete_contractor(contractor_id)
+    if deleted == 0:
         raise HTTPException(status_code=404, detail="Contractor not found")
     return {"message": "Contractor deleted"}
 
@@ -360,43 +182,40 @@ async def delete_contractor(contractor_id: str, current_user: dict = Depends(req
 
 @api_router.get("/departments", response_model=List[Department])
 async def get_departments(current_user: dict = Depends(get_current_user)):
-    departments = await db.departments.find({}, {"_id": 0}).to_list(100)
-    return departments
+    return await department_repo.list_all()
+
 
 @api_router.post("/departments", response_model=Department)
 async def create_department(data: DepartmentCreate, current_user: dict = Depends(require_role("admin", "warehouse_manager"))):
-    existing = await db.departments.find_one({"code": data.code.upper()})
+    existing = await department_repo.get_by_code(data.code)
     if existing:
         raise HTTPException(status_code=400, detail="Department code already exists")
-    
+
     dept = Department(
         name=data.name,
         code=data.code.upper(),
-        description=data.description or ""
+        description=data.description or "",
     )
-    await db.departments.insert_one(dept.model_dump())
+    await department_repo.insert(dept.model_dump())
     return dept
+
 
 @api_router.put("/departments/{dept_id}", response_model=Department)
 async def update_department(dept_id: str, data: DepartmentCreate, current_user: dict = Depends(require_role("admin", "warehouse_manager"))):
-    result = await db.departments.find_one_and_update(
-        {"id": dept_id},
-        {"$set": {"name": data.name, "description": data.description or ""}},
-        return_document=True
-    )
+    result = await department_repo.update(dept_id, data.name, data.description or "")
     if not result:
         raise HTTPException(status_code=404, detail="Department not found")
-    result.pop("_id", None)
     return result
+
 
 @api_router.delete("/departments/{dept_id}")
 async def delete_department(dept_id: str, current_user: dict = Depends(require_role("admin"))):
-    product_count = await db.products.count_documents({"department_id": dept_id})
+    product_count = await department_repo.count_products_by_department(dept_id)
     if product_count > 0:
         raise HTTPException(status_code=400, detail="Cannot delete department with products")
-    
-    result = await db.departments.delete_one({"id": dept_id})
-    if result.deleted_count == 0:
+
+    deleted = await department_repo.delete(dept_id)
+    if deleted == 0:
         raise HTTPException(status_code=404, detail="Department not found")
     return {"message": "Department deleted"}
 
@@ -404,31 +223,28 @@ async def delete_department(dept_id: str, current_user: dict = Depends(require_r
 
 @api_router.get("/vendors", response_model=List[Vendor])
 async def get_vendors(current_user: dict = Depends(require_role("admin", "warehouse_manager"))):
-    vendors = await db.vendors.find({}, {"_id": 0}).to_list(100)
-    return vendors
+    return await vendor_repo.list_all()
+
 
 @api_router.post("/vendors", response_model=Vendor)
 async def create_vendor(data: VendorCreate, current_user: dict = Depends(require_role("admin", "warehouse_manager"))):
     vendor = Vendor(**data.model_dump())
-    await db.vendors.insert_one(vendor.model_dump())
+    await vendor_repo.insert(vendor.model_dump())
     return vendor
+
 
 @api_router.put("/vendors/{vendor_id}", response_model=Vendor)
 async def update_vendor(vendor_id: str, data: VendorCreate, current_user: dict = Depends(require_role("admin", "warehouse_manager"))):
-    result = await db.vendors.find_one_and_update(
-        {"id": vendor_id},
-        {"$set": data.model_dump()},
-        return_document=True
-    )
+    result = await vendor_repo.update(vendor_id, data.model_dump())
     if not result:
         raise HTTPException(status_code=404, detail="Vendor not found")
-    result.pop("_id", None)
     return result
+
 
 @api_router.delete("/vendors/{vendor_id}")
 async def delete_vendor(vendor_id: str, current_user: dict = Depends(require_role("admin"))):
-    result = await db.vendors.delete_one({"id": vendor_id})
-    if result.deleted_count == 0:
+    deleted = await vendor_repo.delete(vendor_id)
+    if deleted == 0:
         raise HTTPException(status_code=404, detail="Vendor not found")
     return {"message": "Vendor deleted"}
 
@@ -439,44 +255,63 @@ async def get_products(
     department_id: Optional[str] = None,
     search: Optional[str] = None,
     low_stock: bool = False,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
-    query = {}
-    if department_id:
-        query["department_id"] = department_id
-    if search:
-        query["$or"] = [
-            {"name": {"$regex": search, "$options": "i"}},
-            {"sku": {"$regex": search, "$options": "i"}},
-            {"barcode": {"$regex": search, "$options": "i"}}
-        ]
-    if low_stock:
-        query["$expr"] = {"$lte": ["$quantity", "$min_stock"]}
-    
-    products = await db.products.find(query, {"_id": 0}).to_list(1000)
-    return products
+    return await product_repo.list_products(
+        department_id=department_id,
+        search=search,
+        low_stock=low_stock,
+    )
+
 
 @api_router.get("/products/{product_id}", response_model=Product)
 async def get_product(product_id: str, current_user: dict = Depends(get_current_user)):
-    product = await db.products.find_one({"id": product_id}, {"_id": 0})
+    product = await product_repo.get_by_id(product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
 
+
+@api_router.get("/products/{product_id}/stock-history")
+async def get_product_stock_history(
+    product_id: str,
+    limit: int = 50,
+    current_user: dict = Depends(require_role("admin", "warehouse_manager")),
+):
+    """Get stock transaction history for a product (stock ledger)."""
+    product = await product_repo.get_by_id(product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    history = await get_stock_history(product_id=product_id, limit=limit)
+    return {"product_id": product_id, "sku": product.get("sku"), "history": history}
+
+
+class SuggestUomRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+
+@api_router.post("/products/suggest-uom")
+async def suggest_uom(data: SuggestUomRequest, current_user: dict = Depends(require_role("admin", "warehouse_manager"))):
+    """Use AI to suggest base_unit, sell_uom, pack_qty from product name."""
+    result = await classify_uom(data.name, data.description)
+    return result
+
+
 @api_router.post("/products", response_model=Product)
 async def create_product(data: ProductCreate, current_user: dict = Depends(require_role("admin", "warehouse_manager"))):
-    department = await db.departments.find_one({"id": data.department_id}, {"_id": 0})
+    department = await department_repo.get_by_id(data.department_id)
     if not department:
         raise HTTPException(status_code=400, detail="Department not found")
-    
+
     vendor_name = ""
     if data.vendor_id:
-        vendor = await db.vendors.find_one({"id": data.vendor_id}, {"_id": 0})
+        vendor = await vendor_repo.get_by_id(data.vendor_id)
         if vendor:
             vendor_name = vendor.get("name", "")
-    
+
     sku = await generate_sku(department["code"])
-    
+
     product = Product(
         sku=sku,
         name=data.name,
@@ -490,50 +325,50 @@ async def create_product(data: ProductCreate, current_user: dict = Depends(requi
         vendor_id=data.vendor_id,
         vendor_name=vendor_name,
         original_sku=data.original_sku,
-        barcode=data.barcode
+        barcode=data.barcode,
+        base_unit=getattr(data, "base_unit", "each"),
+        sell_uom=getattr(data, "sell_uom", "each"),
+        pack_qty=getattr(data, "pack_qty", 1),
     )
-    
-    await db.products.insert_one(product.model_dump())
-    await db.departments.update_one({"id": data.department_id}, {"$inc": {"product_count": 1}})
-    
+
+    await product_repo.insert(product.model_dump())
+    await department_repo.increment_product_count(data.department_id, 1)
+
     return product
+
 
 @api_router.put("/products/{product_id}", response_model=Product)
 async def update_product(product_id: str, data: ProductUpdate, current_user: dict = Depends(require_role("admin", "warehouse_manager"))):
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
-    
+
     if "department_id" in update_data:
-        department = await db.departments.find_one({"id": update_data["department_id"]}, {"_id": 0})
+        department = await department_repo.get_by_id(update_data["department_id"])
         if department:
             update_data["department_name"] = department["name"]
-    
+
     if "vendor_id" in update_data:
         if update_data["vendor_id"]:
-            vendor = await db.vendors.find_one({"id": update_data["vendor_id"]}, {"_id": 0})
+            vendor = await vendor_repo.get_by_id(update_data["vendor_id"])
             update_data["vendor_name"] = vendor.get("name", "") if vendor else ""
         else:
             update_data["vendor_name"] = ""
-    
-    result = await db.products.find_one_and_update(
-        {"id": product_id},
-        {"$set": update_data},
-        return_document=True
-    )
+
+    result = await product_repo.update(product_id, update_data)
     if not result:
         raise HTTPException(status_code=404, detail="Product not found")
-    result.pop("_id", None)
     return result
+
 
 @api_router.delete("/products/{product_id}")
 async def delete_product(product_id: str, current_user: dict = Depends(require_role("admin", "warehouse_manager"))):
-    product = await db.products.find_one({"id": product_id})
+    product = await product_repo.get_by_id(product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    
-    await db.products.delete_one({"id": product_id})
-    await db.departments.update_one({"id": product["department_id"]}, {"$inc": {"product_count": -1}})
-    
+
+    await product_repo.delete(product_id)
+    await department_repo.increment_product_count(product["department_id"], -1)
+
     return {"message": "Product deleted"}
 
 # ==================== MATERIAL WITHDRAWAL (POS) ====================
@@ -541,21 +376,16 @@ async def delete_product(product_id: str, current_user: dict = Depends(require_r
 @api_router.post("/withdrawals", response_model=MaterialWithdrawal)
 async def create_withdrawal(data: MaterialWithdrawalCreate, current_user: dict = Depends(get_current_user)):
     """Create a material withdrawal - Contractors withdraw materials charged to their account"""
-    
-    # For contractors, they are the one withdrawing
-    # For warehouse managers, they need to specify contractor
     if current_user.get("role") == "contractor":
         contractor = current_user
     else:
-        # Warehouse manager processes for a contractor - contractor_id should be in request
-        # For now, warehouse manager can also process without contractor (walk-in edge case)
         contractor = current_user
-    
+
     subtotal = sum(item.subtotal for item in data.items)
     cost_total = sum(item.cost * item.quantity for item in data.items)
     tax = round(subtotal * 0.08, 2)
     total = round(subtotal + tax, 2)
-    
+
     withdrawal = MaterialWithdrawal(
         items=data.items,
         job_id=data.job_id,
@@ -571,36 +401,40 @@ async def create_withdrawal(data: MaterialWithdrawalCreate, current_user: dict =
         billing_entity=contractor.get("billing_entity", ""),
         payment_status="unpaid",
         processed_by_id=current_user["id"],
-        processed_by_name=current_user.get("name", "")
+        processed_by_name=current_user.get("name", ""),
     )
-    
-    await db.withdrawals.insert_one(withdrawal.model_dump())
-    
-    # Update product quantities
-    for item in data.items:
-        await db.products.update_one(
-            {"id": item.product_id},
-            {"$inc": {"quantity": -item.quantity}}
+
+    # Atomic stock decrement + stock ledger (rolls back on insufficient stock)
+    try:
+        await process_withdrawal_stock_changes(
+            items=data.items,
+            withdrawal_id=withdrawal.id,
+            user_id=current_user["id"],
+            user_name=current_user.get("name", ""),
         )
-    
+    except InsufficientStockError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+
+    await withdrawal_repo.insert(withdrawal.model_dump())
     return withdrawal
+
 
 @api_router.post("/withdrawals/for-contractor")
 async def create_withdrawal_for_contractor(
     contractor_id: str,
     data: MaterialWithdrawalCreate,
-    current_user: dict = Depends(require_role("admin", "warehouse_manager"))
+    current_user: dict = Depends(require_role("admin", "warehouse_manager")),
 ):
     """Warehouse manager creates withdrawal on behalf of a contractor"""
-    contractor = await db.users.find_one({"id": contractor_id, "role": "contractor"}, {"_id": 0, "password": 0})
-    if not contractor:
+    contractor = await user_repo.get_by_id(contractor_id)
+    if not contractor or contractor.get("role") != "contractor":
         raise HTTPException(status_code=404, detail="Contractor not found")
-    
+
     subtotal = sum(item.subtotal for item in data.items)
     cost_total = sum(item.cost * item.quantity for item in data.items)
     tax = round(subtotal * 0.08, 2)
     total = round(subtotal + tax, 2)
-    
+
     withdrawal = MaterialWithdrawal(
         items=data.items,
         job_id=data.job_id,
@@ -616,18 +450,22 @@ async def create_withdrawal_for_contractor(
         billing_entity=contractor.get("billing_entity", ""),
         payment_status="unpaid",
         processed_by_id=current_user["id"],
-        processed_by_name=current_user.get("name", "")
+        processed_by_name=current_user.get("name", ""),
     )
-    
-    await db.withdrawals.insert_one(withdrawal.model_dump())
-    
-    for item in data.items:
-        await db.products.update_one(
-            {"id": item.product_id},
-            {"$inc": {"quantity": -item.quantity}}
+
+    try:
+        await process_withdrawal_stock_changes(
+            items=data.items,
+            withdrawal_id=withdrawal.id,
+            user_id=current_user["id"],
+            user_name=current_user.get("name", ""),
         )
-    
+    except InsufficientStockError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+
+    await withdrawal_repo.insert(withdrawal.model_dump())
     return withdrawal
+
 
 @api_router.get("/withdrawals")
 async def get_withdrawals(
@@ -636,34 +474,22 @@ async def get_withdrawals(
     billing_entity: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
-    query = {}
-    
-    # Contractors can only see their own withdrawals
-    if current_user.get("role") == "contractor":
-        query["contractor_id"] = current_user["id"]
-    elif contractor_id:
-        query["contractor_id"] = contractor_id
-    
-    if payment_status:
-        query["payment_status"] = payment_status
-    if billing_entity:
-        query["billing_entity"] = billing_entity
-    if start_date:
-        query["created_at"] = {"$gte": start_date}
-    if end_date:
-        if "created_at" in query:
-            query["created_at"]["$lte"] = end_date
-        else:
-            query["created_at"] = {"$lte": end_date}
-    
-    withdrawals = await db.withdrawals.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
-    return withdrawals
+    cid = current_user["id"] if current_user.get("role") == "contractor" else contractor_id
+    return await withdrawal_repo.list_withdrawals(
+        contractor_id=cid,
+        payment_status=payment_status,
+        billing_entity=billing_entity,
+        start_date=start_date,
+        end_date=end_date,
+        limit=1000,
+    )
+
 
 @api_router.get("/withdrawals/{withdrawal_id}")
 async def get_withdrawal(withdrawal_id: str, current_user: dict = Depends(get_current_user)):
-    withdrawal = await db.withdrawals.find_one({"id": withdrawal_id}, {"_id": 0})
+    withdrawal = await withdrawal_repo.get_by_id(withdrawal_id)
     if not withdrawal:
         raise HTTPException(status_code=404, detail="Withdrawal not found")
     
@@ -682,16 +508,9 @@ async def get_financial_summary(
     current_user: dict = Depends(require_role("admin"))
 ):
     """Get financial summary for admin dashboard"""
-    query = {}
-    if start_date:
-        query["created_at"] = {"$gte": start_date}
-    if end_date:
-        if "created_at" in query:
-            query["created_at"]["$lte"] = end_date
-        else:
-            query["created_at"] = {"$lte": end_date}
-    
-    withdrawals = await db.withdrawals.find(query, {"_id": 0}).to_list(10000)
+    withdrawals = await withdrawal_repo.list_withdrawals(
+        start_date=start_date, end_date=end_date, limit=10000
+    )
     
     # Calculate totals
     total_unpaid = sum(w["total"] for w in withdrawals if w.get("payment_status") == "unpaid")
@@ -739,23 +558,18 @@ async def get_financial_summary(
 
 @api_router.put("/withdrawals/{withdrawal_id}/mark-paid")
 async def mark_withdrawal_paid(withdrawal_id: str, current_user: dict = Depends(require_role("admin"))):
-    result = await db.withdrawals.find_one_and_update(
-        {"id": withdrawal_id},
-        {"$set": {"payment_status": "paid", "paid_at": datetime.now(timezone.utc).isoformat()}},
-        return_document=True
-    )
+    paid_at = datetime.now(timezone.utc).isoformat()
+    result = await withdrawal_repo.mark_paid(withdrawal_id, paid_at)
     if not result:
         raise HTTPException(status_code=404, detail="Withdrawal not found")
-    result.pop("_id", None)
     return result
+
 
 @api_router.put("/withdrawals/bulk-mark-paid")
 async def bulk_mark_paid(withdrawal_ids: List[str], current_user: dict = Depends(require_role("admin"))):
-    result = await db.withdrawals.update_many(
-        {"id": {"$in": withdrawal_ids}},
-        {"$set": {"payment_status": "paid", "paid_at": datetime.now(timezone.utc).isoformat()}}
-    )
-    return {"updated": result.modified_count}
+    paid_at = datetime.now(timezone.utc).isoformat()
+    updated = await withdrawal_repo.bulk_mark_paid(withdrawal_ids, paid_at)
+    return {"updated": updated}
 
 @api_router.get("/financials/export")
 async def export_financials(
@@ -767,20 +581,13 @@ async def export_financials(
     current_user: dict = Depends(require_role("admin"))
 ):
     """Export financial data as CSV"""
-    query = {}
-    if payment_status:
-        query["payment_status"] = payment_status
-    if billing_entity:
-        query["billing_entity"] = billing_entity
-    if start_date:
-        query["created_at"] = {"$gte": start_date}
-    if end_date:
-        if "created_at" in query:
-            query["created_at"]["$lte"] = end_date
-        else:
-            query["created_at"] = {"$lte": end_date}
-    
-    withdrawals = await db.withdrawals.find(query, {"_id": 0}).sort("created_at", -1).to_list(10000)
+    withdrawals = await withdrawal_repo.list_withdrawals(
+        payment_status=payment_status,
+        billing_entity=billing_entity,
+        start_date=start_date,
+        end_date=end_date,
+        limit=10000,
+    )
     
     # Create CSV
     output = io.StringIO()
@@ -828,17 +635,10 @@ async def get_sales_report(
     end_date: Optional[str] = None,
     current_user: dict = Depends(require_role("admin", "warehouse_manager"))
 ):
-    query = {}
-    if start_date:
-        query["created_at"] = {"$gte": start_date}
-    if end_date:
-        if "created_at" in query:
-            query["created_at"]["$lte"] = end_date
-        else:
-            query["created_at"] = {"$lte": end_date}
-    
-    withdrawals = await db.withdrawals.find(query, {"_id": 0}).to_list(10000)
-    
+    withdrawals = await withdrawal_repo.list_withdrawals(
+        start_date=start_date, end_date=end_date, limit=10000
+    )
+
     total_revenue = sum(w.get("total", 0) for w in withdrawals)
     total_tax = sum(w.get("tax", 0) for w in withdrawals)
     total_transactions = len(withdrawals)
@@ -873,7 +673,7 @@ async def get_sales_report(
 
 @api_router.get("/reports/inventory")
 async def get_inventory_report(current_user: dict = Depends(require_role("admin", "warehouse_manager"))):
-    products = await db.products.find({}, {"_id": 0}).to_list(10000)
+    products = await product_repo.list_products()
     
     total_products = len(products)
     total_value = sum(p.get("price", 0) * p.get("quantity", 0) for p in products)
@@ -909,10 +709,9 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
     
     # For contractors, show their own stats
     if current_user.get("role") == "contractor":
-        my_withdrawals = await db.withdrawals.find(
-            {"contractor_id": current_user["id"]},
-            {"_id": 0}
-        ).sort("created_at", -1).to_list(1000)
+        my_withdrawals = await withdrawal_repo.list_withdrawals(
+            contractor_id=current_user["id"], limit=1000
+        )
         
         total_spent = sum(w.get("total", 0) for w in my_withdrawals)
         unpaid = sum(w.get("total", 0) for w in my_withdrawals if w.get("payment_status") == "unpaid")
@@ -925,26 +724,51 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
         }
     
     # For warehouse manager / admin
-    today_withdrawals = await db.withdrawals.find({"created_at": {"$gte": today_str}}, {"_id": 0}).to_list(1000)
+    today_withdrawals = await withdrawal_repo.list_withdrawals(
+        start_date=today_str, limit=1000
+    )
     today_revenue = sum(w.get("total", 0) for w in today_withdrawals)
     today_transactions = len(today_withdrawals)
-    
-    total_products = await db.products.count_documents({})
-    low_stock_products = await db.products.count_documents({"$expr": {"$lte": ["$quantity", "$min_stock"]}})
-    total_vendors = await db.vendors.count_documents({})
-    total_contractors = await db.users.count_documents({"role": "contractor"})
-    
+
+    # Week revenue (last 7 days)
+    week_start = (datetime.now(timezone.utc) - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+    week_start_str = week_start.isoformat()
+    week_withdrawals = await withdrawal_repo.list_withdrawals(
+        start_date=week_start_str, limit=10000
+    )
+    week_revenue = sum(w.get("total", 0) for w in week_withdrawals)
+
+    total_products = await product_repo.count_all()
+    low_stock_products = await product_repo.count_low_stock()
+    total_vendors = await vendor_repo.count()
+    total_contractors = await user_repo.count_contractors()
+
     # Unpaid totals
-    unpaid_total = 0
-    unpaid_withdrawals = await db.withdrawals.find({"payment_status": "unpaid"}, {"_id": 0}).to_list(10000)
+    unpaid_withdrawals = await withdrawal_repo.list_withdrawals(
+        payment_status="unpaid", limit=10000
+    )
     unpaid_total = sum(w.get("total", 0) for w in unpaid_withdrawals)
-    
-    recent_withdrawals = await db.withdrawals.find({}, {"_id": 0}).sort("created_at", -1).to_list(5)
-    low_stock_items = await db.products.find({"$expr": {"$lte": ["$quantity", "$min_stock"]}}, {"_id": 0}).to_list(10)
-    
+
+    recent_withdrawals = await withdrawal_repo.list_withdrawals(limit=5)
+    low_stock_items = await product_repo.list_low_stock(10)
+
+    # Revenue by day for last 7 days (for chart)
+    revenue_by_day = {}
+    for i in range(7):
+        d = (datetime.now(timezone.utc) - timedelta(days=6 - i)).replace(hour=0, minute=0, second=0, microsecond=0)
+        key = d.strftime("%Y-%m-%d")
+        revenue_by_day[key] = 0
+    for w in week_withdrawals:
+        created = w.get("created_at", "")[:10]
+        if created in revenue_by_day:
+            revenue_by_day[created] += w.get("total", 0)
+    revenue_by_day_list = [{"date": k, "revenue": round(v, 2)} for k, v in sorted(revenue_by_day.items())]
+
     return {
         "today_revenue": round(today_revenue, 2),
         "today_transactions": today_transactions,
+        "week_revenue": round(week_revenue, 2),
+        "revenue_by_day": revenue_by_day_list,
         "total_products": total_products,
         "low_stock_count": low_stock_products,
         "total_vendors": total_vendors,
@@ -960,43 +784,41 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
 async def extract_receipt(file: UploadFile = File(...), current_user: dict = Depends(require_role("admin", "warehouse_manager"))):
     try:
         contents = await file.read()
-        image_base64 = base64.b64encode(contents).decode('utf-8')
-        
-        from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
-        
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
-        if not api_key:
+        if not os.environ.get("LLM_API_KEY"):
             raise HTTPException(status_code=500, detail="LLM API key not configured")
-        
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"receipt-{uuid.uuid4()}",
-            system_message="""You are a receipt parser. Extract product information from receipt images.
-            Return ONLY valid JSON in this exact format:
-            {
-                "store_name": "Store Name",
-                "products": [
-                    {"name": "Product Name", "quantity": 1, "price": 9.99, "original_sku": "SKU123"}
-                ],
-                "total": 99.99,
-                "date": "2024-01-15"
-            }"""
-        ).with_model("gemini", "gemini-3-flash-preview")
-        
-        image_content = ImageContent(image_base64=image_base64)
-        user_message = UserMessage(
-            text="Extract all product information from this receipt. Return only valid JSON.",
-            image_contents=[image_content]
+
+        from services.llm import generate_with_image
+
+        system_msg = """You are a receipt parser for a hardware store. Extract product information from receipt images.
+Infer unit of measure from product names (e.g. "5 Gal Paint" -> base_unit gallon, pack_qty 5; "2x4x8" -> foot; "Nail Box" -> box).
+Allowed units: each, case, box, pack, bag, roll, kit, gallon, quart, pint, liter, pound, ounce, foot, meter, yard, sqft.
+Return ONLY valid JSON:
+{
+    "store_name": "Store Name",
+    "products": [
+        {"name": "Product Name", "quantity": 1, "price": 9.99, "original_sku": "SKU123", "base_unit": "gallon", "sell_uom": "gallon", "pack_qty": 5}
+    ],
+    "total": 99.99,
+    "date": "2024-01-15"
+}
+Always include base_unit, sell_uom, pack_qty for each product. Use "each" and 1 when unsure."""
+
+        response = await asyncio.to_thread(
+            generate_with_image,
+            "Extract all product information from this receipt. Return only valid JSON.",
+            contents,
+            mime_type=file.content_type or "image/jpeg",
+            system_instruction=system_msg,
         )
-        
-        response = await chat.send_message(user_message)
-        
+        if not response:
+            raise HTTPException(status_code=500, detail="LLM failed to process receipt")
+
         json_match = re.search(r'\{[\s\S]*\}', response)
         if json_match:
             extracted_data = json.loads(json_match.group())
         else:
             extracted_data = json.loads(response)
-        
+
         return extracted_data
         
     except json.JSONDecodeError as e:
@@ -1010,54 +832,51 @@ async def extract_receipt(file: UploadFile = File(...), current_user: dict = Dep
 async def import_vendor_pdf(vendor_id: str, file: UploadFile = File(...), current_user: dict = Depends(require_role("admin", "warehouse_manager"))):
     import tempfile
     temp_file_path = None
-    
+
     try:
-        vendor = await db.vendors.find_one({"id": vendor_id}, {"_id": 0})
+        vendor = await vendor_repo.get_by_id(vendor_id)
         if not vendor:
             raise HTTPException(status_code=404, detail="Vendor not found")
-        
+
         contents = await file.read()
-        
+
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
             temp_file.write(contents)
             temp_file_path = temp_file.name
-        
-        from emergentintegrations.llm.chat import LlmChat, UserMessage, FileContentWithMimeType
-        
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
-        if not api_key:
+
+        if not os.environ.get("LLM_API_KEY"):
             raise HTTPException(status_code=500, detail="LLM API key not configured")
-        
-        departments = await db.departments.find({}, {"_id": 0}).to_list(100)
+
+        from services.llm import generate_with_pdf
+
+        departments = await department_repo.list_all()
         dept_list = ", ".join([f"{d['name']} ({d['code']})" for d in departments])
-        
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"vendor-pdf-{uuid.uuid4()}",
-            system_message=f"""You are an invoice/receipt parser for a hardware store.
+        system_msg = f"""You are an invoice/receipt parser for a hardware store.
 Available departments: {dept_list}
+Allowed UOM units: each, case, box, pack, bag, roll, kit, gallon, quart, pint, liter, pound, ounce, foot, meter, yard, sqft.
+Infer base_unit, sell_uom, pack_qty from product names (e.g. "5 Gal Paint" -> base_unit gallon, pack_qty 5).
 Return ONLY valid JSON:
-{{"store_name": "...", "products": [{{"name": "...", "quantity": 1, "price": 9.99, "cost": 7.99, "original_sku": "...", "suggested_department": "PLU"}}], "total": 99.99, "date": "2024-01-15"}}
-Use EFFECTIVE price (after discounts). Match products to departments."""
-        ).with_model("gemini", "gemini-3-flash-preview")
-        
-        file_content = FileContentWithMimeType(file_path=temp_file_path, mime_type="application/pdf")
-        user_message = UserMessage(
-            text="Extract all product information. Return only valid JSON.",
-            file_contents=[file_content]
+{{"store_name": "...", "products": [{{"name": "...", "quantity": 1, "price": 9.99, "cost": 7.99, "original_sku": "...", "suggested_department": "PLU", "base_unit": "gallon", "sell_uom": "gallon", "pack_qty": 5}}], "total": 99.99, "date": "2024-01-15"}}
+Use EFFECTIVE price (after discounts). Match products to departments. Always include base_unit, sell_uom, pack_qty (use "each", "each", 1 when unsure)."""
+
+        response = await asyncio.to_thread(
+            generate_with_pdf,
+            "Extract all product information. Return only valid JSON.",
+            temp_file_path,
+            system_instruction=system_msg,
         )
-        
-        response = await chat.send_message(user_message)
-        
+        if not response:
+            raise HTTPException(status_code=500, detail="LLM failed to process PDF")
+
         json_match = re.search(r'\{[\s\S]*\}', response)
         if json_match:
             extracted_data = json.loads(json_match.group())
         else:
             extracted_data = json.loads(response)
-        
+
         extracted_data["vendor_id"] = vendor_id
         extracted_data["vendor_name"] = vendor.get("name", "")
-        
+
         return extracted_data
         
     except json.JSONDecodeError as e:
@@ -1070,28 +889,48 @@ Use EFFECTIVE price (after discounts). Match products to departments."""
         if temp_file_path and os.path.exists(temp_file_path):
             os.unlink(temp_file_path)
 
+def _resolve_uom(item: dict) -> Tuple[str, str, int]:
+    """Resolve base_unit, sell_uom, pack_qty from item, validating against allowed units."""
+    bu = (item.get("base_unit") or "each").lower().strip()
+    su = (item.get("sell_uom") or item.get("base_unit") or "each").lower().strip()
+    pq = item.get("pack_qty")
+    try:
+        pq = max(1, int(pq)) if pq is not None else 1
+    except (ValueError, TypeError):
+        pq = 1
+    bu = bu if bu in ALLOWED_BASE_UNITS else "each"
+    su = su if su in ALLOWED_BASE_UNITS else "each"
+    return bu, su, pq
+
+
 @api_router.post("/vendors/{vendor_id}/import-products")
 async def import_vendor_products(vendor_id: str, products: List[dict], current_user: dict = Depends(require_role("admin", "warehouse_manager"))):
-    vendor = await db.vendors.find_one({"id": vendor_id}, {"_id": 0})
+    vendor = await vendor_repo.get_by_id(vendor_id)
     if not vendor:
         raise HTTPException(status_code=404, detail="Vendor not found")
-    
+
+    # Classify UOM for products missing valid base_unit/sell_uom
+    needs_uom = [p for p in products if (p.get("base_unit") or "").lower() not in ALLOWED_BASE_UNITS or (p.get("sell_uom") or "").lower() not in ALLOWED_BASE_UNITS]
+    if needs_uom:
+        await classify_uom_batch(needs_uom)
+
     imported = []
     errors = []
-    
+
     for item in products:
         try:
             dept_code = item.get("suggested_department", "HDW")
-            department = await db.departments.find_one({"code": dept_code}, {"_id": 0})
+            department = await department_repo.get_by_code(dept_code)
             
             if not department:
-                department = await db.departments.find_one({"code": "HDW"}, {"_id": 0})
+                department = await department_repo.get_by_code("HDW")
                 if not department:
                     errors.append({"product": item.get("name"), "error": "No valid department"})
                     continue
             
             sku = await generate_sku(department["code"])
-            
+            bu, su, pq = _resolve_uom(item)
+
             product = Product(
                 sku=sku,
                 name=item.get("name", "Unknown"),
@@ -1104,44 +943,81 @@ async def import_vendor_products(vendor_id: str, products: List[dict], current_u
                 department_name=department["name"],
                 vendor_id=vendor_id,
                 vendor_name=vendor.get("name", ""),
-                original_sku=item.get("original_sku")
+                original_sku=item.get("original_sku"),
+                base_unit=bu,
+                sell_uom=su,
+                pack_qty=pq,
             )
             
-            await db.products.insert_one(product.model_dump())
+            await product_repo.insert(product.model_dump())
+            await process_import_stock_changes(
+                product_id=product.id,
+                sku=product.sku,
+                product_name=product.name,
+                quantity=product.quantity,
+                user_id=current_user["id"],
+                user_name=current_user.get("name", ""),
+            )
             imported.append(product)
-            await db.departments.update_one({"id": department["id"]}, {"$inc": {"product_count": 1}})
-            await db.vendors.update_one({"id": vendor_id}, {"$inc": {"product_count": 1}})
-            
+            await department_repo.increment_product_count(department["id"], 1)
+            await vendor_repo.increment_product_count(vendor_id, 1)
+
         except Exception as e:
             errors.append({"product": item.get("name"), "error": str(e)})
-    
-    return {"imported": len(imported), "errors": len(errors), "products": imported, "error_details": errors}
+
+    return {
+        "imported": len(imported),
+        "errors": len(errors),
+        "products": imported,
+        "error_details": errors,
+    }
 
 @api_router.post("/receipts/import")
-async def import_receipt_products(products: List[ExtractedProduct], department_id: str, current_user: dict = Depends(require_role("admin", "warehouse_manager"))):
-    department = await db.departments.find_one({"id": department_id}, {"_id": 0})
+async def import_receipt_products(
+    products: List[ExtractedProduct],
+    department_id: str,
+    current_user: dict = Depends(require_role("admin", "warehouse_manager")),
+):
+    department = await department_repo.get_by_id(department_id)
     if not department:
         raise HTTPException(status_code=400, detail="Department not found")
-    
+
+    # Convert to dicts for UOM classification; classify any missing/invalid UOM
+    items = [{"name": p.name, "base_unit": p.base_unit, "sell_uom": p.sell_uom, "pack_qty": p.pack_qty, **p.model_dump()} for p in products]
+    needs_uom = [i for i in items if (i.get("base_unit") or "").lower() not in ALLOWED_BASE_UNITS or (i.get("sell_uom") or "").lower() not in ALLOWED_BASE_UNITS]
+    if needs_uom:
+        await classify_uom_batch(needs_uom)
+
     imported = []
-    for item in products:
+    for item in items:
         sku = await generate_sku(department["code"])
+        bu, su, pq = _resolve_uom(item)
         product = Product(
             sku=sku,
-            name=item.name,
-            price=item.price,
-            cost=round(item.price * 0.7, 2),
-            quantity=item.quantity,
+            name=item["name"],
+            price=float(item["price"]),
+            cost=round(float(item["price"]) * 0.7, 2),
+            quantity=int(item.get("quantity", 1)),
             min_stock=5,
             department_id=department_id,
             department_name=department["name"],
-            original_sku=item.original_sku
+            original_sku=item.get("original_sku"),
+            base_unit=bu,
+            sell_uom=su,
+            pack_qty=pq,
         )
-        await db.products.insert_one(product.model_dump())
+        await product_repo.insert(product.model_dump())
+        await process_import_stock_changes(
+            product_id=product.id,
+            sku=product.sku,
+            product_name=product.name,
+            quantity=product.quantity,
+            user_id=current_user["id"],
+            user_name=current_user.get("name", ""),
+        )
         imported.append(product)
-    
-    await db.departments.update_one({"id": department_id}, {"$inc": {"product_count": len(imported)}})
-    
+
+    await department_repo.increment_product_count(department_id, len(imported))
     return {"imported": len(imported), "products": imported}
 
 # ==================== STRIPE PAYMENTS ====================
@@ -1155,7 +1031,7 @@ async def create_payment_checkout(data: CreatePaymentRequest, request: Request, 
     """Create a Stripe checkout session for a withdrawal"""
     
     # Fetch the withdrawal
-    withdrawal = await db.withdrawals.find_one({"id": data.withdrawal_id}, {"_id": 0})
+    withdrawal = await withdrawal_repo.get_by_id(data.withdrawal_id)
     if not withdrawal:
         raise HTTPException(status_code=404, detail="Withdrawal not found")
     
@@ -1163,6 +1039,8 @@ async def create_payment_checkout(data: CreatePaymentRequest, request: Request, 
     if withdrawal.get("payment_status") == "paid":
         raise HTTPException(status_code=400, detail="This withdrawal is already paid")
     
+    if not HAS_EMERGENT_STRIPE:
+        raise HTTPException(status_code=503, detail="Stripe integration not installed (emergentintegrations)")
     stripe_api_key = os.environ.get("STRIPE_API_KEY")
     if not stripe_api_key:
         raise HTTPException(status_code=500, detail="Stripe not configured")
@@ -1212,7 +1090,7 @@ async def create_payment_checkout(data: CreatePaymentRequest, request: Request, 
             "status": "initiated",
             "created_at": datetime.now(timezone.utc).isoformat()
         }
-        await db.payment_transactions.insert_one(payment_record)
+        await payment_repo.insert(payment_record)
         
         return {
             "checkout_url": session.url,
@@ -1225,7 +1103,8 @@ async def create_payment_checkout(data: CreatePaymentRequest, request: Request, 
 @api_router.get("/payments/status/{session_id}")
 async def get_payment_status(session_id: str, request: Request, current_user: dict = Depends(get_current_user)):
     """Check the status of a payment session and update records"""
-    
+    if not HAS_EMERGENT_STRIPE:
+        raise HTTPException(status_code=503, detail="Stripe integration not installed (emergentintegrations)")
     stripe_api_key = os.environ.get("STRIPE_API_KEY")
     if not stripe_api_key:
         raise HTTPException(status_code=500, detail="Stripe not configured")
@@ -1238,37 +1117,15 @@ async def get_payment_status(session_id: str, request: Request, current_user: di
         status: CheckoutStatusResponse = await stripe_checkout.get_checkout_status(session_id)
         
         # Find the payment transaction
-        payment = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
-        
+        payment = await payment_repo.get_by_session_id(session_id)
+
         if payment and status.payment_status == "paid" and payment.get("payment_status") != "paid":
-            # Update payment transaction
-            await db.payment_transactions.update_one(
-                {"session_id": session_id},
-                {"$set": {
-                    "payment_status": "paid",
-                    "status": "complete",
-                    "paid_at": datetime.now(timezone.utc).isoformat()
-                }}
-            )
-            
-            # Update the withdrawal
+            paid_at = datetime.now(timezone.utc).isoformat()
+            await payment_repo.update_status(session_id, "paid", "complete", paid_at)
             if payment.get("withdrawal_id"):
-                await db.withdrawals.update_one(
-                    {"id": payment["withdrawal_id"]},
-                    {"$set": {
-                        "payment_status": "paid",
-                        "paid_at": datetime.now(timezone.utc).isoformat(),
-                        "stripe_session_id": session_id
-                    }}
-                )
+                await withdrawal_repo.mark_paid(payment["withdrawal_id"], paid_at)
         elif status.status == "expired":
-            await db.payment_transactions.update_one(
-                {"session_id": session_id},
-                {"$set": {
-                    "payment_status": "expired",
-                    "status": "expired"
-                }}
-            )
+            await payment_repo.update_status(session_id, "expired", "expired")
         
         return {
             "status": status.status,
@@ -1284,6 +1141,8 @@ async def get_payment_status(session_id: str, request: Request, current_user: di
 @api_router.post("/webhook/stripe")
 async def stripe_webhook(request: Request):
     """Handle Stripe webhooks"""
+    if not HAS_EMERGENT_STRIPE:
+        raise HTTPException(status_code=503, detail="Stripe integration not installed (emergentintegrations)")
     stripe_api_key = os.environ.get("STRIPE_API_KEY")
     if not stripe_api_key:
         raise HTTPException(status_code=500, detail="Stripe not configured")
@@ -1302,28 +1161,13 @@ async def stripe_webhook(request: Request):
             session_id = webhook_response.session_id
             
             # Update payment transaction
-            payment = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
-            
+            payment = await payment_repo.get_by_session_id(session_id)
+
             if payment and payment.get("payment_status") != "paid":
-                await db.payment_transactions.update_one(
-                    {"session_id": session_id},
-                    {"$set": {
-                        "payment_status": "paid",
-                        "status": "complete",
-                        "paid_at": datetime.now(timezone.utc).isoformat()
-                    }}
-                )
-                
-                # Update withdrawal
+                paid_at = datetime.now(timezone.utc).isoformat()
+                await payment_repo.update_status(session_id, "paid", "complete", paid_at)
                 if payment.get("withdrawal_id"):
-                    await db.withdrawals.update_one(
-                        {"id": payment["withdrawal_id"]},
-                        {"$set": {
-                            "payment_status": "paid",
-                            "paid_at": datetime.now(timezone.utc).isoformat(),
-                            "stripe_session_id": session_id
-                        }}
-                    )
+                    await withdrawal_repo.mark_paid(payment["withdrawal_id"], paid_at)
         
         return {"received": True}
     except Exception as e:
@@ -1347,10 +1191,10 @@ async def seed_departments():
     
     created = 0
     for dept_data in standard_departments:
-        existing = await db.departments.find_one({"code": dept_data["code"]})
+        existing = await department_repo.get_by_code(dept_data["code"])
         if not existing:
             dept = Department(**dept_data)
-            await db.departments.insert_one(dept.model_dump())
+            await department_repo.insert(dept.model_dump())
             created += 1
     
     return {"message": f"Seeded {created} departments"}
@@ -1363,6 +1207,17 @@ async def root():
 
 app.include_router(api_router)
 
+
+@app.on_event("startup")
+async def startup():
+    """Initialize SQLite database on startup."""
+    try:
+        await init_db()
+        logger.info("Database initialized")
+    except Exception as e:
+        logger.warning(f"Database init: {e}")
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -1373,4 +1228,4 @@ app.add_middleware(
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
+    await close_db()

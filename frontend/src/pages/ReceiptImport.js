@@ -20,6 +20,7 @@ import {
   ArrowRight,
   Loader2,
   Trash2,
+  Sparkles,
 } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -114,9 +115,7 @@ const ReceiptImport = () => {
 
   const updateProduct = (id, field, value) => {
     setEditedProducts(
-      editedProducts.map((p) =>
-        p.id === id ? { ...p, [field]: value } : p
-      )
+      editedProducts.map((p) => (p.id === id ? { ...p, [field]: value } : p))
     );
   };
 
@@ -140,11 +139,14 @@ const ReceiptImport = () => {
 
     const productsToImport = editedProducts
       .filter((p) => p.selected)
-      .map(({ name, quantity, price, original_sku }) => ({
+      .map(({ name, quantity, price, original_sku, base_unit, sell_uom, pack_qty }) => ({
         name,
         quantity: parseInt(quantity) || 1,
         price: parseFloat(price) || 0,
         original_sku,
+        base_unit: base_unit || undefined,
+        sell_uom: sell_uom || undefined,
+        pack_qty: pack_qty != null ? parseInt(pack_qty) : undefined,
       }));
 
     if (productsToImport.length === 0) {
@@ -160,8 +162,7 @@ const ReceiptImport = () => {
       );
 
       toast.success(`Imported ${response.data.imported} products!`);
-      
-      // Reset state
+
       setFile(null);
       setPreview(null);
       setExtractedData(null);
@@ -182,32 +183,45 @@ const ReceiptImport = () => {
 
   return (
     <div className="p-8" data-testid="receipt-import-page">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="font-heading font-bold text-3xl text-slate-900 uppercase tracking-wider">
+      {/* Header with AI badge */}
+      <div className="mb-8">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-violet-500/10 to-amber-500/10 border border-violet-200/50 mb-4">
+          <Sparkles className="w-4 h-4 text-violet-500" />
+          <span className="text-sm font-medium text-violet-700">AI-powered</span>
+        </div>
+        <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
           Receipt Import
         </h1>
-        <p className="text-slate-600 mt-1">
-          Upload receipts from Home Depot, Lowes, etc. to extract and import products
+        <p className="text-slate-500 mt-1 text-sm">
+          Upload receipts from Home Depot, Lowes, etc. — AI extracts products
+          automatically
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Upload Section */}
-        <div className="card-workshop p-6" data-testid="upload-section">
-          <h2 className="font-heading font-bold text-xl text-slate-900 uppercase tracking-wider mb-4">
-            1. Upload Receipt
+        <div
+          className="card-elevated p-6 border-violet-100"
+          data-testid="upload-section"
+        >
+          <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <span className="w-7 h-7 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center text-sm font-bold">
+              1
+            </span>
+            Upload receipt
           </h2>
 
           {!preview ? (
             <div
               onDrop={handleDrop}
               onDragOver={handleDragOver}
-              className="border-2 border-dashed border-slate-300 rounded-md p-12 text-center hover:border-orange-400 transition-colors cursor-pointer"
+              className="border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center hover:border-violet-300 hover:bg-violet-50/30 transition-all cursor-pointer group"
               onClick={() => document.getElementById("receipt-input").click()}
               data-testid="upload-dropzone"
             >
-              <Upload className="w-12 h-12 mx-auto mb-4 text-slate-400" />
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-100 to-amber-50 flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition-transform">
+                <Upload className="w-7 h-7 text-violet-500" />
+              </div>
               <p className="text-slate-600 font-medium">
                 Drop receipt image here or click to browse
               </p>
@@ -225,7 +239,7 @@ const ReceiptImport = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="relative border-2 border-slate-200 rounded-md overflow-hidden">
+              <div className="relative rounded-xl overflow-hidden border border-slate-200 shadow-sm">
                 <img
                   src={preview}
                   alt="Receipt preview"
@@ -234,7 +248,7 @@ const ReceiptImport = () => {
                 />
                 <button
                   onClick={clearAll}
-                  className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-sm hover:bg-red-600"
+                  className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur-sm text-slate-600 rounded-xl hover:bg-red-50 hover:text-red-600 border border-slate-200 shadow-sm transition-colors"
                   data-testid="clear-receipt-btn"
                 >
                   <XCircle className="w-5 h-5" />
@@ -249,18 +263,18 @@ const ReceiptImport = () => {
               <Button
                 onClick={extractReceipt}
                 disabled={extracting}
-                className="w-full btn-primary h-12"
+                className="w-full btn-primary h-11"
                 data-testid="extract-btn"
               >
                 {extracting ? (
                   <>
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Extracting Products...
+                    AI extracting products…
                   </>
                 ) : (
                   <>
-                    <ArrowRight className="w-5 h-5 mr-2" />
-                    Extract Products
+                    <Sparkles className="w-5 h-5 mr-2" />
+                    Extract with AI
                   </>
                 )}
               </Button>
@@ -269,35 +283,41 @@ const ReceiptImport = () => {
         </div>
 
         {/* Extracted Products Section */}
-        <div className="card-workshop p-6" data-testid="extracted-section">
-          <h2 className="font-heading font-bold text-xl text-slate-900 uppercase tracking-wider mb-4">
-            2. Review & Import
+        <div className="card-elevated p-6" data-testid="extracted-section">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <span className="w-7 h-7 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-sm font-bold">
+              2
+            </span>
+            Review & import
           </h2>
 
           {!extractedData ? (
-            <div className="text-center py-12 text-slate-400">
-              <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>Upload and extract a receipt to see products</p>
+            <div className="text-center py-16 text-slate-400">
+              <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                <Package className="w-7 h-7 text-slate-400" />
+              </div>
+              <p className="font-medium">Upload and extract a receipt to see products</p>
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Store Info */}
               {extractedData.store_name && (
-                <div className="p-3 bg-slate-50 rounded-sm border border-slate-200">
-                  <p className="text-sm text-slate-500">Source Store</p>
-                  <p className="font-semibold text-slate-900">
+                <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200">
+                  <p className="text-xs text-slate-500 font-medium">Source store</p>
+                  <p className="font-semibold text-slate-900 mt-0.5">
                     {extractedData.store_name}
                   </p>
                 </div>
               )}
 
-              {/* Department Selection */}
               <div>
-                <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
-                  Import to Department *
+                <Label className="text-slate-600 font-medium text-sm">
+                  Import to department *
                 </Label>
                 <Select value={selectedDept} onValueChange={setSelectedDept}>
-                  <SelectTrigger className="input-workshop mt-2" data-testid="import-dept-select">
+                  <SelectTrigger
+                    className="input-field mt-2"
+                    data-testid="import-dept-select"
+                  >
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
@@ -310,38 +330,42 @@ const ReceiptImport = () => {
                 </Select>
               </div>
 
-              {/* Products List */}
-              <div className="space-y-3 max-h-[350px] overflow-auto" data-testid="extracted-products-list">
+              <div
+                className="space-y-3 max-h-[350px] overflow-auto"
+                data-testid="extracted-products-list"
+              >
                 {editedProducts.map((product) => (
                   <div
                     key={product.id}
-                    className={`p-4 border-2 rounded-sm transition-colors ${
+                    className={`p-4 rounded-xl border transition-all ${
                       product.selected
-                        ? "border-orange-300 bg-orange-50"
-                        : "border-slate-200 bg-slate-50 opacity-60"
+                        ? "border-amber-200 bg-amber-50/50"
+                        : "border-slate-200 bg-slate-50/50 opacity-60"
                     }`}
                     data-testid={`extracted-product-${product.id}`}
                   >
                     <div className="flex items-start gap-3">
                       <button
                         onClick={() => toggleProduct(product.id)}
-                        className={`mt-1 w-5 h-5 rounded-sm border-2 flex items-center justify-center ${
+                        className={`mt-1 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
                           product.selected
-                            ? "bg-orange-500 border-orange-500 text-white"
+                            ? "bg-amber-500 border-amber-500 text-white"
                             : "border-slate-300"
                         }`}
                         data-testid={`toggle-product-${product.id}`}
                       >
-                        {product.selected && <CheckCircle className="w-4 h-4" />}
+                        {product.selected && (
+                          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                        )}
                       </button>
 
-                      <div className="flex-1 space-y-2">
+                      <div className="flex-1 min-w-0 space-y-2">
                         <Input
                           value={product.name}
                           onChange={(e) =>
                             updateProduct(product.id, "name", e.target.value)
                           }
-                          className="input-workshop h-10 text-sm"
+                          className="input-field h-10 text-sm"
                           placeholder="Product name"
                           data-testid={`product-name-${product.id}`}
                         />
@@ -352,7 +376,7 @@ const ReceiptImport = () => {
                             onChange={(e) =>
                               updateProduct(product.id, "quantity", e.target.value)
                             }
-                            className="input-workshop h-10 text-sm"
+                            className="input-field h-10 text-sm"
                             placeholder="Qty"
                             data-testid={`product-qty-${product.id}`}
                           />
@@ -363,21 +387,21 @@ const ReceiptImport = () => {
                             onChange={(e) =>
                               updateProduct(product.id, "price", e.target.value)
                             }
-                            className="input-workshop h-10 text-sm"
+                            className="input-field h-10 text-sm"
                             placeholder="Price"
                             data-testid={`product-price-${product.id}`}
                           />
                         </div>
                         {product.original_sku && (
-                          <p className="text-xs text-slate-400">
-                            Original SKU: {product.original_sku}
+                          <p className="text-xs text-slate-400 font-mono">
+                            Original: {product.original_sku}
                           </p>
                         )}
                       </div>
 
                       <button
                         onClick={() => removeProduct(product.id)}
-                        className="p-1 text-red-500 hover:bg-red-50 rounded"
+                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
                         data-testid={`remove-product-${product.id}`}
                       >
                         <Trash2 className="w-4 h-4" />
@@ -387,30 +411,28 @@ const ReceiptImport = () => {
                 ))}
               </div>
 
-              {/* Import Summary */}
-              <div className="p-3 bg-slate-100 rounded-sm border border-slate-200">
+              <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200">
                 <p className="text-sm text-slate-600">
                   <strong>{editedProducts.filter((p) => p.selected).length}</strong> of{" "}
                   {editedProducts.length} products selected for import
                 </p>
               </div>
 
-              {/* Import Button */}
               <Button
                 onClick={importProducts}
                 disabled={importing || !selectedDept}
-                className="w-full btn-primary h-12"
+                className="w-full btn-primary h-11"
                 data-testid="import-products-btn"
               >
                 {importing ? (
                   <>
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Importing...
+                    Importing…
                   </>
                 ) : (
                   <>
                     <CheckCircle className="w-5 h-5 mr-2" />
-                    Import Selected Products
+                    Import selected products
                   </>
                 )}
               </Button>
@@ -419,29 +441,38 @@ const ReceiptImport = () => {
         </div>
       </div>
 
-      {/* Info Section */}
-      <div className="card-workshop p-6 mt-6 bg-slate-50">
-        <h3 className="font-heading font-bold text-lg text-slate-900 uppercase tracking-wider mb-3">
-          How It Works
+      {/* How It Works - AI focus */}
+      <div className="card-elevated p-6 mt-8 bg-gradient-to-br from-slate-50 to-violet-50/30 border-violet-100/50">
+        <h3 className="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-violet-500" />
+          How it works
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-slate-600">
-          <div className="flex items-start gap-3">
-            <span className="w-8 h-8 bg-orange-500 text-white rounded-sm flex items-center justify-center font-bold flex-shrink-0">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-slate-600">
+          <div className="flex items-start gap-4">
+            <span className="w-9 h-9 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center font-semibold shrink-0">
               1
             </span>
-            <p>Upload a receipt image from any hardware store (Home Depot, Lowes, etc.)</p>
+            <p>
+              Upload a receipt image from any hardware store (Home Depot, Lowes,
+              etc.)
+            </p>
           </div>
-          <div className="flex items-start gap-3">
-            <span className="w-8 h-8 bg-orange-500 text-white rounded-sm flex items-center justify-center font-bold flex-shrink-0">
+          <div className="flex items-start gap-4">
+            <span className="w-9 h-9 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center font-semibold shrink-0">
               2
             </span>
-            <p>AI extracts product names, quantities, and prices automatically</p>
+            <p>
+              <strong className="text-slate-700">AI extracts</strong> product
+              names, quantities, and prices automatically
+            </p>
           </div>
-          <div className="flex items-start gap-3">
-            <span className="w-8 h-8 bg-orange-500 text-white rounded-sm flex items-center justify-center font-bold flex-shrink-0">
+          <div className="flex items-start gap-4">
+            <span className="w-9 h-9 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center font-semibold shrink-0">
               3
             </span>
-            <p>Products get new SKUs in your system and are added to inventory</p>
+            <p>
+              Products get new SKUs in your system and are added to inventory
+            </p>
           </div>
         </div>
       </div>

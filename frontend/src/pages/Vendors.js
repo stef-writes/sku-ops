@@ -31,6 +31,7 @@ import {
   Package,
   FileText,
 } from "lucide-react";
+import { EmptyState } from "../components/EmptyState";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -293,14 +294,18 @@ const Vendors = () => {
 
       {/* Vendors Grid */}
       {vendors.length === 0 ? (
-        <div className="card-workshop p-12 text-center">
-          <Users className="w-16 h-16 mx-auto mb-4 text-slate-300" />
-          <p className="text-slate-500 font-medium">No vendors yet</p>
-          <p className="text-slate-400 text-sm mb-4">Add vendors to track your suppliers</p>
-          <Button onClick={() => openDialog()} className="btn-primary">
-            <Plus className="w-5 h-5 mr-2" />
-            Add First Vendor
-          </Button>
+        <div className="card-workshop p-12">
+          <EmptyState
+            icon={Users}
+            title="No vendors yet"
+            description="Add vendors to track your suppliers"
+            action={
+              <Button onClick={() => openDialog()} className="btn-primary">
+                <Plus className="w-5 h-5 mr-2" />
+                Add First Vendor
+              </Button>
+            }
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="vendors-grid">

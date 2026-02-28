@@ -15,7 +15,7 @@ Build a complete hardware storefront, POS, and inventory management system with 
 
 ## Architecture
 - **Frontend**: React + Tailwind CSS + Shadcn UI
-- **Backend**: FastAPI + MongoDB
+- **Backend**: FastAPI + SQLite (aiosqlite)
 - **Auth**: JWT-based authentication with RBAC
 - **AI**: Gemini 3 Flash for receipt OCR
 - **Payments**: Stripe via emergentintegrations library
@@ -96,11 +96,31 @@ Format: `DEPT-XXXXX` (e.g., LUM-00001, PLU-00002)
 ## Next Tasks
 1. **Xero Integration** (P1): Generate draft invoices from unpaid "Charge to Account" transactions
 2. **ServiceM8 Integration** (P2): Sync job IDs for contractor dropdown selection
-3. Refactor server.py into modular APIRouters
+3. ~~Refactor server.py into modular APIRouters~~ (partial: models, auth, db, services extracted)
+
+## Recent Changes (Feb 26, 2026)
+
+### Stock Ledger & Atomic Inventory
+- **Stock ledger**: Every quantity change now creates an immutable `StockTransaction` record (product_id, quantity_delta, type, reference_id, user, timestamp)
+- **Atomic withdrawals**: POS withdrawals use `findOneAndUpdate` with `quantity >= requested` guard; insufficient stock rolls back and returns 400
+- **New API**: `GET /api/products/{product_id}/stock-history` — audit trail for any product
+- **Import flows**: Receipt and vendor PDF imports now record IMPORT transactions in the ledger
+
+### Backend Modularization
+- `backend/db.py` — MongoDB connection, `ensure_indexes()` on startup
+- `backend/auth.py` — JWT helpers, `get_current_user`, `require_role`
+- `backend/models/` — Pydantic models (user, department, vendor, product, withdrawal, stock)
+- `backend/services/inventory.py` — `process_withdrawal_stock_changes`, `process_import_stock_changes`, `get_stock_history`
+- MongoDB indexes for products, withdrawals, stock_transactions
 
 ## Test Credentials
 - Admin: `admin@test.com` / `password123`
 - Contractor: `contractor@test.com` / `password123`
+
+## Database (SQLite)
+- Single file: `data/sku_ops.db` (default, configurable via `DATABASE_URL`)
+- Tables: users, departments, vendors, products, withdrawals, payment_transactions, sku_counters, stock_transactions
+- No external DB process required
 
 ## Key API Endpoints
 - Auth: `/api/auth/register`, `/api/auth/login`, `/api/auth/me`

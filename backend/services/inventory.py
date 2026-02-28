@@ -1,0 +1,199 @@
+"""
+Inventory service: atomic stock operations and stock ledger.
+
+Every quantity change creates an immutable StockTransaction record.
+Withdrawals use atomic UPDATE with quantity guard to prevent overselling.
+"""
+from datetime import datetime, timezone
+from typing import List, Optional, Tuple
+
+from fastapi import HTTPException
+
+from models.stock import StockTransaction, StockTransactionType
+from models.withdrawal import WithdrawalItem
+from repositories.product_repo import product_repo
+from repositories.stock_repo import stock_repo
+
+
+class InsufficientStockError(HTTPException):
+    """Raised when a product has insufficient quantity for withdrawal."""
+
+    def __init__(self, sku: str, requested: int, available: int):
+        super().__init__(
+            status_code=400,
+            detail=f"Insufficient stock for {sku}: requested {requested}, available {available}",
+        )
+
+
+async def _record_stock_transaction(
+    product_id: str,
+    sku: str,
+    product_name: str,
+    quantity_delta: int,
+    quantity_before: int,
+    transaction_type: StockTransactionType,
+    user_id: str,
+    user_name: str,
+    reference_id: Optional[str] = None,
+    reason: Optional[str] = None,
+) -> None:
+    """Append an immutable transaction to the stock ledger."""
+    quantity_after = quantity_before + quantity_delta
+    tx = StockTransaction(
+        product_id=product_id,
+        sku=sku,
+        product_name=product_name,
+        quantity_delta=quantity_delta,
+        quantity_before=quantity_before,
+        quantity_after=quantity_after,
+        transaction_type=transaction_type,
+        reference_id=reference_id,
+        reference_type=transaction_type.value,
+        reason=reason,
+        user_id=user_id,
+        user_name=user_name,
+    )
+    await stock_repo.insert_transaction(tx.model_dump())
+
+
+async def process_withdrawal_stock_changes(
+    items: List[WithdrawalItem],
+    withdrawal_id: str,
+    user_id: str,
+    user_name: str,
+) -> None:
+    """
+    Atomically decrement product quantities for a withdrawal.
+    Uses UPDATE with quantity guard to prevent overselling.
+    Rolls back on first failure (caller should handle).
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    completed: List[Tuple[str, int]] = []  # (product_id, quantity) for rollback
+
+    try:
+        for item in items:
+            result = await product_repo.atomic_decrement(
+                item.product_id, item.quantity, now
+            )
+
+            if not result:
+                product = await product_repo.get_by_id(item.product_id, "quantity, sku")
+                available = product.get("quantity", 0) if product else 0
+                raise InsufficientStockError(
+                    sku=item.sku, requested=item.quantity, available=available
+                )
+
+            quantity_before = result.get("quantity", 0) + item.quantity
+            await _record_stock_transaction(
+                product_id=item.product_id,
+                sku=item.sku,
+                product_name=item.name,
+                quantity_delta=-item.quantity,
+                quantity_before=quantity_before,
+                transaction_type=StockTransactionType.WITHDRAWAL,
+                user_id=user_id,
+                user_name=user_name,
+                reference_id=withdrawal_id,
+            )
+            completed.append((item.product_id, item.quantity))
+
+    except InsufficientStockError:
+        for product_id, qty in completed:
+            await product_repo.increment_quantity(product_id, qty, now)
+        raise
+
+
+async def process_receiving_stock_changes(
+    product_id: str,
+    sku: str,
+    product_name: str,
+    quantity: int,
+    user_id: str,
+    user_name: str,
+    reference_id: Optional[str] = None,
+) -> None:
+    """Add stock (receiving, import, return) and record transaction."""
+    now = datetime.now(timezone.utc).isoformat()
+    result = await product_repo.add_quantity(product_id, quantity, now)
+    if not result:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    quantity_before = result.get("quantity", 0) - quantity
+    await _record_stock_transaction(
+        product_id=product_id,
+        sku=sku,
+        product_name=product_name,
+        quantity_delta=quantity,
+        quantity_before=quantity_before,
+        transaction_type=StockTransactionType.RECEIVING,
+        user_id=user_id,
+        user_name=user_name,
+        reference_id=reference_id,
+    )
+
+
+async def process_import_stock_changes(
+    product_id: str,
+    sku: str,
+    product_name: str,
+    quantity: int,
+    user_id: str,
+    user_name: str,
+) -> None:
+    """Record stock added via bulk import (new product creation - no delta from existing)."""
+    await _record_stock_transaction(
+        product_id=product_id,
+        sku=sku,
+        product_name=product_name,
+        quantity_delta=quantity,
+        quantity_before=0,
+        transaction_type=StockTransactionType.IMPORT,
+        user_id=user_id,
+        user_name=user_name,
+    )
+
+
+async def get_stock_history(
+    product_id: str,
+    limit: int = 50,
+) -> List[dict]:
+    """Get stock transaction history for a product."""
+    return await stock_repo.list_by_product(product_id, limit)
+
+
+async def process_adjustment_stock_changes(
+    product_id: str,
+    quantity_delta: int,
+    reason: str,
+    user_id: str,
+    user_name: str,
+) -> None:
+    """Adjust stock (count, damage, correction) and record transaction."""
+    if quantity_delta == 0:
+        raise ValueError("quantity_delta must not be zero")
+    now = datetime.now(timezone.utc).isoformat()
+    product = await product_repo.get_by_id(product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    quantity_before = product.get("quantity", 0)
+    quantity_after = quantity_before + quantity_delta
+    if quantity_after < 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot adjust: would result in negative stock (current: {quantity_before}, delta: {quantity_delta})",
+        )
+    await product_repo.update(
+        product_id,
+        {"quantity": quantity_after, "updated_at": now},
+    )
+    await _record_stock_transaction(
+        product_id=product_id,
+        sku=product.get("sku", ""),
+        product_name=product.get("name", ""),
+        quantity_delta=quantity_delta,
+        quantity_before=quantity_before,
+        transaction_type=StockTransactionType.ADJUSTMENT,
+        user_id=user_id,
+        user_name=user_name,
+        reason=reason,
+    )

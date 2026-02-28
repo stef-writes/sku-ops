@@ -376,6 +376,8 @@ const Financials = () => {
               <th>Job ID</th>
               <th>Service Address</th>
               <th>Total</th>
+              <th>Cost</th>
+              <th>Margin</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -383,7 +385,7 @@ const Financials = () => {
           <tbody>
             {withdrawals.length === 0 ? (
               <tr>
-                <td colSpan="8" className="text-center py-12 text-slate-400">
+                <td colSpan="10" className="text-center py-12 text-slate-400">
                   No transactions found
                 </td>
               </tr>
@@ -415,6 +417,8 @@ const Financials = () => {
                     {w.service_address}
                   </td>
                   <td className="font-mono font-bold">${w.total.toFixed(2)}</td>
+                  <td className="font-mono text-slate-500 text-sm">${(w.cost_total || 0).toFixed(2)}</td>
+                  <td className="font-mono text-green-600 text-sm">${((w.total || 0) - (w.cost_total || 0)).toFixed(2)}</td>
                   <td>
                     {w.payment_status === "paid" ? (
                       <span className="badge-success">Paid</span>

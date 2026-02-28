@@ -31,6 +31,7 @@ import {
   CreditCard,
   Clock,
   Loader2,
+  Radio,
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
@@ -56,8 +57,10 @@ const POS = () => {
   const [notes, setNotes] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("charge"); // "charge" or "pay_now"
   const [checkingPayment, setCheckingPayment] = useState(false);
+  const [isLive, setIsLive] = useState(false);
 
   const isContractor = user?.role === "contractor";
+  const canPoll = !isContractor && (user?.role === "warehouse_manager" || user?.role === "admin");
 
   // Check for payment return from Stripe
   useEffect(() => {
@@ -118,6 +121,30 @@ const POS = () => {
   useEffect(() => {
     fetchProducts();
   }, [search, selectedDept]);
+
+  // Live polling for warehouse manager/admin when tab visible
+  useEffect(() => {
+    if (!canPoll) return;
+    const poll = () => {
+      if (document.visibilityState === "visible") {
+        setIsLive(true);
+        fetchProducts();
+      } else {
+        setIsLive(false);
+      }
+    };
+    const id = setInterval(poll, 5000);
+    if (document.visibilityState === "visible") setIsLive(true);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") setIsLive(true);
+      else setIsLive(false);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [canPoll, search, selectedDept]);
 
   const fetchData = async () => {
     try {
@@ -188,6 +215,7 @@ const POS = () => {
           quantity: 1,
           subtotal: product.price,
           max_quantity: product.quantity,
+          unit: product.sell_uom || "each",
         },
       ]);
     }
@@ -258,7 +286,7 @@ const POS = () => {
     setProcessing(true);
     try {
       const withdrawalData = {
-        items: cart.map(({ product_id, sku, name, quantity, price, cost, subtotal }) => ({
+        items: cart.map(({ product_id, sku, name, quantity, price, cost, subtotal, unit }) => ({
           product_id,
           sku,
           name,
@@ -266,6 +294,7 @@ const POS = () => {
           price,
           cost,
           subtotal,
+          unit: unit || "each",
         })),
         job_id: jobId.trim(),
         service_address: serviceAddress.trim(),
@@ -313,7 +342,12 @@ const POS = () => {
       setPaymentMethod("charge");
       fetchProducts();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Withdrawal failed");
+      const detail = error.response?.data?.detail;
+      if (typeof detail === "string" && detail.includes("Insufficient stock")) {
+        toast.error(detail + " Reduce quantity or remove the item and try again.");
+      } else {
+        toast.error(detail || "Withdrawal failed");
+      }
     } finally {
       setProcessing(false);
     }
@@ -321,9 +355,10 @@ const POS = () => {
 
   if (loading) {
     return (
-      <div className="p-8 flex items-center justify-center min-h-screen">
-        <div className="text-slate-600 font-heading text-xl uppercase tracking-wider">
-          Loading...
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex items-center gap-3 text-slate-500">
+          <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+          <span className="font-medium">Loading materials…</span>
         </div>
       </div>
     );
@@ -333,13 +368,13 @@ const POS = () => {
     <div className="flex h-screen" data-testid="pos-page">
       {/* Cart Panel - Left Side */}
       <div
-        className="w-1/3 bg-white border-r-2 border-slate-200 flex flex-col"
+        className="w-1/3 bg-white border-r border-slate-200 flex flex-col shadow-sm"
         data-testid="cart-panel"
       >
         {/* Cart Header */}
-        <div className="p-6 border-b-2 border-slate-200">
+        <div className="p-6 border-b border-slate-200">
           <div className="flex items-center justify-between">
-            <h2 className="font-heading font-bold text-xl text-slate-900 uppercase tracking-wider">
+            <h2 className="text-lg font-semibold text-slate-900">
               {isContractor ? "My Withdrawal" : "Material Withdrawal"}
             </h2>
             {cart.length > 0 && (
@@ -363,22 +398,27 @@ const POS = () => {
         <div className="flex-1 overflow-auto p-4" data-testid="cart-items">
           {cart.length === 0 ? (
             <div className="text-center py-12 text-slate-400">
-              <ShoppingCart className="w-16 h-16 mx-auto mb-4 opacity-50" />
+              <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                <ShoppingCart className="w-7 h-7 text-slate-400" />
+              </div>
               <p className="font-medium">Cart is empty</p>
-              <p className="text-sm">Select materials to withdraw</p>
+              <p className="text-sm mt-1">Select materials to withdraw</p>
             </div>
           ) : (
             <div className="space-y-3">
               {cart.map((item) => (
                 <div
                   key={item.product_id}
-                  className="bg-slate-50 border-2 border-slate-200 rounded-sm p-4"
+                  className="bg-slate-50/80 border border-slate-200 rounded-xl p-4"
                   data-testid={`cart-item-${item.sku}`}
                 >
                   <div className="flex justify-between items-start mb-2">
                     <div>
                       <p className="font-mono text-xs text-slate-500">{item.sku}</p>
                       <p className="font-semibold text-slate-900">{item.name}</p>
+                      {item.unit && item.unit !== "each" && (
+                        <p className="text-xs text-slate-500 mt-0.5">{item.quantity} {item.unit}</p>
+                      )}
                     </div>
                     <button
                       onClick={() => removeFromCart(item.product_id)}
@@ -392,7 +432,7 @@ const POS = () => {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => updateQuantity(item.product_id, -1)}
-                        className="w-8 h-8 border-2 border-slate-300 rounded-sm flex items-center justify-center hover:bg-slate-100"
+                        className="w-8 h-8 border border-slate-200 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors"
                         data-testid={`qty-minus-${item.sku}`}
                       >
                         <Minus className="w-4 h-4" />
@@ -402,13 +442,13 @@ const POS = () => {
                       </span>
                       <button
                         onClick={() => updateQuantity(item.product_id, 1)}
-                        className="w-8 h-8 border-2 border-slate-300 rounded-sm flex items-center justify-center hover:bg-slate-100"
+                        className="w-8 h-8 border border-slate-200 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors"
                         data-testid={`qty-plus-${item.sku}`}
                       >
                         <Plus className="w-4 h-4" />
                       </button>
                     </div>
-                    <p className="font-heading font-bold text-lg">
+                    <p className="font-semibold text-slate-900">
                       ${item.subtotal.toFixed(2)}
                     </p>
                   </div>
@@ -419,7 +459,7 @@ const POS = () => {
         </div>
 
         {/* Cart Summary */}
-        <div className="p-6 border-t-2 border-slate-200 bg-slate-50">
+        <div className="p-6 border-t border-slate-200 bg-slate-50/80">
           <div className="space-y-2 mb-4">
             <div className="flex justify-between text-slate-600">
               <span>Subtotal</span>
@@ -429,8 +469,8 @@ const POS = () => {
               <span>Tax (8%)</span>
               <span className="font-mono">${tax.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-xl font-bold text-slate-900 pt-2 border-t border-slate-300">
-              <span className="font-heading uppercase">Total</span>
+            <div className="flex justify-between text-xl font-semibold text-slate-900 pt-2 border-t border-slate-200">
+              <span>Total</span>
               <span className="font-mono">${total.toFixed(2)}</span>
             </div>
           </div>
@@ -447,10 +487,10 @@ const POS = () => {
       </div>
 
       {/* Products Panel - Right Side */}
-      <div className="flex-1 flex flex-col bg-slate-50" data-testid="products-panel">
+      <div className="flex-1 flex flex-col bg-slate-50/80" data-testid="products-panel">
         {/* Search & Filter Bar */}
-        <div className="p-6 bg-white border-b-2 border-slate-200">
-          <div className="flex gap-4">
+        <div className="p-6 bg-white border-b border-slate-200">
+          <div className="flex items-center gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <Input
@@ -475,6 +515,12 @@ const POS = () => {
                 </option>
               ))}
             </select>
+            {canPoll && (
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${isLive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                <Radio className={`w-4 h-4 ${isLive ? "animate-pulse" : ""}`} />
+                <span>{isLive ? "Live" : "Paused"}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -494,7 +540,7 @@ const POS = () => {
                   className="pos-item cursor-pointer"
                   data-testid={`pos-product-${product.sku}`}
                 >
-                  <div className="aspect-[4/3] bg-slate-100 flex items-center justify-center border-b-2 border-slate-200">
+                  <div className="aspect-[4/3] bg-slate-100/80 flex items-center justify-center border-b border-slate-200/80">
                     <span className="font-mono text-2xl text-slate-400 font-bold">
                       {product.department_name?.slice(0, 3).toUpperCase() || "---"}
                     </span>
@@ -508,8 +554,9 @@ const POS = () => {
                       {product.name}
                     </p>
                     <div className="flex items-center justify-between mt-2">
-                      <span className="font-heading font-bold text-xl text-orange-500">
+                      <span className="font-semibold text-lg text-amber-600">
                         ${product.price.toFixed(2)}
+                        <span className="text-xs font-normal text-slate-500 ml-1">/ {product.sell_uom || "each"}</span>
                       </span>
                       <span className="text-xs text-slate-400">
                         {product.quantity} in stock
@@ -525,10 +572,10 @@ const POS = () => {
 
       {/* Checkout Dialog */}
       <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
-        <DialogContent className="sm:max-w-lg" data-testid="checkout-dialog">
+        <DialogContent className="sm:max-w-lg rounded-2xl" data-testid="checkout-dialog">
           <DialogHeader>
-            <DialogTitle className="font-heading font-bold text-xl uppercase tracking-wider">
-              Log Material Withdrawal
+            <DialogTitle className="text-lg font-semibold">
+              Log material withdrawal
             </DialogTitle>
           </DialogHeader>
 
@@ -536,7 +583,7 @@ const POS = () => {
             {/* Contractor Selection (for warehouse manager/admin) */}
             {!isContractor && (
               <div>
-                <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
+                <Label className="text-slate-600 font-medium text-sm">
                   Contractor *
                 </Label>
                 <Select
@@ -580,9 +627,9 @@ const POS = () => {
 
             {/* Service Address */}
             <div>
-              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
+              <Label className="text-slate-600 font-medium text-sm">
                 <MapPin className="w-4 h-4 inline mr-1" />
-                Service Address *
+                Service address *
               </Label>
               <Input
                 value={serviceAddress}
@@ -595,8 +642,8 @@ const POS = () => {
 
             {/* Notes */}
             <div>
-              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
-                Notes (Optional)
+              <Label className="text-slate-600 font-medium text-sm">
+                Notes (optional)
               </Label>
               <Input
                 value={notes}
@@ -609,16 +656,16 @@ const POS = () => {
 
             {/* Payment Method Selection */}
             <div>
-              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide mb-3 block">
-                Payment Method
+              <Label className="text-slate-600 font-medium text-sm mb-3 block">
+                Payment method
               </Label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod("pay_now")}
-                  className={`p-4 rounded-sm border-2 text-left transition-all ${
+                  className={`p-4 rounded-xl border text-left transition-all ${
                     paymentMethod === "pay_now"
-                      ? "border-orange-500 bg-orange-50"
+                      ? "border-amber-400 bg-amber-50/80"
                       : "border-slate-200 hover:border-slate-300"
                   }`}
                   data-testid="payment-method-pay-now"
@@ -632,15 +679,15 @@ const POS = () => {
                 <button
                   type="button"
                   onClick={() => setPaymentMethod("charge")}
-                  className={`p-4 rounded-sm border-2 text-left transition-all ${
+                  className={`p-4 rounded-xl border text-left transition-all ${
                     paymentMethod === "charge"
-                      ? "border-orange-500 bg-orange-50"
+                      ? "border-amber-400 bg-amber-50/80"
                       : "border-slate-200 hover:border-slate-300"
                   }`}
                   data-testid="payment-method-charge"
                 >
                   <div className="flex items-center gap-2 mb-1">
-                    <Clock className={`w-5 h-5 ${paymentMethod === "charge" ? "text-orange-500" : "text-slate-500"}`} />
+                    <Clock className={`w-5 h-5 ${paymentMethod === "charge" ? "text-amber-500" : "text-slate-500"}`} />
                     <span className="font-semibold text-slate-900">Charge to Account</span>
                   </div>
                   <p className="text-xs text-slate-500">Invoice later via Xero</p>
@@ -649,7 +696,7 @@ const POS = () => {
             </div>
 
             {/* Summary */}
-            <div className="bg-slate-50 p-4 rounded-sm border-2 border-slate-200">
+            <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200">
               <div className="flex justify-between text-lg font-bold mb-2">
                 <span>Total Value</span>
                 <span className="font-mono">${total.toFixed(2)}</span>
@@ -695,11 +742,11 @@ const POS = () => {
 
       {/* Payment Processing Overlay */}
       {checkingPayment && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="payment-processing-overlay">
-          <div className="bg-white p-8 rounded-lg shadow-xl text-center">
-            <Loader2 className="w-12 h-12 animate-spin text-orange-500 mx-auto mb-4" />
-            <h3 className="font-heading font-bold text-xl mb-2">Verifying Payment</h3>
-            <p className="text-slate-600">Please wait while we confirm your payment...</p>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" data-testid="payment-processing-overlay">
+          <div className="bg-white p-8 rounded-2xl shadow-soft-lg text-center max-w-sm">
+            <Loader2 className="w-12 h-12 animate-spin text-amber-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Verifying payment</h3>
+            <p className="text-slate-500 text-sm">Confirming your payment…</p>
           </div>
         </div>
       )}
