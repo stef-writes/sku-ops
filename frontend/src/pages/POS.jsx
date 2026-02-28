@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import { API } from "@/lib/api";
 
 const POS = () => {
   const { user } = useAuth();

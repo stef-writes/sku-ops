@@ -21,22 +21,30 @@ import {
   Loader2,
   Trash2,
   Sparkles,
+  FileSpreadsheet,
 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import { API } from "@/lib/api";
 
 const ReceiptImport = () => {
   const [departments, setDepartments] = useState([]);
+  const [vendors, setVendors] = useState([]);
   const [selectedDept, setSelectedDept] = useState("");
+  const [selectedVendor, setSelectedVendor] = useState("");
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [extracting, setExtracting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [extractedData, setExtractedData] = useState(null);
   const [editedProducts, setEditedProducts] = useState([]);
+  const [csvFile, setCsvFile] = useState(null);
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvResult, setCsvResult] = useState(null);
 
   useEffect(() => {
     fetchDepartments();
+    fetchVendors();
   }, []);
 
   const fetchDepartments = async () => {
@@ -45,6 +53,15 @@ const ReceiptImport = () => {
       setDepartments(response.data);
     } catch (error) {
       console.error("Error fetching departments:", error);
+    }
+  };
+
+  const fetchVendors = async () => {
+    try {
+      const response = await axios.get(`${API}/vendors`);
+      setVendors(response.data);
+    } catch (error) {
+      console.error("Error fetching vendors:", error);
     }
   };
 
@@ -181,6 +198,45 @@ const ReceiptImport = () => {
     setEditedProducts([]);
   };
 
+  const handleCsvFileChange = (e) => {
+    const selected = e.target.files?.[0];
+    if (selected?.name?.toLowerCase().endsWith(".csv")) {
+      setCsvFile(selected);
+      setCsvResult(null);
+    } else if (selected) {
+      toast.error("Please select a CSV file");
+    }
+  };
+
+  const importCsv = async () => {
+    if (!csvFile || !selectedDept) {
+      toast.error("Select a department and CSV file");
+      return;
+    }
+    setCsvImporting(true);
+    setCsvResult(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", csvFile);
+      formData.append("department_id", selectedDept);
+      if (selectedVendor) formData.append("vendor_id", selectedVendor);
+
+      const response = await axios.post(`${API}/products/import-csv`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      setCsvResult(response.data);
+      toast.success(`Imported ${response.data.imported} products`);
+      if (response.data.errors > 0) {
+        toast.warning(`${response.data.errors} rows had errors`);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "CSV import failed");
+    } finally {
+      setCsvImporting(false);
+    }
+  };
+
   return (
     <div className="p-8" data-testid="receipt-import-page">
       {/* Header with AI badge */}
@@ -193,11 +249,17 @@ const ReceiptImport = () => {
           Receipt Import
         </h1>
         <p className="text-slate-500 mt-1 text-sm">
-          Upload receipts from Home Depot, Lowes, etc. — AI extracts products
-          automatically
+          Upload receipts or bulk import from CSV
         </p>
       </div>
 
+      <Tabs defaultValue="receipt" className="mt-4">
+        <TabsList className="mb-4">
+          <TabsTrigger value="receipt">Receipt (AI)</TabsTrigger>
+          <TabsTrigger value="csv">CSV Bulk Import</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="receipt">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Upload Section */}
         <div
@@ -440,6 +502,118 @@ const ReceiptImport = () => {
           )}
         </div>
       </div>
+        </TabsContent>
+
+        <TabsContent value="csv">
+          <div className="card-elevated p-6 max-w-2xl border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+              Bulk import from CSV
+            </h2>
+            <p className="text-slate-600 text-sm mb-4">
+              Supply Yard format: Product, SKU, Barcode, On hand, Reorder point, Unit cost, Retail price, Department
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <Label className="text-slate-600 font-medium text-sm">Department *</Label>
+                <Select value={selectedDept} onValueChange={setSelectedDept}>
+                  <SelectTrigger className="input-field mt-2">
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name} ({d.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-slate-600 font-medium text-sm">Vendor (optional)</Label>
+                <Select value={selectedVendor} onValueChange={setSelectedVendor}>
+                  <SelectTrigger className="input-field mt-2">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {vendors.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>
+                        {v.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const f = e.dataTransfer.files?.[0];
+                  if (f?.name?.toLowerCase().endsWith(".csv")) {
+                    setCsvFile(f);
+                    setCsvResult(null);
+                  }
+                }}
+                onDragOver={(e) => e.preventDefault()}
+                className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-emerald-300 cursor-pointer"
+                onClick={() => document.getElementById("csv-input").click()}
+              >
+                <input
+                  id="csv-input"
+                  type="file"
+                  accept=".csv"
+                  onChange={handleCsvFileChange}
+                  className="hidden"
+                />
+                <FileSpreadsheet className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+                <p className="text-slate-600 font-medium">
+                  {csvFile ? csvFile.name : "Drop CSV or click to browse"}
+                </p>
+              </div>
+
+              {csvResult && (
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm">
+                  <p className="font-medium text-slate-900">
+                    Imported {csvResult.imported} products
+                    {csvResult.errors > 0 && ` · ${csvResult.errors} errors`}
+                  </p>
+                  {csvResult.error_details?.length > 0 && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-slate-500">View errors</summary>
+                      <ul className="mt-2 space-y-1 text-slate-600 text-xs max-h-32 overflow-auto">
+                        {csvResult.error_details.map((e, i) => (
+                          <li key={i}>{e.product}: {e.error}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+              )}
+
+              <Button
+                onClick={importCsv}
+                disabled={csvImporting || !csvFile || !selectedDept}
+                className="w-full btn-primary h-11"
+              >
+                {csvImporting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Importing…
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-5 h-5 mr-2" />
+                    Import CSV
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* How It Works - AI focus */}
       <div className="card-elevated p-6 mt-8 bg-gradient-to-br from-slate-50 to-violet-50/30 border-violet-100/50">

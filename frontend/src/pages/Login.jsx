@@ -107,6 +107,9 @@ const Login = () => {
             </Button>
           </form>
 
+          <p className="text-center mt-4 text-slate-400 text-xs">
+            Demo: admin@demo.local / demo123
+          </p>
           <p className="text-center mt-6 text-slate-500 text-sm">
             Don't have an account?{" "}
             <Link

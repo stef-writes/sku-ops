@@ -33,7 +33,7 @@ import {
   Cell,
 } from "recharts";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import { API } from "@/lib/api";
 
 const COLORS = ["#f97316", "#0f172a", "#15803d", "#3b82f6", "#8b5cf6", "#ec4899"];
 

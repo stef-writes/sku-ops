@@ -1,5 +1,5 @@
 import asyncio
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Request, Form
 from fastapi.responses import StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
 import os
@@ -83,9 +83,43 @@ logger = logging.getLogger(__name__)
 
 # ==================== SKU GENERATOR ====================
 
+SKU_FORMAT = "DEPT-XXXXX"  # 3-letter dept code + 5-digit sequence
+
 async def generate_sku(department_code: str) -> str:
     number = await sku_repo.increment_and_get(department_code)
     return f"{department_code}-{str(number).zfill(5)}"
+
+
+@api_router.get("/sku/preview")
+async def get_sku_preview(
+    department_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Preview the next SKU for a department (without consuming it)."""
+    department = await department_repo.get_by_id(department_id)
+    if not department:
+        raise HTTPException(status_code=404, detail="Department not found")
+    code = department["code"]
+    next_num = await sku_repo.get_next_number(code)
+    next_sku = f"{code}-{str(next_num).zfill(5)}"
+    return {"next_sku": next_sku, "department_code": code, "format": SKU_FORMAT}
+
+
+@api_router.get("/sku/overview")
+async def get_sku_overview(current_user: dict = Depends(get_current_user)):
+    """SKU system overview: format, departments with next available SKU."""
+    departments = await department_repo.list_all()
+    counters = await sku_repo.get_all_counters()
+    depts_with_next = []
+    for d in departments:
+        code = d["code"]
+        next_num = (counters.get(code, 0) + 1)
+        depts_with_next.append({
+            **d,
+            "next_sku": f"{code}-{str(next_num).zfill(5)}",
+        })
+    return {"format": SKU_FORMAT, "departments": depts_with_next}
+
 
 # ==================== AUTH ROUTES ====================
 
@@ -250,18 +284,30 @@ async def delete_vendor(vendor_id: str, current_user: dict = Depends(require_rol
 
 # ==================== PRODUCT ROUTES ====================
 
-@api_router.get("/products", response_model=List[Product])
+@api_router.get("/products")
 async def get_products(
     department_id: Optional[str] = None,
     search: Optional[str] = None,
     low_stock: bool = False,
+    limit: Optional[int] = None,
+    offset: int = 0,
     current_user: dict = Depends(get_current_user),
 ):
-    return await product_repo.list_products(
+    items = await product_repo.list_products(
         department_id=department_id,
         search=search,
         low_stock=low_stock,
+        limit=limit,
+        offset=offset,
     )
+    if limit is not None:
+        total = await product_repo.count_products(
+            department_id=department_id,
+            search=search,
+            low_stock=low_stock,
+        )
+        return {"items": items, "total": total}
+    return items
 
 
 @api_router.get("/products/{product_id}", response_model=Product)
@@ -311,6 +357,7 @@ async def create_product(data: ProductCreate, current_user: dict = Depends(requi
             vendor_name = vendor.get("name", "")
 
     sku = await generate_sku(department["code"])
+    barcode = (data.barcode or "").strip() or sku  # Default to SKU when barcode blank
 
     product = Product(
         sku=sku,
@@ -325,7 +372,7 @@ async def create_product(data: ProductCreate, current_user: dict = Depends(requi
         vendor_id=data.vendor_id,
         vendor_name=vendor_name,
         original_sku=data.original_sku,
-        barcode=data.barcode,
+        barcode=barcode,
         base_unit=getattr(data, "base_unit", "each"),
         sell_uom=getattr(data, "sell_uom", "each"),
         pack_qty=getattr(data, "pack_qty", 1),
@@ -1020,6 +1067,273 @@ async def import_receipt_products(
     await department_repo.increment_product_count(department_id, len(imported))
     return {"imported": len(imported), "products": imported}
 
+
+# Keyword hints for auto-department from product name (Supply Yard style)
+_DEPT_KEYWORDS = {
+    "PLU": ["pex", "pvc", "cpvc", "pipe", "valve", "elbow", "coupling", "adapter", "sweat", "press", "crimp", "tailpiece", "drain", "faucet", "toilet", "sink"],
+    "ELE": ["wire", "cable", "connector", "emt", "conduit", "outlet", "switch", "breaker", "led", "light", "lamp", "box", "strap", "clamp", "knockout"],
+    "PNT": ["paint", "brush", "roller", "stain", "primer", "caulk", "spray", "sanding", "sandpaper"],
+    "LUM": ["lumber", "board", "stud", "plywood", "2x4", "2x6", "trim", "furring", "door", "slab", "moulding"],
+    "TOL": ["tool", "drill", "saw", "sander", "bit", "blade", "hammer", "screwdriver", "wrench", "level"],
+    "HDW": ["screw", "nail", "bolt", "anchor", "hinge", "lock", "bracket", "fastener"],
+    "GDN": ["garden", "plant", "soil", "fertilizer", "hose", "sprinkler"],
+    "APP": ["appliance", "furnace", "range", "hood", "filter", "hvac"],
+}
+
+
+def _suggest_department(name: str, departments_by_code: dict) -> Optional[str]:
+    """Suggest department code from product name using keyword matching."""
+    if not name:
+        return None
+    name_lower = name.lower()
+    for code, keywords in _DEPT_KEYWORDS.items():
+        if code in departments_by_code and any(kw in name_lower for kw in keywords):
+            return code
+    return None
+
+
+# UOM inference from product name (e.g. "5 Gal Paint" -> gallon, 5)
+def _infer_uom(name: str) -> tuple[str, str, int]:
+    """Infer base_unit, sell_uom, pack_qty from product name."""
+    n = name.lower()
+    # (pattern, unit) - pattern has optional (\d+) capture for pack_qty
+    for pattern, unit in [
+        (r"(\d+)\s*gal", "gallon"),
+        (r"gal(?:lon)?\b", "gallon"),
+        (r"(\d+)\s*pk\b", "each"),
+        (r"(\d+)pk\b", "each"),
+        (r"(\d+)\s*pack", "each"),
+        (r"(\d+)\s*ft\b", "foot"),
+        (r"(\d+)\s*'\s*", "foot"),
+        (r"x(\d+)'", "foot"),
+        (r"(\d+)\s*box", "box"),
+        (r"(\d+)\s*roll", "roll"),
+        (r"(\d+)\s*case", "case"),
+        (r"(\d+)\s*lb", "pound"),
+        (r"sq\s*ft", "sqft"),
+    ]:
+        m = re.search(pattern, n, re.IGNORECASE)
+        if m and unit in ALLOWED_BASE_UNITS:
+            pq = 1
+            if m.groups() and m.group(1):
+                try:
+                    pq = max(1, int(m.group(1)))
+                except (ValueError, TypeError):
+                    pass
+            return unit, unit, pq
+    return "each", "each", 1
+
+
+def _parse_dollar(val: str) -> float:
+    """Parse '$2.73' or '2.73' to float."""
+    if not val or not str(val).strip():
+        return 0.0
+    s = str(val).replace("$", "").replace(",", "").strip()
+    try:
+        return round(float(s), 2)
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def _parse_csv_products(content: bytes) -> list[dict]:
+    """
+    Parse Supply Yard inventory CSV format.
+    Columns: Product, SKU, Barcode, On hand, Reorder qty, Reorder point,
+             Unit cost, Total cost, Retail price, Retail (Ex. Tax), Retail (Inc. Tax), Department/Category
+    """
+    decoded = content.decode("utf-8", errors="replace")
+    reader = csv.reader(io.StringIO(decoded))
+
+    # Find header row (first row containing 'Product' in first column)
+    header = None
+    header_idx = -1
+    for i, row in enumerate(reader):
+        if row and str(row[0]).strip().lower() == "product":
+            header = [c.strip() for c in row]
+            header_idx = i
+            break
+
+    if not header:
+        raise ValueError("CSV must have a header row with 'Product' in first column")
+
+    # Build column indices (handle slight variants)
+    col_map = {}
+    for idx, name in enumerate(header):
+        n = name.lower()
+        if "product" in n:
+            col_map["name"] = idx
+        elif "sku" in n and "barcode" not in n:
+            col_map["sku"] = idx
+        elif "on hand" in n or "quantity" in n:
+            col_map["quantity"] = idx
+        elif "reorder point" in n:
+            col_map["min_stock"] = idx
+        elif "unit cost" in n or "cost" in n:
+            col_map["cost"] = idx
+        elif "retail price" in n and "ex" not in n and "inc" not in n:
+            col_map["price"] = idx
+        elif "department" in n or "category" in n:
+            col_map["department"] = idx
+        elif "barcode" in n:
+            col_map["barcode"] = idx
+
+    if "name" not in col_map:
+        raise ValueError("CSV must have a Product/name column")
+
+    # Re-read from start to get data rows
+    decoded2 = content.decode("utf-8", errors="replace")
+    rows = list(csv.reader(io.StringIO(decoded2)))
+
+    products = []
+    for i, row in enumerate(rows):
+        if i <= header_idx or len(row) <= col_map["name"]:
+            continue
+        name = (row[col_map["name"]] or "").strip()
+        if not name:
+            continue
+        # Skip meta rows
+        if name.lower().startswith("current inventory") or name.lower().startswith("for the period"):
+            continue
+
+        qty = 0
+        try:
+            qty = int(float((row[col_map.get("quantity", 3)] or "0").replace(",", "")))
+        except (ValueError, TypeError, IndexError):
+            pass
+
+        cost = _parse_dollar(row[col_map.get("cost", 6)] if col_map.get("cost", 6) < len(row) else "0")
+        price = _parse_dollar(row[col_map.get("price", 8)] if col_map.get("price", 8) < len(row) else "0")
+        if price <= 0 and cost > 0:
+            price = round(cost * 1.4, 2)
+        elif cost <= 0 and price > 0:
+            cost = round(price * 0.7, 2)
+
+        min_stock = 5
+        try:
+            min_stock = max(0, int(float((row[col_map.get("min_stock", 5)] or "0").replace(",", ""))))
+        except (ValueError, TypeError, IndexError):
+            pass
+        if min_stock == 0:
+            min_stock = 5
+
+        products.append({
+            "name": name,
+            "quantity": qty,
+            "cost": cost,
+            "price": price,
+            "min_stock": min_stock,
+            "original_sku": (row[col_map["sku"]] or "").strip() or None if col_map.get("sku") is not None and col_map["sku"] < len(row) else None,
+            "barcode": (row[col_map["barcode"]] or "").strip() or None if col_map.get("barcode") is not None and col_map["barcode"] < len(row) else None,
+            "department": (row[col_map["department"]] or "").strip() or None if col_map.get("department") is not None and col_map["department"] < len(row) else None,
+        })
+
+    return products
+
+
+@api_router.post("/products/import-csv")
+async def import_products_csv(
+    file: UploadFile = File(...),
+    department_id: str = Form(...),
+    vendor_id: Optional[str] = Form(None),
+    current_user: dict = Depends(require_role("admin", "warehouse_manager")),
+):
+    """
+    Bulk import products from a Supply Yard–style CSV.
+    CSV columns: Product, SKU, Barcode, On hand, Reorder qty, Reorder point, Unit cost, Retail price, Department/Category
+    """
+    department = await department_repo.get_by_id(department_id)
+    if not department:
+        raise HTTPException(status_code=400, detail="Department not found")
+
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="File must be a CSV")
+
+    content = await file.read()
+    try:
+        rows = _parse_csv_products(content)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not rows:
+        raise HTTPException(status_code=400, detail="No valid product rows found in CSV")
+
+    vendor_name = ""
+    if vendor_id:
+        vendor = await vendor_repo.get_by_id(vendor_id)
+        if vendor:
+            vendor_name = vendor.get("name", "")
+
+    # Build department lookup: by code, and for auto-suggest
+    all_depts = await department_repo.list_all()
+    dept_cache = {department["code"]: department, department["id"]: department}
+    dept_by_code = {d["code"]: d for d in all_depts}
+    for d in all_depts:
+        dept_cache[d["code"]] = d
+        dept_cache[d["name"].lower()] = d
+
+    imported = []
+    errors = []
+
+    for item in rows:
+        try:
+            dept = department
+            if item.get("department"):
+                # CSV has department: match by code or name
+                raw = item["department"].strip()
+                key = raw.upper()[:3] if len(raw) >= 3 else raw.lower()
+                dept = dept_cache.get(key) or dept_cache.get(raw.lower()) or department
+            else:
+                # Auto-suggest department from product name
+                suggested_code = _suggest_department(item["name"], dept_by_code)
+                if suggested_code:
+                    dept = dept_by_code.get(suggested_code) or department
+
+            sku = await generate_sku(dept["code"])
+            barcode = item.get("barcode") or sku  # Use SKU as barcode when CSV has none
+            bu, su, pq = _infer_uom(item["name"])
+
+            product = Product(
+                sku=sku,
+                name=item["name"],
+                description="",
+                price=item["price"],
+                cost=item["cost"],
+                quantity=item["quantity"],
+                min_stock=item["min_stock"],
+                department_id=dept["id"],
+                department_name=dept["name"],
+                vendor_id=vendor_id,
+                vendor_name=vendor_name,
+                original_sku=item.get("original_sku"),
+                barcode=barcode,
+                base_unit=bu,
+                sell_uom=su,
+                pack_qty=pq,
+            )
+            await product_repo.insert(product.model_dump())
+            await process_import_stock_changes(
+                product_id=product.id,
+                sku=product.sku,
+                product_name=product.name,
+                quantity=product.quantity,
+                user_id=current_user["id"],
+                user_name=current_user.get("name", ""),
+            )
+            imported.append({"id": product.id, "sku": product.sku, "name": product.name, "quantity": product.quantity})
+            await department_repo.increment_product_count(dept["id"], 1)
+            if vendor_id:
+                await vendor_repo.increment_product_count(vendor_id, 1)
+        except Exception as e:
+            errors.append({"product": item["name"], "error": str(e)})
+
+    return {
+        "imported": len(imported),
+        "errors": len(errors),
+        "products": imported,
+        "error_details": errors[:20],
+    }
+
+
 # ==================== STRIPE PAYMENTS ====================
 
 class CreatePaymentRequest(BaseModel):
@@ -1176,9 +1490,13 @@ async def stripe_webhook(request: Request):
 
 # ==================== SEED DATA ====================
 
-@api_router.post("/seed/departments")
-async def seed_departments():
-    standard_departments = [
+DEMO_CSV_PATH = os.path.join(os.path.dirname(__file__), "data", "SY Inventory - Sheet1 (1).csv")
+DEMO_PRODUCT_LIMIT = 2000  # Full CSV (~1270 products)
+
+
+async def _seed_standard_departments() -> None:
+    """Seed standard departments if not present."""
+    standard = [
         {"name": "Lumber", "code": "LUM", "description": "Wood, plywood, boards"},
         {"name": "Plumbing", "code": "PLU", "description": "Pipes, fittings, fixtures"},
         {"name": "Electrical", "code": "ELE", "description": "Wiring, outlets, switches"},
@@ -1186,18 +1504,96 @@ async def seed_departments():
         {"name": "Tools", "code": "TOL", "description": "Hand tools, power tools"},
         {"name": "Hardware", "code": "HDW", "description": "Fasteners, hinges, locks"},
         {"name": "Garden", "code": "GDN", "description": "Plants, soil, fertilizers"},
-        {"name": "Appliances", "code": "APP", "description": "Home appliances"}
+        {"name": "Appliances", "code": "APP", "description": "Home appliances"},
     ]
-    
-    created = 0
-    for dept_data in standard_departments:
-        existing = await department_repo.get_by_code(dept_data["code"])
-        if not existing:
-            dept = Department(**dept_data)
-            await department_repo.insert(dept.model_dump())
-            created += 1
-    
-    return {"message": f"Seeded {created} departments"}
+    for d in standard:
+        if not await department_repo.get_by_code(d["code"]):
+            await department_repo.insert(Department(**d).model_dump())
+
+
+async def seed_demo_inventory() -> None:
+    """Seed ~150 products from CSV on first run for full demo experience."""
+    try:
+        count = await product_repo.count_all()
+        if count > 0:
+            return
+        if not os.path.exists(DEMO_CSV_PATH):
+            logger.warning(f"Demo CSV not found: {DEMO_CSV_PATH}")
+            return
+
+        await _seed_standard_departments()
+        demo_user = await user_repo.get_by_email(MOCK_USER_EMAIL)
+        if not demo_user:
+            logger.warning("Demo user not found, skipping inventory seed")
+            return
+
+        with open(DEMO_CSV_PATH, "rb") as f:
+            content = f.read()
+        rows = _parse_csv_products(content)
+        all_depts = await department_repo.list_all()
+        dept_by_code = {d["code"]: d for d in all_depts}
+
+        imported = 0
+        for i, item in enumerate(rows):
+            if imported >= DEMO_PRODUCT_LIMIT:
+                break
+            try:
+                dept = None
+                if item.get("department"):
+                    raw = item["department"].strip()
+                    key = raw.upper()[:3] if len(raw) >= 3 else raw.lower()
+                    dept = next((d for d in all_depts if d["code"] == key or d["name"].lower() == raw.lower()), None)
+                if not dept:
+                    suggested = _suggest_department(item["name"], dept_by_code)
+                    dept = dept_by_code.get(suggested) if suggested else None
+                if not dept:
+                    dept = all_depts[0]
+
+                sku = await generate_sku(dept["code"])
+                barcode = item.get("barcode") or sku
+                bu, su, pq = _infer_uom(item["name"])
+
+                product = Product(
+                    sku=sku,
+                    name=item["name"],
+                    description="",
+                    price=item["price"],
+                    cost=item["cost"],
+                    quantity=item["quantity"],
+                    min_stock=max(5, item["min_stock"]),
+                    department_id=dept["id"],
+                    department_name=dept["name"],
+                    vendor_id=None,
+                    vendor_name="",
+                    original_sku=item.get("original_sku"),
+                    barcode=barcode,
+                    base_unit=bu,
+                    sell_uom=su,
+                    pack_qty=pq,
+                )
+                await product_repo.insert(product.model_dump())
+                await process_import_stock_changes(
+                    product_id=product.id,
+                    sku=product.sku,
+                    product_name=product.name,
+                    quantity=product.quantity,
+                    user_id=demo_user["id"],
+                    user_name=demo_user.get("name", "Demo"),
+                )
+                await department_repo.increment_product_count(dept["id"], 1)
+                imported += 1
+            except Exception as e:
+                logger.debug(f"Demo seed skip {item.get('name')}: {e}")
+
+        logger.info(f"Demo inventory seeded: {imported} products")
+    except Exception as e:
+        logger.warning(f"Demo inventory seed: {e}")
+
+
+@api_router.post("/seed/departments")
+async def seed_departments():
+    await _seed_standard_departments()
+    return {"message": "Departments ready"}
 
 # ==================== MAIN ====================
 
@@ -1208,12 +1604,37 @@ async def root():
 app.include_router(api_router)
 
 
+MOCK_USER_EMAIL = "admin@demo.local"
+MOCK_USER_PASSWORD = "demo123"
+
+
+async def seed_mock_user():
+    """Create a demo admin user if none exists."""
+    try:
+        existing = await user_repo.get_by_email(MOCK_USER_EMAIL)
+        if not existing:
+            user = User(
+                email=MOCK_USER_EMAIL,
+                name="Demo Admin",
+                role="admin",
+            )
+            user_dict = user.model_dump()
+            user_dict["password"] = hash_password(MOCK_USER_PASSWORD)
+            await user_repo.insert(user_dict)
+            logger.info(f"Mock user created: {MOCK_USER_EMAIL}")
+    except Exception as e:
+        logger.warning(f"Mock user seed: {e}")
+
+
 @app.on_event("startup")
 async def startup():
     """Initialize SQLite database on startup."""
     try:
         await init_db()
         logger.info("Database initialized")
+        await seed_mock_user()
+        await _seed_standard_departments()
+        await seed_demo_inventory()
     except Exception as e:
         logger.warning(f"Database init: {e}")
 

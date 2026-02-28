@@ -16,10 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-
-const API = process.env.REACT_APP_BACKEND_URL
-  ? `${process.env.REACT_APP_BACKEND_URL}/api`
-  : "/api";
+import { API } from "@/lib/api";
 
 const TX_TYPE_LABELS = {
   withdrawal: "Withdrawal",

@@ -21,18 +21,19 @@ import {
 import {
   Search,
   Plus,
-  Edit2,
-  Trash2,
   Package,
   AlertTriangle,
-  X,
-  History,
-  SlidersHorizontal,
   Sparkles,
+  Printer,
+  ChevronLeft,
+  ChevronRight,
+  Info,
 } from "lucide-react";
 import { StockHistoryModal } from "../components/StockHistoryModal";
+import { BarcodeLabelsModal } from "../components/BarcodeLabelsModal";
+import { ProductDetailModal } from "../components/ProductDetailModal";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import { API } from "@/lib/api";
 
 const UOM_OPTIONS = [
   "each", "case", "box", "pack", "bag", "roll", "gallon", "quart", "pint",
@@ -58,6 +59,13 @@ const Inventory = () => {
   const [adjusting, setAdjusting] = useState(false);
   const [suggestingUom, setSuggestingUom] = useState(false);
   const suggestUomTimeout = useRef(null);
+  const [labelsModalOpen, setLabelsModalOpen] = useState(false);
+  const [labelsProducts, setLabelsProducts] = useState([]);
+  const [detailProduct, setDetailProduct] = useState(null);
+  const [skuPreview, setSkuPreview] = useState(null);
+  const [page, setPage] = useState(0);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const PAGE_SIZE = 50;
 
   const [form, setForm] = useState({
     name: "",
@@ -79,14 +87,29 @@ const Inventory = () => {
   }, []);
 
   useEffect(() => {
-    fetchProducts();
+    setPage(0);
   }, [search, filterDept, filterLowStock]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [search, filterDept, filterLowStock, page]);
 
   useEffect(() => {
     return () => {
       if (suggestUomTimeout.current) clearTimeout(suggestUomTimeout.current);
     };
   }, []);
+
+  // SKU preview when adding new product and department is selected
+  useEffect(() => {
+    if (!dialogOpen || editingProduct || !form.department_id) {
+      setSkuPreview(null);
+      return;
+    }
+    axios.get(`${API}/sku/preview?department_id=${form.department_id}`)
+      .then(({ data }) => setSkuPreview(data.next_sku))
+      .catch(() => setSkuPreview(null));
+  }, [dialogOpen, editingProduct, form.department_id]);
 
   const fetchData = async () => {
     try {
@@ -110,9 +133,18 @@ const Inventory = () => {
       if (search) params.append("search", search);
       if (filterDept) params.append("department_id", filterDept);
       if (filterLowStock) params.append("low_stock", "true");
+      params.append("limit", String(PAGE_SIZE));
+      params.append("offset", String(page * PAGE_SIZE));
 
       const response = await axios.get(`${API}/products?${params}`);
-      setProducts(response.data);
+      const data = response.data;
+      if (data?.items != null) {
+        setProducts(data.items);
+        setTotalProducts(data.total ?? data.items.length);
+      } else {
+        setProducts(Array.isArray(data) ? data : []);
+        setTotalProducts(Array.isArray(data) ? data.length : 0);
+      }
     } catch (error) {
       console.error("Error fetching products:", error);
     }
@@ -208,8 +240,8 @@ const Inventory = () => {
         await axios.put(`${API}/products/${editingProduct.id}`, data);
         toast.success("Product updated!");
       } else {
-        await axios.post(`${API}/products`, data);
-        toast.success("Product created!");
+        const { data: created } = await axios.post(`${API}/products`, data);
+        toast.success(`Product created with SKU ${created?.sku ?? ""}`);
       }
 
       setDialogOpen(false);
@@ -278,17 +310,66 @@ const Inventory = () => {
           <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
             Inventory
           </h1>
-          <p className="text-slate-500 mt-1 text-sm">{products.length} products</p>
+          <p className="text-slate-500 mt-1 text-sm">{totalProducts} products</p>
         </div>
-        <Button
-          onClick={() => openDialog()}
-          className="btn-primary h-12 px-6"
-          data-testid="add-product-btn"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Add Product
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setLabelsProducts(products);
+              setLabelsModalOpen(true);
+            }}
+            className="h-12 px-6"
+          >
+            <Printer className="w-5 h-5 mr-2" />
+            Print Labels
+          </Button>
+          <Button
+            onClick={() => openDialog()}
+            className="btn-primary h-12 px-6"
+            data-testid="add-product-btn"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Add Product
+          </Button>
+        </div>
       </div>
+
+      <BarcodeLabelsModal
+        products={labelsProducts}
+        open={labelsModalOpen}
+        onOpenChange={setLabelsModalOpen}
+      />
+
+      <ProductDetailModal
+        product={detailProduct}
+        open={!!detailProduct}
+        onOpenChange={(open) => !open && setDetailProduct(null)}
+        onEdit={(p) => {
+          setDetailProduct(null);
+          openDialog(p);
+        }}
+        onAdjust={(p) => {
+          setDetailProduct(null);
+          setAdjustProduct(p);
+          setAdjustDelta("");
+          setAdjustReason("correction");
+        }}
+        onDelete={handleDelete}
+        onPrintLabels={(prods) => {
+          setLabelsProducts(prods);
+          setLabelsModalOpen(true);
+        }}
+        onViewHistory={(p) => {
+          setDetailProduct(null);
+          setStockHistoryProduct(p);
+        }}
+      />
+
+      {/* SKU hint */}
+      <p className="text-sm text-slate-500 mb-4">
+        SKUs are auto-assigned (e.g. <span className="font-mono">LUM-00001</span>). Search by name, SKU, or barcode.
+      </p>
 
       {/* Filters */}
       <div className="card-elevated p-5 mb-6" data-testid="inventory-filters">
@@ -358,7 +439,12 @@ const Inventory = () => {
               </tr>
             ) : (
               products.map((product) => (
-                <tr key={product.id} data-testid={`product-row-${product.sku}`}>
+                <tr
+                  key={product.id}
+                  data-testid={`product-row-${product.sku}`}
+                  onClick={() => setDetailProduct(product)}
+                  className="cursor-pointer hover:bg-slate-50/80 transition-colors"
+                >
                   <td className="font-mono text-sm">{product.sku}</td>
                   <td>
                     <div>
@@ -389,41 +475,15 @@ const Inventory = () => {
                       <span className="badge-success">In Stock</span>
                     )}
                   </td>
-                  <td>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setStockHistoryProduct(product)}
-                        className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-sm transition-colors"
-                        title="Stock history"
-                      >
-                        <History className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setAdjustProduct(product);
-                          setAdjustDelta("");
-                          setAdjustReason("correction");
-                        }}
-                        className="p-2 text-slate-600 hover:text-green-600 hover:bg-green-50 rounded-sm transition-colors"
-                        title="Adjust stock"
-                      >
-                        <SlidersHorizontal className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => openDialog(product)}
-                        className="p-2 text-slate-600 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                        data-testid={`edit-product-${product.sku}`}
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(product)}
-                        className="p-2 text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-sm transition-colors"
-                        data-testid={`delete-product-${product.sku}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => setDetailProduct(product)}
+                      className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-sm transition-colors"
+                      title="View details"
+                      data-testid={`product-detail-${product.sku}`}
+                    >
+                      <Info className="w-4 h-4" />
+                    </button>
                   </td>
                 </tr>
               ))
@@ -431,6 +491,35 @@ const Inventory = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {totalProducts > PAGE_SIZE && (
+        <div className="flex items-center justify-between mt-4 px-1">
+          <p className="text-sm text-slate-500">
+            Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalProducts)} of {totalProducts}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={(page + 1) * PAGE_SIZE >= totalProducts}
+            >
+              Next
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Product Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -442,6 +531,34 @@ const Inventory = () => {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+            {/* SKU: immutable when editing, live preview when adding */}
+            <div className={`rounded-lg px-4 py-3 ${editingProduct ? "bg-amber-50/50 border border-amber-200/60" : "bg-slate-50 border border-slate-200"}`}>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  SKU
+                </p>
+                {editingProduct && (
+                  <span className="text-[10px] font-medium text-amber-700 uppercase tracking-wider">
+                    Cannot be changed
+                  </span>
+                )}
+              </div>
+              {editingProduct ? (
+                <p className="font-mono text-lg font-semibold text-slate-900">
+                  {editingProduct.sku}
+                </p>
+              ) : skuPreview ? (
+                <p className="font-mono text-lg font-semibold text-slate-700">
+                  {skuPreview}
+                  <span className="text-xs font-normal text-slate-400 ml-2">
+                    (assigned on save)
+                  </span>
+                </p>
+              ) : (
+                <p className="text-sm text-slate-400">Select a department to see SKU</p>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <Label className="text-slate-600 font-medium text-sm">
@@ -500,6 +617,8 @@ const Inventory = () => {
                   <SelectContent>
                     {departments.map((dept) => (
                       <SelectItem key={dept.id} value={dept.id}>
+                        <span className="font-mono font-medium">{dept.code}</span>
+                        <span className="text-slate-400 mx-1.5">—</span>
                         {dept.name}
                       </SelectItem>
                     ))}
@@ -628,7 +747,16 @@ const Inventory = () => {
               </div>
               <div className="col-span-2">
                 <Label className="text-slate-600 font-medium text-sm">Barcode</Label>
-                <Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} placeholder="Optional barcode" className="input-workshop mt-2" data-testid="product-barcode-input" />
+                <Input
+                  value={form.barcode}
+                  onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+                  placeholder={editingProduct ? (editingProduct.sku || "Use SKU") : "Leave blank to use SKU"}
+                  className="input-workshop mt-2"
+                  data-testid="product-barcode-input"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Leave blank to use SKU for labels & scanning
+                </p>
               </div>
             </div>
 

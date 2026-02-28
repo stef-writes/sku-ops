@@ -20,9 +20,37 @@ async def list_products(
     department_id: Optional[str] = None,
     search: Optional[str] = None,
     low_stock: bool = False,
+    limit: Optional[int] = None,
+    offset: int = 0,
 ) -> list:
     conn = get_connection()
-    query = "SELECT * FROM products WHERE 1=1"
+    base = "SELECT * FROM products WHERE 1=1"
+    params: list = []
+    if department_id:
+        base += " AND department_id = ?"
+        params.append(department_id)
+    if search:
+        base += " AND (name LIKE ? OR sku LIKE ? OR barcode LIKE ?)"
+        term = f"%{search}%"
+        params.extend([term, term, term])
+    if low_stock:
+        base += " AND quantity <= min_stock"
+    base += " ORDER BY name"
+    if limit is not None:
+        base += " LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+    cursor = await conn.execute(base, params)
+    rows = await cursor.fetchall()
+    return [_row_to_dict(r) for r in rows]
+
+
+async def count_products(
+    department_id: Optional[str] = None,
+    search: Optional[str] = None,
+    low_stock: bool = False,
+) -> int:
+    conn = get_connection()
+    query = "SELECT COUNT(*) FROM products WHERE 1=1"
     params: list = []
     if department_id:
         query += " AND department_id = ?"
@@ -33,10 +61,9 @@ async def list_products(
         params.extend([term, term, term])
     if low_stock:
         query += " AND quantity <= min_stock"
-    query += " ORDER BY name"
     cursor = await conn.execute(query, params)
-    rows = await cursor.fetchall()
-    return [_row_to_dict(r) for r in rows]
+    row = await cursor.fetchone()
+    return row[0] if row else 0
 
 
 async def get_by_id(product_id: str, columns: Optional[str] = "*") -> Optional[dict]:
@@ -174,6 +201,7 @@ async def list_low_stock(limit: int = 10) -> list:
 
 class ProductRepo:
     list_products = staticmethod(list_products)
+    count_products = staticmethod(count_products)
     get_by_id = staticmethod(get_by_id)
     insert = staticmethod(insert)
     update = staticmethod(update)

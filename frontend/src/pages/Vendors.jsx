@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { EmptyState } from "../components/EmptyState";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import { API } from "@/lib/api";
 
 const Vendors = () => {
   const [vendors, setVendors] = useState([]);
