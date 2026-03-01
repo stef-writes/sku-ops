@@ -10,8 +10,10 @@ from fastapi import HTTPException
 from models import Product
 from models.product import ALLOWED_BASE_UNITS
 from repositories import department_repo, product_repo, vendor_repo
-from services.document_import import resolve_uom
+from services.document_import import infer_uom, resolve_uom, suggest_department
+from services.document_enrichment import enrich_for_import
 from services.inventory import process_receiving_stock_changes
+from domain.barcode import validate_barcode
 from services.product_lifecycle import create_product as lifecycle_create
 from services.uom_classifier import classify_uom_batch
 
@@ -57,8 +59,30 @@ async def import_document(
     default_dept = await department_repo.get_by_code("HDW") or (departments[0] if departments else None)
     dept_by_id = {d["id"]: d for d in departments}
     dept_by_code = {d["code"].upper(): d for d in departments}
+    dept_codes = list(dept_by_code.keys())
 
     selected = [p for p in products if p.get("selected", True)]
+    vendor_products = await product_repo.list_by_vendor(vendor_id)
+    selected = await enrich_for_import(selected, vendor_products, dept_codes)
+
+    for item in selected:
+        suggested = (item.get("suggested_department") or "HDW").upper()
+        if not suggested or suggested == "HDW" or suggested not in dept_by_code:
+            rule_dept = suggest_department(item.get("name", "") or "", dept_by_code)
+            if rule_dept:
+                item["suggested_department"] = rule_dept
+
+    # Rule-based UOM upgrade: if item has "each", try infer_uom to get foot/gallon/box/etc
+    for item in selected:
+        bu = (item.get("base_unit") or "each").lower()
+        su = (item.get("sell_uom") or "each").lower()
+        if bu == "each" and su == "each":
+            inferred_bu, inferred_su, inferred_pq = infer_uom(item.get("name", "") or "")
+            if inferred_bu != "each":
+                item["base_unit"] = inferred_bu
+                item["sell_uom"] = inferred_su
+                item["pack_qty"] = inferred_pq
+
     needs_uom = [p for p in selected if (p.get("base_unit") or "").lower() not in ALLOWED_BASE_UNITS or (p.get("sell_uom") or "").lower() not in ALLOWED_BASE_UNITS]
     if needs_uom:
         await classify_uom_batch(needs_uom)
@@ -66,6 +90,7 @@ async def import_document(
     imported = []
     matched = []
     errors = []
+    warnings = []
     for item in selected:
         try:
             delivered = item.get("delivered_qty")
@@ -105,6 +130,20 @@ async def import_document(
             bu, su, pq = resolve_uom(item)
             cost_val = float(item.get("cost") or 0) or float(item.get("price", 0)) * 0.7
 
+            barcode_val = item.get("barcode")
+            if barcode_val and str(barcode_val).strip():
+                barcode_val = str(barcode_val).strip()
+                if barcode_val.isdigit():
+                    valid, _ = validate_barcode(barcode_val)
+                    if not valid:
+                        warnings.append({
+                            "product": item.get("name", "Unknown"),
+                            "warning": "Invalid UPC/EAN barcode; using SKU",
+                        })
+                        barcode_val = None
+            else:
+                barcode_val = None
+
             product = await lifecycle_create(
                 department_id=dept["id"],
                 department_name=dept["name"],
@@ -117,6 +156,7 @@ async def import_document(
                 vendor_id=vendor_id,
                 vendor_name=vendor.get("name", ""),
                 original_sku=item.get("original_sku"),
+                barcode=barcode_val,
                 base_unit=bu,
                 sell_uom=su,
                 pack_qty=pq,
@@ -133,6 +173,7 @@ async def import_document(
         "imported": len(imported),
         "matched": len(matched),
         "errors": len(errors),
+        "warnings": warnings,
         "products": imported,
         "matched_products": matched,
         "error_details": errors,

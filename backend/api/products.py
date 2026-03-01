@@ -5,7 +5,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from auth import get_current_user, require_role
-from domain.exceptions import ResourceNotFoundError
+from domain.barcode import validate_barcode
+from domain.exceptions import DuplicateBarcodeError, InvalidBarcodeError, ResourceNotFoundError
 from models import Product, ProductCreate, ProductUpdate
 from repositories import department_repo, product_repo, vendor_repo
 from services.inventory import get_stock_history
@@ -85,26 +86,31 @@ async def create_product(data: ProductCreate, current_user: dict = Depends(requi
         if vendor:
             vendor_name = vendor.get("name", "")
 
-    product = await lifecycle_create(
-        department_id=data.department_id,
-        department_name=department["name"],
-        name=data.name,
-        description=data.description or "",
-        price=data.price,
-        cost=data.cost,
-        quantity=data.quantity,
-        min_stock=data.min_stock,
-        vendor_id=data.vendor_id,
-        vendor_name=vendor_name,
-        original_sku=data.original_sku,
-        barcode=data.barcode,
-        base_unit=getattr(data, "base_unit", "each"),
-        sell_uom=getattr(data, "sell_uom", "each"),
-        pack_qty=getattr(data, "pack_qty", 1),
-        user_id=current_user["id"],
-        user_name=current_user.get("name", ""),
-    )
-    return product
+    try:
+        product = await lifecycle_create(
+            department_id=data.department_id,
+            department_name=department["name"],
+            name=data.name,
+            description=data.description or "",
+            price=data.price,
+            cost=data.cost,
+            quantity=data.quantity,
+            min_stock=data.min_stock,
+            vendor_id=data.vendor_id,
+            vendor_name=vendor_name,
+            original_sku=data.original_sku,
+            barcode=data.barcode,
+            base_unit=getattr(data, "base_unit", "each"),
+            sell_uom=getattr(data, "sell_uom", "each"),
+            pack_qty=getattr(data, "pack_qty", 1),
+            user_id=current_user["id"],
+            user_name=current_user.get("name", ""),
+        )
+        return product
+    except DuplicateBarcodeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except InvalidBarcodeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.put("/{product_id}", response_model=Product)
@@ -118,6 +124,10 @@ async def update_product(product_id: str, data: ProductUpdate, current_user: dic
         result = await lifecycle_update(product_id, update_data, current_product=product)
     except ResourceNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except DuplicateBarcodeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except InvalidBarcodeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return result
 
 
@@ -173,6 +183,7 @@ async def import_products_csv(
 
     imported = []
     errors = []
+    warnings = []
 
     for item in rows:
         try:
@@ -188,6 +199,20 @@ async def import_products_csv(
 
             bu, su, pq = infer_uom(item["name"])
 
+            barcode_val = item.get("barcode")
+            if barcode_val and str(barcode_val).strip():
+                barcode_val = str(barcode_val).strip()
+                if barcode_val.isdigit():
+                    valid, _ = validate_barcode(barcode_val)
+                    if not valid:
+                        warnings.append({
+                            "product": item["name"],
+                            "warning": "Invalid UPC/EAN barcode; using SKU",
+                        })
+                        barcode_val = None
+            else:
+                barcode_val = None
+
             product = await lifecycle_create(
                 department_id=dept["id"],
                 department_name=dept["name"],
@@ -200,7 +225,7 @@ async def import_products_csv(
                 vendor_id=vendor_id,
                 vendor_name=vendor_name,
                 original_sku=item.get("original_sku"),
-                barcode=item.get("barcode"),
+                barcode=barcode_val,
                 base_unit=bu,
                 sell_uom=su,
                 pack_qty=pq,
@@ -214,6 +239,7 @@ async def import_products_csv(
     return {
         "imported": len(imported),
         "errors": len(errors),
+        "warnings": warnings,
         "products": imported,
         "error_details": errors[:20],
     }

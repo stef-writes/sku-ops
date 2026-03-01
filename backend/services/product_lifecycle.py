@@ -8,7 +8,8 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from db import transaction
-from domain.exceptions import ResourceNotFoundError
+from domain.barcode import validate_barcode
+from domain.exceptions import DuplicateBarcodeError, InvalidBarcodeError, ResourceNotFoundError
 from models import Product
 from repositories import department_repo, product_repo, vendor_repo
 from services.inventory import process_import_stock_changes
@@ -45,6 +46,19 @@ async def create_product(
 
     sku = await generate_sku(department["code"], name)
     barcode_val = (barcode or "").strip() or sku
+
+    # Validate UPC/EAN if value looks numeric
+    if barcode_val and barcode_val.isdigit():
+        valid, _ = validate_barcode(barcode_val)
+        if not valid:
+            raise InvalidBarcodeError(
+                barcode_val,
+                "Invalid UPC (12 digits) or EAN-13 (13 digits) check digit",
+            )
+    # Check uniqueness
+    existing = await product_repo.find_by_barcode(barcode_val)
+    if existing:
+        raise DuplicateBarcodeError(barcode_val, existing.get("name", "Unknown"))
 
     product = Product(
         sku=sku,
@@ -99,6 +113,28 @@ async def update_product(
 
     update_data = {k: v for k, v in updates.items() if v is not None}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    # Normalize and validate barcode on update
+    if "barcode" in update_data:
+        barcode_raw = update_data["barcode"]
+        barcode_val = (barcode_raw or "").strip() or product.get("sku", "")
+        update_data["barcode"] = barcode_val if barcode_val else product.get("sku", "")
+        current_barcode = (product.get("barcode") or "").strip()
+        if update_data["barcode"] != current_barcode:
+            if update_data["barcode"] and update_data["barcode"].isdigit():
+                valid, _ = validate_barcode(update_data["barcode"])
+                if not valid:
+                    raise InvalidBarcodeError(
+                        update_data["barcode"],
+                        "Invalid UPC (12 digits) or EAN-13 (13 digits) check digit",
+                    )
+            existing = await product_repo.find_by_barcode(
+                update_data["barcode"], exclude_product_id=product_id
+            )
+            if existing:
+                raise DuplicateBarcodeError(
+                    update_data["barcode"], existing.get("name", "Unknown")
+                )
 
     if "department_id" in update_data:
         department = await department_repo.get_by_id(update_data["department_id"])

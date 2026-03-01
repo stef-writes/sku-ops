@@ -226,6 +226,33 @@ async def init_db() -> None:
         await _conn.commit()
     except Exception:
         pass
+    # Migration: barcode uniqueness - dedupe first, then create index
+    try:
+        cursor = await _conn.execute("""
+            SELECT barcode FROM products
+            WHERE barcode IS NOT NULL AND TRIM(barcode) != ''
+            GROUP BY barcode HAVING COUNT(*) > 1
+        """)
+        dupes = [row[0] for row in await cursor.fetchall()]
+        for barcode in dupes:
+            cursor = await _conn.execute(
+                "SELECT id, sku FROM products WHERE barcode = ? ORDER BY created_at",
+                (barcode,),
+            )
+            rows = await cursor.fetchall()
+            for i, row in enumerate(rows):
+                if i > 0:
+                    pid, psku = row["id"], row["sku"]
+                    await _conn.execute(
+                        "UPDATE products SET barcode = ? WHERE id = ?",
+                        (psku, pid),
+                    )
+        await _conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode) WHERE barcode IS NOT NULL AND TRIM(barcode) != ''"
+        )
+        await _conn.commit()
+    except Exception:
+        pass
 
 
 def get_connection() -> aiosqlite.Connection:

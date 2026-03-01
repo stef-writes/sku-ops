@@ -90,6 +90,25 @@ DEMO_USER_PASSWORD = _demo_password()
 # Seed on startup: always in dev/test; in staging/prod only if demo creds configured
 seed_on_startup = is_development or is_test or bool(DEMO_USER_EMAIL)
 
+# LLM - optional. Prefer Ollama (free, local, open-source) when configured; else Gemini (cloud).
+# Ollama: install from ollama.com, run `ollama pull llama3.2` and `ollama pull llama3.2-vision`
+# In development: auto-enable Ollama (try localhost:11434). Set OLLAMA_BASE_URL="" to disable.
+_ollama_url = os.environ.get("OLLAMA_BASE_URL", "").strip().rstrip("/")
+if is_development and not _ollama_url and "OLLAMA_BASE_URL" not in os.environ:
+    _ollama_url = "http://localhost:11434"  # Auto-try Ollama in dev when uv/npm run dev
+OLLAMA_BASE_URL = _ollama_url or "http://localhost:11434"
+OLLAMA_ENABLED = bool(_ollama_url)
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2").strip() or "llama3.2"
+OLLAMA_VISION_MODEL = os.environ.get("OLLAMA_VISION_MODEL", "llama3.2-vision").strip() or "llama3.2-vision"
+
+# Gemini (Google) - cloud, free tier ~60 req/min, requires API key, data sent to Google
+LLM_API_KEY = os.environ.get("LLM_API_KEY", "").strip()
+GEMINI_AVAILABLE = bool(LLM_API_KEY)
+LLM_SETUP_URL = "https://aistudio.google.com/app/apikey"
+
+# Any LLM available. Prefer Ollama (free) when both configured.
+LLM_AVAILABLE = OLLAMA_ENABLED or GEMINI_AVAILABLE
+
 # E2E / live tests: backend URL to hit. Set REACT_APP_BACKEND_URL or E2E_BACKEND_URL.
 def _e2e_backend_url() -> str:
     url = (

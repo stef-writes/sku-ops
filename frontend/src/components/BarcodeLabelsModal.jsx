@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { useReactToPrint } from "react-to-print";
 import Barcode from "react-barcode";
+import { getBarcodeFormat } from "@/lib/barcodeFormat";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -41,6 +42,7 @@ export function BarcodeLabelsModal({ products, open, onOpenChange }) {
           >
             {products?.filter((p) => (p.barcode || p.sku)?.toString().trim()).map((p) => {
               const code = (p.barcode || p.sku).toString().trim();
+              const format = getBarcodeFormat(code);
               return (
               <div
                 key={p.id}
@@ -49,7 +51,7 @@ export function BarcodeLabelsModal({ products, open, onOpenChange }) {
               >
                 <Barcode
                   value={code}
-                  format="CODE128"
+                  format={format}
                   width={1.2}
                   height={28}
                   margin={0}

@@ -8,11 +8,25 @@ const ChatAssistant = () => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [aiAvailable, setAiAvailable] = useState(null);
+  const [setupUrl, setSetupUrl] = useState(null);
   const scrollRef = useRef(null);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (open && aiAvailable === null) {
+      axios
+        .get(`${API}/chat/status`)
+        .then(({ data }) => {
+          setAiAvailable(data.available);
+          setSetupUrl(data.setup_url);
+        })
+        .catch(() => setAiAvailable(false));
+    }
+  }, [open]);
 
   const send = async () => {
     const text = input.trim();
@@ -79,7 +93,25 @@ const ChatAssistant = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.length === 0 && (
+              {aiAvailable === false && (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-900">
+                  <p className="font-medium mb-2">AI assistant not configured</p>
+                  <p className="text-amber-800 mb-3">
+                    Add LLM_API_KEY to backend/.env to enable the chat assistant, document parsing, and UOM classification.
+                  </p>
+                  {setupUrl && (
+                    <a
+                      href={setupUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-amber-700 underline hover:text-amber-900"
+                    >
+                      Get a free Gemini API key →
+                    </a>
+                  )}
+                </div>
+              )}
+              {messages.length === 0 && aiAvailable !== false && (
                 <p className="text-sm text-slate-500 text-center py-8">
                   Ask about inventory, products, low stock, departments, or vendors.
                 </p>
@@ -126,9 +158,9 @@ const ChatAssistant = () => {
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask about inventory..."
+                  placeholder={aiAvailable === false ? "Configure LLM_API_KEY to enable" : "Ask about inventory..."}
                   className="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
-                  disabled={loading}
+                  disabled={loading || aiAvailable === false}
                 />
                 <button
                   type="submit"

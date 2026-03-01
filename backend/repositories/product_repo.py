@@ -95,6 +95,38 @@ async def get_by_id(product_id: str, columns: Optional[str] = "*", conn=None) ->
     return _row_to_dict(row)
 
 
+async def list_by_vendor(vendor_id: str, limit: int = 200) -> list:
+    """List products for a vendor (for LLM enrichment / product alignment)."""
+    if not vendor_id:
+        return []
+    conn = get_connection()
+    cursor = await conn.execute(
+        "SELECT id, name, sku, original_sku FROM products WHERE vendor_id = ? ORDER BY name LIMIT ?",
+        (vendor_id, limit),
+    )
+    rows = await cursor.fetchall()
+    return [_row_to_dict(r) for r in rows]
+
+
+async def find_by_barcode(barcode: str, exclude_product_id: Optional[str] = None, conn=None) -> Optional[dict]:
+    """Find product by barcode. Optionally exclude a product (for update uniqueness check)."""
+    if not barcode or not str(barcode).strip():
+        return None
+    c = conn or get_connection()
+    if exclude_product_id:
+        cursor = await c.execute(
+            "SELECT * FROM products WHERE barcode = ? AND id != ?",
+            (barcode.strip(), exclude_product_id),
+        )
+    else:
+        cursor = await c.execute(
+            "SELECT * FROM products WHERE barcode = ?",
+            (barcode.strip(),),
+        )
+    row = await cursor.fetchone()
+    return _row_to_dict(row)
+
+
 async def find_by_original_sku_and_vendor(original_sku: str, vendor_id: str) -> Optional[dict]:
     """Find existing product by vendor's SKU and vendor. For matching incoming orders to inventory."""
     if not original_sku or not str(original_sku).strip() or not vendor_id:
@@ -264,6 +296,7 @@ class ProductRepo:
     list_products = staticmethod(list_products)
     count_products = staticmethod(count_products)
     get_by_id = staticmethod(get_by_id)
+    find_by_barcode = staticmethod(find_by_barcode)
     find_by_original_sku_and_vendor = staticmethod(find_by_original_sku_and_vendor)
     insert = staticmethod(insert)
     update = staticmethod(update)

@@ -4,12 +4,17 @@ Uses Gemini 1.5 Flash (free tier). Tools: search products, inventory stats, low 
 """
 import asyncio
 import json
-import os
 import logging
 
+from config import LLM_API_KEY, LLM_AVAILABLE, LLM_SETUP_URL
 from db import get_connection
 
 logger = logging.getLogger(__name__)
+
+LLM_NOT_CONFIGURED_MSG = (
+    "AI assistant is not configured. Add LLM_API_KEY to backend/.env. "
+    f"Get a free key at {LLM_SETUP_URL}"
+)
 
 GEMINI_MODEL = "gemini-1.5-flash"
 MAX_ACT_LOOPS = 8  # Prevent runaway tool loops
@@ -141,13 +146,12 @@ async def chat(messages: list[dict], user_message: str) -> dict:
     ReAct loop: send to Gemini with tools, execute any function_call, feed result back, repeat.
     Returns { "response": "...", "tool_calls": [...] }.
     """
-    api_key = os.environ.get("LLM_API_KEY")
-    if not api_key:
-        return {"response": "LLM API key not configured. Set LLM_API_KEY in backend/.env.", "tool_calls": []}
+    if not LLM_AVAILABLE:
+        return {"response": LLM_NOT_CONFIGURED_MSG, "tool_calls": []}
 
     try:
         import google.generativeai as genai
-        genai.configure(api_key=api_key)
+        genai.configure(api_key=LLM_API_KEY)
         model = genai.GenerativeModel(GEMINI_MODEL, system_instruction=SYSTEM_PROMPT)
         tools = _build_tools()
     except Exception as e:

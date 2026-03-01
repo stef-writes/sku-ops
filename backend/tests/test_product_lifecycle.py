@@ -5,7 +5,7 @@ import pytest_asyncio
 from db import get_connection
 from repositories import department_repo, product_repo
 from services.product_lifecycle import create_product, update_product, delete_product
-from domain.exceptions import ResourceNotFoundError
+from domain.exceptions import DuplicateBarcodeError, InvalidBarcodeError, ResourceNotFoundError
 
 
 @pytest.mark.asyncio
@@ -94,3 +94,94 @@ async def test_delete_nonexistent_raises(db):
     """Delete nonexistent product raises ResourceNotFoundError."""
     with pytest.raises(ResourceNotFoundError):
         await delete_product("nonexistent-id")
+
+
+@pytest.mark.asyncio
+async def test_create_product_duplicate_barcode_raises(db):
+    """Create product with barcode already used raises DuplicateBarcodeError."""
+    product1 = await create_product(
+        department_id="dept-1",
+        department_name="Hardware",
+        name="Product A",
+        barcode="042100005264",
+        user_id="user-1",
+        user_name="Test",
+    )
+    assert product1.barcode == "042100005264"
+
+    with pytest.raises(DuplicateBarcodeError):
+        await create_product(
+            department_id="dept-1",
+            department_name="Hardware",
+            name="Product B",
+            barcode="042100005264",
+            user_id="user-1",
+            user_name="Test",
+        )
+
+
+@pytest.mark.asyncio
+async def test_create_product_invalid_upc_raises(db):
+    """Create product with invalid UPC check digit raises InvalidBarcodeError."""
+    with pytest.raises(InvalidBarcodeError):
+        await create_product(
+            department_id="dept-1",
+            department_name="Hardware",
+            name="Product Bad",
+            barcode="042100005265",
+            user_id="user-1",
+            user_name="Test",
+        )
+
+
+@pytest.mark.asyncio
+async def test_create_product_blank_barcode_uses_sku(db):
+    """Create product with blank barcode uses SKU as barcode."""
+    product = await create_product(
+        department_id="dept-1",
+        department_name="Hardware",
+        name="Product No Barcode",
+        barcode=None,
+        user_id="user-1",
+        user_name="Test",
+    )
+    assert product.barcode == product.sku
+
+
+@pytest.mark.asyncio
+async def test_update_product_to_duplicate_barcode_raises(db):
+    """Update product barcode to one already used raises DuplicateBarcodeError."""
+    product1 = await create_product(
+        department_id="dept-1",
+        department_name="Hardware",
+        name="Product One",
+        barcode="042100005264",
+        user_id="user-1",
+        user_name="Test",
+    )
+    product2 = await create_product(
+        department_id="dept-1",
+        department_name="Hardware",
+        name="Product Two",
+        barcode="023456000073",
+        user_id="user-1",
+        user_name="Test",
+    )
+
+    with pytest.raises(DuplicateBarcodeError):
+        await update_product(product2.id, {"barcode": "042100005264"})
+
+
+@pytest.mark.asyncio
+async def test_update_product_invalid_upc_raises(db):
+    """Update product with invalid UPC raises InvalidBarcodeError."""
+    product = await create_product(
+        department_id="dept-1",
+        department_name="Hardware",
+        name="Product",
+        user_id="user-1",
+        user_name="Test",
+    )
+
+    with pytest.raises(InvalidBarcodeError):
+        await update_product(product.id, {"barcode": "042100005265"})

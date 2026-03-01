@@ -760,12 +760,12 @@ const Inventory = () => {
                 <Input
                   value={form.barcode}
                   onChange={(e) => setForm({ ...form, barcode: e.target.value })}
-                  placeholder={editingProduct ? (editingProduct.sku || "Use SKU") : "Leave blank to use SKU"}
+                  placeholder="UPC (12 digits) or leave blank to use SKU"
                   className="input-workshop mt-2"
                   data-testid="product-barcode-input"
                 />
                 <p className="text-xs text-slate-500 mt-1">
-                  Leave blank to use SKU for labels & scanning
+                  UPC for vendor products; leave blank to use internal SKU (Code128)
                 </p>
               </div>
             </div>

@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:backend": "cd backend && ENV=development python -m uvicorn server:app --reload --host 0.0.0.0 --port 8000",
+    "dev:backend": "cd backend && ENV=development OLLAMA_BASE_URL=http://localhost:11434 python -m uvicorn server:app --reload --host 0.0.0.0 --port 8000",
     "dev:frontend": "cd frontend && npm run dev"
   },
   "devDependencies": {

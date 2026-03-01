@@ -1,6 +1,6 @@
 """
-AI-powered UOM classification for hardware/building-supply products.
-Uses Google Gemini (google-generativeai) to infer base_unit, sell_uom, pack_qty.
+UOM classification for hardware/building-supply products.
+Uses Google Gemini when LLM_API_KEY is set; otherwise falls back to rule-based infer_uom.
 """
 from typing import List, Optional
 import asyncio
@@ -8,6 +8,8 @@ import json
 import re
 import logging
 
+from config import LLM_AVAILABLE
+from services.document_import import infer_uom as rule_infer_uom
 from services.llm import generate_text
 
 logger = logging.getLogger(__name__)
@@ -26,17 +28,18 @@ def _normalize_unit(raw: str) -> str:
     if not raw or not isinstance(raw, str):
         return "each"
     v = raw.lower().strip()
-    # Common LLM variations
+    # Common LLM variations and abbreviations
     mapping = {
-        "gal": "gallon", "gals": "gallon", "gallons": "gallon",
-        "qts": "quart", "quarts": "quart", "qt": "quart",
-        "pt": "pint", "pints": "pint", "pts": "pint",
-        "lbs": "pound", "lb": "pound", "pounds": "pound",
-        "oz": "ounce", "ozs": "ounce", "ounces": "ounce",
-        "ft": "foot", "feet": "foot", "lf": "foot", "lnft": "foot",
+        "gal": "gallon", "gals": "gallon", "gallons": "gallon", "gal.": "gallon",
+        "qts": "quart", "quarts": "quart", "qt": "quart", "qt.": "quart",
+        "pt": "pint", "pints": "pint", "pts": "pint", "pt.": "pint",
+        "lbs": "pound", "lb": "pound", "pounds": "pound", "lb.": "pound",
+        "oz": "ounce", "ozs": "ounce", "ounces": "ounce", "oz.": "ounce",
+        "ft": "foot", "feet": "foot", "lf": "foot", "lnft": "foot", "ln ft": "foot", "linear foot": "foot",
         "m": "meter", "meters": "meter", "metres": "meter",
         "yd": "yard", "yards": "yard", "yds": "yard",
-        "sq ft": "sqft", "sqft": "sqft", "square feet": "sqft",
+        "sq ft": "sqft", "sqft": "sqft", "square feet": "sqft", "sq. ft": "sqft",
+        "bx": "box", "cs": "case", "pk": "pack", "pkg": "pack", "pkgs": "pack",
         "ea": "each", "pc": "each", "pcs": "each", "piece": "each", "pieces": "each",
     }
     v = mapping.get(v, v)
@@ -91,12 +94,20 @@ Return ONLY valid JSON: {{"base_unit": "...", "sell_uom": "...", "pack_qty": 1}}
 
 async def classify_uom_batch(products: List[dict]) -> List[dict]:
     """
-    Batch classify UOM for multiple products in one LLM call.
-    products: list of {"name": str, "quantity": int?, "price": float?, ...}
+    Classify UOM for products. Uses LLM when available; otherwise rule-based infer_uom.
     Returns same list with base_unit, sell_uom, pack_qty added to each item.
     """
     if not products:
         return []
+
+    # Free path: rule-based (no API key)
+    if not LLM_AVAILABLE:
+        for p in products:
+            bu, su, pq = rule_infer_uom(p.get("name", ""))
+            p["base_unit"] = bu
+            p["sell_uom"] = su
+            p["pack_qty"] = pq
+        return products
 
     for p in products:
         p.setdefault("base_unit", "each")
@@ -111,7 +122,7 @@ Allowed units: {units_str}
 Products:
 {chr(10).join(f'- "{n}"' for n in names)}
 
-For each product, infer base_unit, sell_uom, pack_qty from the name (e.g. "5 Gal Paint" -> gallon/gallon/5, "2x4x8" -> foot/foot/8).
+Infer base_unit, sell_uom, pack_qty from the name. Examples: "5 Gal Paint" -> gallon/gallon/5; "2x4x8 Stud" -> foot/foot/8; "PEX 1/2 100ft" -> foot/foot/100; "Screw Box" -> box/box/1; "Wire 12/2" -> foot/foot/1; "Drywall 4x8" -> sqft/sqft/1; "Concrete 80lb" -> pound/pound/1; "Duct Tape" -> roll/roll/1. Use "each" only when name suggests a single item (faucet, fixture).
 Return ONLY a JSON array, one object per product in same order: [{{"base_unit":"...","sell_uom":"...","pack_qty":1}}, ...]"""
 
     try:

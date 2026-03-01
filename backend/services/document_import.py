@@ -49,22 +49,38 @@ def suggest_department(name: str, departments_by_code: dict) -> Optional[str]:
 
 
 def infer_uom(name: str) -> Tuple[str, str, int]:
-    """Infer base_unit, sell_uom, pack_qty from product name."""
+    """
+    Infer base_unit, sell_uom, pack_qty from product name.
+    Order: explicit patterns first (e.g. 5 gal), then keyword-based rules.
+    """
     n = name.lower()
+
+    # 1. Explicit quantity + unit patterns
     for pattern, unit in [
         (r"(\d+)\s*gal", "gallon"),
+        (r"(\d+)\s*gal\.?", "gallon"),
         (r"gal(?:lon)?\b", "gallon"),
-        (r"(\d+)\s*pk\b", "each"),
-        (r"(\d+)pk\b", "each"),
-        (r"(\d+)\s*pack", "each"),
-        (r"(\d+)\s*ft\b", "foot"),
-        (r"(\d+)\s*'\s*", "foot"),
-        (r"x(\d+)'", "foot"),
+        (r"(\d+)\s*qt\.?", "quart"),
+        (r"quart\b", "quart"),
+        (r"(\d+)\s*pt\.?", "pint"),
+        (r"(\d+)\s*pk\b", "pack"),
+        (r"(\d+)pk\b", "pack"),
+        (r"(\d+)\s*pack", "pack"),
         (r"(\d+)\s*box", "box"),
         (r"(\d+)\s*roll", "roll"),
         (r"(\d+)\s*case", "case"),
         (r"(\d+)\s*lb", "pound"),
+        (r"(\d+)\s*oz", "ounce"),
+        (r"(\d+)\s*ft\b", "foot"),
+        (r"(\d+)\s*'\s*", "foot"),
+        (r"(\d+)'\s*", "foot"),
+        (r"x(\d+)'", "foot"),
+        (r"(\d+)\s*lf\b", "foot"),
+        (r"(\d+)\s*ln\s*ft", "foot"),
         (r"sq\s*ft", "sqft"),
+        (r"(\d+)\s*sq\s*ft", "sqft"),
+        (r"(\d+)\s*bag", "bag"),
+        (r"(\d+)\s*kit", "kit"),
     ]:
         m = re.search(pattern, n, re.IGNORECASE)
         if m and unit in ALLOWED_BASE_UNITS:
@@ -75,6 +91,68 @@ def infer_uom(name: str) -> Tuple[str, str, int]:
                 except (ValueError, TypeError):
                     pass
             return unit, unit, pq
+
+    # 2. Roll (before linear - tape, mesh are roll not foot)
+    roll_keywords = ["tape", "screen", "mesh", "landscape fabric", "vapor barrier", "house wrap"]
+    if any(kw in n for kw in roll_keywords):
+        return "roll", "roll", 1
+
+    # 3. Keyword-based inference (linear / by foot)
+    linear_keywords = [
+        "pipe", "pvc", "cpvc", "pex", "conduit", "emt", "wire", "cable", "romex",
+        "rope", "hose", "chain", "cord", "extension cord", "trim", "moulding", "molding",
+        "lumber", "stud", "2x4", "2x6", "2x8", "1x4", "1x6", "board", "furring",
+        "rebar", "angle iron", "duct", "ductwork", "flex duct", "b vent",
+        "sill plate", "joist", "rafter", "siding", "fencing", "fence",
+    ]
+    if any(kw in n for kw in linear_keywords):
+        # Extract length if present (e.g. "2x4x8" -> 8, "100ft" -> 100)
+        len_matches = re.findall(r"(?:x|\*)(\d+)\b", n)
+        pq = max(1, int(len_matches[-1])) if len_matches else 1
+        ft_m = re.search(r"(\d+)\s*ft\b", n) or re.search(r"(\d+)\s*'\s*", n)
+        if ft_m:
+            pq = max(1, int(ft_m.group(1)))
+        return "foot", "foot", pq
+
+    # 3. Liquid / coatings
+    liquid_keywords = ["paint", "stain", "primer", "sealer", "thinner", "polyurethane", "varnish"]
+    if any(kw in n for kw in liquid_keywords):
+        if "quart" in n or "qt" in n:
+            return "quart", "quart", 1
+        if "pint" in n or "pt" in n:
+            return "pint", "pint", 1
+        return "gallon", "gallon", 1
+
+    # 5. Box / pack (fasteners, small parts)
+    box_keywords = ["screw", "nail", "bolt", "nut", "washer", "anchor", "fastener", "rivet", "staple"]
+    if any(kw in n for kw in box_keywords):
+        if "box" in n or "bx" in n:
+            return "box", "box", 1
+        if "pack" in n or "pk" in n or "pkg" in n:
+            return "pack", "pack", 1
+        if "case" in n:
+            return "case", "case", 1
+        return "box", "box", 1
+
+    # 6. Sqft (sheet goods)
+    sqft_keywords = ["drywall", "sheetrock", "plywood", "osb", "mdf", "hardboard", "insulation board", "ceiling tile"]
+    if any(kw in n for kw in sqft_keywords):
+        return "sqft", "sqft", 1
+
+    # 7. Bag (bulk) - concrete, soil, etc
+    bag_keywords = ["concrete", "mortar", "grout", "sand", "gravel", "mulch", "soil", "fertilizer"]
+    if any(kw in n for kw in bag_keywords):
+        if "lb" in n or "pound" in n:
+            return "pound", "pound", 1
+        return "bag", "bag", 1
+
+    # 8. Kit / each (assemblies, fixtures)
+    kit_keywords = ["kit", "assembly", "faucet", "light fixture", "vanity", "toilet", "sink"]
+    if any(kw in n for kw in kit_keywords):
+        if "kit" in n:
+            return "kit", "kit", 1
+        return "each", "each", 1
+
     return "each", "each", 1
 
 

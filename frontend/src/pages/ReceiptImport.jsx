@@ -44,6 +44,7 @@ const ReceiptImport = () => {
   const [csvFile, setCsvFile] = useState(null);
   const [csvImporting, setCsvImporting] = useState(false);
   const [csvResult, setCsvResult] = useState(null);
+  const [useAi, setUseAi] = useState(false);
 
   useEffect(() => {
     fetchDepartments();
@@ -119,7 +120,8 @@ const ReceiptImport = () => {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await axios.post(`${API}/documents/parse`, formData, {
+      const url = `${API}/documents/parse${useAi ? "?use_ai=true" : ""}`;
+      const response = await axios.post(url, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
@@ -206,6 +208,9 @@ const ReceiptImport = () => {
         ? `Imported ${created} new products, added to ${matched} existing${response.data.vendor_created ? " (new vendor)" : ""}!`
         : `Imported ${created} products${response.data.vendor_created ? " (new vendor created)" : ""}!`;
       toast.success(msg);
+      if (response.data.warnings?.length > 0) {
+        toast.info(`${response.data.warnings.length} product(s) had invalid barcode; SKU used instead`);
+      }
 
       setFile(null);
       setPreview(null);
@@ -260,6 +265,9 @@ const ReceiptImport = () => {
       if (response.data.errors > 0) {
         toast.warning(`${response.data.errors} rows had errors`);
       }
+      if (response.data.warnings?.length > 0) {
+        toast.info(`${response.data.warnings.length} product(s) had invalid barcode; SKU used instead`);
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || "CSV import failed");
     } finally {
@@ -271,21 +279,21 @@ const ReceiptImport = () => {
     <div className="p-8" data-testid="receipt-import-page">
       {/* Header with AI badge */}
       <div className="mb-8">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-violet-500/10 to-amber-500/10 border border-violet-200/50 mb-4">
-          <Sparkles className="w-4 h-4 text-violet-500" />
-          <span className="text-sm font-medium text-violet-700">AI-powered</span>
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 mb-4">
+          <Package className="w-4 h-4 text-slate-600" />
+          <span className="text-sm font-medium text-slate-700">Document import</span>
         </div>
         <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
           Document Import
         </h1>
         <p className="text-slate-500 mt-1 text-sm">
-          Upload receipts, invoices, or PDFs; bulk import from CSV
+          Upload receipts, invoices, or PDFs (free OCR); bulk import from CSV
         </p>
       </div>
 
       <Tabs defaultValue="receipt" className="mt-4">
         <TabsList className="mb-4">
-          <TabsTrigger value="receipt">Document (AI)</TabsTrigger>
+          <TabsTrigger value="receipt">Document</TabsTrigger>
           <TabsTrigger value="csv">CSV Bulk Import</TabsTrigger>
         </TabsList>
 
@@ -360,6 +368,15 @@ const ReceiptImport = () => {
                 <span>{file?.name}</span>
               </div>
 
+              <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                <Checkbox
+                  checked={useAi}
+                  onCheckedChange={(c) => setUseAi(!!c)}
+                  className="border-slate-300"
+                />
+                Use AI (better accuracy, requires LLM_API_KEY)
+              </label>
+
               <Button
                 onClick={extractReceipt}
                 disabled={extracting}
@@ -369,12 +386,12 @@ const ReceiptImport = () => {
                 {extracting ? (
                   <>
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    AI extracting…
+                    {useAi ? "AI extracting…" : "Extracting…"}
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-5 h-5 mr-2" />
-                    Extract with AI
+                    {useAi ? <Sparkles className="w-5 h-5 mr-2" /> : <FileText className="w-5 h-5 mr-2" />}
+                    {useAi ? "Extract with AI" : "Extract (free OCR)"}
                   </>
                 )}
               </Button>
@@ -649,6 +666,7 @@ const ReceiptImport = () => {
                   <p className="font-medium text-slate-900">
                     Imported {csvResult.imported} products
                     {csvResult.errors > 0 && ` · ${csvResult.errors} errors`}
+                    {csvResult.warnings?.length > 0 && ` · ${csvResult.warnings.length} barcode warnings`}
                   </p>
                   {csvResult.error_details?.length > 0 && (
                     <details className="mt-2">
@@ -656,6 +674,16 @@ const ReceiptImport = () => {
                       <ul className="mt-2 space-y-1 text-slate-600 text-xs max-h-32 overflow-auto">
                         {csvResult.error_details.map((e, i) => (
                           <li key={i}>{e.product}: {e.error}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                  {csvResult.warnings?.length > 0 && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-amber-600">View barcode warnings</summary>
+                      <ul className="mt-2 space-y-1 text-slate-600 text-xs max-h-32 overflow-auto">
+                        {csvResult.warnings.map((w, i) => (
+                          <li key={i}>{w.product}: {w.warning}</li>
                         ))}
                       </ul>
                     </details>
