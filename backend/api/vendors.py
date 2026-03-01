@@ -12,7 +12,8 @@ router = APIRouter(prefix="/vendors", tags=["vendors"])
 
 @router.get("", response_model=List[Vendor])
 async def get_vendors(current_user: dict = Depends(require_role("admin", "warehouse_manager"))):
-    return await vendor_repo.list_all()
+    org_id = current_user.get("organization_id") or "default"
+    return await vendor_repo.list_all(org_id)
 
 
 @router.post("", response_model=Vendor)

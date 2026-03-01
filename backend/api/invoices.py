@@ -46,8 +46,9 @@ async def create_invoice(
     current_user: dict = Depends(require_role("admin")),
 ):
     """Create invoice from selected unpaid withdrawals. All must share same billing_entity."""
+    org_id = current_user.get("organization_id") or "default"
     try:
-        inv = await invoice_repo.create_from_withdrawals(data.withdrawal_ids)
+        inv = await invoice_repo.create_from_withdrawals(data.withdrawal_ids, organization_id=org_id)
         return inv
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

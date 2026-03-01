@@ -248,11 +248,12 @@ async def update(
     return await get_by_id(invoice_id)
 
 
-async def add_withdrawals(invoice_id: str, withdrawal_ids: list) -> Optional[dict]:
+async def add_withdrawals(invoice_id: str, withdrawal_ids: list, organization_id: Optional[str] = None) -> Optional[dict]:
     """Link withdrawals to invoice. Validates: unpaid, same billing_entity, not already on another invoice."""
     if not withdrawal_ids:
         return await get_by_id(invoice_id)
     conn = get_connection()
+    org_id = organization_id or "default"
 
     from repositories.withdrawal_repo import withdrawal_repo
 
@@ -261,7 +262,7 @@ async def add_withdrawals(invoice_id: str, withdrawal_ids: list) -> Optional[dic
     contact_name = ""
     contact_email = ""
     for wid in withdrawal_ids:
-        w = await withdrawal_repo.get_by_id(wid)
+        w = await withdrawal_repo.get_by_id(wid, organization_id=org_id)
         if not w:
             raise ValueError(f"Withdrawal {wid} not found")
         if w.get("payment_status") != "unpaid":
@@ -335,19 +336,20 @@ async def add_withdrawals(invoice_id: str, withdrawal_ids: list) -> Optional[dic
     return await get_by_id(invoice_id)
 
 
-async def create_from_withdrawals(withdrawal_ids: list, conn=None) -> dict:
+async def create_from_withdrawals(withdrawal_ids: list, organization_id: Optional[str] = None, conn=None) -> dict:
     """Create new invoice from unpaid withdrawals. All must share same billing_entity."""
     from repositories.withdrawal_repo import withdrawal_repo
 
     if not withdrawal_ids:
         raise ValueError("At least one withdrawal required")
 
+    org_id = organization_id or "default"
     withdrawals = []
     billing_entity = None
     contact_name = ""
     contact_email = ""
     for wid in withdrawal_ids:
-        w = await withdrawal_repo.get_by_id(wid)
+        w = await withdrawal_repo.get_by_id(wid, organization_id=org_id)
         if not w:
             raise ValueError(f"Withdrawal {wid} not found")
         if w.get("payment_status") != "unpaid":
@@ -361,7 +363,6 @@ async def create_from_withdrawals(withdrawal_ids: list, conn=None) -> dict:
         contact_name = w.get("contractor_name") or w.get("contractor_company") or ""
         withdrawals.append(w)
 
-    org_id = withdrawals[0].get("organization_id") or "default"
     inv_id = str(uuid4())
     total_subtotal = 0.0
     total_tax = 0.0

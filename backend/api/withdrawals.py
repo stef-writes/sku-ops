@@ -71,18 +71,21 @@ async def get_withdrawal(withdrawal_id: str, current_user: dict = Depends(get_cu
 
 @router.put("/{withdrawal_id}/mark-paid")
 async def mark_withdrawal_paid(withdrawal_id: str, current_user: dict = Depends(require_role("admin"))):
+    org_id = current_user.get("organization_id") or "default"
+    withdrawal = await withdrawal_repo.get_by_id(withdrawal_id, org_id)
+    if not withdrawal:
+        raise HTTPException(status_code=404, detail="Withdrawal not found")
     paid_at = datetime.now(timezone.utc).isoformat()
     result = await withdrawal_repo.mark_paid(withdrawal_id, paid_at)
-    if not result:
-        raise HTTPException(status_code=404, detail="Withdrawal not found")
     await invoice_repo.mark_paid_for_withdrawal(withdrawal_id)
     return result
 
 
 @router.put("/bulk-mark-paid")
 async def bulk_mark_paid(withdrawal_ids: List[str] = Body(...), current_user: dict = Depends(require_role("admin"))):
+    org_id = current_user.get("organization_id") or "default"
     paid_at = datetime.now(timezone.utc).isoformat()
-    updated = await withdrawal_repo.bulk_mark_paid(withdrawal_ids, paid_at)
+    updated = await withdrawal_repo.bulk_mark_paid(withdrawal_ids, paid_at, organization_id=org_id)
     for wid in withdrawal_ids:
         await invoice_repo.mark_paid_for_withdrawal(wid)
     return {"updated": updated}

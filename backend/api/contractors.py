@@ -39,17 +39,27 @@ async def create_contractor(data: UserCreate, current_user: dict = Depends(requi
 
 @router.put("/{contractor_id}")
 async def update_contractor(contractor_id: str, data: UserUpdate, current_user: dict = Depends(require_role("admin"))):
-    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    org_id = current_user.get("organization_id") or "default"
     contractor = await user_repo.get_by_id(contractor_id)
     if not contractor or contractor.get("role") != "contractor":
         raise HTTPException(status_code=404, detail="Contractor not found")
+    if contractor.get("organization_id") != org_id:
+        raise HTTPException(status_code=404, detail="Contractor not found")
 
+    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
     result = await user_repo.update(contractor_id, update_data)
     return {k: v for k, v in result.items() if k != "password"}
 
 
 @router.delete("/{contractor_id}")
 async def delete_contractor(contractor_id: str, current_user: dict = Depends(require_role("admin"))):
+    org_id = current_user.get("organization_id") or "default"
+    contractor = await user_repo.get_by_id(contractor_id)
+    if not contractor or contractor.get("role") != "contractor":
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    if contractor.get("organization_id") != org_id:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+
     deleted = await user_repo.delete_contractor(contractor_id)
     if deleted == 0:
         raise HTTPException(status_code=404, detail="Contractor not found")
