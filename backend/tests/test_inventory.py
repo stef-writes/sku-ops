@@ -1,10 +1,8 @@
 """Tests for inventory service and withdrawal stock changes."""
 import pytest
 
-from db import get_connection
 from domain.exceptions import InsufficientStockError
 from models.withdrawal import WithdrawalItem
-from repositories import department_repo, product_repo
 from services.inventory import process_withdrawal_stock_changes
 from services.product_lifecycle import create_product
 
@@ -12,15 +10,6 @@ from services.product_lifecycle import create_product
 @pytest.mark.asyncio
 async def test_insufficient_stock_raises(db):
     """Withdrawal with quantity exceeding available raises InsufficientStockError."""
-    from db import init_db, close_db
-    await init_db()
-    conn = get_connection()
-    await conn.execute(
-        """INSERT OR REPLACE INTO departments (id, name, code, description, product_count, created_at)
-           VALUES ('dept-1', 'Hardware', 'HDW', 'HW', 0, datetime('now'))"""
-    )
-    await conn.commit()
-
     product = await create_product(
         department_id="dept-1",
         department_name="Hardware",
@@ -51,4 +40,3 @@ async def test_insufficient_stock_raises(db):
 
     assert exc_info.value.requested == 5
     assert exc_info.value.available == 2
-    await close_db()
