@@ -26,9 +26,10 @@ def _line_item_row_to_dict(row) -> Optional[dict]:
     return d
 
 
-async def _next_invoice_number() -> str:
+async def _next_invoice_number(conn=None) -> str:
     """Generate next invoice number: INV-00001, INV-00002, etc."""
-    conn = get_connection()
+    in_transaction = conn is not None
+    conn = conn or get_connection()
     await conn.execute(
         """INSERT INTO invoice_counters (key, counter) VALUES ('inv', 1)
            ON CONFLICT(key) DO UPDATE SET counter = counter + 1""",
@@ -37,7 +38,8 @@ async def _next_invoice_number() -> str:
         "SELECT counter FROM invoice_counters WHERE key = 'inv'",
     )
     row = await cursor.fetchone()
-    await conn.commit()
+    if not in_transaction:
+        await conn.commit()
     num = row[0] if row else 1
     return f"INV-{str(num).zfill(5)}"
 
@@ -312,7 +314,7 @@ async def add_withdrawals(invoice_id: str, withdrawal_ids: list) -> Optional[dic
     return await get_by_id(invoice_id)
 
 
-async def create_from_withdrawals(withdrawal_ids: list) -> dict:
+async def create_from_withdrawals(withdrawal_ids: list, conn=None) -> dict:
     """Create new invoice from unpaid withdrawals. All must share same billing_entity."""
     from repositories.withdrawal_repo import withdrawal_repo
 
@@ -341,9 +343,10 @@ async def create_from_withdrawals(withdrawal_ids: list) -> dict:
     inv_id = str(uuid4())
     total_subtotal = 0.0
     total_tax = 0.0
-    conn = get_connection()
+    in_transaction = conn is not None
+    conn = conn or get_connection()
     now = datetime.now(timezone.utc).isoformat()
-    invoice_number = await _next_invoice_number()
+    invoice_number = await _next_invoice_number(conn)
 
     await conn.execute(
         """INSERT INTO invoices (id, invoice_number, billing_entity, contact_name, contact_email,
@@ -389,7 +392,8 @@ async def create_from_withdrawals(withdrawal_ids: list) -> dict:
             (inv_id, wid),
         )
 
-    await conn.commit()
+    if not in_transaction:
+        await conn.commit()
     return (await get_by_id(inv_id)) or {}
 
 

@@ -4,14 +4,15 @@ from typing import Optional
 from db import get_connection
 
 
-def _row_to_dict(row) -> dict:
+def _row_to_dict(row) -> Optional[dict]:
     if row is None:
         return None
     return dict(row) if hasattr(row, "keys") else {}
 
 
-async def insert_transaction(tx_dict: dict) -> None:
-    conn = get_connection()
+async def insert_transaction(tx_dict: dict, conn=None) -> None:
+    in_transaction = conn is not None
+    conn = conn or get_connection()
     await conn.execute(
         """INSERT INTO stock_transactions (id, product_id, sku, product_name, quantity_delta, quantity_before,
            quantity_after, transaction_type, reference_id, reference_type, reason, user_id, user_name, created_at)
@@ -33,7 +34,8 @@ async def insert_transaction(tx_dict: dict) -> None:
             tx_dict.get("created_at", ""),
         ),
     )
-    await conn.commit()
+    if not in_transaction:
+        await conn.commit()
 
 
 async def list_by_product(product_id: str, limit: int = 50) -> list:

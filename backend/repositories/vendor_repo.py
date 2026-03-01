@@ -65,13 +65,15 @@ async def insert(vendor_dict: dict) -> None:
     await conn.commit()
 
 
-async def update(vendor_id: str, vendor_dict: dict) -> Optional[dict]:
-    conn = get_connection()
+async def update(vendor_id: str, vendor_dict: dict, conn=None) -> Optional[dict]:
+    in_transaction = conn is not None
+    conn = conn or get_connection()
+    new_name = vendor_dict.get("name", "")
     await conn.execute(
         """UPDATE vendors SET name = ?, contact_name = ?, email = ?, phone = ?, address = ?
            WHERE id = ?""",
         (
-            vendor_dict.get("name", ""),
+            new_name,
             vendor_dict.get("contact_name", ""),
             vendor_dict.get("email", ""),
             vendor_dict.get("phone", ""),
@@ -79,7 +81,12 @@ async def update(vendor_id: str, vendor_dict: dict) -> Optional[dict]:
             vendor_id,
         ),
     )
-    await conn.commit()
+    await conn.execute(
+        "UPDATE products SET vendor_name = ? WHERE vendor_id = ?",
+        (new_name, vendor_id),
+    )
+    if not in_transaction:
+        await conn.commit()
     return await get_by_id(vendor_id)
 
 
@@ -97,13 +104,15 @@ async def count() -> int:
     return row[0] if row else 0
 
 
-async def increment_product_count(vendor_id: str, delta: int) -> None:
-    conn = get_connection()
+async def increment_product_count(vendor_id: str, delta: int, conn=None) -> None:
+    in_transaction = conn is not None
+    conn = conn or get_connection()
     await conn.execute(
         "UPDATE vendors SET product_count = product_count + ? WHERE id = ?",
         (delta, vendor_id),
     )
-    await conn.commit()
+    if not in_transaction:
+        await conn.commit()
 
 
 class VendorRepo:

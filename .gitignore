@@ -66,6 +66,8 @@ agenthub/agents/youtube/db
 data/
 backend/data/*.db
 backend/data/*.db-*
+backend/:memory:
+backend/:memory:*
 
 # Archive files and large assets
 **/*.zip

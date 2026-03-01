@@ -1,5 +1,6 @@
 """Database connection and configuration - SQLite with aiosqlite."""
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import aiosqlite
@@ -220,6 +221,13 @@ async def init_db() -> None:
         await _conn.commit()
     except Exception:
         pass
+    # Migration: enforce SKU uniqueness (drop non-unique index, create unique index)
+    try:
+        await _conn.execute("DROP INDEX IF EXISTS idx_products_sku")
+        await _conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_products_sku ON products(sku)")
+        await _conn.commit()
+    except Exception:
+        pass
 
 
 def get_connection() -> aiosqlite.Connection:
@@ -227,6 +235,23 @@ def get_connection() -> aiosqlite.Connection:
     if _conn is None:
         raise RuntimeError("Database not initialized. Call init_db() at startup.")
     return _conn
+
+
+@asynccontextmanager
+async def transaction():
+    """
+    Async context manager for database transactions.
+    Commits on success, rolls back on exception.
+    Yields the connection for use by repos (pass conn to avoid their commit).
+    """
+    conn = get_connection()
+    await conn.execute("BEGIN")
+    try:
+        yield conn
+        await conn.commit()
+    except Exception:
+        await conn.rollback()
+        raise
 
 
 async def close_db() -> None:

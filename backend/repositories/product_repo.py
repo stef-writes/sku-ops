@@ -66,8 +66,8 @@ async def count_products(
     return row[0] if row else 0
 
 
-async def get_by_id(product_id: str, columns: Optional[str] = "*") -> Optional[dict]:
-    conn = get_connection()
+async def get_by_id(product_id: str, columns: Optional[str] = "*", conn=None) -> Optional[dict]:
+    conn = conn or get_connection()
     cursor = await conn.execute(
         f"SELECT {columns} FROM products WHERE id = ?",
         (product_id,),
@@ -91,8 +91,9 @@ async def find_by_original_sku_and_vendor(original_sku: str, vendor_id: str) -> 
     return _row_to_dict(row)
 
 
-async def insert(product_dict: dict) -> None:
-    conn = get_connection()
+async def insert(product_dict: dict, conn=None) -> None:
+    in_transaction = conn is not None
+    conn = conn or get_connection()
     await conn.execute(
         """INSERT INTO products (id, sku, name, description, price, cost, quantity, min_stock,
            department_id, department_name, vendor_id, vendor_name, original_sku, barcode,
@@ -120,11 +121,13 @@ async def insert(product_dict: dict) -> None:
             product_dict.get("updated_at", ""),
         ),
     )
-    await conn.commit()
+    if not in_transaction:
+        await conn.commit()
 
 
-async def update(product_id: str, updates: dict) -> Optional[dict]:
-    conn = get_connection()
+async def update(product_id: str, updates: dict, conn=None) -> Optional[dict]:
+    in_transaction = conn is not None
+    conn = conn or get_connection()
     set_parts = ["updated_at = ?"]
     values = [updates.get("updated_at", "")]
     for key in ("name", "description", "price", "cost", "quantity", "min_stock",
@@ -144,39 +147,46 @@ async def update(product_id: str, updates: dict) -> Optional[dict]:
         f"UPDATE products SET {', '.join(set_parts)} WHERE id = ?",
         values,
     )
-    await conn.commit()
-    return await get_by_id(product_id)
+    if not in_transaction:
+        await conn.commit()
+    return await get_by_id(product_id, conn=conn)
 
 
-async def delete(product_id: str) -> int:
-    conn = get_connection()
+async def delete(product_id: str, conn=None) -> int:
+    in_transaction = conn is not None
+    conn = conn or get_connection()
     cursor = await conn.execute("DELETE FROM products WHERE id = ?", (product_id,))
-    await conn.commit()
+    if not in_transaction:
+        await conn.commit()
     return cursor.rowcount
 
 
-async def atomic_decrement(product_id: str, quantity: int, updated_at: str) -> Optional[dict]:
+async def atomic_decrement(product_id: str, quantity: int, updated_at: str, conn=None) -> Optional[dict]:
     """Decrement quantity only if >= requested. Returns updated row or None if insufficient."""
-    conn = get_connection()
+    in_transaction = conn is not None
+    conn = conn or get_connection()
     cursor = await conn.execute(
         """UPDATE products SET quantity = quantity - ?, updated_at = ?
            WHERE id = ? AND quantity >= ?""",
         (quantity, updated_at, product_id, quantity),
     )
-    await conn.commit()
+    if not in_transaction:
+        await conn.commit()
     if cursor.rowcount == 0:
         return None
-    return await get_by_id(product_id)
+    return await get_by_id(product_id, conn=conn)
 
 
-async def increment_quantity(product_id: str, quantity: int, updated_at: str) -> None:
+async def increment_quantity(product_id: str, quantity: int, updated_at: str, conn=None) -> None:
     """Rollback: add quantity back."""
-    conn = get_connection()
+    in_transaction = conn is not None
+    conn = conn or get_connection()
     await conn.execute(
         "UPDATE products SET quantity = quantity + ?, updated_at = ? WHERE id = ?",
         (quantity, updated_at, product_id),
     )
-    await conn.commit()
+    if not in_transaction:
+        await conn.commit()
 
 
 async def add_quantity(product_id: str, quantity: int, updated_at: str) -> Optional[dict]:
@@ -187,6 +197,23 @@ async def add_quantity(product_id: str, quantity: int, updated_at: str) -> Optio
         (quantity, updated_at, product_id),
     )
     await conn.commit()
+    return await get_by_id(product_id)
+
+
+async def atomic_adjust(product_id: str, quantity_delta: int, updated_at: str) -> Optional[dict]:
+    """
+    Atomically adjust quantity by delta (+ or -).
+    Returns updated row or None if adjustment would result in negative stock.
+    """
+    conn = get_connection()
+    cursor = await conn.execute(
+        """UPDATE products SET quantity = quantity + ?, updated_at = ?
+           WHERE id = ? AND quantity + ? >= 0""",
+        (quantity_delta, updated_at, product_id, quantity_delta),
+    )
+    await conn.commit()
+    if cursor.rowcount == 0:
+        return None
     return await get_by_id(product_id)
 
 
@@ -225,6 +252,7 @@ class ProductRepo:
     atomic_decrement = staticmethod(atomic_decrement)
     increment_quantity = staticmethod(increment_quantity)
     add_quantity = staticmethod(add_quantity)
+    atomic_adjust = staticmethod(atomic_adjust)
     count_all = staticmethod(count_all)
     count_low_stock = staticmethod(count_low_stock)
     list_low_stock = staticmethod(list_low_stock)

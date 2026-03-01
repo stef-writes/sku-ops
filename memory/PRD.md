@@ -39,15 +39,11 @@ Build a complete hardware storefront, POS, and inventory management system with 
 - [x] "Charge to Account" for later invoicing
 
 ## SKU System
-Format: `DEPT-XXXXX` (e.g., LUM-00001, PLU-00002)
-- LUM: Lumber
-- PLU: Plumbing
-- ELE: Electrical
-- PNT: Paint
-- TOL: Tools
-- HDW: Hardware
-- GDN: Garden
-- APP: Appliances
+Format: `DEPT-SLUG-NNNNNN` (e.g., LUM-PIPE-000001, PLU-FITT-000002)
+- DEPT: Department code (3 letters, uppercase)
+- SLUG: Alphanumeric derived from product name (max 6 chars), or "ITM" if empty
+- NNNNNN: Zero-padded 6-digit counter per department
+- Standard department codes: LUM (Lumber), PLU (Plumbing), ELE (Electrical), PNT (Paint), TOL (Tools), HDW (Hardware), GDN (Garden), APP (Appliances)
 
 ## What's Been Implemented
 
@@ -107,11 +103,11 @@ Format: `DEPT-XXXXX` (e.g., LUM-00001, PLU-00002)
 - **Import flows**: Receipt and vendor PDF imports now record IMPORT transactions in the ledger
 
 ### Backend Modularization
-- `backend/db.py` — MongoDB connection, `ensure_indexes()` on startup
+- `backend/db.py` — SQLite connection (aiosqlite), table creation, migrations on startup
 - `backend/auth.py` — JWT helpers, `get_current_user`, `require_role`
 - `backend/models/` — Pydantic models (user, department, vendor, product, withdrawal, stock)
 - `backend/services/inventory.py` — `process_withdrawal_stock_changes`, `process_import_stock_changes`, `get_stock_history`
-- MongoDB indexes for products, withdrawals, stock_transactions
+- SQLite indexes on products (department, sku UNIQUE, vendor), withdrawals, stock_transactions
 
 ## Test Credentials
 - Admin: `admin@test.com` / `password123`

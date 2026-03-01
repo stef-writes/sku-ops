@@ -14,8 +14,9 @@ def _row_to_dict(row) -> Optional[dict]:
     return d
 
 
-async def insert(withdrawal_dict: dict) -> None:
-    conn = get_connection()
+async def insert(withdrawal_dict: dict, conn=None) -> None:
+    in_transaction = conn is not None
+    conn = conn or get_connection()
     items_json = json.dumps([i if isinstance(i, dict) else i.model_dump() for i in withdrawal_dict["items"]])
     await conn.execute(
         """INSERT INTO withdrawals (id, items, job_id, service_address, notes, subtotal, tax, total, cost_total,
@@ -44,7 +45,8 @@ async def insert(withdrawal_dict: dict) -> None:
             withdrawal_dict.get("created_at", ""),
         ),
     )
-    await conn.commit()
+    if not in_transaction:
+        await conn.commit()
 
 
 async def list_withdrawals(

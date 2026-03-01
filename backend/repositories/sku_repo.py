@@ -24,15 +24,16 @@ async def get_all_counters() -> dict:
 
 
 async def increment_and_get(department_code: str) -> int:
+    code = (department_code or "").strip().upper()
     conn = get_connection()
     await conn.execute(
         """INSERT INTO sku_counters (department_code, counter) VALUES (?, 1)
            ON CONFLICT(department_code) DO UPDATE SET counter = counter + 1""",
-        (department_code,),
+        (code,),
     )
     cursor = await conn.execute(
         "SELECT counter FROM sku_counters WHERE department_code = ?",
-        (department_code,),
+        (code,),
     )
     row = await cursor.fetchone()
     await conn.commit()

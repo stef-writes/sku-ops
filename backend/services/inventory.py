@@ -9,20 +9,11 @@ from typing import List, Optional, Tuple
 
 from fastapi import HTTPException
 
+from domain.exceptions import InsufficientStockError
 from models.stock import StockTransaction, StockTransactionType
 from models.withdrawal import WithdrawalItem
 from repositories.product_repo import product_repo
 from repositories.stock_repo import stock_repo
-
-
-class InsufficientStockError(HTTPException):
-    """Raised when a product has insufficient quantity for withdrawal."""
-
-    def __init__(self, sku: str, requested: int, available: int):
-        super().__init__(
-            status_code=400,
-            detail=f"Insufficient stock for {sku}: requested {requested}, available {available}",
-        )
 
 
 async def _record_stock_transaction(
@@ -36,6 +27,7 @@ async def _record_stock_transaction(
     user_name: str,
     reference_id: Optional[str] = None,
     reason: Optional[str] = None,
+    conn=None,
 ) -> None:
     """Append an immutable transaction to the stock ledger."""
     quantity_after = quantity_before + quantity_delta
@@ -53,7 +45,7 @@ async def _record_stock_transaction(
         user_id=user_id,
         user_name=user_name,
     )
-    await stock_repo.insert_transaction(tx.model_dump())
+    await stock_repo.insert_transaction(tx.model_dump(), conn=conn)
 
 
 async def process_withdrawal_stock_changes(
@@ -61,11 +53,13 @@ async def process_withdrawal_stock_changes(
     withdrawal_id: str,
     user_id: str,
     user_name: str,
+    conn=None,
 ) -> None:
     """
     Atomically decrement product quantities for a withdrawal.
     Uses UPDATE with quantity guard to prevent overselling.
-    Rolls back on first failure (caller should handle).
+    Rolls back all completed decrements on any failure (InsufficientStockError or other).
+    When conn is provided, runs inside that transaction (no commit).
     """
     now = datetime.now(timezone.utc).isoformat()
     completed: List[Tuple[str, int]] = []  # (product_id, quantity) for rollback
@@ -73,11 +67,11 @@ async def process_withdrawal_stock_changes(
     try:
         for item in items:
             result = await product_repo.atomic_decrement(
-                item.product_id, item.quantity, now
+                item.product_id, item.quantity, now, conn=conn
             )
 
             if not result:
-                product = await product_repo.get_by_id(item.product_id, "quantity, sku")
+                product = await product_repo.get_by_id(item.product_id, "quantity, sku", conn=conn)
                 available = product.get("quantity", 0) if product else 0
                 raise InsufficientStockError(
                     sku=item.sku, requested=item.quantity, available=available
@@ -94,12 +88,14 @@ async def process_withdrawal_stock_changes(
                 user_id=user_id,
                 user_name=user_name,
                 reference_id=withdrawal_id,
+                conn=conn,
             )
             completed.append((item.product_id, item.quantity))
 
-    except InsufficientStockError:
+    except Exception:
+        # Roll back all completed decrements on any failure
         for product_id, qty in completed:
-            await product_repo.increment_quantity(product_id, qty, now)
+            await product_repo.increment_quantity(product_id, qty, now, conn=conn)
         raise
 
 
@@ -139,6 +135,7 @@ async def process_import_stock_changes(
     quantity: int,
     user_id: str,
     user_name: str,
+    conn=None,
 ) -> None:
     """Record stock added via bulk import (new product creation - no delta from existing)."""
     await _record_stock_transaction(
@@ -150,6 +147,7 @@ async def process_import_stock_changes(
         transaction_type=StockTransactionType.IMPORT,
         user_id=user_id,
         user_name=user_name,
+        conn=conn,
     )
 
 
@@ -168,24 +166,27 @@ async def process_adjustment_stock_changes(
     user_id: str,
     user_name: str,
 ) -> None:
-    """Adjust stock (count, damage, correction) and record transaction."""
+    """
+    Adjust stock (count, damage, correction) and record transaction.
+    Uses atomic UPDATE to avoid TOCTOU race conditions.
+    """
     if quantity_delta == 0:
         raise ValueError("quantity_delta must not be zero")
     now = datetime.now(timezone.utc).isoformat()
     product = await product_repo.get_by_id(product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    quantity_before = product.get("quantity", 0)
-    quantity_after = quantity_before + quantity_delta
-    if quantity_after < 0:
+
+    result = await product_repo.atomic_adjust(product_id, quantity_delta, now)
+    if not result:
+        quantity_before = product.get("quantity", 0)
         raise HTTPException(
             status_code=400,
             detail=f"Cannot adjust: would result in negative stock (current: {quantity_before}, delta: {quantity_delta})",
         )
-    await product_repo.update(
-        product_id,
-        {"quantity": quantity_after, "updated_at": now},
-    )
+
+    quantity_after = result.get("quantity", 0)
+    quantity_before = quantity_after - quantity_delta
     await _record_stock_transaction(
         product_id=product_id,
         sku=product.get("sku", ""),

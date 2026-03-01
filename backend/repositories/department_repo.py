@@ -56,13 +56,19 @@ async def insert(dept_dict: dict) -> None:
     await conn.commit()
 
 
-async def update(dept_id: str, name: str, description: str) -> Optional[dict]:
-    conn = get_connection()
+async def update(dept_id: str, name: str, description: str, conn=None) -> Optional[dict]:
+    in_transaction = conn is not None
+    conn = conn or get_connection()
     await conn.execute(
         "UPDATE departments SET name = ?, description = ? WHERE id = ?",
         (name, description or "", dept_id),
     )
-    await conn.commit()
+    await conn.execute(
+        "UPDATE products SET department_name = ? WHERE department_id = ?",
+        (name, dept_id),
+    )
+    if not in_transaction:
+        await conn.commit()
     return await get_by_id(dept_id)
 
 
@@ -83,13 +89,15 @@ async def delete(dept_id: str) -> int:
     return cursor.rowcount
 
 
-async def increment_product_count(dept_id: str, delta: int) -> None:
-    conn = get_connection()
+async def increment_product_count(dept_id: str, delta: int, conn=None) -> None:
+    in_transaction = conn is not None
+    conn = conn or get_connection()
     await conn.execute(
         "UPDATE departments SET product_count = product_count + ? WHERE id = ?",
         (delta, dept_id),
     )
-    await conn.commit()
+    if not in_transaction:
+        await conn.commit()
 
 
 class DepartmentRepo:
