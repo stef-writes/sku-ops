@@ -102,6 +102,9 @@ ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6").strip()
 ANTHROPIC_FAST_MODEL = os.environ.get("ANTHROPIC_FAST_MODEL", "claude-haiku-4-5").strip() or "claude-haiku-4-5"
 LLM_SETUP_URL = "https://console.anthropic.com/"
 LLM_AVAILABLE = ANTHROPIC_AVAILABLE  # alias used by enrichment/uom services
+# Extended thinking for chat agents. 0 = off (uses Haiku). >0 = budget in tokens (switches to Sonnet).
+# Reasonable range: 5000–16000. Set in .env as AGENT_THINKING_BUDGET=8000.
+AGENT_THINKING_BUDGET = int(os.environ.get("AGENT_THINKING_BUDGET", "0"))
 
 # E2E / live tests: backend URL to hit. Set REACT_APP_BACKEND_URL or E2E_BACKEND_URL.
 def _e2e_backend_url() -> str:

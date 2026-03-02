@@ -24,9 +24,14 @@ async def chat_assistant(
     data: ChatRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Chat with AI assistant that can search products, inventory stats, low stock, departments, vendors."""
+    """Chat with AI assistant. Routes to specialist agents: inventory, ops, finance, insights."""
     from services.assistant import chat
 
+    ctx = {
+        "org_id": current_user.get("organization_id", "default"),
+        "user_id": current_user.get("id", ""),
+        "user_name": current_user.get("name", ""),
+    }
     messages = data.messages or []
-    result = await chat(messages, (data.message or "").strip(), history=data.history)
+    result = await chat(messages, (data.message or "").strip(), history=data.history, ctx=ctx)
     return result

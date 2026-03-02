@@ -35,6 +35,11 @@ async def lifespan(app: FastAPI):
             await seed_fn()
         except Exception as e:
             logger.warning(f"Seed {seed_fn.__name__}: {e}")
+    try:
+        from services.agents.search import get_index
+        await get_index("default")
+    except Exception as e:
+        logger.warning(f"BM25 index warm-up skipped: {e}")
     yield
     await close_db()
 

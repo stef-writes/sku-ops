@@ -189,6 +189,7 @@ class TestAssistant:
 
     async def test_chat_uses_tools_when_mocked(self, db):
         """Chat assistant calls tools when model requests them."""
+        from unittest.mock import AsyncMock
         from services.assistant import chat
 
         # First call: model requests tool_use
@@ -216,15 +217,21 @@ class TestAssistant:
         end_response.stop_reason = "end_turn"
         end_response.content = [text_block]
 
-        with patch("services.assistant.ANTHROPIC_AVAILABLE", True):
-            with patch("services.assistant._get_client") as mock_get_client:
-                mock_client = MagicMock()
-                mock_client.messages.create = MagicMock(
-                    side_effect=[tool_use_response, end_response]
-                )
-                mock_get_client.return_value = mock_client
+        mock_client = MagicMock()
+        mock_client.messages.create = MagicMock(
+            side_effect=[tool_use_response, end_response]
+        )
 
-                result = await chat([], "What's our inventory count?")
+        # Router delegates to inventory agent; bypass the LLM classify call.
+        # patch("anthropic.Anthropic") patches the class at the source so any
+        # `import anthropic; anthropic.Anthropic(...)` call picks up the mock.
+        with patch("services.assistant.ANTHROPIC_AVAILABLE", True), \
+             patch("services.agents.router.ANTHROPIC_AVAILABLE", True), \
+             patch("services.agents.router.classify", new=AsyncMock(return_value="inventory")), \
+             patch("services.agents.inventory.ANTHROPIC_AVAILABLE", True), \
+             patch("services.agents.inventory.ANTHROPIC_API_KEY", "test-key"), \
+             patch("anthropic.Anthropic", return_value=mock_client):
+            result = await chat([], "What's our inventory count?")
 
         assert result["response"] == "You have 0 products in inventory."
         assert len(result["tool_calls"]) == 1
