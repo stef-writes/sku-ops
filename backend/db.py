@@ -227,6 +227,48 @@ async def init_db() -> None:
         CREATE INDEX IF NOT EXISTS idx_material_requests_contractor ON material_requests(contractor_id);
         CREATE INDEX IF NOT EXISTS idx_material_requests_status ON material_requests(status);
         CREATE INDEX IF NOT EXISTS idx_material_requests_org ON material_requests(organization_id);
+
+        CREATE TABLE IF NOT EXISTS purchase_orders (
+            id TEXT PRIMARY KEY,
+            vendor_id TEXT,
+            vendor_name TEXT NOT NULL DEFAULT '',
+            document_date TEXT,
+            total REAL,
+            status TEXT NOT NULL DEFAULT 'ordered',
+            notes TEXT,
+            created_by_id TEXT NOT NULL DEFAULT '',
+            created_by_name TEXT NOT NULL DEFAULT '',
+            received_at TEXT,
+            received_by_id TEXT,
+            received_by_name TEXT,
+            created_at TEXT NOT NULL,
+            organization_id TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_po_org_status ON purchase_orders(organization_id, status);
+        CREATE INDEX IF NOT EXISTS idx_po_created ON purchase_orders(created_at);
+
+        CREATE TABLE IF NOT EXISTS purchase_order_items (
+            id TEXT PRIMARY KEY,
+            po_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            original_sku TEXT,
+            ordered_qty INTEGER NOT NULL DEFAULT 1,
+            delivered_qty INTEGER,
+            price REAL NOT NULL DEFAULT 0,
+            cost REAL NOT NULL DEFAULT 0,
+            base_unit TEXT NOT NULL DEFAULT 'each',
+            sell_uom TEXT NOT NULL DEFAULT 'each',
+            pack_qty INTEGER NOT NULL DEFAULT 1,
+            suggested_department TEXT NOT NULL DEFAULT 'HDW',
+            status TEXT NOT NULL DEFAULT 'ordered',
+            product_id TEXT,
+            organization_id TEXT,
+            FOREIGN KEY (po_id) REFERENCES purchase_orders(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_po_items_po ON purchase_order_items(po_id);
+        CREATE INDEX IF NOT EXISTS idx_po_items_status ON purchase_order_items(status);
     """)
     # Migration: add UOM columns to products if missing
     try:
@@ -339,6 +381,18 @@ async def init_db() -> None:
         await _conn.commit()
     except Exception:
         await _conn.execute("PRAGMA foreign_keys=ON")
+        pass
+
+    # Migration: rename 'pending' PO/item status to 'ordered' (3-state lifecycle)
+    try:
+        await _conn.execute(
+            "UPDATE purchase_order_items SET status = 'ordered' WHERE status = 'pending'"
+        )
+        await _conn.execute(
+            "UPDATE purchase_orders SET status = 'ordered' WHERE status = 'pending'"
+        )
+        await _conn.commit()
+    except Exception:
         pass
 
 

@@ -9,6 +9,7 @@ import Inventory from "./pages/Inventory";
 import Vendors from "./pages/Vendors";
 import Departments from "./pages/Departments";
 import ReceiptImport from "./pages/ReceiptImport";
+import PurchaseOrders from "./pages/PurchaseOrders";
 import Reports from "./pages/Reports";
 import Contractors from "./pages/Contractors";
 import Financials from "./pages/Financials";
@@ -16,6 +17,7 @@ import Invoices from "./pages/Invoices";
 import MyHistory from "./pages/MyHistory";
 import RequestMaterials from "./pages/RequestMaterials";
 import PendingRequests from "./pages/PendingRequests";
+import Graphs from "./pages/Graphs";
 import Layout from "./components/Layout";
 import "./App.css";
 
@@ -49,6 +51,14 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route
+            path="/graphs"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "warehouse_manager"]}>
+                <Graphs />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/*"
             element={
@@ -113,6 +123,14 @@ function App() {
                       } 
                     />
                     <Route 
+                      path="/purchase-orders" 
+                      element={
+                        <ProtectedRoute allowedRoles={["admin", "warehouse_manager"]}>
+                          <PurchaseOrders />
+                        </ProtectedRoute>
+                      } 
+                    />
+                    <Route 
                       path="/reports" 
                       element={
                         <ProtectedRoute allowedRoles={["admin", "warehouse_manager"]}>
@@ -144,13 +162,13 @@ function App() {
                         </ProtectedRoute>
                       } 
                     />
-                    <Route 
-                      path="/my-history" 
+                    <Route
+                      path="/my-history"
                       element={
                         <ProtectedRoute allowedRoles={["contractor"]}>
                           <MyHistory />
                         </ProtectedRoute>
-                      } 
+                      }
                     />
                   </Routes>
                 </Layout>

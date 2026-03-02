@@ -130,7 +130,7 @@ def _parse_line_item(line: str) -> Optional[dict]:
                 "ordered_qty": max(1, qty),
                 "delivered_qty": max(1, qty),
                 "price": round(price, 2),
-                "cost": round(price * 0.7, 2),
+                "cost": 0.0,
                 "original_sku": None,
                 "base_unit": bu,
                 "sell_uom": su,

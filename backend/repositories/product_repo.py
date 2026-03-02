@@ -1,5 +1,4 @@
 """Product repository."""
-import json
 from typing import Optional
 
 from db import get_connection
@@ -138,16 +137,40 @@ async def find_by_barcode(barcode: str, exclude_product_id: Optional[str] = None
     return _row_to_dict(row)
 
 
-async def find_by_original_sku_and_vendor(original_sku: str, vendor_id: str) -> Optional[dict]:
+async def find_by_original_sku_and_vendor(
+    original_sku: str, vendor_id: str, organization_id: Optional[str] = None
+) -> Optional[dict]:
     """Find existing product by vendor's SKU and vendor. For matching incoming orders to inventory."""
     if not original_sku or not str(original_sku).strip() or not vendor_id:
         return None
     norm = str(original_sku).strip().lower()
+    org_id = organization_id or "default"
     conn = get_connection()
     cursor = await conn.execute(
         """SELECT * FROM products
-           WHERE vendor_id = ? AND TRIM(LOWER(COALESCE(original_sku, ''))) = ?""",
-        (vendor_id, norm),
+           WHERE vendor_id = ? AND TRIM(LOWER(COALESCE(original_sku, ''))) = ?
+           AND (organization_id = ? OR organization_id IS NULL)""",
+        (vendor_id, norm, org_id),
+    )
+    row = await cursor.fetchone()
+    return _row_to_dict(row)
+
+
+async def find_by_name_and_vendor(
+    name: str, vendor_id: str, organization_id: Optional[str] = None
+) -> Optional[dict]:
+    """Find existing product by exact name (case-insensitive) and vendor.
+    Name-based fallback when original_sku is absent — prevents duplicate product creation."""
+    if not name or not str(name).strip() or not vendor_id:
+        return None
+    norm = str(name).strip().lower()
+    org_id = organization_id or "default"
+    conn = get_connection()
+    cursor = await conn.execute(
+        """SELECT * FROM products
+           WHERE vendor_id = ? AND TRIM(LOWER(name)) = ?
+           AND (organization_id = ? OR organization_id IS NULL)""",
+        (vendor_id, norm, org_id),
     )
     row = await cursor.fetchone()
     return _row_to_dict(row)
@@ -196,7 +219,7 @@ async def update(product_id: str, updates: dict, conn=None) -> Optional[dict]:
     values = [updates.get("updated_at", "")]
     for key in ("name", "description", "price", "cost", "quantity", "min_stock",
                  "department_id", "department_name", "vendor_id", "vendor_name", "barcode",
-                 "base_unit", "sell_uom", "pack_qty"):
+                 "base_unit", "sell_uom", "pack_qty", "original_sku"):
         if key in updates and updates[key] is not None:
             set_parts.append(f"{key} = ?")
             values.append(updates[key])
@@ -320,6 +343,8 @@ class ProductRepo:
     get_by_id = staticmethod(get_by_id)
     find_by_barcode = staticmethod(find_by_barcode)
     find_by_original_sku_and_vendor = staticmethod(find_by_original_sku_and_vendor)
+    find_by_name_and_vendor = staticmethod(find_by_name_and_vendor)
+    list_by_vendor = staticmethod(list_by_vendor)
     insert = staticmethod(insert)
     update = staticmethod(update)
     delete = staticmethod(delete)

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -14,21 +15,32 @@ import {
 import {
   Upload,
   FileImage,
-  CheckCircle,
+  ClipboardList,
   XCircle,
+  CheckCircle,
   Package,
   Loader2,
   Trash2,
   Sparkles,
   FileSpreadsheet,
   FileText,
+  Search,
+  Link2,
+  Plus,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-
 import { API } from "@/lib/api";
 
+const UOM_OPTIONS = [
+  "each", "foot", "sqft", "yard", "meter",
+  "gallon", "quart", "pint", "liter",
+  "pound", "ounce",
+  "box", "pack", "bag", "case", "roll", "kit",
+];
+
 const ReceiptImport = () => {
+  const navigate = useNavigate();
   const [departments, setDepartments] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [selectedDept, setSelectedDept] = useState("");
@@ -44,7 +56,8 @@ const ReceiptImport = () => {
   const [csvFile, setCsvFile] = useState(null);
   const [csvImporting, setCsvImporting] = useState(false);
   const [csvResult, setCsvResult] = useState(null);
-  const [useAi, setUseAi] = useState(false);
+  // product_id → { matched: product|null, options: [], searching: false, query: "" }
+  const [productMatches, setProductMatches] = useState({});
 
   useEffect(() => {
     fetchDepartments();
@@ -109,7 +122,7 @@ const ReceiptImport = () => {
     e.preventDefault();
   }, []);
 
-  const extractReceipt = async () => {
+  const extractReceipt = async (useAi = false) => {
     if (!file) {
       toast.error("Please select a document (image or PDF)");
       return;
@@ -127,20 +140,29 @@ const ReceiptImport = () => {
 
       setExtractedData(response.data);
       setVendorName(response.data.vendor_name || "");
-      setEditedProducts(
-        (response.data.products || []).map((p, idx) => ({
-          ...p,
-          id: idx,
-          selected: true,
-          quantity: p.quantity ?? 1,
-          ordered_qty: p.ordered_qty ?? p.quantity ?? 1,
-          delivered_qty: p.delivered_qty ?? p.quantity ?? 1,
-        }))
-      );
+      const mapped = (response.data.products || []).map((p, idx) => ({
+        ...p,
+        id: idx,
+        selected: true,
+        quantity: p.quantity ?? 1,
+        ordered_qty: p.ordered_qty ?? p.quantity ?? 1,
+        delivered_qty: p.delivered_qty ?? p.quantity ?? 1,
+        base_unit: p.base_unit || "each",
+        pack_qty: p.pack_qty ?? 1,
+        min_stock: 5,
+        matched_product: null,
+      }));
+      setEditedProducts(mapped);
       toast.success("Document extracted successfully!");
+      autoMatch(mapped);
     } catch (error) {
       console.error("Extraction error:", error);
-      toast.error(error.response?.data?.detail || "Failed to extract document");
+      const detail = error.response?.data?.detail || "Failed to extract document";
+      if (error.response?.status === 503) {
+        toast.error("AI not configured — add ANTHROPIC_API_KEY to backend/.env, or use free OCR instead");
+      } else {
+        toast.error(detail);
+      }
     } finally {
       setExtracting(false);
     }
@@ -164,14 +186,14 @@ const ReceiptImport = () => {
     setEditedProducts(editedProducts.filter((p) => p.id !== id));
   };
 
-  const importProducts = async () => {
+  const saveAsPurchaseOrder = async () => {
     const vName = (vendorName || extractedData?.vendor_name || "").trim();
     if (!vName) {
       toast.error("Vendor name is required");
       return;
     }
 
-    const productsToImport = editedProducts
+    const productsToSave = editedProducts
       .filter((p) => p.selected)
       .map((p) => ({
         name: p.name,
@@ -182,44 +204,40 @@ const ReceiptImport = () => {
         cost: p.cost != null ? parseFloat(p.cost) : undefined,
         original_sku: p.original_sku,
         base_unit: p.base_unit || undefined,
-        sell_uom: p.sell_uom || undefined,
+        sell_uom: p.sell_uom || p.base_unit || undefined,
         pack_qty: p.pack_qty != null ? parseInt(p.pack_qty) : undefined,
         suggested_department: p.suggested_department || undefined,
+        min_stock: p.min_stock != null ? parseInt(p.min_stock) : 5,
+        product_id: p.matched_product?.id || undefined,
+        _ai_parsed: p._ai_parsed || false,
         selected: true,
       }));
 
-    if (productsToImport.length === 0) {
-      toast.error("No products selected for import");
+    if (productsToSave.length === 0) {
+      toast.error("No products selected");
       return;
     }
 
     setImporting(true);
     try {
-      const response = await axios.post(`${API}/documents/import`, {
+      await axios.post(`${API}/purchase-orders`, {
         vendor_name: vName,
         create_vendor_if_missing: createVendorIfMissing,
         department_id: selectedDept || null,
-        products: productsToImport,
+        document_date: extractedData?.document_date || null,
+        total: extractedData?.total || null,
+        products: productsToSave,
       });
 
-      const created = response.data.imported || 0;
-      const matched = response.data.matched || 0;
-      const msg = matched > 0
-        ? `Imported ${created} new products, added to ${matched} existing${response.data.vendor_created ? " (new vendor)" : ""}!`
-        : `Imported ${created} products${response.data.vendor_created ? " (new vendor created)" : ""}!`;
-      toast.success(msg);
-      if (response.data.warnings?.length > 0) {
-        toast.info(`${response.data.warnings.length} product(s) had invalid barcode; SKU used instead`);
-      }
-
+      toast.success(`Purchase order saved — ${productsToSave.length} item(s) pending receipt`);
       setFile(null);
       setPreview(null);
       setExtractedData(null);
       setEditedProducts([]);
       setVendorName("");
-      fetchVendors();
+      navigate("/purchase-orders");
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Failed to import products");
+      toast.error(error.response?.data?.detail || "Failed to save purchase order");
     } finally {
       setImporting(false);
     }
@@ -231,6 +249,46 @@ const ReceiptImport = () => {
     setExtractedData(null);
     setEditedProducts([]);
     setVendorName("");
+    setProductMatches({});
+  };
+
+  // Fire a name search for every extracted item in parallel to find inventory matches
+  const autoMatch = async (products) => {
+    const updates = {};
+    await Promise.all(
+      products.map(async (p) => {
+        if (!p.name?.trim()) return;
+        try {
+          const res = await axios.get(`${API}/products?search=${encodeURIComponent(p.name)}&limit=5`);
+          const options = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+          updates[p.id] = { matched: null, options, searching: false, query: "" };
+        } catch {
+          updates[p.id] = { matched: null, options: [], searching: false, query: "" };
+        }
+      })
+    );
+    setProductMatches((prev) => ({ ...prev, ...updates }));
+  };
+
+  const searchMatch = async (itemId, query) => {
+    setProductMatches((prev) => ({ ...prev, [itemId]: { ...prev[itemId], searching: true, query } }));
+    try {
+      const res = await axios.get(`${API}/products?search=${encodeURIComponent(query)}&limit=5`);
+      const options = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+      setProductMatches((prev) => ({ ...prev, [itemId]: { ...prev[itemId], options, searching: false } }));
+    } catch {
+      setProductMatches((prev) => ({ ...prev, [itemId]: { ...prev[itemId], searching: false } }));
+    }
+  };
+
+  const confirmMatch = (itemId, product) => {
+    setEditedProducts((prev) => prev.map((p) => p.id === itemId ? { ...p, matched_product: product } : p));
+    setProductMatches((prev) => ({ ...prev, [itemId]: { ...prev[itemId], matched: product, query: "", options: [] } }));
+  };
+
+  const clearMatch = (itemId) => {
+    setEditedProducts((prev) => prev.map((p) => p.id === itemId ? { ...p, matched_product: null } : p));
+    setProductMatches((prev) => ({ ...prev, [itemId]: { ...prev[itemId], matched: null } }));
   };
 
   const handleCsvFileChange = (e) => {
@@ -368,33 +426,33 @@ const ReceiptImport = () => {
                 <span>{file?.name}</span>
               </div>
 
-              <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-                <Checkbox
-                  checked={useAi}
-                  onCheckedChange={(c) => setUseAi(!!c)}
-                  className="border-slate-300"
-                />
-                Use AI (better accuracy, requires LLM_API_KEY)
-              </label>
-
-              <Button
-                onClick={extractReceipt}
-                disabled={extracting}
-                className="w-full btn-primary h-11"
-                data-testid="extract-btn"
-              >
-                {extracting ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    {useAi ? "AI extracting…" : "Extracting…"}
-                  </>
-                ) : (
-                  <>
-                    {useAi ? <Sparkles className="w-5 h-5 mr-2" /> : <FileText className="w-5 h-5 mr-2" />}
-                    {useAi ? "Extract with AI" : "Extract (free OCR)"}
-                  </>
-                )}
-              </Button>
+              <div className="grid grid-cols-2 gap-2" data-testid="extract-btn">
+                <Button
+                  onClick={() => extractReceipt(true)}
+                  disabled={extracting}
+                  className="btn-primary h-11"
+                >
+                  {extracting ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4 mr-2" />
+                  )}
+                  Extract with AI
+                </Button>
+                <Button
+                  onClick={() => extractReceipt(false)}
+                  disabled={extracting}
+                  variant="outline"
+                  className="h-11 text-slate-600"
+                >
+                  {extracting ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <FileText className="w-4 h-4 mr-2" />
+                  )}
+                  Free OCR
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -541,6 +599,32 @@ const ReceiptImport = () => {
                             data-testid={`product-dept-${product.id}`}
                           />
                         </div>
+                        {/* UOM row — always show so user can verify/correct */}
+                        <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
+                          <select
+                            value={product.base_unit || "each"}
+                            onChange={(e) =>
+                              updateProduct(product.id, "base_unit", e.target.value)
+                            }
+                            className="input-field h-10 text-sm bg-white"
+                            data-testid={`product-unit-${product.id}`}
+                          >
+                            {UOM_OPTIONS.map((u) => (
+                              <option key={u} value={u}>{u}</option>
+                            ))}
+                          </select>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={product.pack_qty ?? 1}
+                            onChange={(e) =>
+                              updateProduct(product.id, "pack_qty", parseInt(e.target.value) || 1)
+                            }
+                            className="input-field h-10 text-sm w-20"
+                            placeholder="Qty"
+                            data-testid={`product-packqty-${product.id}`}
+                          />
+                        </div>
                         {product.original_sku && (
                           <p className="text-xs text-slate-400 font-mono">
                             Original: {product.original_sku}
@@ -568,7 +652,7 @@ const ReceiptImport = () => {
               </div>
 
               <Button
-                onClick={importProducts}
+                onClick={saveAsPurchaseOrder}
                 disabled={importing || !(vendorName || "").trim()}
                 className="w-full btn-primary h-11"
                 data-testid="import-products-btn"
@@ -576,12 +660,12 @@ const ReceiptImport = () => {
                 {importing ? (
                   <>
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Importing…
+                    Saving…
                   </>
                 ) : (
                   <>
-                    <CheckCircle className="w-5 h-5 mr-2" />
-                    Import selected products
+                    <ClipboardList className="w-5 h-5 mr-2" />
+                    Save as Purchase Order
                   </>
                 )}
               </Button>

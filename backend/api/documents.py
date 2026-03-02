@@ -27,27 +27,55 @@ OUTPUT: return ONLY a single valid JSON object, no other text:
 {"vendor_name": "...", "document_date": "YYYY-MM-DD", "total": 0.0, "products": [...]}
 
 Per product:
-{"name": "...", "quantity": 1, "ordered_qty": 1, "delivered_qty": 1, "price": 0.0, "cost": 0.0,
+{"name": "...", "quantity": 1, "price": 0.0, "cost": 0.0,
  "original_sku": null, "base_unit": "each", "sell_uom": "each", "pack_qty": 1, "suggested_department": "HDW"}
 
-UOM RULES — do NOT default everything to "each":
-Allowed: each, case, box, pack, bag, roll, kit, gallon, quart, pint, liter, pound, ounce, foot, meter, yard, sqft
+QUANTITY — most critical. Read the document's "Qty" / "Quantity" / "Count" column:
+- quantity = number of selling units on this line (e.g. if Qty column shows 12, set quantity=12)
+- NEVER default to 1 unless the document literally shows no quantity column or the cell is blank/1
+- quantity is NOT the count inside a pack — that is pack_qty
 
-Infer from explicit quantity+unit in name first, then from category keywords:
-- "5 Gal Paint" → gallon/gallon/5 | PNT
-- "2x4x8 Stud" → foot/foot/8 | LUM
-- "1/2 PEX Pipe 100ft" → foot/foot/100 | PLU
-- "Screw Box 100ct" → box/box/1 | HDW
-- "Wire 12/2 250ft" → foot/foot/250 | ELE
-- "Drywall 4x8 Sheet" → sqft/sqft/32 | LUM
-- "Concrete 80lb Bag" → pound/pound/80 | HDW
-- "Duct Tape Roll" → roll/roll/1 | HDW
-- "Ball Valve 1/2" → each/each/1 | PLU
-- "Caulk Tube" → each/each/1 | PNT
-Use "each" only when no unit or quantity is inferable from the name.
+COST vs PRICE — second most critical:
+- cost = the unit price you PAY per selling unit (look for "Unit Price", "Unit Cost", "Each", "Price Ea." column)
+- price = the suggested retail sell price (set 0.0 unless the document explicitly shows a retail/list price column)
+- CRITICAL: Do NOT set cost = line extension/line total. Line total = qty × unit price.
+  Example: if Qty=3 and Line Total=$29.97 → cost=9.99 NOT 29.97
+- If document shows only line totals: cost = line_total / quantity
+- If document shows a unit price column: cost = that column value directly
 
-Departments: PLU=plumbing, ELE=electrical, PNT=paint, LUM=lumber, TOL=tools, HDW=hardware, GDN=garden, APP=appliances.
-Use effective price after discounts. When ordered/delivered qty unclear, set both equal to quantity."""
+NAME: Remove vendor item codes and barcodes from name. Include specs (size, material, length):
+- Good: "1/2\" x 10ft PEX Pipe" | Bad: "PEX PIPE 1/2X10 #4521-A"
+
+original_sku: vendor's item code/part number for this line; null if not separately visible.
+
+vendor_name: supplier name from document header (not the store's own name).
+document_date: ISO YYYY-MM-DD. Use invoice/PO date, not delivery date.
+
+UOM RULES — do NOT default everything to "each". Reason step by step:
+1. Look for an explicit quantity+unit in the product description (e.g. "100ft", "5 Gal", "80lb").
+2. If found: extract the number as pack_qty and the unit as base_unit and sell_uom.
+3. If not explicit, infer from category keywords below.
+Allowed values: each, case, box, pack, bag, roll, kit, gallon, quart, pint, liter, pound, ounce, foot, meter, yard, sqft
+
+Examples:
+- "5 Gal Exterior Paint" → base_unit=gallon, sell_uom=gallon, pack_qty=5 | PNT
+- "2x4x8 Stud" → base_unit=foot, sell_uom=foot, pack_qty=8 | LUM
+- "2x6x12 Lumber" → base_unit=foot, sell_uom=foot, pack_qty=12 | LUM
+- "1/2\" PEX Pipe 100ft" → base_unit=foot, sell_uom=foot, pack_qty=100 | PLU
+- "3/4\" Copper Pipe 10ft" → base_unit=foot, sell_uom=foot, pack_qty=10 | PLU
+- "Romex 12/2 250ft" → base_unit=foot, sell_uom=foot, pack_qty=250 | ELE
+- "#8 Wood Screw Box 100ct" → base_unit=box, sell_uom=box, pack_qty=1 | HDW
+- "3/8\" Carriage Bolt 50pk" → base_unit=pack, sell_uom=pack, pack_qty=1 | HDW
+- "Drywall 4x8 Sheet" → base_unit=sqft, sell_uom=sqft, pack_qty=32 | LUM
+- "80lb Concrete Mix Bag" → base_unit=pound, sell_uom=pound, pack_qty=80 | HDW
+- "50lb Play Sand" → base_unit=pound, sell_uom=pound, pack_qty=50 | HDW
+- "Duct Tape Roll 60yd" → base_unit=roll, sell_uom=roll, pack_qty=1 | HDW
+- "1/2\" Ball Valve" → base_unit=each, sell_uom=each, pack_qty=1 | PLU
+- "Caulk Tube 10oz" → base_unit=each, sell_uom=each, pack_qty=1 | PNT
+- "Quart Interior Paint" → base_unit=quart, sell_uom=quart, pack_qty=1 | PNT
+Use "each" only when no unit or quantity is inferable.
+
+Departments: PLU=plumbing, ELE=electrical, PNT=paint, LUM=lumber, TOL=tools, HDW=hardware, GDN=garden, APP=appliances."""
 
 
 @router.post("/parse")
@@ -126,17 +154,22 @@ async def parse_document(
                     raise
 
         if not response or not str(response).strip():
-            raise HTTPException(status_code=500, detail="Gemini returned no content. The document may be unreadable or blocked.")
+            raise HTTPException(status_code=500, detail="Claude returned no content. The document may be unreadable or blocked.")
 
         json_match = re.search(r"\{[\s\S]*\}", response)
         extracted = json.loads(json_match.group()) if json_match else json.loads(response)
 
         for p in extracted.get("products", []):
             qty = p.get("quantity", 1)
-            if "ordered_qty" not in p or p["ordered_qty"] is None:
+            # Backfill PO fields from quantity (schema no longer asks LLM for these)
+            p.setdefault("ordered_qty", qty)
+            p.setdefault("delivered_qty", qty)
+            if p["ordered_qty"] is None:
                 p["ordered_qty"] = qty
-            if "delivered_qty" not in p or p["delivered_qty"] is None:
+            if p["delivered_qty"] is None:
                 p["delivered_qty"] = qty
+            # Signal downstream: skip redundant LLM re-enrichment
+            p["_ai_parsed"] = True
 
         return extracted
     except json.JSONDecodeError as e:

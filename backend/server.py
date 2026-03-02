@@ -14,7 +14,7 @@ import logging
 from db import init_db, close_db
 from domain.exceptions import InsufficientStockError, ResourceNotFoundError
 from api import api_router
-from api.seed import seed_mock_user, seed_standard_departments, seed_demo_inventory
+from api.seed import seed_mock_user, seed_standard_departments
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
         logger.warning("CORS_ORIGINS is permissive (*). Set CORS_ORIGINS explicitly for staging/production.")
     await init_db()
     logger.info("Database initialized")
-    for seed_fn in (seed_mock_user, seed_standard_departments, seed_demo_inventory):
+    for seed_fn in (seed_mock_user, seed_standard_departments):
         try:
             await seed_fn()
         except Exception as e:

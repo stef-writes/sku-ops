@@ -7,7 +7,6 @@ from typing import Optional
 
 from fastapi import HTTPException
 
-from models import Product
 from models.product import ALLOWED_BASE_UNITS
 from repositories import department_repo, product_repo, vendor_repo
 from services.document_import import infer_uom, resolve_uom, suggest_department
@@ -62,14 +61,23 @@ async def import_document(
     dept_codes = list(dept_by_code.keys())
 
     selected = [p for p in products if p.get("selected", True)]
-    vendor_products = await product_repo.list_by_vendor(vendor_id)
-    selected = await enrich_for_import(selected, vendor_products, dept_codes)
 
-    enrichment_warnings = [
-        {"product": item.get("name", "Unknown"), "warning": item.pop("enrichment_warning")}
-        for item in selected
-        if item.get("enrichment_warning")
-    ]
+    # AI-parsed items already have dept/UOM/SKU from the document-aware parse LLM.
+    # Running a second (blind) LLM enrichment on them degrades quality — skip it.
+    ai_parsed_items = [p for p in selected if p.get("_ai_parsed")]
+    ocr_items = [p for p in selected if not p.get("_ai_parsed")]
+
+    enrichment_warnings = []
+    if ocr_items:
+        vendor_products = await product_repo.list_by_vendor(vendor_id)
+        ocr_items = await enrich_for_import(ocr_items, vendor_products, dept_codes)
+        enrichment_warnings = [
+            {"product": item.get("name", "Unknown"), "warning": item.pop("enrichment_warning")}
+            for item in ocr_items
+            if item.get("enrichment_warning")
+        ]
+
+    selected = ai_parsed_items + ocr_items
 
     for item in selected:
         suggested = (item.get("suggested_department") or "HDW").upper()
@@ -78,7 +86,7 @@ async def import_document(
             if rule_dept:
                 item["suggested_department"] = rule_dept
 
-    # Rule-based UOM upgrade: if item has "each", try infer_uom to get foot/gallon/box/etc
+    # Rule-based UOM upgrade: only for items where UOM is still "each" (OCR items / missed)
     for item in selected:
         bu = (item.get("base_unit") or "each").lower()
         su = (item.get("sell_uom") or "each").lower()
@@ -89,10 +97,19 @@ async def import_document(
                 item["sell_uom"] = inferred_su
                 item["pack_qty"] = inferred_pq
 
-    needs_uom = [p for p in selected if (p.get("base_unit") or "").lower() not in ALLOWED_BASE_UNITS or (p.get("sell_uom") or "").lower() not in ALLOWED_BASE_UNITS]
+    # LLM UOM classifier: only for OCR items with invalid/missing UOM (AI parse already classified)
+    needs_uom = [
+        p for p in selected
+        if not p.get("_ai_parsed")
+        and (
+            (p.get("base_unit") or "").lower() not in ALLOWED_BASE_UNITS
+            or (p.get("sell_uom") or "").lower() not in ALLOWED_BASE_UNITS
+        )
+    ]
     if needs_uom:
         await classify_uom_batch(needs_uom)
 
+    org_id = (current_user or {}).get("organization_id") or "default"
     imported = []
     matched = []
     errors = []
@@ -104,11 +121,19 @@ async def import_document(
                 delivered = item.get("quantity", 1)
             delivered = max(0, int(delivered))
 
+            # 3-tier matching: explicit product_id → vendor SKU → name
             existing = None
-            if item.get("original_sku") and vendor_id:
+            if item.get("product_id"):
+                existing = await product_repo.get_by_id(item["product_id"], organization_id=org_id)
+            if not existing and item.get("original_sku") and vendor_id:
                 existing = await product_repo.find_by_original_sku_and_vendor(
-                    str(item.get("original_sku")).strip(), vendor_id
+                    str(item["original_sku"]).strip(), vendor_id, organization_id=org_id
                 )
+            if not existing and item.get("name") and vendor_id:
+                existing = await product_repo.find_by_name_and_vendor(
+                    item["name"], vendor_id, organization_id=org_id
+                )
+
             if existing:
                 await process_receiving_stock_changes(
                     product_id=existing["id"],
@@ -119,6 +144,9 @@ async def import_document(
                     user_name=current_user.get("name", ""),
                     reference_id=None,
                 )
+                # Backfill original_sku so future imports match on SKU, not name
+                if item.get("original_sku") and not existing.get("original_sku"):
+                    await product_repo.update(existing["id"], {"original_sku": item["original_sku"]})
                 updated = await product_repo.get_by_id(existing["id"])
                 matched.append(updated)
                 continue

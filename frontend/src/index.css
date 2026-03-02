@@ -61,6 +61,11 @@ code, .font-mono {
   * {
     @apply border-border;
   }
+  /* Reset borders in D3 graph viewports - global border creates tiny edged boxes */
+  .graph-viewport,
+  .graph-viewport * {
+    border-width: 0 !important;
+  }
   body {
     @apply bg-background text-foreground;
   }

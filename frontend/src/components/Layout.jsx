@@ -15,6 +15,7 @@ import {
   History,
   FileText,
   ClipboardList,
+  Network,
 } from "lucide-react";
 import ChatAssistant from "./ChatAssistant";
 
@@ -53,6 +54,11 @@ const Layout = ({ children }) => {
       { path: "/vendors", icon: Users, label: "Vendors" },
       { path: "/departments", icon: Layers, label: "Departments" },
       { path: "/import", icon: Truck, label: "Receive Inventory" },
+      { path: "/purchase-orders", icon: ClipboardList, label: "Purchase Orders" },
+    ];
+
+    const systemItems = [
+      { path: "/graphs", icon: Network, label: "Graphs" },
     ];
 
     if (role === "warehouse_manager") {
@@ -61,6 +67,7 @@ const Layout = ({ children }) => {
         { section: "Operations", items: operationsItems },
         { section: "Inventory", items: inventoryItems },
         { items: [{ path: "/reports", icon: BarChart3, label: "Reports" }] },
+        { section: "System", items: systemItems },
       ];
     }
 
@@ -76,6 +83,7 @@ const Layout = ({ children }) => {
         ],
       },
       { items: [{ path: "/reports", icon: BarChart3, label: "Reports" }] },
+      { section: "System", items: systemItems },
     ];
   };
 
@@ -178,7 +186,7 @@ const Layout = ({ children }) => {
 
       {/* Main Content */}
       <main
-        className="flex-1 overflow-auto bg-slate-50/50"
+        className="flex-1 min-h-0 overflow-auto bg-slate-50/50 flex flex-col"
         data-testid="main-content"
       >
         {children}
