@@ -163,7 +163,7 @@ async def import_document(
 
             bu, su, pq = resolve_uom(item)
             cost_val = float(item.get("cost") or 0) or float(item.get("price", 0)) * 0.7
-            # If no retail price, estimate at cost + 40% markup
+            # Default sell price = cost × 1.4 if no explicit price provided; editable in Inventory
             price_val = float(item.get("price") or 0) or (round(cost_val * 1.4, 2) if cost_val > 0 else 0.0)
 
             barcode_val = item.get("barcode")

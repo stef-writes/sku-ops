@@ -185,8 +185,8 @@ async def update(
             amt = round(float(item.get("quantity", 1)) * float(item.get("unit_price", 0)), 2)
             item_id = item.get("id") or str(uuid4())
             await conn.execute(
-                """INSERT INTO invoice_line_items (id, invoice_id, description, quantity, unit_price, amount, cost, product_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO invoice_line_items (id, invoice_id, description, quantity, unit_price, amount, cost, product_id, job_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     item_id,
                     invoice_id,
@@ -196,6 +196,7 @@ async def update(
                     amt,
                     float(item.get("cost", 0)),
                     item.get("product_id"),
+                    item.get("job_id"),
                 ),
             )
             subtotal += amt

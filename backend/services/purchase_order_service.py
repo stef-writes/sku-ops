@@ -260,6 +260,7 @@ async def receive_po_items(
     received = []
     matched = []
     errors = []
+    cost_total = 0.0
 
     for item_id, update in updates_by_id.items():
         item = items_by_id.get(item_id)
@@ -337,6 +338,7 @@ async def receive_po_items(
                 await update_po_item(item_id, status="arrived", product_id=product.id, delivered_qty=delivered)
                 received.append(product)
 
+            cost_total += float(item.get("cost") or 0) * delivered
         except Exception as e:
             errors.append({"item": item.get("name"), "error": str(e)})
 
@@ -368,4 +370,5 @@ async def receive_po_items(
         "matched": len(matched),
         "errors": len(errors),
         "error_details": errors,
+        "cost_total": round(cost_total, 2),
     }

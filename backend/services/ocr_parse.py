@@ -130,7 +130,7 @@ def _parse_line_item(line: str) -> Optional[dict]:
                 "ordered_qty": max(1, qty),
                 "delivered_qty": max(1, qty),
                 # Invoice/PO price is the unit cost (what store pays vendor).
-                # Retail price is estimated at cost + 40% markup.
+                # Sell price defaults to cost × 1.4 — editable per product in Inventory.
                 "price": round(price * 1.4, 2),
                 "cost": round(price, 2),
                 "original_sku": None,

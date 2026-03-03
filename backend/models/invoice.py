@@ -16,6 +16,7 @@ class InvoiceLineItem(BaseModel):
     amount: float = 0.0
     cost: float = 0.0
     product_id: Optional[str] = None
+    job_id: Optional[str] = None
 
 
 class InvoiceCreate(BaseModel):

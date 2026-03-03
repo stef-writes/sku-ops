@@ -8,7 +8,6 @@ from fastapi.responses import RedirectResponse
 
 from auth import require_role
 from config import XERO_CLIENT_ID, XERO_CLIENT_SECRET, XERO_REDIRECT_URI
-from models.org_settings import OrgSettings
 from repositories.org_settings_repo import (
     clear_xero_tokens,
     get_org_settings,
@@ -133,3 +132,33 @@ async def xero_disconnect(current_user: dict = Depends(require_role("admin"))):
     org_id = current_user.get("organization_id") or "default"
     await clear_xero_tokens(org_id)
     return {"disconnected": True}
+
+
+@router.get("/tracking-categories")
+async def list_tracking_categories(current_user: dict = Depends(require_role("admin"))):
+    """List Xero tracking categories for the connected org."""
+    org_id = current_user.get("organization_id") or "default"
+    settings = await get_org_settings(org_id)
+    if not settings.xero_access_token:
+        raise HTTPException(status_code=400, detail="Xero not connected for this org")
+
+    from adapters.xero_factory import get_xero_gateway
+    gateway = get_xero_gateway(settings)
+    try:
+        categories = await gateway.list_tracking_categories(settings)
+        return {"tracking_categories": categories}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Failed to fetch tracking categories: {e}")
+
+
+@router.post("/select-tracking-category")
+async def select_tracking_category(
+    tracking_category_id: str,
+    current_user: dict = Depends(require_role("admin")),
+):
+    """Save the chosen Xero tracking category ID for job_id tagging on invoice lines."""
+    org_id = current_user.get("organization_id") or "default"
+    settings = await get_org_settings(org_id)
+    updated = settings.model_copy(update={"xero_tracking_category_id": tracking_category_id})
+    saved = await upsert_org_settings(updated)
+    return {"xero_tracking_category_id": saved.xero_tracking_category_id}

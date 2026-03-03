@@ -1,4 +1,5 @@
 """Purchase order API routes."""
+import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,6 +12,8 @@ from services.purchase_order_service import (
     mark_delivery_received,
     receive_po_items,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/purchase-orders", tags=["purchase-orders"])
 
@@ -101,8 +104,21 @@ async def receive_items(
     current_user: dict = Depends(require_role("admin", "warehouse_manager")),
 ):
     """Mark selected items as arrived and update inventory stock."""
-    return await receive_po_items(
+    result = await receive_po_items(
         po_id=po_id,
         item_updates=data.items,
         current_user=current_user,
     )
+    if result.get("cost_total", 0) > 0:
+        from adapters.xero_factory import get_xero_gateway
+        from repositories.org_settings_repo import get_org_settings
+        org_id = current_user.get("organization_id") or "default"
+        try:
+            settings = await get_org_settings(org_id)
+            gateway = get_xero_gateway(settings)
+            po_data = await get_po(po_id, org_id)
+            if po_data:
+                await gateway.sync_po_receipt(po_data, result["cost_total"], settings)
+        except Exception as e:
+            logger.warning("Xero PO receipt sync failed: %s", e)
+    return result

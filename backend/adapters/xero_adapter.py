@@ -73,27 +73,35 @@ class XeroAdapter:
             settings = await self.refresh_token(settings)
 
         line_items = invoice.get("line_items", [])
-        xero_line_items = [
-            {
+        xero_line_items = []
+        for li in line_items:
+            line: dict = {
                 "Description": li.get("description", ""),
                 "Quantity": li.get("quantity", 1),
                 "UnitAmount": li.get("unit_price", 0),
                 "LineAmount": li.get("amount", 0),
                 "AccountCode": settings.xero_sales_account_code,
             }
-            for li in line_items
-        ]
+            if settings.xero_tax_type:
+                line["TaxType"] = settings.xero_tax_type
+            if settings.xero_tracking_category_id and li.get("job_id"):
+                line["Tracking"] = [{
+                    "TrackingCategoryID": settings.xero_tracking_category_id,
+                    "Name": li["job_id"],
+                }]
+            xero_line_items.append(line)
 
-        xero_invoice = {
+        xero_invoice: dict = {
             "Type": "ACCREC",
             "Contact": {"Name": invoice.get("billing_entity", "")},
             "InvoiceNumber": invoice.get("invoice_number", ""),
             "Status": _xero_status(invoice.get("status", "draft")),
-            "SubTotal": invoice.get("subtotal", 0),
-            "TotalTax": invoice.get("tax", 0),
-            "Total": invoice.get("total", 0),
             "LineItems": xero_line_items,
         }
+        if not settings.xero_tax_type:
+            xero_invoice["SubTotal"] = invoice.get("subtotal", 0)
+            xero_invoice["TotalTax"] = invoice.get("tax", 0)
+            xero_invoice["Total"] = invoice.get("total", 0)
 
         headers = self._auth_headers(settings)
         existing_xero_id = invoice.get("xero_invoice_id")
@@ -123,7 +131,8 @@ class XeroAdapter:
         xero_invoice_id = invoices[0].get("InvoiceID")
 
         # Post COGS journal: Debit COGS, Credit Inventory
-        journal_id = await self._post_cogs_journal(invoice, settings, xero_invoice_id)
+        first_job_id = next((li.get("job_id") for li in line_items if li.get("job_id")), None)
+        journal_id = await self._post_cogs_journal(invoice, settings, xero_invoice_id, first_job_id)
 
         return XeroSyncResult(
             success=True,
@@ -132,7 +141,8 @@ class XeroAdapter:
         )
 
     async def _post_cogs_journal(
-        self, invoice: dict, settings: OrgSettings, xero_invoice_id: Optional[str]
+        self, invoice: dict, settings: OrgSettings, xero_invoice_id: Optional[str],
+        first_job_id: Optional[str] = None,
     ) -> Optional[str]:
         line_items = invoice.get("line_items", [])
         cost_total = sum(
@@ -142,19 +152,50 @@ class XeroAdapter:
         if cost_total <= 0:
             return None
 
+        tracking: list = []
+        if settings.xero_tracking_category_id and first_job_id:
+            tracking = [{"TrackingCategoryID": settings.xero_tracking_category_id, "Name": first_job_id}]
+
         narration = f"COGS for invoice {invoice.get('invoice_number', '')} (Xero ID: {xero_invoice_id})"
+        cogs_line: dict = {"AccountCode": settings.xero_cogs_account_code, "Description": narration, "LineAmount": cost_total}
+        inv_line: dict = {"AccountCode": settings.xero_inventory_account_code, "Description": narration, "LineAmount": -cost_total}
+        if tracking:
+            cogs_line["Tracking"] = tracking
+            inv_line["Tracking"] = tracking
+        journal = {
+            "Narration": narration,
+            "JournalLines": [cogs_line, inv_line],
+        }
+        resp = requests.put(
+            f"{XERO_API}/ManualJournals",
+            headers=self._auth_headers(settings),
+            json={"ManualJournals": [journal]},
+            timeout=20,
+        )
+        resp.raise_for_status()
+        journals = resp.json().get("ManualJournals", [])
+        return journals[0].get("ManualJournalID") if journals else None
+
+
+    async def sync_po_receipt(self, po: dict, cost_total: float, settings: OrgSettings) -> XeroSyncResult:
+        if self._is_token_expired(settings):
+            settings = await self.refresh_token(settings)
+
+        vendor_name = po.get("vendor_name", "")
+        po_id = po.get("id", "unknown")
+        narration = f"Inventory receipt — {vendor_name} PO {po_id}"
         journal = {
             "Narration": narration,
             "JournalLines": [
                 {
-                    "AccountCode": settings.xero_cogs_account_code,
-                    "Description": narration,
-                    "LineAmount": cost_total,
-                },
-                {
                     "AccountCode": settings.xero_inventory_account_code,
                     "Description": narration,
-                    "LineAmount": -cost_total,
+                    "LineAmount": cost_total,  # Dr Inventory
+                },
+                {
+                    "AccountCode": settings.xero_ap_account_code,
+                    "Description": narration,
+                    "LineAmount": -cost_total,  # Cr AP
                 },
             ],
         }
@@ -166,7 +207,19 @@ class XeroAdapter:
         )
         resp.raise_for_status()
         journals = resp.json().get("ManualJournals", [])
-        return journals[0].get("ManualJournalID") if journals else None
+        journal_id = journals[0].get("ManualJournalID") if journals else None
+        return XeroSyncResult(success=True, xero_journal_id=journal_id)
+
+    async def list_tracking_categories(self, settings: OrgSettings) -> list[dict]:
+        if self._is_token_expired(settings):
+            settings = await self.refresh_token(settings)
+        resp = requests.get(
+            f"{XERO_API}/TrackingCategories",
+            headers=self._auth_headers(settings),
+            timeout=15,
+        )
+        resp.raise_for_status()
+        return resp.json().get("TrackingCategories", [])
 
 
 def _xero_status(sku_status: str) -> str:
