@@ -15,9 +15,9 @@ from pydantic_ai.messages import (
 logger = logging.getLogger(__name__)
 
 AGENT_TIMEOUT_SECONDS = 45
-_MAX_RETRIES = 3
+_MAX_RETRIES = 5
 _BASE_DELAY = 1.0   # seconds
-_MAX_DELAY = 16.0   # seconds
+_MAX_DELAY = 30.0   # seconds
 
 
 # ── Error classification ─────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ def _classify(e: Exception) -> tuple[_ErrorKind, bool, float | None]:
        any(k in s for k in ("connection error", "network", "socket", "unreachable", "refused", "reset by peer")):
         return _ErrorKind.NETWORK, True, None
 
-    if any(k in s for k in ("500", "503", "502", "overload", "internal server", "service unavailable", "bad gateway")):
+    if any(k in s for k in ("500", "502", "503", "529", "overload", "internal server", "service unavailable", "bad gateway")):
         return _ErrorKind.SERVER, True, None
 
     # Thinking/model config issues — drop settings and retry

@@ -24,7 +24,12 @@
       "Bash(uv run --directory . python -m pytest tests/test_llm_anthropic.py -q)",
       "Bash(uv run --directory . python -m pytest tests/test_memory.py -v)",
       "Bash(uv run python -m pytest tests/test_memory.py -v)",
-      "Bash(uv run python -m pytest tests/test_llm_anthropic.py tests/test_memory.py -q)"
+      "Bash(uv run python -m pytest tests/test_llm_anthropic.py tests/test_memory.py -q)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(curl -s http://localhost:8000/api/health)",
+      "Bash(curl -s http://localhost:8000/)",
+      "Bash(curl -s -X POST http://localhost:8000/api/auth/login -H \"Content-Type: application/json\" -d '{\"\"email\"\":\"\"admin@demo.local\"\",\"\"password\"\":\"\"demo123\"\"}')",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\); print\\(str\\(d\\)[:300]\\)\")"
     ]
   }
 }
