@@ -1,0 +1,5 @@
+# Agent model configuration — change here to swap models without touching agent code.
+# Uses pydantic-ai model strings: "anthropic:<model>", "openai:<model>", "google-gla:<model>", etc.
+# Environment variable AGENT_PRIMARY_MODEL overrides this file.
+
+primary: "anthropic:claude-sonnet-4-6"

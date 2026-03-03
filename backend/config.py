@@ -96,16 +96,33 @@ ALLOW_RESET = is_development or is_test or os.environ.get("ALLOW_RESET", "").low
 # AI - Anthropic Claude. Set ANTHROPIC_API_KEY to enable.
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
 ANTHROPIC_AVAILABLE = bool(ANTHROPIC_API_KEY)
-# Primary model for all agents and document parsing
+# Keep bare model names for non-agent services (OCR, UOM classification, enrichment)
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6").strip() or "claude-sonnet-4-6"
-# Fast/cheap model for simple text tasks (UOM classification, dept enrichment)
 ANTHROPIC_FAST_MODEL = os.environ.get("ANTHROPIC_FAST_MODEL", "claude-haiku-4-5").strip() or "claude-haiku-4-5"
-# Fallback model when Sonnet is overloaded — only used after retries exhausted
-ANTHROPIC_OPUS_MODEL = os.environ.get("ANTHROPIC_OPUS_MODEL", "claude-opus-4-6").strip() or "claude-opus-4-6"
 
 # OpenAI — used for product semantic search embeddings (text-embedding-3-small)
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
 OPENAI_AVAILABLE = bool(OPENAI_API_KEY)
+
+# ── Agent model — single source of truth ─────────────────────────────────────
+# Priority: env AGENT_PRIMARY_MODEL > models.yaml > built-in default
+def _load_agent_model() -> str:
+    env_override = os.environ.get("AGENT_PRIMARY_MODEL", "").strip()
+    if env_override:
+        return env_override
+    try:
+        import yaml
+        _yaml_path = _ROOT / "models.yaml"
+        if _yaml_path.exists():
+            data = yaml.safe_load(_yaml_path.read_text()) or {}
+            model = (data.get("primary") or "").strip()
+            if model:
+                return model
+    except Exception:
+        pass
+    return "anthropic:claude-sonnet-4-6"
+
+AGENT_PRIMARY_MODEL: str = _load_agent_model()
 LLM_SETUP_URL = "https://console.anthropic.com/"
 LLM_AVAILABLE = ANTHROPIC_AVAILABLE  # alias used by enrichment/uom services
 # Extended thinking for chat agents. 0 = off (uses Haiku). >0 = budget in tokens (switches to Sonnet).

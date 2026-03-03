@@ -9,7 +9,7 @@ from datetime import datetime, timezone, timedelta
 from pydantic_ai import Agent, RunContext
 
 from config import (
-    ANTHROPIC_MODEL,
+    AGENT_PRIMARY_MODEL,
     AGENT_THINKING_BUDGET,
     DEFAULT_DEEP_THINKING_BUDGET,
 )
@@ -61,7 +61,7 @@ REASONING — think before acting:
 6. Present margins as percentages, not just raw dollar differences — context matters"""
 
 _agent = Agent(
-    f"anthropic:{ANTHROPIC_MODEL}",
+    AGENT_PRIMARY_MODEL,
     deps_type=AgentDeps,
     system_prompt=SYSTEM_PROMPT,
 )
@@ -105,7 +105,6 @@ async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mo
     from services.agents.agent_utils import build_message_history, extract_text_history, extract_tool_calls, calc_cost, run_agent
 
     deep = mode == "deep"
-    model_id = ANTHROPIC_MODEL
     thinking_budget = (AGENT_THINKING_BUDGET or DEFAULT_DEEP_THINKING_BUDGET) if deep else 0
     msg_history = build_message_history(history)
     model_settings: dict = {}
@@ -116,7 +115,7 @@ async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mo
         result = await run_agent(
             _agent, user_message,
             msg_history=msg_history, deps=deps,
-            model_id=model_id, model_settings=model_settings or None,
+            model_settings=model_settings or None,
             agent_name="FinanceAgent",
         )
     except Exception as e:
@@ -124,13 +123,13 @@ async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mo
         return {"response": "I ran into an issue. Please try again in a moment.", "tool_calls": [], "history": history or [], "thinking": [], "agent": "finance"}
 
     usage = result.usage()
-    cost = calc_cost(model_id, usage)
+    cost = calc_cost(AGENT_PRIMARY_MODEL, usage)
     return {
         "response": result.output,
         "tool_calls": extract_tool_calls(result.all_messages()),
         "thinking": [],
         "history": extract_text_history(result.all_messages()),
-        "usage": {"cost_usd": cost, "input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens, "model": model_id},
+        "usage": {"cost_usd": cost, "input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens, "model": AGENT_PRIMARY_MODEL},
         "agent": "finance",
     }
 

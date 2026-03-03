@@ -96,35 +96,31 @@ async def run_agent(
     *,
     msg_history,
     deps,
-    model_id: str,
-    model_settings: dict | None,
+    model_settings: dict | None = None,
     timeout_seconds: int = AGENT_TIMEOUT_SECONDS,
     agent_name: str = "agent",
 ):
-    """Run a PydanticAI agent with retry/backoff, error classification, and model fallback.
+    """Run a PydanticAI agent with retry/backoff and error classification.
 
-    Retry strategy (up to _MAX_RETRIES attempts on primary model):
+    Model is read from AGENT_PRIMARY_MODEL (models.yaml or env). No fallbacks —
+    failures are raised immediately after retries so they surface clearly.
+
+    Retry strategy (up to _MAX_RETRIES attempts):
     - rate_limit / network / timeout / server  → exponential backoff + jitter
     - model_error (thinking budget etc.)       → drop thinking settings, retry immediately
     - auth / validation                        → fail immediately, no retry
-
-    After retries exhausted, automatically falls back to the other Anthropic model
-    (Haiku ↔ Sonnet) as a last resort before raising.
     """
-    from config import ANTHROPIC_MODEL, ANTHROPIC_OPUS_MODEL
-
-    # Fallback: Sonnet → Opus (upgrade, not downgrade)
-    fallback_model_id: str | None = ANTHROPIC_OPUS_MODEL if model_id == ANTHROPIC_MODEL else None
+    from config import AGENT_PRIMARY_MODEL
 
     active_settings = model_settings
 
-    async def _run(mid: str, settings):
+    async def _run(settings):
         return await asyncio.wait_for(
             agent.run(
                 user_message,
                 message_history=msg_history,
                 deps=deps,
-                model=f"anthropic:{mid}",
+                model=AGENT_PRIMARY_MODEL,
                 model_settings=settings or None,
             ),
             timeout=timeout_seconds,
@@ -134,7 +130,7 @@ async def run_agent(
 
     for attempt in range(_MAX_RETRIES):
         try:
-            return await _run(model_id, active_settings)
+            return await _run(active_settings)
         except asyncio.TimeoutError:
             last_exc = RuntimeError(f"{agent_name} timed out after {timeout_seconds}s")
             kind, retriable, retry_after = _ErrorKind.TIMEOUT, True, None
@@ -146,7 +142,6 @@ async def run_agent(
             logger.error(f"{agent_name} non-retriable {kind} on attempt {attempt + 1}: {last_exc}")
             raise last_exc
 
-        # Thinking settings caused the model error → drop them and retry immediately
         if active_settings and kind == _ErrorKind.MODEL_ERROR:
             logger.warning(f"{agent_name} model_error with thinking settings, dropping and retrying: {last_exc}")
             active_settings = None
@@ -157,17 +152,6 @@ async def run_agent(
             await _backoff(attempt, retry_after)
         else:
             logger.warning(f"{agent_name} {kind} on final attempt {_MAX_RETRIES}/{_MAX_RETRIES}: {last_exc}")
-
-    # Primary exhausted → try fallback model
-    if fallback_model_id:
-        logger.warning(f"{agent_name} primary {model_id} exhausted, falling back to {fallback_model_id}")
-        try:
-            return await _run(fallback_model_id, None)
-        except asyncio.TimeoutError:
-            raise RuntimeError(f"{agent_name} fallback {fallback_model_id} timed out after {timeout_seconds}s")
-        except Exception as e:
-            logger.error(f"{agent_name} fallback {fallback_model_id} also failed: {e}")
-            raise e
 
     raise last_exc
 
@@ -182,6 +166,7 @@ _MODEL_PRICING: dict[str, dict[str, float]] = {
 
 
 def calc_cost(model: str, usage) -> float:
+    model = model.split(":", 1)[-1]  # strip provider prefix ("anthropic:", "openai:", etc.)
     key = next((k for k in _MODEL_PRICING if model.startswith(k)), None)
     if not key:
         return 0.0

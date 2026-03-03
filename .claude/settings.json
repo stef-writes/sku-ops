@@ -21,7 +21,10 @@
       "Bash(uv run pytest tests/test_llm_anthropic.py tests/test_withdrawal_service.py tests/test_invoice_repo.py tests/test_product_lifecycle.py -q)",
       "Bash(uv run pytest tests/test_llm_anthropic.py -q)",
       "Bash(uv run --directory backend pytest backend/tests/test_llm_anthropic.py -q)",
-      "Bash(uv run --directory . python -m pytest tests/test_llm_anthropic.py -q)"
+      "Bash(uv run --directory . python -m pytest tests/test_llm_anthropic.py -q)",
+      "Bash(uv run --directory . python -m pytest tests/test_memory.py -v)",
+      "Bash(uv run python -m pytest tests/test_memory.py -v)",
+      "Bash(uv run python -m pytest tests/test_llm_anthropic.py tests/test_memory.py -q)"
     ]
   }
 }
