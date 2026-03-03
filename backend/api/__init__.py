@@ -22,6 +22,8 @@ from .withdrawals import router as withdrawals_router
 from .material_requests import router as material_requests_router
 from .purchase_orders import router as purchase_orders_router
 from .seed import router as seed_router
+from .settings import router as settings_router
+from .xero_auth import router as xero_auth_router
 
 api_router = APIRouter(prefix="/api")
 
@@ -45,6 +47,8 @@ api_router.include_router(documents_router)
 api_router.include_router(payments_router)
 api_router.include_router(webhooks_router)
 api_router.include_router(seed_router)
+api_router.include_router(settings_router)
+api_router.include_router(xero_auth_router)
 
 
 @api_router.get("/")

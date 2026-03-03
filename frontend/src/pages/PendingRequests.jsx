@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
-import { HardHat, Package, Loader2, Clock } from "lucide-react";
+import { HardHat, Package, Loader2, Clock, AlertTriangle } from "lucide-react";
 import { API } from "@/lib/api";
 
 const PendingRequests = () => {
@@ -81,6 +81,24 @@ const PendingRequests = () => {
     }
   };
 
+  const ageLabel = (dateStr) => {
+    const ms = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(ms / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
+
+  const ageHours = (dateStr) =>
+    (Date.now() - new Date(dateStr).getTime()) / 3600000;
+
+  // Sort oldest first so staff sees the most urgent requests at the top
+  const sortedRequests = [...requests].sort(
+    (a, b) => new Date(a.created_at) - new Date(b.created_at)
+  );
+
   const itemCount = (req) => {
     const items = req.items || [];
     return items.reduce((sum, i) => sum + (i.quantity || 0), 0);
@@ -102,9 +120,16 @@ const PendingRequests = () => {
 
   return (
     <div className="p-8" data-testid="pending-requests-page">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-slate-900">Pending Material Requests</h1>
-        <p className="text-slate-600 mt-1">Process contractor requests into withdrawals at pickup</p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">Pending Material Requests</h1>
+          <p className="text-slate-600 mt-1">Process contractor requests into withdrawals at pickup · Oldest first</p>
+        </div>
+        {requests.length > 0 && (
+          <span className="text-sm font-medium text-slate-500">
+            {requests.length} pending
+          </span>
+        )}
       </div>
 
       {requests.length === 0 ? (
@@ -115,44 +140,67 @@ const PendingRequests = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {requests.map((req) => (
-            <div
-              key={req.id}
-              className="card-workshop p-6 border border-slate-200 hover:border-amber-300 transition-colors"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
-                    <HardHat className="w-6 h-6 text-amber-600" />
+          {sortedRequests.map((req) => {
+            const hours = ageHours(req.created_at);
+            const urgentBorder =
+              hours >= 48
+                ? "border-red-300 bg-red-50/30"
+                : hours >= 24
+                ? "border-orange-300 bg-orange-50/20"
+                : "border-slate-200";
+            const ageBadgeClass =
+              hours >= 48
+                ? "text-red-600 bg-red-50 border border-red-200"
+                : hours >= 24
+                ? "text-orange-600 bg-orange-50 border border-orange-200"
+                : "text-slate-500";
+            return (
+              <div
+                key={req.id}
+                className={`card-workshop p-6 border hover:border-amber-300 transition-colors ${urgentBorder}`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                      <HardHat className="w-6 h-6 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-900">{req.contractor_name || "Unknown"}</p>
+                      <p className="text-sm text-slate-500">{itemCount(req)} items · ${totalAmount(req)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-semibold text-slate-900">{req.contractor_name || "Unknown"}</p>
-                    <p className="text-sm text-slate-500">{itemCount(req)} items · ${totalAmount(req)}</p>
+                  <Button onClick={() => openProcess(req)} size="sm" data-testid={`process-request-${req.id}`}>
+                    Process
+                  </Button>
+                </div>
+
+                <div className="mt-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <Clock className="w-3.5 h-3.5" />
+                    {new Date(req.created_at).toLocaleString()}
                   </div>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${ageBadgeClass}`}>
+                    {hours >= 24 && <AlertTriangle className="w-3 h-3" />}
+                    {ageLabel(req.created_at)}
+                  </span>
                 </div>
-                <Button onClick={() => openProcess(req)} size="sm" data-testid={`process-request-${req.id}`}>
-                  Process
-                </Button>
+
+                {req.items && req.items.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-slate-100">
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Items</p>
+                    <ul className="space-y-0.5 text-sm text-slate-700">
+                      {req.items.map((i, idx) => (
+                        <li key={idx} className="flex justify-between">
+                          <span>{i.name}</span>
+                          <span className="font-mono text-slate-500">×{i.quantity}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
-              <div className="mt-4 flex items-center gap-2 text-xs text-slate-500">
-                <Clock className="w-4 h-4" />
-                {new Date(req.created_at).toLocaleString()}
-              </div>
-              {req.items && req.items.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-slate-100">
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Items</p>
-                  <ul className="mt-1 space-y-0.5 text-sm text-slate-700">
-                    {req.items.slice(0, 3).map((i, idx) => (
-                      <li key={idx}>{i.name} × {i.quantity}</li>
-                    ))}
-                    {req.items.length > 3 && (
-                      <li className="text-slate-500">+{req.items.length - 3} more</li>
-                    )}
-                  </ul>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

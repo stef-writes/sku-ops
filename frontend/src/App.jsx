@@ -11,6 +11,7 @@ import Departments from "./pages/Departments";
 import ReceiptImport from "./pages/ReceiptImport";
 import PurchaseOrders from "./pages/PurchaseOrders";
 import Reports from "./pages/Reports";
+import ProductPerformance from "./pages/ProductPerformance";
 import Contractors from "./pages/Contractors";
 import Financials from "./pages/Financials";
 import Invoices from "./pages/Invoices";
@@ -130,13 +131,21 @@ function App() {
                         </ProtectedRoute>
                       } 
                     />
-                    <Route 
-                      path="/reports" 
+                    <Route
+                      path="/reports"
                       element={
                         <ProtectedRoute allowedRoles={["admin", "warehouse_manager"]}>
                           <Reports />
                         </ProtectedRoute>
-                      } 
+                      }
+                    />
+                    <Route
+                      path="/product-performance"
+                      element={
+                        <ProtectedRoute allowedRoles={["admin", "warehouse_manager"]}>
+                          <ProductPerformance />
+                        </ProtectedRoute>
+                      }
                     />
                     <Route 
                       path="/contractors" 

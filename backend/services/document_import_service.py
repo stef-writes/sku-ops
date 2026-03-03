@@ -163,6 +163,8 @@ async def import_document(
 
             bu, su, pq = resolve_uom(item)
             cost_val = float(item.get("cost") or 0) or float(item.get("price", 0)) * 0.7
+            # If no retail price, estimate at cost + 40% markup
+            price_val = float(item.get("price") or 0) or (round(cost_val * 1.4, 2) if cost_val > 0 else 0.0)
 
             barcode_val = item.get("barcode")
             if barcode_val and str(barcode_val).strip():
@@ -183,7 +185,7 @@ async def import_document(
                 department_name=dept["name"],
                 name=item.get("name", "Unknown"),
                 description=item.get("description", ""),
-                price=float(item.get("price", 0)),
+                price=round(price_val, 2),
                 cost=round(cost_val, 2),
                 quantity=delivered,
                 min_stock=5,

@@ -129,8 +129,10 @@ def _parse_line_item(line: str) -> Optional[dict]:
                 "quantity": max(1, qty),
                 "ordered_qty": max(1, qty),
                 "delivered_qty": max(1, qty),
-                "price": round(price, 2),
-                "cost": 0.0,
+                # Invoice/PO price is the unit cost (what store pays vendor).
+                # Retail price is estimated at cost + 40% markup.
+                "price": round(price * 1.4, 2),
+                "cost": round(price, 2),
                 "original_sku": None,
                 "base_unit": bu,
                 "sell_uom": su,

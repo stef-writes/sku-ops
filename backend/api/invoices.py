@@ -6,8 +6,37 @@ from fastapi import APIRouter, Depends, HTTPException
 from auth import require_role
 from models import InvoiceCreate, InvoiceUpdate, InvoiceSyncXeroBulk
 from repositories import invoice_repo
+from repositories.org_settings_repo import get_org_settings
+from adapters.xero_factory import get_xero_gateway
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
+
+
+async def _sync_one(inv_id: str, org_id: str) -> dict:
+    """Sync a single invoice to Xero. Returns a result dict."""
+    inv = await invoice_repo.get_by_id(inv_id, org_id)
+    if not inv:
+        return {"invoice_id": inv_id, "error": "Invoice not found", "success": False}
+
+    settings = await get_org_settings(org_id)
+    gateway = get_xero_gateway(settings)
+
+    try:
+        result = await gateway.sync_invoice(inv, settings)
+    except Exception as e:
+        return {"invoice_id": inv_id, "invoice_number": inv.get("invoice_number"), "error": str(e), "success": False}
+
+    if result.success and result.xero_invoice_id:
+        await invoice_repo.set_xero_invoice_id(inv_id, result.xero_invoice_id)
+
+    return {
+        "invoice_id": inv_id,
+        "invoice_number": inv.get("invoice_number"),
+        "xero_invoice_id": result.xero_invoice_id,
+        "xero_journal_id": result.xero_journal_id,
+        "success": result.success,
+        "error": result.error,
+    }
 
 
 @router.post("/sync-xero-bulk")
@@ -15,26 +44,16 @@ async def sync_invoices_to_xero_bulk(
     data: InvoiceSyncXeroBulk,
     current_user: dict = Depends(require_role("admin")),
 ):
-    """Bulk sync selected invoices to Xero. Stub for future Xero integration."""
+    """Bulk sync selected invoices to Xero."""
     org_id = current_user.get("organization_id") or "default"
-    results = []
-    errors = []
-    for inv_id in data.invoice_ids:
-        inv = await invoice_repo.get_by_id(inv_id, org_id)
-        if not inv:
-            errors.append({"invoice_id": inv_id, "error": "Invoice not found"})
-            continue
-        # Stub: would call Xero API here
-        results.append({
-            "invoice_id": inv_id,
-            "invoice_number": inv.get("invoice_number"),
-            "message": "Xero integration coming soon",
-        })
+    results = [await _sync_one(inv_id, org_id) for inv_id in data.invoice_ids]
+    successes = [r for r in results if r.get("success")]
+    errors = [r for r in results if not r.get("success")]
     return {
-        "synced": len(results),
+        "synced": len(successes),
         "errors": errors,
         "results": results,
-        "message": f"Bulk Xero sync: {len(results)} queued, {len(errors)} failed",
+        "message": f"Bulk Xero sync: {len(successes)} synced, {len(errors)} failed",
     }
 
 
@@ -122,13 +141,10 @@ async def delete_invoice(invoice_id: str, current_user: dict = Depends(require_r
 
 @router.post("/{invoice_id}/sync-xero")
 async def sync_invoice_to_xero(invoice_id: str, current_user: dict = Depends(require_role("admin"))):
-    """Stub for future Xero integration."""
+    """Sync a single invoice to Xero. Posts invoice + COGS journal."""
     org_id = current_user.get("organization_id") or "default"
-    inv = await invoice_repo.get_by_id(invoice_id, org_id)
-    if not inv:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-    return {
-        "message": "Xero integration coming soon",
-        "invoice_id": invoice_id,
-        "invoice_number": inv.get("invoice_number"),
-    }
+    result = await _sync_one(invoice_id, org_id)
+    if result.get("error") and not result.get("success"):
+        status_code = 404 if result["error"] == "Invoice not found" else 502
+        raise HTTPException(status_code=status_code, detail=result["error"])
+    return result

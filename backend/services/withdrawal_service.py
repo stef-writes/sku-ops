@@ -7,7 +7,7 @@ from fastapi import HTTPException
 
 from db import get_connection, transaction
 from models import MaterialWithdrawal, MaterialWithdrawalCreate
-from repositories import invoice_repo, withdrawal_repo
+from repositories import invoice_repo, product_repo, withdrawal_repo
 from domain.exceptions import InsufficientStockError
 from services.inventory import process_withdrawal_stock_changes
 
@@ -23,6 +23,17 @@ async def create_withdrawal(
     Returns withdrawal dict with optional invoice_id.
     If conn is provided, runs inside that transaction (no commit).
     """
+    # Enrich item costs from product catalog if not set by the caller
+    org_id = current_user.get("organization_id") or "default"
+    products = await product_repo.list_products(organization_id=org_id)
+    cost_map = {p["id"]: p.get("cost", 0.0) for p in products}
+    enriched_items = []
+    for item in data.items:
+        if item.cost == 0.0 and item.product_id in cost_map:
+            item = item.model_copy(update={"cost": cost_map[item.product_id]})
+        enriched_items.append(item)
+    data = data.model_copy(update={"items": enriched_items})
+
     subtotal = sum(item.subtotal for item in data.items)
     cost_total = sum(item.cost * item.quantity for item in data.items)
     tax = round(subtotal * 0.08, 2)

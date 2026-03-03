@@ -32,6 +32,7 @@ class ProductCreate(BaseModel):
     vendor_id: Optional[str] = None
     original_sku: Optional[str] = None
     barcode: Optional[str] = None
+    vendor_barcode: Optional[str] = None
     base_unit: str = "each"
     sell_uom: str = "each"
     pack_qty: int = 1
@@ -59,6 +60,7 @@ class ProductUpdate(BaseModel):
     department_id: Optional[str] = None
     vendor_id: Optional[str] = None
     barcode: Optional[str] = None
+    vendor_barcode: Optional[str] = None
     base_unit: Optional[str] = None
     sell_uom: Optional[str] = None
     pack_qty: Optional[int] = None
@@ -94,6 +96,7 @@ class Product(BaseModel):
     vendor_name: str = ""
     original_sku: Optional[str] = None
     barcode: Optional[str] = None
+    vendor_barcode: Optional[str] = None
     base_unit: str = "each"
     sell_uom: str = "each"
     pack_qty: int = 1

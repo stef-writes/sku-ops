@@ -16,6 +16,7 @@ import {
   FileText,
   ClipboardList,
   Network,
+  TrendingUp,
 } from "lucide-react";
 import ChatAssistant from "./ChatAssistant";
 
@@ -66,7 +67,13 @@ const Layout = ({ children }) => {
         { items: [{ path: "/", icon: LayoutDashboard, label: "Dashboard" }] },
         { section: "Operations", items: operationsItems },
         { section: "Inventory", items: inventoryItems },
-        { items: [{ path: "/reports", icon: BarChart3, label: "Reports" }] },
+        {
+          section: "Analytics",
+          items: [
+            { path: "/reports", icon: BarChart3, label: "Reports" },
+            { path: "/product-performance", icon: TrendingUp, label: "Product Performance" },
+          ],
+        },
         { section: "System", items: systemItems },
       ];
     }
@@ -82,7 +89,13 @@ const Layout = ({ children }) => {
           { path: "/invoices", icon: FileText, label: "Invoices" },
         ],
       },
-      { items: [{ path: "/reports", icon: BarChart3, label: "Reports" }] },
+      {
+        section: "Analytics",
+        items: [
+          { path: "/reports", icon: BarChart3, label: "Reports" },
+          { path: "/product-performance", icon: TrendingUp, label: "Product Performance" },
+        ],
+      },
       { section: "System", items: systemItems },
     ];
   };

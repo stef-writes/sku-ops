@@ -270,6 +270,16 @@ async def init_db() -> None:
         CREATE INDEX IF NOT EXISTS idx_po_items_po ON purchase_order_items(po_id);
         CREATE INDEX IF NOT EXISTS idx_po_items_status ON purchase_order_items(status);
     """)
+    # Migration: add vendor_barcode column for manufacturer UPC/EAN on product packaging
+    try:
+        await _conn.execute("ALTER TABLE products ADD COLUMN vendor_barcode TEXT")
+        await _conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_products_vendor_barcode ON products(vendor_barcode) WHERE vendor_barcode IS NOT NULL AND TRIM(vendor_barcode) != ''"
+        )
+        await _conn.commit()
+    except Exception:
+        pass
+
     # Migration: add UOM columns to products if missing
     try:
         await _conn.execute("ALTER TABLE products ADD COLUMN base_unit TEXT NOT NULL DEFAULT 'each'")
@@ -391,6 +401,55 @@ async def init_db() -> None:
         await _conn.execute(
             "UPDATE purchase_orders SET status = 'ordered' WHERE status = 'pending'"
         )
+        await _conn.commit()
+    except Exception:
+        pass
+
+    # Migration: add cost to invoice_line_items for COGS tracking
+    try:
+        await _conn.execute(
+            "ALTER TABLE invoice_line_items ADD COLUMN cost REAL NOT NULL DEFAULT 0"
+        )
+        await _conn.commit()
+    except Exception:
+        pass  # column already exists
+
+    # Migration: per-org settings (Xero config, account codes)
+    try:
+        await _conn.execute("""
+            CREATE TABLE IF NOT EXISTS org_settings (
+                organization_id TEXT PRIMARY KEY,
+                xero_client_id TEXT,
+                xero_client_secret TEXT,
+                xero_tenant_id TEXT,
+                xero_access_token TEXT,
+                xero_refresh_token TEXT,
+                xero_token_expiry TEXT,
+                xero_sales_account_code TEXT NOT NULL DEFAULT '200',
+                xero_cogs_account_code TEXT NOT NULL DEFAULT '500',
+                xero_inventory_account_code TEXT NOT NULL DEFAULT '630',
+                updated_at TEXT
+            )
+        """)
+        await _conn.commit()
+    except Exception:
+        pass
+
+    # Migration: additional Xero fields in org_settings
+    for col_def in [
+        "xero_ap_account_code TEXT NOT NULL DEFAULT '800'",
+        "xero_tracking_category_id TEXT",
+        "xero_tax_type TEXT NOT NULL DEFAULT ''",
+    ]:
+        try:
+            await _conn.execute(f"ALTER TABLE org_settings ADD COLUMN {col_def}")
+            await _conn.commit()
+        except Exception:
+            pass  # column already exists
+
+    # Migration: job_id on invoice_line_items for per-line Xero tracking
+    try:
+        await _conn.execute("ALTER TABLE invoice_line_items ADD COLUMN job_id TEXT")
         await _conn.commit()
     except Exception:
         pass

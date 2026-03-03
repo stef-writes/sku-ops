@@ -14,6 +14,7 @@ class InvoiceLineItem(BaseModel):
     quantity: float = 1.0
     unit_price: float = 0.0
     amount: float = 0.0
+    cost: float = 0.0
     product_id: Optional[str] = None
 
 

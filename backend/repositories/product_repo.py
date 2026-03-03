@@ -7,7 +7,7 @@ from db import get_connection
 _PRODUCT_COLUMNS = frozenset({
     "id", "sku", "name", "description", "price", "cost", "quantity", "min_stock",
     "department_id", "department_name", "vendor_id", "vendor_name", "original_sku",
-    "barcode", "base_unit", "sell_uom", "pack_qty", "organization_id", "created_at", "updated_at",
+    "barcode", "vendor_barcode", "base_unit", "sell_uom", "pack_qty", "organization_id", "created_at", "updated_at",
 })
 
 
@@ -119,19 +119,20 @@ async def list_by_vendor(vendor_id: str, limit: int = 200) -> list:
 
 async def find_by_barcode(barcode: str, exclude_product_id: Optional[str] = None, organization_id: Optional[str] = None, conn=None) -> Optional[dict]:
     """Find product by barcode. Optionally exclude a product (for update uniqueness check)."""
-    if not barcode or not str(barcode).strip():
+    b = barcode.strip() if barcode else ""
+    if not b:
         return None
     c = conn or get_connection()
     org_id = organization_id or "default"
     if exclude_product_id:
         cursor = await c.execute(
-            "SELECT * FROM products WHERE barcode = ? AND id != ? AND (organization_id = ? OR organization_id IS NULL)",
-            (barcode.strip(), exclude_product_id, org_id),
+            "SELECT * FROM products WHERE (barcode = ? OR sku = ? OR vendor_barcode = ?) AND id != ? AND (organization_id = ? OR organization_id IS NULL)",
+            (b, b, b, exclude_product_id, org_id),
         )
     else:
         cursor = await c.execute(
-            "SELECT * FROM products WHERE barcode = ? AND (organization_id = ? OR organization_id IS NULL)",
-            (barcode.strip(), org_id),
+            "SELECT * FROM products WHERE (barcode = ? OR sku = ? OR vendor_barcode = ?) AND (organization_id = ? OR organization_id IS NULL)",
+            (b, b, b, org_id),
         )
     row = await cursor.fetchone()
     return _row_to_dict(row)
@@ -182,9 +183,9 @@ async def insert(product_dict: dict, conn=None) -> None:
     org_id = product_dict.get("organization_id") or "default"
     await conn.execute(
         """INSERT INTO products (id, sku, name, description, price, cost, quantity, min_stock,
-           department_id, department_name, vendor_id, vendor_name, original_sku, barcode,
+           department_id, department_name, vendor_id, vendor_name, original_sku, barcode, vendor_barcode,
            base_unit, sell_uom, pack_qty, organization_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             product_dict["id"],
             product_dict["sku"],
@@ -200,6 +201,7 @@ async def insert(product_dict: dict, conn=None) -> None:
             product_dict.get("vendor_name", ""),
             product_dict.get("original_sku"),
             product_dict.get("barcode"),
+            product_dict.get("vendor_barcode"),
             product_dict.get("base_unit", "each"),
             product_dict.get("sell_uom", "each"),
             product_dict.get("pack_qty", 1),
@@ -219,7 +221,7 @@ async def update(product_id: str, updates: dict, conn=None) -> Optional[dict]:
     values = [updates.get("updated_at", "")]
     for key in ("name", "description", "price", "cost", "quantity", "min_stock",
                  "department_id", "department_name", "vendor_id", "vendor_name", "barcode",
-                 "base_unit", "sell_uom", "pack_qty", "original_sku"):
+                 "vendor_barcode", "base_unit", "sell_uom", "pack_qty", "original_sku"):
         if key in updates and updates[key] is not None:
             set_parts.append(f"{key} = ?")
             values.append(updates[key])

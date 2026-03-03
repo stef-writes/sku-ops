@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
@@ -28,7 +28,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Info,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { StockHistoryModal } from "../components/StockHistoryModal";
 import { BarcodeLabelsModal } from "../components/BarcodeLabelsModal";
 import { ProductDetailModal } from "../components/ProductDetailModal";
@@ -67,6 +76,8 @@ const Inventory = () => {
   const [skuPreview, setSkuPreview] = useState(null);
   const [page, setPage] = useState(0);
   const [totalProducts, setTotalProducts] = useState(0);
+  const [sortKey, setSortKey] = useState(null);
+  const [sortDir, setSortDir] = useState("asc");
   const PAGE_SIZE = 50;
 
   const [form, setForm] = useState({
@@ -306,6 +317,64 @@ const Inventory = () => {
     }
   };
 
+  const handleSort = (key) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  const sortedProducts = useMemo(() => {
+    if (!sortKey) return products;
+    return [...products].sort((a, b) => {
+      const va = a[sortKey];
+      const vb = b[sortKey];
+      const cmp =
+        typeof va === "number" && typeof vb === "number"
+          ? va - vb
+          : String(va ?? "").localeCompare(String(vb ?? ""));
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [products, sortKey, sortDir]);
+
+  const totalPages = Math.ceil(totalProducts / PAGE_SIZE);
+
+  const SortTh = ({ label, col, className = "" }) => {
+    const active = sortKey === col;
+    return (
+      <th
+        onClick={() => handleSort(col)}
+        className={`cursor-pointer select-none hover:bg-slate-100 transition-colors ${className}`}
+      >
+        <span className="flex items-center gap-1">
+          {label}
+          {active ? (
+            sortDir === "asc" ? (
+              <ArrowUp className="w-3 h-3 text-amber-500" />
+            ) : (
+              <ArrowDown className="w-3 h-3 text-amber-500" />
+            )
+          ) : (
+            <ArrowUpDown className="w-3 h-3 opacity-25" />
+          )}
+        </span>
+      </th>
+    );
+  };
+
+  const FieldTip = ({ children }) => (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Info className="w-3.5 h-3.5 text-slate-400 cursor-help inline-block ml-1 align-middle" />
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-[220px] text-center">
+        {children}
+      </TooltipContent>
+    </Tooltip>
+  );
+
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center min-h-[50vh]">
@@ -318,6 +387,7 @@ const Inventory = () => {
   }
 
   return (
+    <TooltipProvider delayDuration={300}>
     <div className="p-8" data-testid="inventory-page">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
@@ -413,18 +483,25 @@ const Inventory = () => {
               </option>
             ))}
           </select>
-          <button
-            onClick={() => setFilterLowStock(!filterLowStock)}
-            className={`h-11 px-4 border rounded-lg flex items-center gap-2 transition-all ${
-              filterLowStock
-                ? "border-amber-400 bg-amber-50 text-amber-700"
-                : "border-slate-200 hover:border-slate-300"
-            }`}
-            data-testid="inventory-low-stock-filter"
-          >
-            <AlertTriangle className="w-5 h-5" />
-            Low Stock Only
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setFilterLowStock(!filterLowStock)}
+                className={`h-11 px-4 border rounded-lg flex items-center gap-2 transition-all ${
+                  filterLowStock
+                    ? "border-amber-400 bg-amber-50 text-amber-700"
+                    : "border-slate-200 hover:border-slate-300"
+                }`}
+                data-testid="inventory-low-stock-filter"
+              >
+                <AlertTriangle className="w-5 h-5" />
+                Low Stock Only
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              Shows items where quantity ≤ min stock level
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -433,19 +510,19 @@ const Inventory = () => {
         <table className="w-full table-workshop">
           <thead>
             <tr>
-              <th>SKU</th>
-              <th>Product Name</th>
-              <th>Department</th>
+              <SortTh label="SKU" col="sku" />
+              <SortTh label="Product Name" col="name" />
+              <SortTh label="Department" col="department_name" />
               <th>Unit</th>
-              <th>Price</th>
-              <th>Cost</th>
-              <th>Quantity</th>
-              <th>Status</th>
+              <SortTh label="Price" col="price" />
+              <SortTh label="Cost" col="cost" />
+              <SortTh label="Quantity" col="quantity" />
+              <SortTh label="Status" col="quantity" />
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {products.length === 0 ? (
+            {sortedProducts.length === 0 ? (
               <tr>
                 <td colSpan="9" className="text-center py-12 text-slate-400">
                   <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -453,7 +530,7 @@ const Inventory = () => {
                 </td>
               </tr>
             ) : (
-              products.map((product) => (
+              sortedProducts.map((product) => (
                 <tr
                   key={product.id}
                   data-testid={`product-row-${product.sku}`}
@@ -513,7 +590,7 @@ const Inventory = () => {
           <p className="text-sm text-slate-500">
             Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalProducts)} of {totalProducts}
           </p>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -523,6 +600,21 @@ const Inventory = () => {
               <ChevronLeft className="w-4 h-4" />
               Previous
             </Button>
+            <div className="flex items-center gap-1.5 text-sm text-slate-600">
+              <span>Page</span>
+              <input
+                type="number"
+                min={1}
+                max={totalPages}
+                value={page + 1}
+                onChange={(e) => {
+                  const p = parseInt(e.target.value, 10) - 1;
+                  if (!isNaN(p) && p >= 0 && p < totalPages) setPage(p);
+                }}
+                className="w-14 border border-slate-200 rounded px-2 py-1 text-center text-sm focus:outline-none focus:border-amber-400"
+              />
+              <span>of {totalPages}</span>
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -710,6 +802,7 @@ const Inventory = () => {
               <div>
                 <Label className="text-slate-600 font-medium text-sm">
                   Min stock level
+                  <FieldTip>Alert threshold — item shows as Low Stock when quantity falls to or below this number.</FieldTip>
                 </Label>
                 <Input
                   type="number"
@@ -723,7 +816,10 @@ const Inventory = () => {
 
               <div className="col-span-3 flex items-end gap-2 flex-wrap">
                 <div className="flex-1 min-w-[100px]">
-                  <Label className="text-slate-600 font-medium text-sm">Base Unit</Label>
+                  <Label className="text-slate-600 font-medium text-sm">
+                    Base Unit
+                    <FieldTip>The physical unit this product is stored and counted in (e.g. each, roll, gallon).</FieldTip>
+                  </Label>
                   <Select value={form.base_unit} onValueChange={(v) => setForm({ ...form, base_unit: v })}>
                     <SelectTrigger className="input-workshop mt-2"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -732,7 +828,10 @@ const Inventory = () => {
                   </Select>
                 </div>
                 <div className="flex-1 min-w-[100px]">
-                  <Label className="text-slate-600 font-medium text-sm">Sell Unit</Label>
+                  <Label className="text-slate-600 font-medium text-sm">
+                    Sell Unit
+                    <FieldTip>The unit shown to customers and used when issuing materials (e.g. box, case). Can differ from Base Unit.</FieldTip>
+                  </Label>
                   <Select value={form.sell_uom} onValueChange={(v) => setForm({ ...form, sell_uom: v })}>
                     <SelectTrigger className="input-workshop mt-2"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -741,7 +840,10 @@ const Inventory = () => {
                   </Select>
                 </div>
                 <div className="min-w-[80px]">
-                  <Label className="text-slate-600 font-medium text-sm">Pack Qty</Label>
+                  <Label className="text-slate-600 font-medium text-sm">
+                    Pack Qty
+                    <FieldTip>How many Base Units are in one Sell Unit. E.g. a box of 12 screws → Pack Qty = 12.</FieldTip>
+                  </Label>
                   <Input type="number" min="1" value={form.pack_qty} onChange={(e) => setForm({ ...form, pack_qty: e.target.value })} className="input-workshop mt-2" />
                 </div>
                 <Button
@@ -861,6 +963,7 @@ const Inventory = () => {
         variant="danger"
       />
     </div>
+    </TooltipProvider>
   );
 };
 

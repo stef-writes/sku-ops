@@ -23,6 +23,8 @@ def _line_item_row_to_dict(row) -> Optional[dict]:
         d["unit_price"] = float(d["unit_price"])
     if d and "amount" in d:
         d["amount"] = float(d["amount"])
+    if d and "cost" in d:
+        d["cost"] = float(d["cost"])
     return d
 
 
@@ -183,8 +185,8 @@ async def update(
             amt = round(float(item.get("quantity", 1)) * float(item.get("unit_price", 0)), 2)
             item_id = item.get("id") or str(uuid4())
             await conn.execute(
-                """INSERT INTO invoice_line_items (id, invoice_id, description, quantity, unit_price, amount, product_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO invoice_line_items (id, invoice_id, description, quantity, unit_price, amount, cost, product_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     item_id,
                     invoice_id,
@@ -192,6 +194,7 @@ async def update(
                     float(item.get("quantity", 1)),
                     float(item.get("unit_price", 0)),
                     amt,
+                    float(item.get("cost", 0)),
                     item.get("product_id"),
                 ),
             )
@@ -302,8 +305,8 @@ async def add_withdrawals(invoice_id: str, withdrawal_ids: list, organization_id
             amt = round(qty * price, 2)
             total_subtotal += amt
             await conn.execute(
-                """INSERT INTO invoice_line_items (id, invoice_id, description, quantity, unit_price, amount, product_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO invoice_line_items (id, invoice_id, description, quantity, unit_price, amount, cost, product_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     str(uuid4()),
                     invoice_id,
@@ -311,6 +314,7 @@ async def add_withdrawals(invoice_id: str, withdrawal_ids: list, organization_id
                     qty,
                     price,
                     amt,
+                    float(item.get("cost", 0)),
                     item.get("product_id"),
                 ),
             )
@@ -385,8 +389,8 @@ async def create_from_withdrawals(withdrawal_ids: list, organization_id: Optiona
             amt = round(qty * price, 2)
             total_subtotal += amt
             await conn.execute(
-                """INSERT INTO invoice_line_items (id, invoice_id, description, quantity, unit_price, amount, product_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO invoice_line_items (id, invoice_id, description, quantity, unit_price, amount, cost, product_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     str(uuid4()),
                     inv_id,
@@ -394,6 +398,7 @@ async def create_from_withdrawals(withdrawal_ids: list, organization_id: Optiona
                     qty,
                     price,
                     amt,
+                    float(item.get("cost", 0)),
                     item.get("product_id"),
                 ),
             )
@@ -437,6 +442,16 @@ async def mark_paid_for_withdrawal(withdrawal_id: str) -> None:
         await conn.commit()
 
 
+async def set_xero_invoice_id(invoice_id: str, xero_invoice_id: str) -> None:
+    """Store the Xero invoice ID after a successful sync."""
+    conn = get_connection()
+    await conn.execute(
+        "UPDATE invoices SET xero_invoice_id = ?, updated_at = ? WHERE id = ?",
+        (xero_invoice_id, datetime.now(timezone.utc).isoformat(), invoice_id),
+    )
+    await conn.commit()
+
+
 async def delete_draft(invoice_id: str) -> bool:
     """Delete draft invoice and unlink withdrawals."""
     conn = get_connection()
@@ -466,6 +481,7 @@ class InvoiceRepo:
     add_withdrawals = staticmethod(add_withdrawals)
     create_from_withdrawals = staticmethod(create_from_withdrawals)
     mark_paid_for_withdrawal = staticmethod(mark_paid_for_withdrawal)
+    set_xero_invoice_id = staticmethod(set_xero_invoice_id)
     delete_draft = staticmethod(delete_draft)
 
 

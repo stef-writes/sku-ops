@@ -133,6 +133,12 @@ DEFAULT_DEEP_THINKING_BUDGET = 8000
 # Per-session AI spend cap in USD. 0 = unlimited. Set SESSION_COST_CAP=2.00 in .env.
 SESSION_COST_CAP = float(os.environ.get("SESSION_COST_CAP", "2.00"))
 
+# Xero OAuth 2.0 — register a Xero app at developer.xero.com to get these.
+# XERO_REDIRECT_URI must match the callback URL registered in your Xero app.
+XERO_CLIENT_ID = os.environ.get("XERO_CLIENT_ID", "").strip()
+XERO_CLIENT_SECRET = os.environ.get("XERO_CLIENT_SECRET", "").strip()
+XERO_REDIRECT_URI = os.environ.get("XERO_REDIRECT_URI", "").strip()
+
 # E2E / live tests: backend URL to hit. Set REACT_APP_BACKEND_URL or E2E_BACKEND_URL.
 def _e2e_backend_url() -> str:
     url = (
