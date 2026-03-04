@@ -4,8 +4,10 @@ import pytest_asyncio
 
 from shared.infrastructure.database import get_connection
 from fastapi import HTTPException
-from models import MaterialWithdrawalCreate, WithdrawalItem
-from repositories import product_repo, stock_repo, withdrawal_repo
+from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
+from catalog.infrastructure.product_repo import product_repo
+from inventory.infrastructure.stock_repo import stock_repo
+from operations.infrastructure.withdrawal_repo import withdrawal_repo
 from catalog.application.product_lifecycle import create_product
 from operations.application.withdrawal_service import create_withdrawal
 

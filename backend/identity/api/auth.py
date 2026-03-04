@@ -2,8 +2,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 
 from identity.application.auth_service import hash_password, verify_password, create_token, get_current_user
-from models import ROLES, User, UserCreate, UserLogin
-from repositories import user_repo
+from identity.domain.user import ROLES, User, UserCreate, UserLogin
+from identity.infrastructure.user_repo import user_repo
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

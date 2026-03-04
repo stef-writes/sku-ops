@@ -12,7 +12,7 @@ from identity.application.auth_service import require_role
 from shared.infrastructure.config import ANTHROPIC_AVAILABLE, LLM_SETUP_URL
 from documents.application.import_service import import_document as do_import_document
 
-from api.schemas import DocumentImportRequest
+from documents.domain.document import DocumentImportRequest
 
 logger = logging.getLogger(__name__)
 

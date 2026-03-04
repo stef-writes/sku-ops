@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from identity.application.auth_service import get_current_user
 from shared.infrastructure.config import ANTHROPIC_AVAILABLE, LLM_SETUP_URL, SESSION_COST_CAP
 
-from api.schemas import ChatRequest
+from assistant.api.schemas import ChatRequest
 
 router = APIRouter(tags=["chat"])
 
@@ -25,7 +25,7 @@ async def chat_status(current_user: dict = Depends(get_current_user)):
 @router.delete("/chat/sessions/{session_id}", status_code=204)
 async def clear_session(session_id: str, current_user: dict = Depends(get_current_user)):
     """Clear a chat session's history. Triggers background memory extraction first."""
-    from services import session_store
+    from assistant.application.session_store import session_store
     from assistant.agents.memory_extract import extract_and_save
 
     history = session_store.get_or_create(session_id)
@@ -46,7 +46,7 @@ async def chat_assistant(
 ):
     """Chat with AI assistant. Routes to specialist agents: inventory, ops, finance, insights."""
     from assistant.application.assistant import chat
-    from services import session_store
+    from assistant.application.session_store import session_store
     from assistant.agents.memory_store import recall
     from assistant.agents.memory_extract import extract_and_save
 

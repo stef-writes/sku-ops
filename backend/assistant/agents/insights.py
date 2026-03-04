@@ -120,7 +120,7 @@ async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mo
 # ── DB query implementations (unchanged) ────────────────────────────────────
 
 async def _get_top_products(args: dict, org_id: str) -> str:
-    from repositories import withdrawal_repo
+    from operations.infrastructure.withdrawal_repo import withdrawal_repo
     days = min(int(args.get("days") or 30), 365)
     by = args.get("by", "revenue").lower()
     if by not in ("volume", "revenue"):

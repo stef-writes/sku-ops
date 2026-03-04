@@ -4,8 +4,8 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Depends
 
 from identity.application.auth_service import get_current_user, require_role
-from models import Department, DepartmentCreate
-from repositories import department_repo
+from catalog.domain.department import Department, DepartmentCreate
+from catalog.infrastructure.department_repo import department_repo
 
 router = APIRouter(prefix="/departments", tags=["departments"])
 

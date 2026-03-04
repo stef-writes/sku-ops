@@ -4,39 +4,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from identity.application.auth_service import require_role
-from models import InvoiceCreate, InvoiceUpdate, InvoiceSyncXeroBulk
-from repositories import invoice_repo
-from identity.infrastructure.org_settings_repo import get_org_settings
-from finance.adapters.xero_factory import get_xero_gateway
+from finance.domain.invoice import InvoiceCreate, InvoiceUpdate, InvoiceSyncXeroBulk
+from finance.infrastructure.invoice_repo import invoice_repo
+from finance.application.invoice_service import sync_invoice
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
-
-
-async def _sync_one(inv_id: str, org_id: str) -> dict:
-    """Sync a single invoice to Xero. Returns a result dict."""
-    inv = await invoice_repo.get_by_id(inv_id, org_id)
-    if not inv:
-        return {"invoice_id": inv_id, "error": "Invoice not found", "success": False}
-
-    settings = await get_org_settings(org_id)
-    gateway = get_xero_gateway(settings)
-
-    try:
-        result = await gateway.sync_invoice(inv, settings)
-    except Exception as e:
-        return {"invoice_id": inv_id, "invoice_number": inv.get("invoice_number"), "error": str(e), "success": False}
-
-    if result.success and result.xero_invoice_id:
-        await invoice_repo.set_xero_invoice_id(inv_id, result.xero_invoice_id)
-
-    return {
-        "invoice_id": inv_id,
-        "invoice_number": inv.get("invoice_number"),
-        "xero_invoice_id": result.xero_invoice_id,
-        "xero_journal_id": result.xero_journal_id,
-        "success": result.success,
-        "error": result.error,
-    }
 
 
 @router.post("/sync-xero-bulk")
@@ -46,7 +18,7 @@ async def sync_invoices_to_xero_bulk(
 ):
     """Bulk sync selected invoices to Xero."""
     org_id = current_user.get("organization_id") or "default"
-    results = [await _sync_one(inv_id, org_id) for inv_id in data.invoice_ids]
+    results = [await sync_invoice(inv_id, org_id) for inv_id in data.invoice_ids]
     successes = [r for r in results if r.get("success")]
     errors = [r for r in results if not r.get("success")]
     return {
@@ -143,7 +115,7 @@ async def delete_invoice(invoice_id: str, current_user: dict = Depends(require_r
 async def sync_invoice_to_xero(invoice_id: str, current_user: dict = Depends(require_role("admin"))):
     """Sync a single invoice to Xero. Posts invoice + COGS journal."""
     org_id = current_user.get("organization_id") or "default"
-    result = await _sync_one(invoice_id, org_id)
+    result = await sync_invoice(invoice_id, org_id)
     if result.get("error") and not result.get("success"):
         status_code = 404 if result["error"] == "Invoice not found" else 502
         raise HTTPException(status_code=status_code, detail=result["error"])

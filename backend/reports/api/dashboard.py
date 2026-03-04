@@ -3,7 +3,10 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 
 from identity.application.auth_service import get_current_user, require_role
-from repositories import product_repo, user_repo, vendor_repo, withdrawal_repo
+from catalog.infrastructure.product_repo import product_repo
+from identity.infrastructure.user_repo import user_repo
+from catalog.infrastructure.vendor_repo import vendor_repo
+from operations.infrastructure.withdrawal_repo import withdrawal_repo
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 

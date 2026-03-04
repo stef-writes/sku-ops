@@ -5,8 +5,11 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException
 
 from identity.application.auth_service import get_current_user, require_role
-from models import MaterialRequestCreate, MaterialRequestProcess, MaterialWithdrawalCreate, WithdrawalItem
-from repositories import material_request_repo, user_repo, withdrawal_repo
+from operations.domain.material_request import MaterialRequestCreate, MaterialRequestProcess
+from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
+from operations.infrastructure.material_request_repo import material_request_repo
+from identity.infrastructure.user_repo import user_repo
+from operations.infrastructure.withdrawal_repo import withdrawal_repo
 from operations.application.withdrawal_service import create_withdrawal as do_create_withdrawal
 from shared.infrastructure.database import transaction
 

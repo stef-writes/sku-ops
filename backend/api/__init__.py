@@ -5,16 +5,16 @@ from fastapi import APIRouter
 
 from identity.api.auth import router as auth_router
 from assistant.api.chat import router as chat_router
-from .health import router as health_router
+from reports.api.health import router as health_router
 from operations.api.contractors import router as contractors_router
-from .dashboard import router as dashboard_router
+from reports.api.dashboard import router as dashboard_router
 from catalog.api.departments import router as departments_router
 from documents.api.documents import router as documents_router
 from finance.api.financials import router as financials_router
 from finance.api.invoices import router as invoices_router
 from finance.api.payments import router as payments_router
 from catalog.api.products import router as products_router
-from .reports import router as reports_router
+from reports.api.reports import router as reports_router
 from catalog.api.sku import router as sku_router
 from catalog.api.vendors import router as vendors_router
 from finance.api.webhooks import router as webhooks_router

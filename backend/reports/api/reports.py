@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends
 
 from identity.application.auth_service import require_role
 from shared.infrastructure.database import get_connection
-from repositories import product_repo, withdrawal_repo
+from catalog.infrastructure.product_repo import product_repo
+from operations.infrastructure.withdrawal_repo import withdrawal_repo
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 

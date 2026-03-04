@@ -125,7 +125,7 @@ async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mo
 # ── DB query implementations (unchanged) ────────────────────────────────────
 
 async def _get_contractor_history(args: dict, org_id: str) -> str:
-    from repositories import withdrawal_repo
+    from operations.infrastructure.withdrawal_repo import withdrawal_repo
     name = (args.get("name") or "").strip()
     limit = min(int(args.get("limit") or 20), 100)
     all_withdrawals = await withdrawal_repo.list_withdrawals(limit=500, organization_id=org_id)
@@ -161,7 +161,7 @@ async def _get_contractor_history(args: dict, org_id: str) -> str:
 
 
 async def _get_job_materials(args: dict, org_id: str) -> str:
-    from repositories import withdrawal_repo
+    from operations.infrastructure.withdrawal_repo import withdrawal_repo
     job_id = (args.get("job_id") or "").strip()
     all_withdrawals = await withdrawal_repo.list_withdrawals(limit=1000, organization_id=org_id)
     job_withdrawals = [w for w in all_withdrawals if (w.get("job_id") or "").lower() == job_id.lower()]
@@ -198,7 +198,7 @@ async def _get_job_materials(args: dict, org_id: str) -> str:
 
 
 async def _list_recent_withdrawals(args: dict, org_id: str) -> str:
-    from repositories import withdrawal_repo
+    from operations.infrastructure.withdrawal_repo import withdrawal_repo
     days = min(int(args.get("days") or 7), 365)
     limit = min(int(args.get("limit") or 20), 100)
     since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()

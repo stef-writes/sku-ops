@@ -9,7 +9,9 @@ from typing import Optional
 from fastapi import HTTPException
 
 from catalog.domain.product import ALLOWED_BASE_UNITS
-from repositories import department_repo, product_repo, vendor_repo
+from catalog.infrastructure.department_repo import department_repo
+from catalog.infrastructure.product_repo import product_repo
+from catalog.infrastructure.vendor_repo import vendor_repo
 from purchasing.infrastructure.po_repo import (
     create_po as _create_po,
     create_po_items,

@@ -6,8 +6,10 @@ from typing import Optional
 from fastapi import HTTPException
 
 from shared.infrastructure.database import get_connection, transaction
-from models import MaterialWithdrawal, MaterialWithdrawalCreate
-from repositories import invoice_repo, product_repo, withdrawal_repo
+from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalCreate
+from finance.infrastructure.invoice_repo import invoice_repo
+from catalog.infrastructure.product_repo import product_repo
+from operations.infrastructure.withdrawal_repo import withdrawal_repo
 from shared.domain.exceptions import InsufficientStockError
 from inventory.application.inventory_service import process_withdrawal_stock_changes
 

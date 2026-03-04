@@ -8,7 +8,9 @@ from typing import Optional
 from fastapi import HTTPException
 
 from catalog.domain.product import ALLOWED_BASE_UNITS
-from repositories import department_repo, product_repo, vendor_repo
+from catalog.infrastructure.department_repo import department_repo
+from catalog.infrastructure.product_repo import product_repo
+from catalog.infrastructure.vendor_repo import vendor_repo
 from documents.application.import_parser import infer_uom, resolve_uom, suggest_department
 from documents.application.enrichment_service import enrich_for_import
 from inventory.application.inventory_service import process_receiving_stock_changes

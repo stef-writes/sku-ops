@@ -7,14 +7,16 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from identity.application.auth_service import get_current_user, require_role
 from catalog.domain.barcode import validate_barcode
 from shared.domain.exceptions import DuplicateBarcodeError, InvalidBarcodeError, ResourceNotFoundError
-from models import Product, ProductCreate, ProductUpdate
-from repositories import department_repo, product_repo, vendor_repo
+from catalog.domain.product import Product, ProductCreate, ProductUpdate
+from catalog.infrastructure.department_repo import department_repo
+from catalog.infrastructure.product_repo import product_repo
+from catalog.infrastructure.vendor_repo import vendor_repo
 from inventory.application.inventory_service import get_stock_history
 from catalog.application.product_lifecycle import create_product as lifecycle_create, delete_product as lifecycle_delete, update_product as lifecycle_update
 from inventory.application.uom_classifier import classify_uom, classify_uom_batch
 from documents.application.import_parser import infer_uom, parse_csv_products, suggest_department
 
-from api.schemas import SuggestUomRequest
+from catalog.api.schemas import SuggestUomRequest
 
 router = APIRouter(prefix="/products", tags=["products"])
 

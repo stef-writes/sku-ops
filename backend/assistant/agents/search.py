@@ -41,7 +41,7 @@ class ProductSearchIndex:
         self._bm25 = None
 
     async def rebuild(self, org_id: str = "default") -> None:
-        from repositories import product_repo
+        from catalog.infrastructure.product_repo import product_repo
         products = await product_repo.list_products(limit=10000, organization_id=org_id)
         if not products:
             self._products = []

@@ -137,7 +137,7 @@ async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mo
 # ── DB query implementations (unchanged) ────────────────────────────────────
 
 async def _get_invoice_summary(org_id: str) -> str:
-    from repositories import invoice_repo
+    from finance.infrastructure.invoice_repo import invoice_repo
     invoices = await invoice_repo.list_invoices(limit=10000, organization_id=org_id)
     summary: dict[str, dict] = {}
     for inv in invoices:
@@ -153,7 +153,7 @@ async def _get_invoice_summary(org_id: str) -> str:
 
 
 async def _get_outstanding_balances(args: dict, org_id: str) -> str:
-    from repositories import withdrawal_repo
+    from operations.infrastructure.withdrawal_repo import withdrawal_repo
     limit = min(int(args.get("limit") or 20), 100)
     withdrawals = await withdrawal_repo.list_withdrawals(payment_status="unpaid", limit=10000, organization_id=org_id)
     entity_map: dict[str, dict] = {}
@@ -178,7 +178,7 @@ async def _get_outstanding_balances(args: dict, org_id: str) -> str:
 
 
 async def _get_revenue_summary(args: dict, org_id: str) -> str:
-    from repositories import withdrawal_repo
+    from operations.infrastructure.withdrawal_repo import withdrawal_repo
     days = min(int(args.get("days") or 30), 365)
     since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     withdrawals = await withdrawal_repo.list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
@@ -200,7 +200,7 @@ async def _get_revenue_summary(args: dict, org_id: str) -> str:
 
 
 async def _get_pl_summary(args: dict, org_id: str) -> str:
-    from repositories import withdrawal_repo
+    from operations.infrastructure.withdrawal_repo import withdrawal_repo
     days = min(int(args.get("days") or 30), 365)
     since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     withdrawals = await withdrawal_repo.list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
@@ -219,7 +219,7 @@ async def _get_pl_summary(args: dict, org_id: str) -> str:
 
 
 async def _get_top_products(args: dict, org_id: str) -> str:
-    from repositories import withdrawal_repo
+    from operations.infrastructure.withdrawal_repo import withdrawal_repo
     days = min(int(args.get("days") or 7), 365)
     limit = min(int(args.get("limit") or 10), 50)
     since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()

@@ -39,8 +39,8 @@ class TestHealthAI:
 
     def test_ai_health_unavailable_without_key(self, client):
         """Without ANTHROPIC_API_KEY, returns 503 with setup URL."""
-        with patch("api.health.ANTHROPIC_AVAILABLE", False):
-            with patch("api.health.LLM_SETUP_URL", "https://console.anthropic.com/"):
+        with patch("reports.api.health.ANTHROPIC_AVAILABLE", False):
+            with patch("reports.api.health.LLM_SETUP_URL", "https://console.anthropic.com/"):
                 response = client.get("/api/health/ai")
         assert response.status_code == 503
         data = response.json()
@@ -50,8 +50,8 @@ class TestHealthAI:
 
     def test_ai_health_ok_when_configured(self, client):
         """With Anthropic configured, returns 200 and model info."""
-        with patch("api.health.ANTHROPIC_AVAILABLE", True):
-            with patch("api.health.ANTHROPIC_MODEL", "claude-sonnet-4-6"):
+        with patch("reports.api.health.ANTHROPIC_AVAILABLE", True):
+            with patch("reports.api.health.ANTHROPIC_MODEL", "claude-sonnet-4-6"):
                 response = client.get("/api/health/ai")
         assert response.status_code == 200
         data = response.json()

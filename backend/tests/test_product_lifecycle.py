@@ -3,7 +3,8 @@ import pytest
 import pytest_asyncio
 
 from shared.infrastructure.database import get_connection
-from repositories import department_repo, product_repo
+from catalog.infrastructure.department_repo import department_repo
+from catalog.infrastructure.product_repo import product_repo
 from catalog.application.product_lifecycle import create_product, update_product, delete_product
 from shared.domain.exceptions import DuplicateBarcodeError, InvalidBarcodeError, ResourceNotFoundError
 

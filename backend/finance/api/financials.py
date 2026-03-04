@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
 from identity.application.auth_service import require_role
-from repositories import withdrawal_repo
+from operations.infrastructure.withdrawal_repo import withdrawal_repo
 
 router = APIRouter(prefix="/financials", tags=["financials"])
 

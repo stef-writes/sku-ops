@@ -8,8 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from identity.application.auth_service import hash_password, require_role
 from shared.infrastructure.config import ALLOW_RESET, DEMO_USER_EMAIL as MOCK_USER_EMAIL, DEMO_USER_PASSWORD as MOCK_USER_PASSWORD
 from shared.infrastructure.database import get_connection
-from models import Department, User
-from repositories import department_repo, organization_repo, product_repo, user_repo
+from catalog.domain.department import Department
+from identity.domain.user import User
+from catalog.infrastructure.department_repo import department_repo
+from identity.infrastructure.org_repo import organization_repo
+from catalog.infrastructure.product_repo import product_repo
+from identity.infrastructure.user_repo import user_repo
 from documents.application.import_parser import infer_uom, parse_csv_products, suggest_department
 from catalog.application.product_lifecycle import create_product as lifecycle_create
 

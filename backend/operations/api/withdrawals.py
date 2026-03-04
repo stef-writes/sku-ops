@@ -5,8 +5,10 @@ from typing import List, Optional
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from identity.application.auth_service import get_current_user, require_role
-from models import MaterialWithdrawal, MaterialWithdrawalCreate
-from repositories import invoice_repo, user_repo, withdrawal_repo
+from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalCreate
+from finance.infrastructure.invoice_repo import invoice_repo
+from identity.infrastructure.user_repo import user_repo
+from operations.infrastructure.withdrawal_repo import withdrawal_repo
 from operations.application.withdrawal_service import create_withdrawal as do_create_withdrawal
 
 router = APIRouter(prefix="/withdrawals", tags=["withdrawals"])

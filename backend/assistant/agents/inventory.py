@@ -199,7 +199,7 @@ async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mo
 # ── DB query implementations (unchanged) ────────────────────────────────────
 
 async def _search_products(args: dict, org_id: str) -> str:
-    from repositories import product_repo
+    from catalog.infrastructure.product_repo import product_repo
     query = (args.get("query") or "").strip()
     limit = min(int(args.get("limit") or 20), 50)
     items = await product_repo.list_products(search=query, limit=limit, organization_id=org_id)
@@ -304,7 +304,7 @@ async def _get_inventory_stats(org_id: str) -> str:
 
 
 async def _list_low_stock(args: dict, org_id: str) -> str:
-    from repositories import product_repo
+    from catalog.infrastructure.product_repo import product_repo
     limit = min(int(args.get("limit") or 20), 50)
     items = await product_repo.list_low_stock(limit=limit, organization_id=org_id)
     out = [
@@ -322,7 +322,8 @@ async def _list_low_stock(args: dict, org_id: str) -> str:
 
 
 async def _list_departments(org_id: str) -> str:
-    from repositories import department_repo, sku_repo
+    from catalog.infrastructure.department_repo import department_repo
+    from catalog.infrastructure.sku_repo import sku_repo
     depts = await department_repo.list_all(org_id=org_id)
     counters = await sku_repo.get_all_counters()
     out = []
@@ -340,7 +341,7 @@ async def _list_departments(org_id: str) -> str:
 
 
 async def _list_vendors(org_id: str) -> str:
-    from repositories import vendor_repo
+    from catalog.infrastructure.vendor_repo import vendor_repo
     vendors = await vendor_repo.list_all(org_id=org_id)
     out = [{"name": v.get("name"), "product_count": v.get("product_count", 0)} for v in vendors]
     return json.dumps({"vendors": out})
@@ -385,7 +386,7 @@ async def _get_usage_velocity(args: dict, org_id: str) -> str:
 
 
 async def _get_reorder_suggestions(args: dict, org_id: str) -> str:
-    from repositories import product_repo
+    from catalog.infrastructure.product_repo import product_repo
     limit = min(int(args.get("limit") or 20), 50)
     since = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
     conn = get_connection()

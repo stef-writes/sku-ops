@@ -2,7 +2,8 @@
 import pytest
 import pytest_asyncio
 
-from repositories import invoice_repo, withdrawal_repo
+from finance.infrastructure.invoice_repo import invoice_repo
+from operations.infrastructure.withdrawal_repo import withdrawal_repo
 
 
 async def _create_withdrawal_with_items(contractor_id: str, billing_entity: str, items: list) -> str:

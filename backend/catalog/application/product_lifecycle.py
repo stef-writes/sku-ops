@@ -10,8 +10,10 @@ from typing import Any, Optional
 from shared.infrastructure.database import transaction
 from catalog.domain.barcode import validate_barcode
 from shared.domain.exceptions import DuplicateBarcodeError, InvalidBarcodeError, ResourceNotFoundError
-from models import Product
-from repositories import department_repo, product_repo, vendor_repo
+from catalog.domain.product import Product
+from catalog.infrastructure.department_repo import department_repo
+from catalog.infrastructure.product_repo import product_repo
+from catalog.infrastructure.vendor_repo import vendor_repo
 from inventory.application.inventory_service import process_import_stock_changes
 from catalog.application.sku_service import generate_sku
 

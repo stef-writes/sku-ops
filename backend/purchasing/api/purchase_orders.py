@@ -1,11 +1,11 @@
 """Purchase order API routes."""
 import logging
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 
 from identity.application.auth_service import require_role
+from purchasing.domain.purchase_order import CreatePORequest, MarkDeliveryRequest, ReceiveItemsRequest
 from purchasing.infrastructure.po_repo import get_po, get_po_items, list_pos
 from purchasing.application.purchase_order_service import (
     create_purchase_order,
@@ -16,23 +16,6 @@ from purchasing.application.purchase_order_service import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/purchase-orders", tags=["purchase-orders"])
-
-
-class CreatePORequest(BaseModel):
-    vendor_name: str
-    create_vendor_if_missing: bool = True
-    department_id: Optional[str] = None
-    document_date: Optional[str] = None
-    total: Optional[float] = None
-    products: List[dict]
-
-
-class ReceiveItemsRequest(BaseModel):
-    items: List[dict]  # [{"id": item_id, "delivered_qty": qty}]
-
-
-class MarkDeliveryRequest(BaseModel):
-    item_ids: List[str]
 
 
 @router.post("")

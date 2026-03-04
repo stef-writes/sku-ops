@@ -8,9 +8,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from finance.adapters.payment_factory import get_payment_gateway
 from identity.application.auth_service import get_current_user
-from repositories import invoice_repo, payment_repo, withdrawal_repo
+from finance.infrastructure.invoice_repo import invoice_repo
+from finance.infrastructure.payment_repo import payment_repo
+from operations.infrastructure.withdrawal_repo import withdrawal_repo
 
-from api.schemas import CreatePaymentRequest
+from finance.api.schemas import CreatePaymentRequest
 
 logger = logging.getLogger(__name__)
 

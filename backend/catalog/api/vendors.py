@@ -4,8 +4,8 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Depends
 
 from identity.application.auth_service import get_current_user, require_role
-from models import Vendor, VendorCreate
-from repositories import vendor_repo
+from catalog.domain.vendor import Vendor, VendorCreate
+from catalog.infrastructure.vendor_repo import vendor_repo
 
 router = APIRouter(prefix="/vendors", tags=["vendors"])
 
