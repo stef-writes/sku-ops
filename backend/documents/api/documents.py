@@ -119,7 +119,7 @@ async def parse_document(
 
         def _do_parse():
             if is_pdf:
-                from services.llm import generate_with_pdf
+                from assistant.application.llm import generate_with_pdf
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tf:
                     tf.write(contents)
                     temp_path = tf.name
@@ -133,7 +133,7 @@ async def parse_document(
                     if os.path.exists(temp_path):
                         os.unlink(temp_path)
             else:
-                from services.llm import generate_with_image
+                from assistant.application.llm import generate_with_image
                 return generate_with_image(
                     "Extract all product and vendor information. Return only valid JSON.",
                     contents,

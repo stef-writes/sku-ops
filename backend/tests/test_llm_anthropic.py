@@ -65,22 +65,22 @@ class TestLLMService:
 
     def test_generate_text_returns_none_without_client(self):
         """generate_text returns None when Anthropic not configured."""
-        from services.llm import generate_text
+        from assistant.application.llm import generate_text
 
-        with patch("services.llm._get_client", return_value=None):
+        with patch("assistant.application.llm._get_client", return_value=None):
             result = generate_text("Hello")
         assert result is None
 
     def test_generate_text_returns_text_when_mocked(self):
         """generate_text returns model output when client is mocked."""
-        from services.llm import generate_text
+        from assistant.application.llm import generate_text
 
         mock_client = MagicMock()
         mock_client.messages.create.return_value = MagicMock(
             content=[MagicMock(text="Mocked response")]
         )
 
-        with patch("services.llm._get_client", return_value=mock_client):
+        with patch("assistant.application.llm._get_client", return_value=mock_client):
             result = generate_text("Hello", system_instruction="Be helpful")
 
         assert result == "Mocked response"
@@ -92,15 +92,15 @@ class TestLLMService:
 
     def test_generate_with_image_raises_without_client(self):
         """generate_with_image raises when LLM not configured."""
-        from services.llm import generate_with_image
+        from assistant.application.llm import generate_with_image
 
-        with patch("services.llm._get_client", return_value=None):
+        with patch("assistant.application.llm._get_client", return_value=None):
             with pytest.raises(ValueError, match="LLM not configured"):
                 generate_with_image("Describe this", b"\xff\xd8\xfffake-jpeg")
 
     def test_generate_with_image_succeeds_when_mocked(self):
         """generate_with_image returns model output when client is mocked."""
-        from services.llm import generate_with_image
+        from assistant.application.llm import generate_with_image
 
         mock_client = MagicMock()
         mock_client.messages.create.return_value = MagicMock(
@@ -110,7 +110,7 @@ class TestLLMService:
         # Minimal JPEG bytes
         jpeg_bytes = b"\xff\xd8\xff\x00\x00\x00\x00\xff\xd9"
 
-        with patch("services.llm._get_client", return_value=mock_client):
+        with patch("assistant.application.llm._get_client", return_value=mock_client):
             result = generate_with_image("What is this?", jpeg_bytes)
 
         assert result == "A red apple"
@@ -125,9 +125,9 @@ class TestLLMService:
 
     def test_generate_with_pdf_raises_without_client(self):
         """generate_with_pdf raises when LLM not configured."""
-        from services.llm import generate_with_pdf
+        from assistant.application.llm import generate_with_pdf
 
-        with patch("services.llm._get_client", return_value=None):
+        with patch("assistant.application.llm._get_client", return_value=None):
             with pytest.raises(ValueError, match="LLM not configured"):
                 generate_with_pdf("Extract items", "/nonexistent.pdf")
 
@@ -151,8 +151,8 @@ class TestChatStatus:
     async def test_chat_status_unavailable_without_key(self, client, db):
         """Chat status reports available=false when no API key."""
         headers = self._auth_headers(client)
-        with patch("api.chat.ANTHROPIC_AVAILABLE", False):
-            with patch("api.chat.LLM_SETUP_URL", "https://console.anthropic.com/"):
+        with patch("assistant.api.chat.ANTHROPIC_AVAILABLE", False):
+            with patch("assistant.api.chat.LLM_SETUP_URL", "https://console.anthropic.com/"):
                 response = client.get("/api/chat/status", headers=headers)
         assert response.status_code == 200
         data = response.json()
@@ -164,7 +164,7 @@ class TestChatStatus:
     async def test_chat_status_available_when_configured(self, client, db):
         """Chat status reports available=true when Anthropic configured."""
         headers = self._auth_headers(client)
-        with patch("api.chat.ANTHROPIC_AVAILABLE", True):
+        with patch("assistant.api.chat.ANTHROPIC_AVAILABLE", True):
             response = client.get("/api/chat/status", headers=headers)
         assert response.status_code == 200
         data = response.json()
@@ -179,9 +179,9 @@ class TestAssistant:
 
     async def test_chat_returns_setup_message_without_key(self, db):
         """When no API key, chat returns setup instructions."""
-        from services.assistant import chat
+        from assistant.application.assistant import chat
 
-        with patch("services.assistant.ANTHROPIC_AVAILABLE", False):
+        with patch("assistant.application.assistant.ANTHROPIC_AVAILABLE", False):
             result = await chat("How many products?", history=None)
         assert "ANTHROPIC_API_KEY" in result["response"] or "Anthropic" in result["response"]
         assert result["tool_calls"] == []
@@ -189,7 +189,7 @@ class TestAssistant:
     async def test_chat_dispatches_to_correct_agent(self, db):
         """assistant.chat() dispatches to the correct specialist agent by agent_type."""
         from unittest.mock import AsyncMock
-        from services.assistant import chat
+        from assistant.application.assistant import chat
 
         expected = {
             "response": "You have 0 products in inventory.",
@@ -200,8 +200,8 @@ class TestAssistant:
             "agent": "inventory",
         }
 
-        with patch("services.assistant.ANTHROPIC_AVAILABLE", True), \
-             patch("services.agents.inventory.run", new=AsyncMock(return_value=expected)):
+        with patch("assistant.application.assistant.ANTHROPIC_AVAILABLE", True), \
+             patch("assistant.agents.inventory.run", new=AsyncMock(return_value=expected)):
             result = await chat(
                 "What's our inventory count?",
                 history=None,

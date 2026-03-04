@@ -10,7 +10,7 @@ import logging
 
 from shared.infrastructure.config import LLM_AVAILABLE
 from documents.application.import_parser import infer_uom as rule_infer_uom
-from services.llm import generate_text
+from assistant.application.llm import generate_text
 
 logger = logging.getLogger(__name__)
 

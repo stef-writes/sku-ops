@@ -13,7 +13,7 @@ from shared.infrastructure.config import (
     AGENT_THINKING_BUDGET,
     DEFAULT_DEEP_THINKING_BUDGET,
 )
-from services.agents.deps import AgentDeps
+from assistant.agents.deps import AgentDeps
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,7 @@ async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mo
     if not ANTHROPIC_AVAILABLE:
         return {"response": "Finance agent requires ANTHROPIC_API_KEY.", "tool_calls": [], "history": [], "thinking": [], "agent": "finance"}
 
-    from services.agents.agent_utils import build_message_history, extract_text_history, extract_tool_calls, calc_cost, run_agent
+    from assistant.agents.agent_utils import build_message_history, extract_text_history, extract_tool_calls, calc_cost, run_agent
 
     deep = mode == "deep"
     thinking_budget = (AGENT_THINKING_BUDGET or DEFAULT_DEEP_THINKING_BUDGET) if deep else 0

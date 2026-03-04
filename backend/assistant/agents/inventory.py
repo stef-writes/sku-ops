@@ -16,8 +16,8 @@ from shared.infrastructure.config import (
     DEFAULT_DEEP_THINKING_BUDGET,
 )
 from shared.infrastructure.database import get_connection
-from services.agents.deps import AgentDeps
-from services.agents.agent_utils import build_message_history, extract_text_history, extract_tool_calls, calc_cost, run_agent
+from assistant.agents.deps import AgentDeps
+from assistant.agents.agent_utils import build_message_history, extract_text_history, extract_tool_calls, calc_cost, run_agent
 
 logger = logging.getLogger(__name__)
 
@@ -219,7 +219,7 @@ async def _search_products(args: dict, org_id: str) -> str:
 
 async def _search_semantic(args: dict, org_id: str) -> str:
     from shared.infrastructure.config import OPENAI_API_KEY
-    from services.agents.search import get_index
+    from assistant.agents.search import get_index
     query = (args.get("query") or "").strip()
     limit = min(int(args.get("limit") or 10), 30)
     index = await get_index(org_id)

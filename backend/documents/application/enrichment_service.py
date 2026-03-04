@@ -28,7 +28,7 @@ async def enrich_for_import(
         return items
 
     try:
-        from services.llm import generate_text
+        from assistant.application.llm import generate_text
     except ImportError:
         return items
 

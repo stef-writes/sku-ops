@@ -15,8 +15,8 @@ from shared.infrastructure.config import (
     DEFAULT_DEEP_THINKING_BUDGET,
 )
 from shared.infrastructure.database import get_connection
-from services.agents.deps import AgentDeps
-from services.agents.agent_utils import build_message_history, extract_text_history, extract_tool_calls, calc_cost, run_agent
+from assistant.agents.deps import AgentDeps
+from assistant.agents.agent_utils import build_message_history, extract_text_history, extract_tool_calls, calc_cost, run_agent
 
 logger = logging.getLogger(__name__)
 

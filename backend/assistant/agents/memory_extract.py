@@ -68,7 +68,7 @@ async def extract_and_save(
 
         artifacts = json.loads(raw)
         if isinstance(artifacts, list) and artifacts:
-            from services.agents.memory_store import save
+            from assistant.agents.memory_store import save
             await save(org_id, user_id, session_id, artifacts)
 
     except Exception as e:

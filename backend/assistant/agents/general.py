@@ -11,8 +11,8 @@ from shared.infrastructure.config import (
     AGENT_THINKING_BUDGET,
     DEFAULT_DEEP_THINKING_BUDGET,
 )
-from services.agents.deps import AgentDeps
-from services.agents.agent_utils import (
+from assistant.agents.deps import AgentDeps
+from assistant.agents.agent_utils import (
     build_message_history,
     extract_text_history,
     extract_tool_calls,
@@ -21,23 +21,23 @@ from services.agents.agent_utils import (
 )
 
 # Import tool implementations from specialist agents
-from services.agents.inventory import (
+from assistant.agents.inventory import (
     _search_products,
     _get_inventory_stats,
     _list_low_stock,
     _get_reorder_suggestions,
     _get_department_health,
 )
-from services.agents.ops import (
+from assistant.agents.ops import (
     _list_recent_withdrawals,
     _list_pending_material_requests,
 )
-from services.agents.finance import (
+from assistant.agents.finance import (
     _get_revenue_summary,
     _get_outstanding_balances,
     _get_pl_summary,
 )
-from services.agents.insights import (
+from assistant.agents.insights import (
     _get_top_products,
     _forecast_stockout,
 )

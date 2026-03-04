@@ -1,6 +1,6 @@
 """Chat assistant entrypoint. Dispatches directly to the appropriate specialist agent."""
 from shared.infrastructure.config import ANTHROPIC_AVAILABLE, LLM_SETUP_URL
-from services.agents.deps import AgentDeps
+from assistant.agents.deps import AgentDeps
 
 LLM_NOT_CONFIGURED_MSG = (
     "Chat assistant requires an Anthropic API key. Add ANTHROPIC_API_KEY to backend/.env. "
@@ -8,12 +8,12 @@ LLM_NOT_CONFIGURED_MSG = (
 )
 
 _AGENT_MODULES = {
-    "inventory": "services.agents.inventory",
-    "ops":       "services.agents.ops",
-    "finance":   "services.agents.finance",
-    "insights":  "services.agents.insights",
-    "general":   "services.agents.general",
-    "dashboard": "services.agents.general",  # alias for general (dashboard assistant)
+    "inventory": "assistant.agents.inventory",
+    "ops":       "assistant.agents.ops",
+    "finance":   "assistant.agents.finance",
+    "insights":  "assistant.agents.insights",
+    "general":   "assistant.agents.general",
+    "dashboard": "assistant.agents.general",  # alias for general (dashboard assistant)
 }
 
 

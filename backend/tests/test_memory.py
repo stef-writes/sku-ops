@@ -11,13 +11,13 @@ class TestMemoryStore:
 
     async def test_recall_empty_returns_empty_string(self, db):
         """No artifacts → recall returns ''."""
-        from services.agents.memory_store import recall
+        from assistant.agents.memory_store import recall
         result = await recall(org_id="default", user_id="user-1")
         assert result == ""
 
     async def test_save_and_recall_basic(self, db):
         """save() persists artifacts; recall() returns formatted string."""
-        from services.agents.memory_store import save, recall
+        from assistant.agents.memory_store import save, recall
 
         artifacts = [
             {"type": "entity_fact", "subject": "contractor:john", "content": "John has $300 unpaid", "tags": ["contractor"]},
@@ -34,7 +34,7 @@ class TestMemoryStore:
 
     async def test_recall_respects_org_and_user_isolation(self, db):
         """Artifacts saved for one user/org are not visible to another."""
-        from services.agents.memory_store import save, recall
+        from assistant.agents.memory_store import save, recall
 
         await save("org-A", "user-A", "sess-A", [
             {"type": "entity_fact", "subject": "product:X", "content": "Product X is discontinued", "tags": []}
@@ -54,7 +54,7 @@ class TestMemoryStore:
 
     async def test_save_skips_artifacts_without_content(self, db):
         """Artifacts missing 'content' are silently dropped."""
-        from services.agents.memory_store import save, recall
+        from assistant.agents.memory_store import save, recall
 
         artifacts = [
             {"type": "entity_fact", "subject": "test", "content": ""},  # empty content → skip
@@ -70,7 +70,7 @@ class TestMemoryStore:
 
     async def test_recall_limit(self, db):
         """recall() respects the limit parameter."""
-        from services.agents.memory_store import save, recall
+        from assistant.agents.memory_store import save, recall
 
         # Save 10 artifacts
         artifacts = [
@@ -86,7 +86,7 @@ class TestMemoryStore:
 
     async def test_save_empty_list_is_noop(self, db):
         """save([]) should not crash and recall still returns ''."""
-        from services.agents.memory_store import save, recall
+        from assistant.agents.memory_store import save, recall
         await save("default", "user-1", "sess-noop", [])
         result = await recall("default", "user-1")
         assert result == ""
@@ -98,31 +98,31 @@ class TestMemoryExtract:
 
     async def test_skips_short_history(self, db):
         """extract_and_save is a no-op when history has < 4 messages (returns before any LLM call)."""
-        from services.agents.memory_extract import extract_and_save
+        from assistant.agents.memory_extract import extract_and_save
 
         # Function exits before touching anthropic; just ensure no crash and no artifacts
         await extract_and_save("default", "user-1", "sess-1", [
             {"role": "user", "content": "hi"},
             {"role": "assistant", "content": "hello"},
         ])
-        from services.agents.memory_store import recall
+        from assistant.agents.memory_store import recall
         assert await recall("default", "user-1") == ""
 
     async def test_skips_when_no_api_key(self, db):
         """extract_and_save exits early when ANTHROPIC_API_KEY is empty."""
-        from services.agents.memory_extract import extract_and_save
+        from assistant.agents.memory_extract import extract_and_save
 
         history = [{"role": r, "content": f"msg {i}"} for i, r in enumerate(["user", "assistant"] * 3)]
-        with patch("services.agents.memory_extract.ANTHROPIC_API_KEY", "", create=True):
+        with patch("assistant.agents.memory_extract.ANTHROPIC_API_KEY", "", create=True):
             with patch("shared.infrastructure.config.ANTHROPIC_API_KEY", ""):
                 await extract_and_save("default", "user-1", "sess-nokey", history)
         # No crash, no artifacts
-        from services.agents.memory_store import recall
+        from assistant.agents.memory_store import recall
         assert await recall("default", "user-1") == ""
 
     async def test_saves_artifacts_from_llm_response(self, db):
         """When LLM returns valid JSON array, artifacts are saved."""
-        from services.agents.memory_extract import extract_and_save
+        from assistant.agents.memory_extract import extract_and_save
 
         history = [{"role": r, "content": f"msg {i}"} for i, r in enumerate(["user", "assistant"] * 4)]
 
@@ -139,14 +139,14 @@ class TestMemoryExtract:
              patch("anthropic.AsyncAnthropic", return_value=mock_client):
             await extract_and_save("default", "user-1", "sess-ok", history)
 
-        from services.agents.memory_store import recall
+        from assistant.agents.memory_store import recall
         result = await recall("default", "user-1")
         assert "contractor:alice" in result
         assert "Alice owes $200" in result
 
     async def test_handles_markdown_fenced_json(self, db):
         """extract_and_save strips ```json fences if model wraps output."""
-        from services.agents.memory_extract import extract_and_save
+        from assistant.agents.memory_extract import extract_and_save
 
         history = [{"role": r, "content": f"msg {i}"} for i, r in enumerate(["user", "assistant"] * 4)]
 
@@ -164,13 +164,13 @@ class TestMemoryExtract:
              patch("anthropic.AsyncAnthropic", return_value=mock_client):
             await extract_and_save("default", "user-1", "sess-fence", history)
 
-        from services.agents.memory_store import recall
+        from assistant.agents.memory_store import recall
         result = await recall("default", "user-1")
         assert "pending requests" in result
 
     async def test_swallows_llm_exceptions(self, db):
         """extract_and_save never raises — LLM errors are silently logged."""
-        from services.agents.memory_extract import extract_and_save
+        from assistant.agents.memory_extract import extract_and_save
 
         history = [{"role": r, "content": f"msg {i}"} for i, r in enumerate(["user", "assistant"] * 4)]
 
@@ -185,7 +185,7 @@ class TestMemoryExtract:
 
     async def test_swallows_json_parse_error(self, db):
         """extract_and_save never raises when LLM returns invalid JSON."""
-        from services.agents.memory_extract import extract_and_save
+        from assistant.agents.memory_extract import extract_and_save
 
         history = [{"role": r, "content": f"msg {i}"} for i, r in enumerate(["user", "assistant"] * 4)]
 
