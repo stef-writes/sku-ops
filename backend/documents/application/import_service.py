@@ -9,8 +9,8 @@ from fastapi import HTTPException
 
 from catalog.domain.product import ALLOWED_BASE_UNITS
 from repositories import department_repo, product_repo, vendor_repo
-from services.document_import import infer_uom, resolve_uom, suggest_department
-from services.document_enrichment import enrich_for_import
+from documents.application.import_parser import infer_uom, resolve_uom, suggest_department
+from documents.application.enrichment_service import enrich_for_import
 from inventory.application.inventory_service import process_receiving_stock_changes
 from catalog.domain.barcode import validate_barcode
 from catalog.application.product_lifecycle import create_product as lifecycle_create

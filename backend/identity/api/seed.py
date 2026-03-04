@@ -10,7 +10,7 @@ from shared.infrastructure.config import ALLOW_RESET, DEMO_USER_EMAIL as MOCK_US
 from shared.infrastructure.database import get_connection
 from models import Department, User
 from repositories import department_repo, organization_repo, product_repo, user_repo
-from services.document_import import infer_uom, parse_csv_products, suggest_department
+from documents.application.import_parser import infer_uom, parse_csv_products, suggest_department
 from catalog.application.product_lifecycle import create_product as lifecycle_create
 
 import logging
@@ -215,7 +215,7 @@ async def seed_demo_tenants() -> None:
                     if imported >= DEMO_PRODUCT_PER_ORG:
                         break
                     try:
-                        from services.document_import import suggest_department
+                        from documents.application.import_parser import suggest_department
                         suggested = suggest_department(item["name"], dept_by_code) if dept_by_code else None
                         dept = dept_by_code.get(suggested) if suggested else (all_depts[0] if all_depts else None)
                         if not dept:

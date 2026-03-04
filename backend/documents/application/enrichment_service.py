@@ -70,7 +70,12 @@ Return ONLY the JSON array, no other text."""
         if not json_match:
             return items
 
-        results = json.loads(json_match.group())
+        try:
+            results = json.loads(json_match.group())
+        except json.JSONDecodeError as e:
+            logger.warning("Document enrichment: LLM returned invalid JSON — %s", e)
+            return items
+
         for i, item in enumerate(items):
             if i < len(results):
                 r = results[i]
@@ -82,7 +87,7 @@ Return ONLY the JSON array, no other text."""
                     if orig and str(orig).strip():
                         item["original_sku"] = str(orig).strip()
     except Exception as e:
-        logger.warning(f"Document enrichment failed: {e}")
+        logger.warning("Document enrichment failed (%s: %s) — items returned without enrichment", type(e).__name__, e)
         for item in items:
             item.setdefault("enrichment_warning", "Auto-classification unavailable — verify department and SKU matching")
     return items

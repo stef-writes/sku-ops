@@ -9,7 +9,7 @@ from .health import router as health_router
 from operations.api.contractors import router as contractors_router
 from .dashboard import router as dashboard_router
 from catalog.api.departments import router as departments_router
-from .documents import router as documents_router
+from documents.api.documents import router as documents_router
 from finance.api.financials import router as financials_router
 from finance.api.invoices import router as invoices_router
 from finance.api.payments import router as payments_router

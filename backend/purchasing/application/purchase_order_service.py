@@ -18,8 +18,8 @@ from purchasing.infrastructure.po_repo import (
     update_po_item,
     update_po_status,
 )
-from services.document_import import infer_uom, suggest_department
-from services.document_enrichment import enrich_for_import
+from documents.application.import_parser import infer_uom, suggest_department
+from documents.application.enrichment_service import enrich_for_import
 from inventory.application.inventory_service import process_receiving_stock_changes
 from catalog.application.product_lifecycle import create_product as lifecycle_create
 from inventory.application.uom_classifier import classify_uom_batch

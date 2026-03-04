@@ -12,7 +12,7 @@ from repositories import department_repo, product_repo, vendor_repo
 from inventory.application.inventory_service import get_stock_history
 from catalog.application.product_lifecycle import create_product as lifecycle_create, delete_product as lifecycle_delete, update_product as lifecycle_update
 from inventory.application.uom_classifier import classify_uom, classify_uom_batch
-from services.document_import import infer_uom, parse_csv_products, suggest_department
+from documents.application.import_parser import infer_uom, parse_csv_products, suggest_department
 
 from api.schemas import SuggestUomRequest
 

@@ -10,9 +10,9 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from identity.application.auth_service import require_role
 from shared.infrastructure.config import ANTHROPIC_AVAILABLE, LLM_SETUP_URL
-from services.document_import_service import import_document as do_import_document
+from documents.application.import_service import import_document as do_import_document
 
-from .schemas import DocumentImportRequest
+from api.schemas import DocumentImportRequest
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ async def parse_document(
 
     if not use_ai:
         try:
-            from services.ocr_parse import extract_from_document
+            from documents.application.ocr_service import extract_from_document
             extracted = await asyncio.to_thread(
                 extract_from_document, contents, content_type, filename
             )

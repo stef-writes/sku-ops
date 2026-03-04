@@ -8,7 +8,7 @@ import re
 from datetime import datetime
 from typing import Optional
 
-from services.document_import import infer_uom, parse_dollar
+from documents.application.import_parser import infer_uom, parse_dollar
 
 # Line item: optional SKU/code, description, quantity, price. Common patterns.
 _LINE_PATTERNS = [
