@@ -4,7 +4,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
-from auth import get_current_user, require_role
+from identity.application.auth_service import get_current_user, require_role
 from catalog.domain.barcode import validate_barcode
 from shared.domain.exceptions import DuplicateBarcodeError, InvalidBarcodeError, ResourceNotFoundError
 from models import Product, ProductCreate, ProductUpdate

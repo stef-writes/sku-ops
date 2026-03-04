@@ -1,6 +1,6 @@
 """Repository layer for SQLite data access."""
-from .user_repo import user_repo
-from .organization_repo import organization_repo
+from identity.infrastructure.user_repo import user_repo
+from identity.infrastructure.org_repo import organization_repo
 from .department_repo import department_repo
 from .vendor_repo import vendor_repo
 from .product_repo import product_repo

@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 
-from auth import get_current_user, require_role
+from identity.application.auth_service import get_current_user, require_role
 from models import MaterialWithdrawal, MaterialWithdrawalCreate
 from repositories import invoice_repo, user_repo, withdrawal_repo
 from services.withdrawal_service import create_withdrawal as do_create_withdrawal

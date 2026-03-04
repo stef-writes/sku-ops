@@ -5,7 +5,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from auth import require_role
+from identity.application.auth_service import require_role
 from repositories.po_repo import get_po, get_po_items, list_pos
 from services.purchase_order_service import (
     create_purchase_order,
@@ -111,7 +111,7 @@ async def receive_items(
     )
     if result.get("cost_total", 0) > 0:
         from adapters.xero_factory import get_xero_gateway
-        from repositories.org_settings_repo import get_org_settings
+        from identity.infrastructure.org_settings_repo import get_org_settings
         org_id = current_user.get("organization_id") or "default"
         try:
             settings = await get_org_settings(org_id)

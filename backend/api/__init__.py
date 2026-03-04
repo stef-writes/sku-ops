@@ -3,7 +3,7 @@ API package - aggregates all routers for the main app.
 """
 from fastapi import APIRouter
 
-from .auth import router as auth_router
+from identity.api.auth import router as auth_router
 from .chat import router as chat_router
 from .health import router as health_router
 from .contractors import router as contractors_router
@@ -21,8 +21,8 @@ from .webhooks import router as webhooks_router
 from .withdrawals import router as withdrawals_router
 from .material_requests import router as material_requests_router
 from .purchase_orders import router as purchase_orders_router
-from .seed import router as seed_router
-from .settings import router as settings_router
+from identity.api.seed import router as seed_router
+from identity.api.settings import router as settings_router
 from .xero_auth import router as xero_auth_router
 
 api_router = APIRouter(prefix="/api")

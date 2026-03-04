@@ -2,7 +2,7 @@
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 
-from auth import get_current_user, require_role
+from identity.application.auth_service import get_current_user, require_role
 from repositories import product_repo, user_repo, vendor_repo, withdrawal_repo
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])

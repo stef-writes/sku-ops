@@ -3,10 +3,10 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from auth import require_role
+from identity.application.auth_service import require_role
 from models import InvoiceCreate, InvoiceUpdate, InvoiceSyncXeroBulk
 from repositories import invoice_repo
-from repositories.org_settings_repo import get_org_settings
+from identity.infrastructure.org_settings_repo import get_org_settings
 from adapters.xero_factory import get_xero_gateway
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])

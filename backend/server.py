@@ -14,7 +14,7 @@ import logging
 from shared.infrastructure.database import init_db, close_db
 from shared.domain.exceptions import InsufficientStockError, ResourceNotFoundError
 from api import api_router
-from api.seed import seed_mock_user, seed_standard_departments
+from identity.api.seed import seed_mock_user, seed_standard_departments
 
 logging.basicConfig(
     level=logging.INFO,

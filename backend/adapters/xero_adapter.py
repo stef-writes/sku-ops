@@ -5,7 +5,7 @@ from typing import Optional
 
 import requests
 
-from models.org_settings import OrgSettings
+from identity.domain.org_settings import OrgSettings
 from ports.xero import XeroSyncResult
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ class XeroAdapter:
 
     async def refresh_token(self, settings: OrgSettings) -> OrgSettings:
         from shared.infrastructure.config import XERO_CLIENT_ID, XERO_CLIENT_SECRET
-        from repositories.org_settings_repo import upsert_org_settings
+        from identity.infrastructure.org_settings_repo import upsert_org_settings
 
         resp = requests.post(
             XERO_TOKEN_URL,

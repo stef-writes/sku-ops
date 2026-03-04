@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Optional, Protocol
 
-from models.org_settings import OrgSettings
+from identity.domain.org_settings import OrgSettings
 
 
 @dataclass

@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from auth import hash_password, require_role
+from identity.application.auth_service import hash_password, require_role
 from shared.infrastructure.config import ALLOW_RESET, DEMO_USER_EMAIL as MOCK_USER_EMAIL, DEMO_USER_PASSWORD as MOCK_USER_PASSWORD
 from shared.infrastructure.database import get_connection
 from models import Department, User

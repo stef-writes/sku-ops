@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from adapters.payment_factory import get_payment_gateway
-from auth import get_current_user
+from identity.application.auth_service import get_current_user
 from repositories import invoice_repo, payment_repo, withdrawal_repo
 
 from .schemas import CreatePaymentRequest

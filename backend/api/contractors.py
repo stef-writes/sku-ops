@@ -1,7 +1,7 @@
 """Contractor management routes (admin only)."""
 from fastapi import APIRouter, HTTPException, Depends
 
-from auth import hash_password, require_role
+from identity.application.auth_service import hash_password, require_role
 from models import User, UserCreate, UserUpdate
 from repositories import user_repo
 

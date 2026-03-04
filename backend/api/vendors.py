@@ -3,7 +3,7 @@ from typing import List
 
 from fastapi import APIRouter, HTTPException, Depends
 
-from auth import get_current_user, require_role
+from identity.application.auth_service import get_current_user, require_role
 from models import Vendor, VendorCreate
 from repositories import vendor_repo
 

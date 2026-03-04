@@ -1,7 +1,7 @@
 """Authentication routes."""
 from fastapi import APIRouter, HTTPException, Depends
 
-from auth import hash_password, verify_password, create_token, get_current_user
+from identity.application.auth_service import hash_password, verify_password, create_token, get_current_user
 from models import ROLES, User, UserCreate, UserLogin
 from repositories import user_repo
 

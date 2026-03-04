@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from shared.infrastructure.database import get_connection
-from models.org_settings import OrgSettings
+from identity.domain.org_settings import OrgSettings
 
 
 async def get_org_settings(org_id: str) -> OrgSettings:

@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from auth import get_current_user, require_role
+from identity.application.auth_service import get_current_user, require_role
 from models import MaterialRequestCreate, MaterialRequestProcess, MaterialWithdrawalCreate, WithdrawalItem
 from repositories import material_request_repo, user_repo, withdrawal_repo
 from services.withdrawal_service import create_withdrawal as do_create_withdrawal

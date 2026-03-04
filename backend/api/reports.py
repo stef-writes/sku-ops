@@ -5,7 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends
 
-from auth import require_role
+from identity.application.auth_service import require_role
 from shared.infrastructure.database import get_connection
 from repositories import product_repo, withdrawal_repo
 

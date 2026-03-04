@@ -1,5 +1,5 @@
 """Factory for Xero gateway. Returns real adapter when connected, stub otherwise."""
-from models.org_settings import OrgSettings
+from identity.domain.org_settings import OrgSettings
 from adapters.stub_xero import StubXeroAdapter
 
 

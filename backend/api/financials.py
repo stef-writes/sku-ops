@@ -7,7 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
-from auth import require_role
+from identity.application.auth_service import require_role
 from repositories import withdrawal_repo
 
 router = APIRouter(prefix="/financials", tags=["financials"])

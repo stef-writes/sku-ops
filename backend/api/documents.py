@@ -8,7 +8,7 @@ import tempfile
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-from auth import require_role
+from identity.application.auth_service import require_role
 from shared.infrastructure.config import ANTHROPIC_AVAILABLE, LLM_SETUP_URL
 from services.document_import_service import import_document as do_import_document
 

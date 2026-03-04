@@ -1,5 +1,5 @@
 """Pydantic models for the API."""
-from .user import (
+from identity.domain.user import (
     ROLES,
     User,
     UserCreate,

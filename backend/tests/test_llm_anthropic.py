@@ -137,7 +137,7 @@ class TestChatStatus:
 
     def _auth_headers(self, client):
         """Get auth headers using test user token."""
-        from auth import create_token
+        from identity.application.auth_service import create_token
 
         token = create_token("user-1", "test@test.com", "admin", "default")
         return {"Authorization": f"Bearer {token}"}

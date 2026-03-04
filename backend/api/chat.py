@@ -4,7 +4,7 @@ import uuid
 
 from fastapi import APIRouter, Depends
 
-from auth import get_current_user
+from identity.application.auth_service import get_current_user
 from shared.infrastructure.config import ANTHROPIC_AVAILABLE, LLM_SETUP_URL, SESSION_COST_CAP
 
 from .schemas import ChatRequest

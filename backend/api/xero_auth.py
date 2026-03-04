@@ -6,9 +6,9 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 
-from auth import require_role
+from identity.application.auth_service import require_role
 from shared.infrastructure.config import XERO_CLIENT_ID, XERO_CLIENT_SECRET, XERO_REDIRECT_URI
-from repositories.org_settings_repo import (
+from identity.infrastructure.org_settings_repo import (
     clear_xero_tokens,
     get_org_settings,
     upsert_org_settings,
