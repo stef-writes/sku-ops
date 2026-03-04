@@ -9,6 +9,7 @@ import json
 import re
 import logging
 
+from catalog.domain.units import ALLOWED_BASE_UNITS
 from shared.infrastructure.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
@@ -20,14 +21,6 @@ RuleInferFn = Callable[[str], Tuple[str, str, int]]
 def _default_rule_infer(name: str) -> Tuple[str, str, int]:
     """Fallback: everything is 'each'."""
     return "each", "each", 1
-
-ALLOWED_UNITS = [
-    "each", "case", "box", "pack", "bag", "roll", "kit",
-    "gallon", "quart", "pint", "liter",
-    "pound", "ounce",
-    "foot", "meter", "yard",
-    "sqft",
-]
 
 
 def _normalize_unit(raw: str) -> str:
@@ -50,7 +43,7 @@ def _normalize_unit(raw: str) -> str:
         "ea": "each", "pc": "each", "pcs": "each", "piece": "each", "pieces": "each",
     }
     v = mapping.get(v, v)
-    return v if v in ALLOWED_UNITS else "each"
+    return v if v in ALLOWED_BASE_UNITS else "each"
 
 
 def _normalize_pack_qty(val) -> int:
@@ -78,7 +71,7 @@ async def classify_uom(
     if not generate_text:
         return {"base_unit": "each", "sell_uom": "each", "pack_qty": 1}
 
-    units_str = ", ".join(ALLOWED_UNITS)
+    units_str = ", ".join(ALLOWED_BASE_UNITS)
     prompt = f"""Classify the unit of measure for this hardware/building-supply product.
 Product name: {product_name}
 {f'Description: {description}' if description else ''}
@@ -138,7 +131,7 @@ async def classify_uom_batch(
         p.setdefault("sell_uom", "each")
         p.setdefault("pack_qty", 1)
 
-    units_str = ", ".join(ALLOWED_UNITS)
+    units_str = ", ".join(ALLOWED_BASE_UNITS)
     names = [p.get("name", "Unknown") for p in products]
     prompt = f"""Classify unit of measure for each hardware/building-supply product.
 Allowed units: {units_str}

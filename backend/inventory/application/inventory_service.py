@@ -7,11 +7,9 @@ Withdrawals use atomic UPDATE with quantity guard to prevent overselling.
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
-from fastapi import HTTPException
-
-from inventory.domain.errors import InsufficientStockError
-from inventory.domain.stock import StockTransaction, StockTransactionType
-from operations.domain.withdrawal import WithdrawalItem
+from kernel.errors import ResourceNotFoundError
+from inventory.domain.errors import InsufficientStockError, NegativeStockError
+from inventory.domain.stock import StockDecrement, StockTransaction, StockTransactionType
 from catalog.application.queries import (
     get_product_by_id, atomic_decrement_product,
     increment_product_quantity, add_product_quantity, atomic_adjust_product,
@@ -57,7 +55,7 @@ async def _record_stock_transaction(
 
 
 async def process_withdrawal_stock_changes(
-    items: List[WithdrawalItem],
+    items: List[StockDecrement],
     withdrawal_id: str,
     user_id: str,
     user_name: str,
@@ -122,7 +120,7 @@ async def process_receiving_stock_changes(
     now = datetime.now(timezone.utc).isoformat()
     result = await add_product_quantity(product_id, quantity, now)
     if not result:
-        raise HTTPException(status_code=404, detail="Product not found")
+        raise ResourceNotFoundError("Product", product_id)
 
     quantity_before = result.get("quantity", 0) - quantity
     await _record_stock_transaction(
@@ -187,15 +185,12 @@ async def process_adjustment_stock_changes(
     now = datetime.now(timezone.utc).isoformat()
     product = await get_product_by_id(product_id)
     if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
+        raise ResourceNotFoundError("Product", product_id)
 
     result = await atomic_adjust_product(product_id, quantity_delta, now)
     if not result:
         quantity_before = product.get("quantity", 0)
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot adjust: would result in negative stock (current: {quantity_before}, delta: {quantity_delta})",
-        )
+        raise NegativeStockError(product_id, current=quantity_before, delta=quantity_delta)
 
     quantity_after = result.get("quantity", 0)
     quantity_before = quantity_after - quantity_delta

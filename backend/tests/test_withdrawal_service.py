@@ -3,7 +3,7 @@ import pytest
 import pytest_asyncio
 
 from shared.infrastructure.database import get_connection
-from fastapi import HTTPException
+from inventory.domain.errors import InsufficientStockError
 from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
 from catalog.infrastructure.product_repo import product_repo
 from inventory.infrastructure.stock_repo import stock_repo
@@ -109,13 +109,11 @@ async def test_create_withdrawal_insufficient_stock_raises(db):
     contractor = {"id": "contractor-1", "name": "Contractor User"}
     current_user = {"id": "user-1", "name": "Test"}
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(InsufficientStockError) as exc_info:
         await create_withdrawal(data, contractor, current_user)
 
-    assert exc_info.value.status_code == 400
-    assert "Insufficient stock" in str(exc_info.value.detail)
-    assert "5" in str(exc_info.value.detail)
-    assert "2" in str(exc_info.value.detail)
+    assert exc_info.value.requested == 5
+    assert exc_info.value.available == 2
 
     # Stock unchanged
     updated = await product_repo.get_by_id(product.id)

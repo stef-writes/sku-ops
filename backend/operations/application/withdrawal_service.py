@@ -3,13 +3,11 @@ Withdrawal service: encapsulates creation of material withdrawals with transacti
 """
 from typing import Callable, Awaitable, Optional
 
-from fastapi import HTTPException
-
 from shared.infrastructure.database import transaction
+from inventory.domain.stock import StockDecrement
 from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalCreate
 from operations.infrastructure.withdrawal_repo import withdrawal_repo as _default_withdrawal_repo
 from operations.ports.withdrawal_repo_port import WithdrawalRepoPort
-from inventory.domain.errors import InsufficientStockError
 
 CreateInvoiceFn = Optional[Callable[..., Awaitable[dict]]]
 ListProductsFn = Callable[..., Awaitable[list]]
@@ -60,17 +58,18 @@ async def create_withdrawal(
     withdrawal.compute_totals()
 
     async def _do_create(tx_conn):
-        try:
-            await process_stock_changes(
-                items=data.items,
-                withdrawal_id=withdrawal.id,
-                user_id=current_user["id"],
-                user_name=current_user.get("name", ""),
-                organization_id=current_user.get("organization_id") or "default",
-                conn=tx_conn,
-            )
-        except InsufficientStockError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+        decrements = [
+            StockDecrement(product_id=i.product_id, sku=i.sku, name=i.name, quantity=i.quantity)
+            for i in data.items
+        ]
+        await process_stock_changes(
+            items=decrements,
+            withdrawal_id=withdrawal.id,
+            user_id=current_user["id"],
+            user_name=current_user.get("name", ""),
+            organization_id=current_user.get("organization_id") or "default",
+            conn=tx_conn,
+        )
 
         w_dict = withdrawal.model_dump()
         w_dict["organization_id"] = current_user.get("organization_id") or "default"

@@ -2,7 +2,17 @@
 from enum import Enum
 from typing import Optional
 
+from pydantic import BaseModel
+
 from kernel.entity import Entity
+
+
+class StockDecrement(BaseModel):
+    """What inventory needs to know to reduce stock — no pricing or billing."""
+    product_id: str
+    sku: str
+    name: str
+    quantity: int
 
 
 class StockTransactionType(str, Enum):
