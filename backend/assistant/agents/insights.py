@@ -12,9 +12,12 @@ from shared.infrastructure.config import (
     AGENT_PRIMARY_MODEL,
     AGENT_THINKING_BUDGET,
     DEFAULT_DEEP_THINKING_BUDGET,
+    ANTHROPIC_AVAILABLE,
 )
 from shared.infrastructure.database import get_connection
 from assistant.agents.deps import AgentDeps
+from assistant.agents.agent_utils import build_message_history, extract_text_history, extract_tool_calls, calc_cost, run_agent
+from operations.application.queries import list_withdrawals
 
 logger = logging.getLogger(__name__)
 
@@ -80,12 +83,9 @@ async def forecast_stockout(ctx: RunContext[AgentDeps], limit: int = 15) -> str:
     return await _forecast_stockout({"limit": limit}, ctx.deps.org_id)
 
 
-async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mode: str = "fast") -> dict:
-    from shared.infrastructure.config import ANTHROPIC_AVAILABLE
+async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mode: str = "fast", session_id: str = "") -> dict:
     if not ANTHROPIC_AVAILABLE:
         return {"response": "Insights agent requires ANTHROPIC_API_KEY.", "tool_calls": [], "history": [], "thinking": [], "agent": "insights"}
-
-    from assistant.agents.agent_utils import build_message_history, extract_text_history, extract_tool_calls, calc_cost, run_agent
 
     deep = mode == "deep"
     thinking_budget = (AGENT_THINKING_BUDGET or DEFAULT_DEEP_THINKING_BUDGET) if deep else 0
@@ -100,6 +100,7 @@ async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mo
             msg_history=msg_history, deps=deps,
             model_settings=model_settings or None,
             agent_name="InsightsAgent",
+            session_id=session_id, mode=mode,
         )
     except Exception as e:
         logger.error(f"InsightsAgent failed: {e}")
@@ -120,14 +121,13 @@ async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mo
 # ── DB query implementations (unchanged) ────────────────────────────────────
 
 async def _get_top_products(args: dict, org_id: str) -> str:
-    from operations.infrastructure.withdrawal_repo import withdrawal_repo
     days = min(int(args.get("days") or 30), 365)
     by = args.get("by", "revenue").lower()
     if by not in ("volume", "revenue"):
         by = "revenue"
     limit = min(int(args.get("limit") or 10), 50)
     since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-    withdrawals = await withdrawal_repo.list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
+    withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
     product_map: dict[str, dict] = {}
     for w in withdrawals:
         for item in (w.get("items") or []):

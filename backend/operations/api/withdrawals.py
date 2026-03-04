@@ -6,8 +6,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 
 from identity.application.auth_service import get_current_user, require_role
 from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalCreate
-from finance.infrastructure.invoice_repo import invoice_repo
-from identity.infrastructure.user_repo import user_repo
+from finance.application.invoice_service import mark_paid_for_withdrawal
+from identity.application.user_service import get_user_by_id
 from operations.infrastructure.withdrawal_repo import withdrawal_repo
 from operations.application.withdrawal_service import create_withdrawal as do_create_withdrawal
 
@@ -28,7 +28,7 @@ async def create_withdrawal_for_contractor(
 ):
     """Warehouse manager creates withdrawal on behalf of a contractor"""
     org_id = current_user.get("organization_id") or "default"
-    contractor = await user_repo.get_by_id(contractor_id)
+    contractor = await get_user_by_id(contractor_id)
     if not contractor or contractor.get("role") != "contractor":
         raise HTTPException(status_code=404, detail="Contractor not found")
     if contractor.get("organization_id") and contractor.get("organization_id") != org_id:
@@ -79,7 +79,7 @@ async def mark_withdrawal_paid(withdrawal_id: str, current_user: dict = Depends(
         raise HTTPException(status_code=404, detail="Withdrawal not found")
     paid_at = datetime.now(timezone.utc).isoformat()
     result = await withdrawal_repo.mark_paid(withdrawal_id, paid_at)
-    await invoice_repo.mark_paid_for_withdrawal(withdrawal_id)
+    await mark_paid_for_withdrawal(withdrawal_id)
     return result
 
 
@@ -89,5 +89,5 @@ async def bulk_mark_paid(withdrawal_ids: List[str] = Body(...), current_user: di
     paid_at = datetime.now(timezone.utc).isoformat()
     updated = await withdrawal_repo.bulk_mark_paid(withdrawal_ids, paid_at, organization_id=org_id)
     for wid in withdrawal_ids:
-        await invoice_repo.mark_paid_for_withdrawal(wid)
+        await mark_paid_for_withdrawal(wid)
     return {"updated": updated}

@@ -149,6 +149,6 @@ def _e2e_backend_url() -> str:
         return url
     if is_development:
         return "http://localhost:8000"
-    return "https://hardware-pos-stripe.preview.emergentagent.com"
+    return "http://localhost:8000"  # require E2E_BACKEND_URL or REACT_APP_BACKEND_URL when deployed
 
 E2E_BACKEND_URL = _e2e_backend_url()

@@ -210,3 +210,14 @@ code, .font-mono {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
+
+@keyframes graphPanelIn {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

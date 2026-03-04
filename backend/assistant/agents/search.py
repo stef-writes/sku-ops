@@ -7,6 +7,9 @@ import re
 
 import numpy as np
 
+from catalog.application.queries import list_products
+from shared.infrastructure.config import OPENAI_API_KEY
+
 logger = logging.getLogger(__name__)
 
 EMBEDDING_MODEL = "text-embedding-3-small"
@@ -41,8 +44,7 @@ class ProductSearchIndex:
         self._bm25 = None
 
     async def rebuild(self, org_id: str = "default") -> None:
-        from catalog.infrastructure.product_repo import product_repo
-        products = await product_repo.list_products(limit=10000, organization_id=org_id)
+        products = await list_products(limit=10000, organization_id=org_id)
         if not products:
             self._products = []
             self._embeddings = None
@@ -51,7 +53,6 @@ class ProductSearchIndex:
 
         self._products = products
 
-        from shared.infrastructure.config import OPENAI_API_KEY
         if OPENAI_API_KEY:
             await self._build_embeddings(products, OPENAI_API_KEY)
         else:

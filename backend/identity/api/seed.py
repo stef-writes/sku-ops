@@ -10,9 +10,8 @@ from shared.infrastructure.config import ALLOW_RESET, DEMO_USER_EMAIL as MOCK_US
 from shared.infrastructure.database import get_connection
 from catalog.domain.department import Department
 from identity.domain.user import User
-from catalog.infrastructure.department_repo import department_repo
+from catalog.application.queries import list_departments, get_department_by_code, insert_department, count_all_products
 from identity.infrastructure.org_repo import organization_repo
-from catalog.infrastructure.product_repo import product_repo
 from identity.infrastructure.user_repo import user_repo
 from documents.application.import_parser import infer_uom, parse_csv_products, suggest_department
 from catalog.application.product_lifecycle import create_product as lifecycle_create
@@ -50,10 +49,10 @@ async def seed_standard_departments(organization_id: str = "default") -> None:
         {"name": "Appliances", "code": "APP", "description": "Home appliances"},
     ]
     for d in standard:
-        if not await department_repo.get_by_code(d["code"], organization_id):
+        if not await get_department_by_code(d["code"], organization_id):
             d_dict = Department(**d).model_dump()
             d_dict["organization_id"] = organization_id
-            await department_repo.insert(d_dict)
+            await insert_department(d_dict)
 
 
 async def seed_demo_inventory(organization_id: str = "default") -> None:
@@ -61,7 +60,7 @@ async def seed_demo_inventory(organization_id: str = "default") -> None:
     if not MOCK_USER_EMAIL:
         return
     try:
-        count = await product_repo.count_all(organization_id)
+        count = await count_all_products(organization_id)
         if count > 0:
             return
         if not os.path.exists(DEMO_CSV_PATH):
@@ -77,7 +76,7 @@ async def seed_demo_inventory(organization_id: str = "default") -> None:
         with open(DEMO_CSV_PATH, "rb") as f:
             content = f.read()
         rows = parse_csv_products(content)
-        all_depts = await department_repo.list_all(organization_id)
+        all_depts = await list_departments(organization_id)
         dept_by_code = {d["code"]: d for d in all_depts}
 
         imported = 0
@@ -212,7 +211,7 @@ async def seed_demo_tenants() -> None:
 
             admin_user = await user_repo.get_by_email(f"admin@{org['slug']}.demo")
             if admin_user and rows:
-                all_depts = await department_repo.list_all(org_id)
+                all_depts = await list_departments(org_id)
                 dept_by_code = {d["code"]: d for d in all_depts}
                 imported = 0
                 for i, item in enumerate(rows):
@@ -332,7 +331,7 @@ async def reset_and_reseed_inventory(current_user: dict = Depends(require_role("
         await conn.commit()
         logger.info("Inventory reset complete")
         await seed_demo_inventory(org_id)
-        count = await product_repo.count_all(org_id)
+        count = await count_all_products(org_id)
         return {"message": f"Inventory reset and reseeded with {count} products"}
     except Exception as e:
         logger.error(f"Reset inventory failed: {e}")

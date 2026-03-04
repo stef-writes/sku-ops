@@ -1,10 +1,15 @@
 """Invoice repository."""
-import json
 from typing import Optional
 from uuid import uuid4
 from datetime import datetime, timezone
 
 from shared.infrastructure.database import get_connection
+from operations.application.queries import get_withdrawal_by_id
+
+
+async def _get_withdrawal(wid: str, org_id: str) -> Optional[dict]:
+    """Fetch a withdrawal via the operations application layer."""
+    return await get_withdrawal_by_id(wid, organization_id=org_id)
 
 
 def _invoice_row_to_dict(row) -> Optional[dict]:
@@ -259,14 +264,12 @@ async def add_withdrawals(invoice_id: str, withdrawal_ids: list, organization_id
     conn = get_connection()
     org_id = organization_id or "default"
 
-    from operations.infrastructure.withdrawal_repo import withdrawal_repo
-
     withdrawals = []
     billing_entity = None
     contact_name = ""
     contact_email = ""
     for wid in withdrawal_ids:
-        w = await withdrawal_repo.get_by_id(wid, organization_id=org_id)
+        w = await _get_withdrawal(wid, org_id)
         if not w:
             raise ValueError(f"Withdrawal {wid} not found")
         if w.get("payment_status") != "unpaid":
@@ -344,8 +347,6 @@ async def add_withdrawals(invoice_id: str, withdrawal_ids: list, organization_id
 
 async def create_from_withdrawals(withdrawal_ids: list, organization_id: Optional[str] = None, conn=None) -> dict:
     """Create new invoice from unpaid withdrawals. All must share same billing_entity."""
-    from operations.infrastructure.withdrawal_repo import withdrawal_repo
-
     if not withdrawal_ids:
         raise ValueError("At least one withdrawal required")
 
@@ -355,7 +356,7 @@ async def create_from_withdrawals(withdrawal_ids: list, organization_id: Optiona
     contact_name = ""
     contact_email = ""
     for wid in withdrawal_ids:
-        w = await withdrawal_repo.get_by_id(wid, organization_id=org_id)
+        w = await _get_withdrawal(wid, org_id)
         if not w:
             raise ValueError(f"Withdrawal {wid} not found")
         if w.get("payment_status") != "unpaid":

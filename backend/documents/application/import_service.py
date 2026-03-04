@@ -8,9 +8,11 @@ from typing import Optional
 from fastapi import HTTPException
 
 from catalog.domain.product import ALLOWED_BASE_UNITS
-from catalog.infrastructure.department_repo import department_repo
-from catalog.infrastructure.product_repo import product_repo
-from catalog.infrastructure.vendor_repo import vendor_repo
+from catalog.application.queries import (
+    list_departments, get_department_by_code, find_vendor_by_name, insert_vendor,
+    list_products_by_vendor, get_product_by_id, find_product_by_original_sku_and_vendor,
+    find_product_by_name_and_vendor, update_product,
+)
 from documents.application.import_parser import infer_uom, resolve_uom, suggest_department
 from documents.application.enrichment_service import enrich_for_import
 from inventory.application.inventory_service import process_receiving_stock_changes
@@ -34,13 +36,13 @@ async def import_document(
     if not vendor_name:
         raise HTTPException(status_code=400, detail="Vendor name is required")
 
-    vendor = await vendor_repo.find_by_name(vendor_name)
+    vendor = await find_vendor_by_name(vendor_name)
     if not vendor:
         if not create_vendor_if_missing:
             raise HTTPException(status_code=400, detail=f"Vendor '{vendor_name}' not found. Enable 'Create vendor if missing' or add vendor first.")
         vendor_id = uuid.uuid4().hex
         now = datetime.now(timezone.utc).isoformat()
-        await vendor_repo.insert({
+        await insert_vendor({
             "id": vendor_id,
             "name": vendor_name,
             "contact_name": "",
@@ -56,8 +58,8 @@ async def import_document(
         vendor_id = vendor["id"]
         vendor_created = False
 
-    departments = await department_repo.list_all()
-    default_dept = await department_repo.get_by_code("HDW") or (departments[0] if departments else None)
+    departments = await list_departments()
+    default_dept = await get_department_by_code("HDW") or (departments[0] if departments else None)
     dept_by_id = {d["id"]: d for d in departments}
     dept_by_code = {d["code"].upper(): d for d in departments}
     dept_codes = list(dept_by_code.keys())
@@ -71,7 +73,7 @@ async def import_document(
 
     enrichment_warnings = []
     if ocr_items:
-        vendor_products = await product_repo.list_by_vendor(vendor_id)
+        vendor_products = await list_products_by_vendor(vendor_id)
         ocr_items = await enrich_for_import(ocr_items, vendor_products, dept_codes)
         enrichment_warnings = [
             {"product": item.get("name", "Unknown"), "warning": item.pop("enrichment_warning")}
@@ -126,13 +128,13 @@ async def import_document(
             # 3-tier matching: explicit product_id → vendor SKU → name
             existing = None
             if item.get("product_id"):
-                existing = await product_repo.get_by_id(item["product_id"], organization_id=org_id)
+                existing = await get_product_by_id(item["product_id"], organization_id=org_id)
             if not existing and item.get("original_sku") and vendor_id:
-                existing = await product_repo.find_by_original_sku_and_vendor(
+                existing = await find_product_by_original_sku_and_vendor(
                     str(item["original_sku"]).strip(), vendor_id, organization_id=org_id
                 )
             if not existing and item.get("name") and vendor_id:
-                existing = await product_repo.find_by_name_and_vendor(
+                existing = await find_product_by_name_and_vendor(
                     item["name"], vendor_id, organization_id=org_id
                 )
 
@@ -148,8 +150,8 @@ async def import_document(
                 )
                 # Backfill original_sku so future imports match on SKU, not name
                 if item.get("original_sku") and not existing.get("original_sku"):
-                    await product_repo.update(existing["id"], {"original_sku": item["original_sku"]})
-                updated = await product_repo.get_by_id(existing["id"])
+                    await update_product(existing["id"], {"original_sku": item["original_sku"]})
+                updated = await get_product_by_id(existing["id"])
                 matched.append(updated)
                 continue
 

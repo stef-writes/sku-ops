@@ -31,13 +31,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { API } from "@/lib/api";
-
-const UOM_OPTIONS = [
-  "each", "foot", "sqft", "yard", "meter",
-  "gallon", "quart", "pint", "liter",
-  "pound", "ounce",
-  "box", "pack", "bag", "case", "roll", "kit",
-];
+import { UOM_OPTIONS } from "@/lib/constants";
 
 const ReceiptImport = () => {
   const navigate = useNavigate();

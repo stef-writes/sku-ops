@@ -18,7 +18,7 @@ Build a complete hardware storefront, POS, and inventory management system with 
 - **Backend**: FastAPI + SQLite (aiosqlite)
 - **Auth**: JWT-based authentication with RBAC
 - **AI**: Gemini 3 Flash for receipt OCR
-- **Payments**: Stripe via emergentintegrations library
+- **Payments**: Stub adapter (Pay Now → stub flow; Charge to Account → Xero invoicing)
 
 ## User Personas
 1. **Admin**: Full access - user management, financial dashboard, invoice exports

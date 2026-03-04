@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { ROLES } from "@/lib/constants";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -32,7 +33,7 @@ const Layout = ({ children }) => {
   const getNavGroups = () => {
     const role = user?.role;
 
-    if (role === "contractor") {
+    if (role === ROLES.CONTRACTOR) {
       return [
         {
           items: [
@@ -62,7 +63,7 @@ const Layout = ({ children }) => {
       { path: "/graphs", icon: Network, label: "Graphs" },
     ];
 
-    if (role === "warehouse_manager") {
+    if (role === ROLES.WAREHOUSE_MANAGER) {
       return [
         { items: [{ path: "/", icon: LayoutDashboard, label: "Dashboard" }] },
         { section: "Operations", items: operationsItems },
@@ -104,15 +105,15 @@ const Layout = ({ children }) => {
 
   const getRoleBadge = () => {
     const role = user?.role;
-    if (role === "admin") return "bg-rose-500";
-    if (role === "warehouse_manager") return "bg-blue-500";
+    if (role === ROLES.ADMIN) return "bg-rose-500";
+    if (role === ROLES.WAREHOUSE_MANAGER) return "bg-blue-500";
     return "bg-emerald-500";
   };
 
   const getRoleLabel = () => {
     const role = user?.role;
-    if (role === "admin") return "Admin";
-    if (role === "warehouse_manager") return "Warehouse";
+    if (role === ROLES.ADMIN) return "Admin";
+    if (role === ROLES.WAREHOUSE_MANAGER) return "Warehouse";
     return "Contractor";
   };
 

@@ -23,6 +23,7 @@ async def chat(
     ctx: dict | None = None,
     mode: str = "fast",
     agent_type: str = "general",
+    session_id: str = "",
 ) -> dict:
     """
     Dispatch user message directly to the appropriate specialist agent.
@@ -43,4 +44,4 @@ async def chat(
     import importlib
     module_path = _AGENT_MODULES.get(agent_type, _AGENT_MODULES["general"])
     agent_module = importlib.import_module(module_path)
-    return await agent_module.run(user_message, history=history, deps=deps, mode=mode)
+    return await agent_module.run(user_message, history=history, deps=deps, mode=mode, session_id=session_id)

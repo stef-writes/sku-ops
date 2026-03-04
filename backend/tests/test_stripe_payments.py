@@ -128,7 +128,7 @@ class TestStripePaymentEndpoints:
         # Try with non-existent withdrawal ID
         payment_data = {
             "withdrawal_id": "nonexistent-id-12345",
-            "origin_url": "https://hardware-pos-stripe.preview.emergentagent.com"
+            "origin_url": "http://localhost:3000"
         }
         
         response = requests.post(f"{API_URL}/payments/create-checkout", json=payment_data, headers=headers)
@@ -165,7 +165,7 @@ class TestStripePaymentEndpoints:
         # Now create payment checkout
         payment_data = {
             "withdrawal_id": withdrawal_id,
-            "origin_url": "https://hardware-pos-stripe.preview.emergentagent.com"
+            "origin_url": "http://localhost:3000"
         }
         
         response = requests.post(f"{API_URL}/payments/create-checkout", json=payment_data, headers=headers)
@@ -208,7 +208,7 @@ class TestStripePaymentEndpoints:
         # Create payment session
         payment_data = {
             "withdrawal_id": withdrawal["id"],
-            "origin_url": "https://hardware-pos-stripe.preview.emergentagent.com"
+            "origin_url": "http://localhost:3000"
         }
         
         checkout_response = requests.post(f"{API_URL}/payments/create-checkout", json=payment_data, headers=headers)
@@ -263,7 +263,7 @@ class TestStripePaymentEndpoints:
         # Now try to create payment for it
         payment_data = {
             "withdrawal_id": withdrawal["id"],
-            "origin_url": "https://hardware-pos-stripe.preview.emergentagent.com"
+            "origin_url": "http://localhost:3000"
         }
         
         response = requests.post(f"{API_URL}/payments/create-checkout", json=payment_data, headers=contractor_headers)

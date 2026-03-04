@@ -17,15 +17,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { API } from "@/lib/api";
-
-const TX_TYPE_LABELS = {
-  withdrawal: "Withdrawal",
-  import: "Import",
-  adjustment: "Adjustment",
-  receiving: "Receiving",
-  return: "Return",
-  transfer: "Transfer",
-};
+import { TX_TYPE_LABELS } from "@/lib/constants";
 
 export function StockHistoryModal({ product, open, onOpenChange }) {
   const [history, setHistory] = useState([]);

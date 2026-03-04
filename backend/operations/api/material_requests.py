@@ -8,7 +8,7 @@ from identity.application.auth_service import get_current_user, require_role
 from operations.domain.material_request import MaterialRequestCreate, MaterialRequestProcess
 from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
 from operations.infrastructure.material_request_repo import material_request_repo
-from identity.infrastructure.user_repo import user_repo
+from identity.application.user_service import get_user_by_id
 from operations.infrastructure.withdrawal_repo import withdrawal_repo
 from operations.application.withdrawal_service import create_withdrawal as do_create_withdrawal
 from shared.infrastructure.database import transaction
@@ -85,7 +85,7 @@ async def process_material_request(
     if req.get("status") != "pending":
         raise HTTPException(status_code=400, detail="Request already processed")
 
-    contractor = await user_repo.get_by_id(req["contractor_id"])
+    contractor = await get_user_by_id(req["contractor_id"])
     if not contractor or contractor.get("role") != "contractor":
         raise HTTPException(status_code=400, detail="Contractor not found")
     if contractor.get("organization_id") and contractor.get("organization_id") != org_id:

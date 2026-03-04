@@ -94,7 +94,7 @@ async def receive_items(
     )
     if result.get("cost_total", 0) > 0:
         from finance.adapters.xero_factory import get_xero_gateway
-        from identity.infrastructure.org_settings_repo import get_org_settings
+        from identity.application.org_service import get_org_settings
         org_id = current_user.get("organization_id") or "default"
         try:
             settings = await get_org_settings(org_id)

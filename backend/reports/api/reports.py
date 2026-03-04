@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends
 
 from identity.application.auth_service import require_role
 from shared.infrastructure.database import get_connection
-from catalog.infrastructure.product_repo import product_repo
-from operations.infrastructure.withdrawal_repo import withdrawal_repo
+from catalog.application.queries import list_products
+from operations.application.queries import list_withdrawals
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -20,7 +20,7 @@ async def get_sales_report(
     current_user: dict = Depends(require_role("admin", "warehouse_manager")),
 ):
     org_id = current_user.get("organization_id") or "default"
-    withdrawals = await withdrawal_repo.list_withdrawals(
+    withdrawals = await list_withdrawals(
         start_date=start_date, end_date=end_date, limit=10000, organization_id=org_id
     )
 
@@ -65,7 +65,7 @@ async def get_sales_report(
 @router.get("/inventory")
 async def get_inventory_report(current_user: dict = Depends(require_role("admin", "warehouse_manager"))):
     org_id = current_user.get("organization_id") or "default"
-    products = await product_repo.list_products(organization_id=org_id)
+    products = await list_products(organization_id=org_id)
 
     total_products = len(products)
     total_value = sum(p.get("price", 0) * p.get("quantity", 0) for p in products)
@@ -154,7 +154,7 @@ async def get_product_margins(
     current_user: dict = Depends(require_role("admin", "warehouse_manager")),
 ):
     org_id = current_user.get("organization_id") or "default"
-    withdrawals = await withdrawal_repo.list_withdrawals(
+    withdrawals = await list_withdrawals(
         start_date=start_date, end_date=end_date, limit=10000, organization_id=org_id
     )
 
@@ -203,7 +203,7 @@ async def get_job_pl(
 ):
     """P&L grouped by job_id. sku-ops is the SSOT; this is the primary per-job P&L view."""
     org_id = current_user.get("organization_id") or "default"
-    withdrawals = await withdrawal_repo.list_withdrawals(
+    withdrawals = await list_withdrawals(
         start_date=start_date, end_date=end_date, limit=10000, organization_id=org_id
     )
 
@@ -262,8 +262,8 @@ async def get_kpis(
 ):
     org_id = current_user.get("organization_id") or "default"
     products, withdrawals = await asyncio.gather(
-        product_repo.list_products(organization_id=org_id),
-        withdrawal_repo.list_withdrawals(
+        list_products(organization_id=org_id),
+        list_withdrawals(
             start_date=start_date, end_date=end_date, limit=10000, organization_id=org_id
         ),
     )
@@ -323,8 +323,8 @@ async def get_product_performance(
 ):
     org_id = current_user.get("organization_id") or "default"
     products, withdrawals = await asyncio.gather(
-        product_repo.list_products(organization_id=org_id),
-        withdrawal_repo.list_withdrawals(
+        list_products(organization_id=org_id),
+        list_withdrawals(
             start_date=start_date, end_date=end_date, limit=10000, organization_id=org_id
         ),
     )

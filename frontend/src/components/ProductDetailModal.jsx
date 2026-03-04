@@ -23,15 +23,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { API } from "@/lib/api";
-
-const TX_TYPE_LABELS = {
-  withdrawal: "Withdrawal",
-  import: "Import",
-  adjustment: "Adjustment",
-  receiving: "Receiving",
-  return: "Return",
-  transfer: "Transfer",
-};
+import { TX_TYPE_LABELS } from "@/lib/constants";
 
 function StatusBadge({ product }) {
   if (product.quantity === 0) {

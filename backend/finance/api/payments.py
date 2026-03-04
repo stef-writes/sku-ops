@@ -10,7 +10,7 @@ from finance.adapters.payment_factory import get_payment_gateway
 from identity.application.auth_service import get_current_user
 from finance.infrastructure.invoice_repo import invoice_repo
 from finance.infrastructure.payment_repo import payment_repo
-from operations.infrastructure.withdrawal_repo import withdrawal_repo
+from operations.application.queries import get_withdrawal_by_id, mark_withdrawal_paid
 
 from finance.api.schemas import CreatePaymentRequest
 
@@ -23,7 +23,8 @@ router = APIRouter(prefix="/payments", tags=["payments"])
 async def create_payment_checkout(data: CreatePaymentRequest, request: Request, current_user: dict = Depends(get_current_user)):
     """Create a checkout session for a withdrawal (Stripe or stub adapter)."""
 
-    withdrawal = await withdrawal_repo.get_by_id(data.withdrawal_id)
+    org_id = current_user.get("organization_id") or "default"
+    withdrawal = await get_withdrawal_by_id(data.withdrawal_id, organization_id=org_id)
     if not withdrawal:
         raise HTTPException(status_code=404, detail="Withdrawal not found")
 
@@ -95,7 +96,7 @@ async def get_payment_status(session_id: str, request: Request, current_user: di
             paid_at = datetime.now(timezone.utc).isoformat()
             await payment_repo.update_status(session_id, "paid", "complete", paid_at)
             if payment.get("withdrawal_id"):
-                await withdrawal_repo.mark_paid(payment["withdrawal_id"], paid_at)
+                await mark_withdrawal_paid(payment["withdrawal_id"], paid_at)
                 await invoice_repo.mark_paid_for_withdrawal(payment["withdrawal_id"])
         elif status.status == "expired":
             await payment_repo.update_status(session_id, "expired", "expired")

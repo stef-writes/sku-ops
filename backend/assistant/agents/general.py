@@ -10,6 +10,7 @@ from shared.infrastructure.config import (
     AGENT_PRIMARY_MODEL,
     AGENT_THINKING_BUDGET,
     DEFAULT_DEEP_THINKING_BUDGET,
+    ANTHROPIC_AVAILABLE,
 )
 from assistant.agents.deps import AgentDeps
 from assistant.agents.agent_utils import (
@@ -174,8 +175,7 @@ async def forecast_stockout(ctx: RunContext[AgentDeps], limit: int = 15) -> str:
     return await _forecast_stockout({"limit": limit}, ctx.deps.org_id)
 
 
-async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mode: str = "fast") -> dict:
-    from shared.infrastructure.config import ANTHROPIC_AVAILABLE
+async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mode: str = "fast", session_id: str = "") -> dict:
     if not ANTHROPIC_AVAILABLE:
         return {"response": "Assistant requires ANTHROPIC_API_KEY.", "tool_calls": [], "history": [], "thinking": [], "agent": "general"}
 
@@ -192,6 +192,7 @@ async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mo
             msg_history=msg_history, deps=deps,
             model_settings=model_settings or None,
             agent_name="GeneralAgent",
+            session_id=session_id, mode=mode,
         )
     except Exception as e:
         logger.error(f"GeneralAgent failed: {e}")

@@ -3,16 +3,20 @@ import secrets
 from datetime import datetime, timezone
 from urllib.parse import urlencode
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 
 from identity.application.auth_service import require_role
 from shared.infrastructure.config import XERO_CLIENT_ID, XERO_CLIENT_SECRET, XERO_REDIRECT_URI
-from identity.infrastructure.org_settings_repo import (
+from shared.infrastructure.database import get_connection
+from identity.application.org_service import (
     clear_xero_tokens,
     get_org_settings,
     upsert_org_settings,
 )
+from finance.adapters.xero_adapter import XeroAdapter
+from finance.adapters.xero_factory import get_xero_gateway
 
 router = APIRouter(prefix="/xero", tags=["xero"])
 
@@ -20,8 +24,26 @@ XERO_AUTH_URL = "https://login.xero.com/identity/connect/authorize"
 XERO_TOKEN_URL = "https://identity.xero.com/connect/token"
 XERO_SCOPES = "openid profile email accounting.transactions accounting.contacts offline_access"
 
-# Simple in-process state store for CSRF protection (process-scoped, sufficient for single-instance)
-_pending_states: dict[str, str] = {}  # state -> org_id
+
+async def _save_oauth_state(state: str, org_id: str) -> None:
+    conn = get_connection()
+    now = datetime.now(timezone.utc).isoformat()
+    await conn.execute(
+        """INSERT OR REPLACE INTO oauth_states (state, org_id, created_at) VALUES (?, ?, ?)""",
+        (state, org_id, now),
+    )
+    await conn.commit()
+
+
+async def _pop_oauth_state(state: str) -> str | None:
+    conn = get_connection()
+    cursor = await conn.execute("SELECT org_id FROM oauth_states WHERE state = ?", (state,))
+    row = await cursor.fetchone()
+    if not row:
+        return None
+    await conn.execute("DELETE FROM oauth_states WHERE state = ?", (state,))
+    await conn.commit()
+    return row[0]
 
 
 def _require_xero_configured():
@@ -38,7 +60,7 @@ async def xero_connect(current_user: dict = Depends(require_role("admin"))):
     _require_xero_configured()
     org_id = current_user.get("organization_id") or "default"
     state = secrets.token_urlsafe(32)
-    _pending_states[state] = org_id
+    await _save_oauth_state(state, org_id)
 
     params = {
         "response_type": "code",
@@ -58,24 +80,23 @@ async def xero_callback(code: str = "", state: str = "", error: str = ""):
     if error:
         raise HTTPException(status_code=400, detail=f"Xero OAuth error: {error}")
 
-    org_id = _pending_states.pop(state, None)
+    org_id = await _pop_oauth_state(state)
     if not org_id:
         raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
 
-    import requests
-
-    resp = requests.post(
-        XERO_TOKEN_URL,
-        data={
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": XERO_REDIRECT_URI,
-            "client_id": XERO_CLIENT_ID,
-            "client_secret": XERO_CLIENT_SECRET,
-        },
-        timeout=15,
-    )
-    if not resp.ok:
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            XERO_TOKEN_URL,
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": XERO_REDIRECT_URI,
+                "client_id": XERO_CLIENT_ID,
+                "client_secret": XERO_CLIENT_SECRET,
+            },
+            timeout=15,
+        )
+    if not resp.is_success:
         raise HTTPException(status_code=502, detail=f"Xero token exchange failed: {resp.text}")
 
     token_data = resp.json()
@@ -102,7 +123,6 @@ async def list_xero_tenants(current_user: dict = Depends(require_role("admin")))
     if not settings.xero_access_token:
         raise HTTPException(status_code=400, detail="Xero not connected for this org")
 
-    from finance.adapters.xero_adapter import XeroAdapter
     adapter = XeroAdapter()
     try:
         tenants = await adapter.get_tenants(settings.xero_access_token)
@@ -142,7 +162,6 @@ async def list_tracking_categories(current_user: dict = Depends(require_role("ad
     if not settings.xero_access_token:
         raise HTTPException(status_code=400, detail="Xero not connected for this org")
 
-    from finance.adapters.xero_factory import get_xero_gateway
     gateway = get_xero_gateway(settings)
     try:
         categories = await gateway.list_tracking_categories(settings)

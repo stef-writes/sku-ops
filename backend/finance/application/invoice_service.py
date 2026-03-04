@@ -1,8 +1,8 @@
-"""Invoice application services."""
+"""Invoice application services — safe for cross-context import."""
 import logging
 
 from finance.infrastructure.invoice_repo import invoice_repo
-from identity.infrastructure.org_settings_repo import get_org_settings
+from identity.application.org_service import get_org_settings
 from finance.adapters.xero_factory import get_xero_gateway
 
 logger = logging.getLogger(__name__)
@@ -33,3 +33,19 @@ async def sync_invoice(inv_id: str, org_id: str) -> dict:
         "success": result.success,
         "error": result.error,
     }
+
+
+async def mark_paid_for_withdrawal(withdrawal_id: str) -> None:
+    await invoice_repo.mark_paid_for_withdrawal(withdrawal_id)
+
+
+async def create_invoice_from_withdrawals(withdrawal_ids: list, organization_id: str = None, conn=None) -> dict:
+    return await invoice_repo.create_from_withdrawals(withdrawal_ids, organization_id=organization_id, conn=conn)
+
+
+async def list_invoices(organization_id: str, **kwargs):
+    return await invoice_repo.list_invoices(organization_id=organization_id, **kwargs)
+
+
+async def get_invoice(invoice_id: str, org_id: str):
+    return await invoice_repo.get_by_id(invoice_id, org_id)

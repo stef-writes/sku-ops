@@ -12,7 +12,10 @@ from fastapi import HTTPException
 from shared.domain.exceptions import InsufficientStockError
 from inventory.domain.stock import StockTransaction, StockTransactionType
 from operations.domain.withdrawal import WithdrawalItem
-from catalog.infrastructure.product_repo import product_repo
+from catalog.application.queries import (
+    get_product_by_id, atomic_decrement_product,
+    increment_product_quantity, add_product_quantity, atomic_adjust_product,
+)
 from inventory.infrastructure.stock_repo import stock_repo
 
 
@@ -70,12 +73,12 @@ async def process_withdrawal_stock_changes(
 
     try:
         for item in items:
-            result = await product_repo.atomic_decrement(
+            result = await atomic_decrement_product(
                 item.product_id, item.quantity, now, conn=conn
             )
 
             if not result:
-                product = await product_repo.get_by_id(item.product_id, "quantity, sku", conn=conn)
+                product = await get_product_by_id(item.product_id, "quantity, sku", conn=conn)
                 available = product.get("quantity", 0) if product else 0
                 raise InsufficientStockError(
                     sku=item.sku, requested=item.quantity, available=available
@@ -100,7 +103,7 @@ async def process_withdrawal_stock_changes(
     except Exception:
         # Roll back all completed decrements on any failure
         for product_id, qty in completed:
-            await product_repo.increment_quantity(product_id, qty, now, conn=conn)
+            await increment_product_quantity(product_id, qty, now, conn=conn)
         raise
 
 
@@ -115,7 +118,7 @@ async def process_receiving_stock_changes(
 ) -> None:
     """Add stock (receiving, import, return) and record transaction."""
     now = datetime.now(timezone.utc).isoformat()
-    result = await product_repo.add_quantity(product_id, quantity, now)
+    result = await add_product_quantity(product_id, quantity, now)
     if not result:
         raise HTTPException(status_code=404, detail="Product not found")
 
@@ -180,11 +183,11 @@ async def process_adjustment_stock_changes(
     if quantity_delta == 0:
         raise ValueError("quantity_delta must not be zero")
     now = datetime.now(timezone.utc).isoformat()
-    product = await product_repo.get_by_id(product_id)
+    product = await get_product_by_id(product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    result = await product_repo.atomic_adjust(product_id, quantity_delta, now)
+    result = await atomic_adjust_product(product_id, quantity_delta, now)
     if not result:
         quantity_before = product.get("quantity", 0)
         raise HTTPException(

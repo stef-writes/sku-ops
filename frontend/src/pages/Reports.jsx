@@ -27,13 +27,7 @@ import { AreaChart } from "@tremor/react";
 
 import { API } from "@/lib/api";
 import { valueFormatter } from "@/lib/chartConfig";
-
-const DATE_PRESETS = [
-  { label: "Today", getValue: () => { const d = new Date(); return { from: d, to: d }; } },
-  { label: "Last 7 days", getValue: () => { const end = new Date(); const start = new Date(end); start.setDate(start.getDate() - 6); return { from: start, to: end }; } },
-  { label: "This month", getValue: () => { const end = new Date(); const start = new Date(end.getFullYear(), end.getMonth(), 1); return { from: start, to: end }; } },
-  { label: "All time", getValue: () => ({ from: null, to: null }) },
-];
+import { DATE_PRESETS } from "@/lib/constants";
 
 // ─── Stat card ───────────────────────────────────────────────────────────────
 const Stat = ({ label, value, icon: Icon, accent = "amber", note, large }) => {

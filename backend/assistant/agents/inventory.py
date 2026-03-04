@@ -14,10 +14,20 @@ from shared.infrastructure.config import (
     AGENT_PRIMARY_MODEL,
     AGENT_THINKING_BUDGET,
     DEFAULT_DEEP_THINKING_BUDGET,
+    ANTHROPIC_AVAILABLE,
+    OPENAI_API_KEY,
 )
 from shared.infrastructure.database import get_connection
 from assistant.agents.deps import AgentDeps
 from assistant.agents.agent_utils import build_message_history, extract_text_history, extract_tool_calls, calc_cost, run_agent
+from assistant.agents.search import get_index
+from catalog.application.queries import (
+    list_products as catalog_list_products,
+    list_low_stock as catalog_list_low_stock,
+    list_departments as catalog_list_departments,
+    list_vendors as catalog_list_vendors,
+    get_sku_counters,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -161,8 +171,7 @@ async def get_slow_movers(ctx: RunContext[AgentDeps], limit: int = 20, days: int
     return await _get_slow_movers({"limit": limit, "days": days}, ctx.deps.org_id)
 
 
-async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mode: str = "fast") -> dict:
-    from shared.infrastructure.config import ANTHROPIC_AVAILABLE
+async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mode: str = "fast", session_id: str = "") -> dict:
     if not ANTHROPIC_AVAILABLE:
         return {"response": "Inventory agent requires ANTHROPIC_API_KEY.", "tool_calls": [], "history": [], "thinking": [], "agent": "inventory"}
 
@@ -179,6 +188,7 @@ async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mo
             msg_history=msg_history, deps=deps,
             model_settings=model_settings or None,
             agent_name="InventoryAgent",
+            session_id=session_id, mode=mode,
         )
     except Exception as e:
         logger.error(f"InventoryAgent failed: {e}")
@@ -199,10 +209,9 @@ async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mo
 # ── DB query implementations (unchanged) ────────────────────────────────────
 
 async def _search_products(args: dict, org_id: str) -> str:
-    from catalog.infrastructure.product_repo import product_repo
     query = (args.get("query") or "").strip()
     limit = min(int(args.get("limit") or 20), 50)
-    items = await product_repo.list_products(search=query, limit=limit, organization_id=org_id)
+    items = await catalog_list_products(search=query, limit=limit, organization_id=org_id)
     out = [
         {
             "sku": p.get("sku"),
@@ -218,8 +227,6 @@ async def _search_products(args: dict, org_id: str) -> str:
 
 
 async def _search_semantic(args: dict, org_id: str) -> str:
-    from shared.infrastructure.config import OPENAI_API_KEY
-    from assistant.agents.search import get_index
     query = (args.get("query") or "").strip()
     limit = min(int(args.get("limit") or 10), 30)
     index = await get_index(org_id)
@@ -304,9 +311,8 @@ async def _get_inventory_stats(org_id: str) -> str:
 
 
 async def _list_low_stock(args: dict, org_id: str) -> str:
-    from catalog.infrastructure.product_repo import product_repo
     limit = min(int(args.get("limit") or 20), 50)
-    items = await product_repo.list_low_stock(limit=limit, organization_id=org_id)
+    items = await catalog_list_low_stock(limit=limit, organization_id=org_id)
     out = [
         {
             "sku": p.get("sku"),
@@ -322,10 +328,8 @@ async def _list_low_stock(args: dict, org_id: str) -> str:
 
 
 async def _list_departments(org_id: str) -> str:
-    from catalog.infrastructure.department_repo import department_repo
-    from catalog.infrastructure.sku_repo import sku_repo
-    depts = await department_repo.list_all(org_id=org_id)
-    counters = await sku_repo.get_all_counters()
+    depts = await catalog_list_departments(organization_id=org_id)
+    counters = await get_sku_counters()
     out = []
     for d in depts:
         code = d.get("code", "")
@@ -341,8 +345,7 @@ async def _list_departments(org_id: str) -> str:
 
 
 async def _list_vendors(org_id: str) -> str:
-    from catalog.infrastructure.vendor_repo import vendor_repo
-    vendors = await vendor_repo.list_all(org_id=org_id)
+    vendors = await catalog_list_vendors(organization_id=org_id)
     out = [{"name": v.get("name"), "product_count": v.get("product_count", 0)} for v in vendors]
     return json.dumps({"vendors": out})
 
@@ -386,11 +389,10 @@ async def _get_usage_velocity(args: dict, org_id: str) -> str:
 
 
 async def _get_reorder_suggestions(args: dict, org_id: str) -> str:
-    from catalog.infrastructure.product_repo import product_repo
     limit = min(int(args.get("limit") or 20), 50)
     since = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
     conn = get_connection()
-    low_stock = await product_repo.list_low_stock(limit=100, organization_id=org_id)
+    low_stock = await catalog_list_low_stock(limit=100, organization_id=org_id)
     if not low_stock:
         return json.dumps({"count": 0, "suggestions": []})
     product_ids = [p["id"] for p in low_stock]

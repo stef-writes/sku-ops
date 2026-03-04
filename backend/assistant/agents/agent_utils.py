@@ -1,7 +1,9 @@
 """Shared utilities for all specialist agents."""
 import asyncio
+import json
 import logging
 import random
+import time
 from enum import Enum
 
 from pydantic_ai.messages import (
@@ -9,8 +11,10 @@ from pydantic_ai.messages import (
     ModelResponse,
     TextPart,
     ToolCallPart,
+    ToolReturnPart,
     UserPromptPart,
 )
+from shared.infrastructure.config import AGENT_PRIMARY_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +42,6 @@ def _classify(e: Exception) -> tuple[_ErrorKind, bool, float | None]:
     s = str(e).lower()
     t = type(e).__name__.lower()
 
-    # Extract Retry-After header when available (Anthropic sends this on 429)
     retry_after: float | None = None
     resp = getattr(e, "response", None)
     if resp is not None:
@@ -64,7 +67,6 @@ def _classify(e: Exception) -> tuple[_ErrorKind, bool, float | None]:
     if any(k in s for k in ("500", "502", "503", "529", "overload", "internal server", "service unavailable", "bad gateway")):
         return _ErrorKind.SERVER, True, None
 
-    # Thinking/model config issues — drop settings and retry
     if any(k in s for k in ("thinking", "budget", "extended thinking", "model_settings")):
         return _ErrorKind.MODEL_ERROR, True, None
 
@@ -99,20 +101,17 @@ async def run_agent(
     model_settings: dict | None = None,
     timeout_seconds: int = AGENT_TIMEOUT_SECONDS,
     agent_name: str = "agent",
+    session_id: str = "",
+    mode: str = "fast",
 ):
-    """Run a PydanticAI agent with retry/backoff and error classification.
+    """Run a PydanticAI agent with retry/backoff, error classification, and run logging.
 
-    Model is read from AGENT_PRIMARY_MODEL (models.yaml or env). No fallbacks —
-    failures are raised immediately after retries so they surface clearly.
-
-    Retry strategy (up to _MAX_RETRIES attempts):
-    - rate_limit / network / timeout / server  → exponential backoff + jitter
-    - model_error (thinking budget etc.)       → drop thinking settings, retry immediately
-    - auth / validation                        → fail immediately, no retry
+    Every invocation (success or failure) is logged to the agent_runs table
+    via fire-and-forget background task.
     """
-    from shared.infrastructure.config import AGENT_PRIMARY_MODEL
-
     active_settings = model_settings
+    t0 = time.monotonic()
+    attempts = 0
 
     async def _run(settings):
         return await asyncio.wait_for(
@@ -129,8 +128,17 @@ async def run_agent(
     last_exc: Exception = RuntimeError(f"{agent_name}: no attempts made")
 
     for attempt in range(_MAX_RETRIES):
+        attempts = attempt + 1
         try:
-            return await _run(active_settings)
+            result = await _run(active_settings)
+            duration_ms = int((time.monotonic() - t0) * 1000)
+            _log_success(
+                result, user_message=user_message, agent_name=agent_name,
+                session_id=session_id, org_id=getattr(deps, "org_id", ""),
+                user_id=getattr(deps, "user_id", ""),
+                mode=mode, duration_ms=duration_ms, attempts=attempts,
+            )
+            return result
         except asyncio.TimeoutError:
             last_exc = RuntimeError(f"{agent_name} timed out after {timeout_seconds}s")
             kind, retriable, retry_after = _ErrorKind.TIMEOUT, True, None
@@ -140,6 +148,13 @@ async def run_agent(
 
         if not retriable:
             logger.error(f"{agent_name} non-retriable {kind} on attempt {attempt + 1}: {last_exc}")
+            _log_failure(
+                user_message=user_message, agent_name=agent_name,
+                session_id=session_id, org_id=getattr(deps, "org_id", ""),
+                user_id=getattr(deps, "user_id", ""),
+                mode=mode, duration_ms=int((time.monotonic() - t0) * 1000),
+                attempts=attempts, error=str(last_exc), error_kind=kind.value,
+            )
             raise last_exc
 
         if active_settings and kind == _ErrorKind.MODEL_ERROR:
@@ -153,7 +168,58 @@ async def run_agent(
         else:
             logger.warning(f"{agent_name} {kind} on final attempt {_MAX_RETRIES}/{_MAX_RETRIES}: {last_exc}")
 
+    _log_failure(
+        user_message=user_message, agent_name=agent_name,
+        session_id=session_id, org_id=getattr(deps, "org_id", ""),
+        user_id=getattr(deps, "user_id", ""),
+        mode=mode, duration_ms=int((time.monotonic() - t0) * 1000),
+        attempts=attempts, error=str(last_exc),
+        error_kind=_classify(last_exc)[0].value,
+    )
     raise last_exc
+
+
+# ── Run logging (fire-and-forget) ────────────────────────────────────────────
+
+def _log_success(result, *, user_message, agent_name, session_id, org_id, user_id, mode, duration_ms, attempts):
+    usage = result.usage()
+    cost = calc_cost(AGENT_PRIMARY_MODEL, usage)
+    tool_calls = extract_tool_calls_detailed(result.all_messages())
+    response_text = result.output if isinstance(result.output, str) else str(result.output)
+
+    async def _write():
+        try:
+            from assistant.infrastructure.agent_run_repo import log_agent_run
+            await log_agent_run(
+                session_id=session_id, org_id=org_id, user_id=user_id,
+                agent_name=agent_name, model=AGENT_PRIMARY_MODEL, mode=mode,
+                user_message=user_message, response_text=response_text,
+                tool_calls=tool_calls,
+                input_tokens=usage.input_tokens, output_tokens=usage.output_tokens,
+                cost_usd=cost, duration_ms=duration_ms, attempts=attempts,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to log agent run: {e}")
+
+    asyncio.create_task(_write())
+
+
+def _log_failure(*, user_message, agent_name, session_id, org_id, user_id, mode, duration_ms, attempts, error, error_kind):
+    async def _write():
+        try:
+            from assistant.infrastructure.agent_run_repo import log_agent_run
+            await log_agent_run(
+                session_id=session_id, org_id=org_id, user_id=user_id,
+                agent_name=agent_name, model=AGENT_PRIMARY_MODEL, mode=mode,
+                user_message=user_message, response_text="",
+                tool_calls=[], input_tokens=0, output_tokens=0,
+                cost_usd=0.0, duration_ms=duration_ms, attempts=attempts,
+                error=error, error_kind=error_kind,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to log agent run failure: {e}")
+
+    asyncio.create_task(_write())
 
 
 # ── Pricing ───────────────────────────────────────────────────────────────────
@@ -166,7 +232,7 @@ _MODEL_PRICING: dict[str, dict[str, float]] = {
 
 
 def calc_cost(model: str, usage) -> float:
-    model = model.split(":", 1)[-1]  # strip provider prefix ("anthropic:", "openai:", etc.)
+    model = model.split(":", 1)[-1]
     key = next((k for k in _MODEL_PRICING if model.startswith(k)), None)
     if not key:
         return 0.0
@@ -210,11 +276,42 @@ def extract_text_history(messages) -> list[dict]:
 
 
 def extract_tool_calls(messages) -> list[dict]:
-    """Extract tool call names from PydanticAI all_messages()."""
+    """Extract tool call names only (lightweight, for API response)."""
     out = []
     for msg in messages:
         if isinstance(msg, ModelResponse):
             for part in msg.parts:
                 if isinstance(part, ToolCallPart):
                     out.append({"tool": part.tool_name})
+    return out
+
+
+def extract_tool_calls_detailed(messages) -> list[dict]:
+    """Extract tool calls with arguments and return values for monitoring."""
+    # Build a map of tool_call_id → return value from subsequent ModelRequests
+    return_map: dict[str, str] = {}
+    for msg in messages:
+        if isinstance(msg, ModelRequest):
+            for part in msg.parts:
+                if isinstance(part, ToolReturnPart):
+                    ret = part.content if isinstance(part.content, str) else str(part.content)
+                    return_map[part.tool_call_id] = ret[:500]
+
+    out = []
+    for msg in messages:
+        if isinstance(msg, ModelResponse):
+            for part in msg.parts:
+                if isinstance(part, ToolCallPart):
+                    args_raw = part.args
+                    if isinstance(args_raw, str):
+                        try:
+                            args_raw = json.loads(args_raw)
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+                    entry = {
+                        "tool": part.tool_name,
+                        "args": args_raw,
+                        "result_preview": return_map.get(part.tool_call_id, ""),
+                    }
+                    out.append(entry)
     return out

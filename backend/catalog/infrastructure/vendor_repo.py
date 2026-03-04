@@ -48,15 +48,11 @@ async def find_by_name(name: str, organization_id: Optional[str] = None) -> Opti
     org_id = organization_id or "default"
     cursor = await conn.execute(
         """SELECT id, name, contact_name, email, phone, address, product_count, organization_id, created_at FROM vendors
-           WHERE organization_id = ? OR organization_id IS NULL""",
-        (org_id,),
+           WHERE TRIM(LOWER(name)) = ? AND (organization_id = ? OR organization_id IS NULL)""",
+        (normalized, org_id),
     )
-    rows = await cursor.fetchall()
-    for row in rows:
-        d = _row_to_dict(row)
-        if d and d.get("name", "").strip().lower() == normalized:
-            return d
-    return None
+    row = await cursor.fetchone()
+    return _row_to_dict(row)
 
 
 async def insert(vendor_dict: dict) -> None:

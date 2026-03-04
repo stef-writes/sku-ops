@@ -15,6 +15,8 @@ import { Card, Metric, SparkAreaChart, AreaChart, Tracker } from "@tremor/react"
 import { format } from "date-fns";
 import { API } from "@/lib/api";
 import { valueFormatter } from "@/lib/chartConfig";
+import { ROLES, ADMIN_ROLES } from "@/lib/constants";
+import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { StockHistoryModal } from "@/components/StockHistoryModal";
 import { RecentTransactions } from "@/components/RecentTransactions";
 
@@ -23,9 +25,9 @@ const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const isContractor = user?.role === "contractor";
-  const isAdmin = user?.role === "admin";
-  const showTransactionsTerminal = isAdmin || user?.role === "warehouse_manager";
+  const isContractor = user?.role === ROLES.CONTRACTOR;
+  const isAdmin = user?.role === ROLES.ADMIN;
+  const showTransactionsTerminal = ADMIN_ROLES.includes(user?.role);
   const [stockHistoryProduct, setStockHistoryProduct] = useState(null);
 
   useEffect(() => {
@@ -56,14 +58,7 @@ const Dashboard = () => {
   };
 
   if (loading) {
-    return (
-      <div className="p-8 flex items-center justify-center min-h-[50vh]">
-        <div className="flex items-center gap-3 text-slate-500">
-          <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
-          <span className="font-medium">Loading dashboard…</span>
-        </div>
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   // Contractor Dashboard
@@ -361,7 +356,7 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      {(isAdmin || user?.role === "warehouse_manager") && (
+      {ADMIN_ROLES.includes(user?.role) && (
         <StockHistoryModal
           product={stockHistoryProduct}
           open={!!stockHistoryProduct}

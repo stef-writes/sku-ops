@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request
 from finance.adapters.payment_factory import get_payment_gateway
 from finance.infrastructure.invoice_repo import invoice_repo
 from finance.infrastructure.payment_repo import payment_repo
-from operations.infrastructure.withdrawal_repo import withdrawal_repo
+from operations.application.queries import mark_withdrawal_paid
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ async def stripe_webhook(request: Request):
                 paid_at = datetime.now(timezone.utc).isoformat()
                 await payment_repo.update_status(session_id, "paid", "complete", paid_at)
                 if payment.get("withdrawal_id"):
-                    await withdrawal_repo.mark_paid(payment["withdrawal_id"], paid_at)
+                    await mark_withdrawal_paid(payment["withdrawal_id"], paid_at)
                     await invoice_repo.mark_paid_for_withdrawal(payment["withdrawal_id"])
 
         return {"received": True}

@@ -3,10 +3,12 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-import requests
+import httpx
 
+from identity.application.org_service import upsert_org_settings
 from identity.domain.org_settings import OrgSettings
 from finance.ports.xero_port import XeroSyncResult
+from shared.infrastructure.config import XERO_CLIENT_ID, XERO_CLIENT_SECRET
 
 logger = logging.getLogger(__name__)
 
@@ -35,19 +37,17 @@ class XeroAdapter:
             return True
 
     async def refresh_token(self, settings: OrgSettings) -> OrgSettings:
-        from shared.infrastructure.config import XERO_CLIENT_ID, XERO_CLIENT_SECRET
-        from identity.infrastructure.org_settings_repo import upsert_org_settings
-
-        resp = requests.post(
-            XERO_TOKEN_URL,
-            data={
-                "grant_type": "refresh_token",
-                "refresh_token": settings.xero_refresh_token,
-                "client_id": XERO_CLIENT_ID,
-                "client_secret": XERO_CLIENT_SECRET,
-            },
-            timeout=15,
-        )
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                XERO_TOKEN_URL,
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": settings.xero_refresh_token,
+                    "client_id": XERO_CLIENT_ID,
+                    "client_secret": XERO_CLIENT_SECRET,
+                },
+                timeout=15,
+            )
         resp.raise_for_status()
         token_data = resp.json()
 
@@ -60,11 +60,12 @@ class XeroAdapter:
         return await upsert_org_settings(updated)
 
     async def get_tenants(self, access_token: str) -> list[dict]:
-        resp = requests.get(
-            XERO_CONNECTIONS_URL,
-            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
-            timeout=15,
-        )
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                XERO_CONNECTIONS_URL,
+                headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+                timeout=15,
+            )
         resp.raise_for_status()
         return resp.json()
 
@@ -106,21 +107,22 @@ class XeroAdapter:
         headers = self._auth_headers(settings)
         existing_xero_id = invoice.get("xero_invoice_id")
 
-        if existing_xero_id:
-            xero_invoice["InvoiceID"] = existing_xero_id
-            resp = requests.post(
-                f"{XERO_API}/Invoices",
-                headers=headers,
-                json={"Invoices": [xero_invoice]},
-                timeout=20,
-            )
-        else:
-            resp = requests.put(
-                f"{XERO_API}/Invoices",
-                headers=headers,
-                json={"Invoices": [xero_invoice]},
-                timeout=20,
-            )
+        async with httpx.AsyncClient() as client:
+            if existing_xero_id:
+                xero_invoice["InvoiceID"] = existing_xero_id
+                resp = await client.post(
+                    f"{XERO_API}/Invoices",
+                    headers=headers,
+                    json={"Invoices": [xero_invoice]},
+                    timeout=20,
+                )
+            else:
+                resp = await client.put(
+                    f"{XERO_API}/Invoices",
+                    headers=headers,
+                    json={"Invoices": [xero_invoice]},
+                    timeout=20,
+                )
 
         resp.raise_for_status()
         result = resp.json()
@@ -166,16 +168,16 @@ class XeroAdapter:
             "Narration": narration,
             "JournalLines": [cogs_line, inv_line],
         }
-        resp = requests.put(
-            f"{XERO_API}/ManualJournals",
-            headers=self._auth_headers(settings),
-            json={"ManualJournals": [journal]},
-            timeout=20,
-        )
+        async with httpx.AsyncClient() as client:
+            resp = await client.put(
+                f"{XERO_API}/ManualJournals",
+                headers=self._auth_headers(settings),
+                json={"ManualJournals": [journal]},
+                timeout=20,
+            )
         resp.raise_for_status()
         journals = resp.json().get("ManualJournals", [])
         return journals[0].get("ManualJournalID") if journals else None
-
 
     async def sync_po_receipt(self, po: dict, cost_total: float, settings: OrgSettings) -> XeroSyncResult:
         if self._is_token_expired(settings):
@@ -199,12 +201,13 @@ class XeroAdapter:
                 },
             ],
         }
-        resp = requests.put(
-            f"{XERO_API}/ManualJournals",
-            headers=self._auth_headers(settings),
-            json={"ManualJournals": [journal]},
-            timeout=20,
-        )
+        async with httpx.AsyncClient() as client:
+            resp = await client.put(
+                f"{XERO_API}/ManualJournals",
+                headers=self._auth_headers(settings),
+                json={"ManualJournals": [journal]},
+                timeout=20,
+            )
         resp.raise_for_status()
         journals = resp.json().get("ManualJournals", [])
         journal_id = journals[0].get("ManualJournalID") if journals else None
@@ -213,11 +216,12 @@ class XeroAdapter:
     async def list_tracking_categories(self, settings: OrgSettings) -> list[dict]:
         if self._is_token_expired(settings):
             settings = await self.refresh_token(settings)
-        resp = requests.get(
-            f"{XERO_API}/TrackingCategories",
-            headers=self._auth_headers(settings),
-            timeout=15,
-        )
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{XERO_API}/TrackingCategories",
+                headers=self._auth_headers(settings),
+                timeout=15,
+            )
         resp.raise_for_status()
         return resp.json().get("TrackingCategories", [])
 

@@ -7,8 +7,8 @@ from fastapi import HTTPException
 
 from shared.infrastructure.database import get_connection, transaction
 from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalCreate
-from finance.infrastructure.invoice_repo import invoice_repo
-from catalog.infrastructure.product_repo import product_repo
+from finance.application.invoice_service import create_invoice_from_withdrawals
+from catalog.application.queries import list_products
 from operations.infrastructure.withdrawal_repo import withdrawal_repo
 from shared.domain.exceptions import InsufficientStockError
 from inventory.application.inventory_service import process_withdrawal_stock_changes
@@ -27,7 +27,7 @@ async def create_withdrawal(
     """
     # Enrich item costs from product catalog if not set by the caller
     org_id = current_user.get("organization_id") or "default"
-    products = await product_repo.list_products(organization_id=org_id)
+    products = await list_products(organization_id=org_id)
     cost_map = {p["id"]: p.get("cost", 0.0) for p in products}
     enriched_items = []
     for item in data.items:
@@ -77,7 +77,7 @@ async def create_withdrawal(
         await withdrawal_repo.insert(w_dict, conn=tx_conn)
 
         try:
-            inv = await invoice_repo.create_from_withdrawals([withdrawal.id], conn=tx_conn)
+            inv = await create_invoice_from_withdrawals([withdrawal.id], conn=tx_conn)
             result = withdrawal.model_dump()
             result["invoice_id"] = inv.get("id")
             return result

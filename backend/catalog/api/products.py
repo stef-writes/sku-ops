@@ -1,20 +1,17 @@
-"""Product CRUD, stock history, and CSV import routes."""
-from datetime import datetime, timezone
+"""Product CRUD and CSV import routes."""
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from identity.application.auth_service import get_current_user, require_role
-from catalog.domain.barcode import validate_barcode
 from shared.domain.exceptions import DuplicateBarcodeError, InvalidBarcodeError, ResourceNotFoundError
 from catalog.domain.product import Product, ProductCreate, ProductUpdate
 from catalog.infrastructure.department_repo import department_repo
 from catalog.infrastructure.product_repo import product_repo
 from catalog.infrastructure.vendor_repo import vendor_repo
-from inventory.application.inventory_service import get_stock_history
 from catalog.application.product_lifecycle import create_product as lifecycle_create, delete_product as lifecycle_delete, update_product as lifecycle_update
-from inventory.application.uom_classifier import classify_uom, classify_uom_batch
-from documents.application.import_parser import infer_uom, parse_csv_products, suggest_department
+from catalog.application.csv_import_service import import_csv
+from inventory.application.uom_classifier import classify_uom
 
 from catalog.api.schemas import SuggestUomRequest
 
@@ -67,21 +64,6 @@ async def get_product(product_id: str, current_user: dict = Depends(get_current_
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
-
-
-@router.get("/{product_id}/stock-history")
-async def get_product_stock_history(
-    product_id: str,
-    limit: int = 50,
-    current_user: dict = Depends(require_role("admin", "warehouse_manager")),
-):
-    """Get stock transaction history for a product (stock ledger)."""
-    org_id = current_user.get("organization_id") or "default"
-    product = await product_repo.get_by_id(product_id, organization_id=org_id)
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    history = await get_stock_history(product_id=product_id, limit=limit)
-    return {"product_id": product_id, "sku": product.get("sku"), "history": history}
 
 
 @router.post("/suggest-uom")
@@ -174,95 +156,19 @@ async def import_products_csv(
 ):
     """Bulk import products from a Supply Yard-style CSV."""
     org_id = current_user.get("organization_id") or "default"
-    department = await department_repo.get_by_id(department_id, org_id)
-    if not department:
-        raise HTTPException(status_code=400, detail="Department not found")
 
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="File must be a CSV")
 
     content = await file.read()
     try:
-        rows = parse_csv_products(content)
+        return await import_csv(
+            content=content,
+            department_id=department_id,
+            vendor_id=vendor_id,
+            user_id=current_user["id"],
+            user_name=current_user.get("name", ""),
+            organization_id=org_id,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-    if not rows:
-        raise HTTPException(status_code=400, detail="No valid product rows found in CSV")
-
-    vendor_name = ""
-    if vendor_id:
-        vendor = await vendor_repo.get_by_id(vendor_id, org_id)
-        if vendor:
-            vendor_name = vendor.get("name", "")
-
-    all_depts = await department_repo.list_all(org_id)
-    dept_cache = {department["code"]: department, department["id"]: department}
-    dept_by_code = {d["code"]: d for d in all_depts}
-    for d in all_depts:
-        dept_cache[d["code"]] = d
-        dept_cache[d["name"].lower()] = d
-
-    imported = []
-    errors = []
-    warnings = []
-
-    for item in rows:
-        try:
-            dept = department
-            if item.get("department"):
-                raw = item["department"].strip()
-                key = raw.upper()[:3] if len(raw) >= 3 else raw.lower()
-                dept = dept_cache.get(key) or dept_cache.get(raw.lower()) or department
-            else:
-                suggested_code = suggest_department(item["name"], dept_by_code)
-                if suggested_code:
-                    dept = dept_by_code.get(suggested_code) or department
-
-            bu, su, pq = infer_uom(item["name"])
-
-            barcode_val = item.get("barcode")
-            if barcode_val and str(barcode_val).strip():
-                barcode_val = str(barcode_val).strip()
-                if barcode_val.isdigit():
-                    valid, _ = validate_barcode(barcode_val)
-                    if not valid:
-                        warnings.append({
-                            "product": item["name"],
-                            "warning": "Invalid UPC/EAN barcode; using SKU",
-                        })
-                        barcode_val = None
-            else:
-                barcode_val = None
-
-            product = await lifecycle_create(
-                department_id=dept["id"],
-                department_name=dept["name"],
-                name=item["name"],
-                description="",
-                price=item["price"],
-                cost=item["cost"],
-                quantity=item["quantity"],
-                min_stock=item["min_stock"],
-                vendor_id=vendor_id,
-                vendor_name=vendor_name,
-                original_sku=item.get("original_sku"),
-                barcode=barcode_val,
-                base_unit=bu,
-                sell_uom=su,
-                pack_qty=pq,
-                user_id=current_user["id"],
-                user_name=current_user.get("name", ""),
-                organization_id=org_id,
-            )
-            imported.append({"id": product.id, "sku": product.sku, "name": product.name, "quantity": product.quantity})
-        except Exception as e:
-            errors.append({"product": item["name"], "error": str(e)})
-
-    return {
-        "imported": len(imported),
-        "errors": len(errors),
-        "warnings": warnings,
-        "products": imported,
-        "error_details": errors[:20],
-    }

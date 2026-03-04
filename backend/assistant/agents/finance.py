@@ -12,8 +12,12 @@ from shared.infrastructure.config import (
     AGENT_PRIMARY_MODEL,
     AGENT_THINKING_BUDGET,
     DEFAULT_DEEP_THINKING_BUDGET,
+    ANTHROPIC_AVAILABLE,
 )
 from assistant.agents.deps import AgentDeps
+from assistant.agents.agent_utils import build_message_history, extract_text_history, extract_tool_calls, calc_cost, run_agent
+from finance.application.invoice_service import list_invoices
+from operations.application.queries import list_withdrawals
 
 logger = logging.getLogger(__name__)
 
@@ -97,12 +101,9 @@ async def get_top_products(ctx: RunContext[AgentDeps], days: int = 7, limit: int
     return await _get_top_products({"days": days, "limit": limit}, ctx.deps.org_id)
 
 
-async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mode: str = "fast") -> dict:
-    from shared.infrastructure.config import ANTHROPIC_AVAILABLE
+async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mode: str = "fast", session_id: str = "") -> dict:
     if not ANTHROPIC_AVAILABLE:
         return {"response": "Finance agent requires ANTHROPIC_API_KEY.", "tool_calls": [], "history": [], "thinking": [], "agent": "finance"}
-
-    from assistant.agents.agent_utils import build_message_history, extract_text_history, extract_tool_calls, calc_cost, run_agent
 
     deep = mode == "deep"
     thinking_budget = (AGENT_THINKING_BUDGET or DEFAULT_DEEP_THINKING_BUDGET) if deep else 0
@@ -117,6 +118,7 @@ async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mo
             msg_history=msg_history, deps=deps,
             model_settings=model_settings or None,
             agent_name="FinanceAgent",
+            session_id=session_id, mode=mode,
         )
     except Exception as e:
         logger.error(f"FinanceAgent failed: {e}")
@@ -137,8 +139,7 @@ async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mo
 # ── DB query implementations (unchanged) ────────────────────────────────────
 
 async def _get_invoice_summary(org_id: str) -> str:
-    from finance.infrastructure.invoice_repo import invoice_repo
-    invoices = await invoice_repo.list_invoices(limit=10000, organization_id=org_id)
+    invoices = await list_invoices(limit=10000, organization_id=org_id)
     summary: dict[str, dict] = {}
     for inv in invoices:
         status = inv.get("status", "unknown")
@@ -153,9 +154,8 @@ async def _get_invoice_summary(org_id: str) -> str:
 
 
 async def _get_outstanding_balances(args: dict, org_id: str) -> str:
-    from operations.infrastructure.withdrawal_repo import withdrawal_repo
     limit = min(int(args.get("limit") or 20), 100)
-    withdrawals = await withdrawal_repo.list_withdrawals(payment_status="unpaid", limit=10000, organization_id=org_id)
+    withdrawals = await list_withdrawals(payment_status="unpaid", limit=10000, organization_id=org_id)
     entity_map: dict[str, dict] = {}
     for w in withdrawals:
         entity = w.get("billing_entity") or w.get("contractor_name") or "Unknown"
@@ -178,10 +178,9 @@ async def _get_outstanding_balances(args: dict, org_id: str) -> str:
 
 
 async def _get_revenue_summary(args: dict, org_id: str) -> str:
-    from operations.infrastructure.withdrawal_repo import withdrawal_repo
     days = min(int(args.get("days") or 30), 365)
     since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-    withdrawals = await withdrawal_repo.list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
+    withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
     total_revenue = sum(w.get("total", 0) for w in withdrawals)
     total_tax = sum(w.get("tax", 0) for w in withdrawals)
     paid = sum(w.get("total", 0) for w in withdrawals if w.get("payment_status") == "paid")
@@ -200,10 +199,9 @@ async def _get_revenue_summary(args: dict, org_id: str) -> str:
 
 
 async def _get_pl_summary(args: dict, org_id: str) -> str:
-    from operations.infrastructure.withdrawal_repo import withdrawal_repo
     days = min(int(args.get("days") or 30), 365)
     since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-    withdrawals = await withdrawal_repo.list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
+    withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
     total_revenue = sum(w.get("total", 0) for w in withdrawals)
     total_cost = sum(w.get("cost_total", 0) for w in withdrawals)
     gross_profit = total_revenue - total_cost
@@ -219,11 +217,10 @@ async def _get_pl_summary(args: dict, org_id: str) -> str:
 
 
 async def _get_top_products(args: dict, org_id: str) -> str:
-    from operations.infrastructure.withdrawal_repo import withdrawal_repo
     days = min(int(args.get("days") or 7), 365)
     limit = min(int(args.get("limit") or 10), 50)
     since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-    withdrawals = await withdrawal_repo.list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
+    withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
     product_map: dict[str, dict] = {}
     for w in withdrawals:
         for item in (w.get("items") or []):

@@ -3,10 +3,9 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 
 from identity.application.auth_service import get_current_user, require_role
-from catalog.infrastructure.product_repo import product_repo
-from identity.infrastructure.user_repo import user_repo
-from catalog.infrastructure.vendor_repo import vendor_repo
-from operations.infrastructure.withdrawal_repo import withdrawal_repo
+from catalog.application.queries import count_all_products, count_low_stock, list_low_stock, count_vendors
+from identity.application.user_service import count_contractors
+from operations.application.queries import list_withdrawals
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -18,7 +17,7 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
 
     org_id = current_user.get("organization_id") or "default"
     if current_user.get("role") == "contractor":
-        my_withdrawals = await withdrawal_repo.list_withdrawals(
+        my_withdrawals = await list_withdrawals(
             contractor_id=current_user["id"], limit=1000, organization_id=org_id
         )
 
@@ -32,7 +31,7 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
             "recent_withdrawals": my_withdrawals[:5],
         }
 
-    today_withdrawals = await withdrawal_repo.list_withdrawals(
+    today_withdrawals = await list_withdrawals(
         start_date=today_str, limit=1000, organization_id=org_id
     )
     today_revenue = sum(w.get("total", 0) for w in today_withdrawals)
@@ -40,23 +39,23 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
 
     week_start = (datetime.now(timezone.utc) - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
     week_start_str = week_start.isoformat()
-    week_withdrawals = await withdrawal_repo.list_withdrawals(
+    week_withdrawals = await list_withdrawals(
         start_date=week_start_str, limit=10000, organization_id=org_id
     )
     week_revenue = sum(w.get("total", 0) for w in week_withdrawals)
 
-    total_products = await product_repo.count_all(org_id)
-    low_stock_products = await product_repo.count_low_stock(org_id)
-    total_vendors = await vendor_repo.count(org_id)
-    total_contractors = await user_repo.count_contractors(org_id)
+    total_products = await count_all_products(org_id)
+    low_stock_products = await count_low_stock(org_id)
+    total_vendors = await count_vendors(org_id)
+    total_contractors = await count_contractors(org_id)
 
-    unpaid_withdrawals = await withdrawal_repo.list_withdrawals(
+    unpaid_withdrawals = await list_withdrawals(
         payment_status="unpaid", limit=10000, organization_id=org_id
     )
     unpaid_total = sum(w.get("total", 0) for w in unpaid_withdrawals)
 
-    recent_withdrawals = await withdrawal_repo.list_withdrawals(limit=5, organization_id=org_id)
-    low_stock_items = await product_repo.list_low_stock(10, org_id)
+    recent_withdrawals = await list_withdrawals(limit=5, organization_id=org_id)
+    low_stock_items = await list_low_stock(10, org_id)
 
     revenue_by_day = {}
     for i in range(7):
@@ -114,7 +113,7 @@ async def get_dashboard_transactions(
         raise HTTPException(status_code=400, detail="time_range must be today, 24h, 7d, or all")
 
     fetch_limit = limit + 1
-    rows = await withdrawal_repo.list_withdrawals(
+    rows = await list_withdrawals(
         start_date=start_date,
         end_date=end_date,
         limit=fetch_limit,

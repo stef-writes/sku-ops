@@ -13,10 +13,12 @@ from shared.infrastructure.config import (
     AGENT_PRIMARY_MODEL,
     AGENT_THINKING_BUDGET,
     DEFAULT_DEEP_THINKING_BUDGET,
+    ANTHROPIC_AVAILABLE,
 )
 from shared.infrastructure.database import get_connection
 from assistant.agents.deps import AgentDeps
 from assistant.agents.agent_utils import build_message_history, extract_text_history, extract_tool_calls, calc_cost, run_agent
+from operations.application.queries import list_withdrawals
 
 logger = logging.getLogger(__name__)
 
@@ -87,8 +89,7 @@ async def list_pending_material_requests(ctx: RunContext[AgentDeps], limit: int 
     return await _list_pending_material_requests({"limit": limit}, ctx.deps.org_id)
 
 
-async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mode: str = "fast") -> dict:
-    from shared.infrastructure.config import ANTHROPIC_AVAILABLE
+async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mode: str = "fast", session_id: str = "") -> dict:
     if not ANTHROPIC_AVAILABLE:
         return {"response": "Ops agent requires ANTHROPIC_API_KEY.", "tool_calls": [], "history": [], "thinking": [], "agent": "ops"}
 
@@ -105,6 +106,7 @@ async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mo
             msg_history=msg_history, deps=deps,
             model_settings=model_settings or None,
             agent_name="OpsAgent",
+            session_id=session_id, mode=mode,
         )
     except Exception as e:
         logger.error(f"OpsAgent failed: {e}")
@@ -125,10 +127,9 @@ async def run(user_message: str, history: list[dict] | None, deps: AgentDeps, mo
 # ── DB query implementations (unchanged) ────────────────────────────────────
 
 async def _get_contractor_history(args: dict, org_id: str) -> str:
-    from operations.infrastructure.withdrawal_repo import withdrawal_repo
     name = (args.get("name") or "").strip()
     limit = min(int(args.get("limit") or 20), 100)
-    all_withdrawals = await withdrawal_repo.list_withdrawals(limit=500, organization_id=org_id)
+    all_withdrawals = await list_withdrawals(limit=500, organization_id=org_id)
     name_lower = name.lower()
     matched = [
         w for w in all_withdrawals
@@ -161,9 +162,8 @@ async def _get_contractor_history(args: dict, org_id: str) -> str:
 
 
 async def _get_job_materials(args: dict, org_id: str) -> str:
-    from operations.infrastructure.withdrawal_repo import withdrawal_repo
     job_id = (args.get("job_id") or "").strip()
-    all_withdrawals = await withdrawal_repo.list_withdrawals(limit=1000, organization_id=org_id)
+    all_withdrawals = await list_withdrawals(limit=1000, organization_id=org_id)
     job_withdrawals = [w for w in all_withdrawals if (w.get("job_id") or "").lower() == job_id.lower()]
     if not job_withdrawals:
         job_withdrawals = [w for w in all_withdrawals if job_id.lower() in (w.get("job_id") or "").lower()]
@@ -198,11 +198,10 @@ async def _get_job_materials(args: dict, org_id: str) -> str:
 
 
 async def _list_recent_withdrawals(args: dict, org_id: str) -> str:
-    from operations.infrastructure.withdrawal_repo import withdrawal_repo
     days = min(int(args.get("days") or 7), 365)
     limit = min(int(args.get("limit") or 20), 100)
     since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-    withdrawals = await withdrawal_repo.list_withdrawals(start_date=since, limit=limit, organization_id=org_id)
+    withdrawals = await list_withdrawals(start_date=since, limit=limit, organization_id=org_id)
     out = [
         {
             "date": w.get("created_at", "")[:10],
