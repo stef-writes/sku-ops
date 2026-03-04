@@ -10,11 +10,11 @@ from shared.domain.exceptions import DuplicateBarcodeError, InvalidBarcodeError,
 from models import Product, ProductCreate, ProductUpdate
 from repositories import department_repo, product_repo, vendor_repo
 from services.inventory import get_stock_history
-from services.product_lifecycle import create_product as lifecycle_create, delete_product as lifecycle_delete, update_product as lifecycle_update
+from catalog.application.product_lifecycle import create_product as lifecycle_create, delete_product as lifecycle_delete, update_product as lifecycle_update
 from services.uom_classifier import classify_uom, classify_uom_batch
 from services.document_import import infer_uom, parse_csv_products, suggest_department
 
-from .schemas import SuggestUomRequest
+from api.schemas import SuggestUomRequest
 
 router = APIRouter(prefix="/products", tags=["products"])
 

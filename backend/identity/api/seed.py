@@ -11,7 +11,7 @@ from shared.infrastructure.database import get_connection
 from models import Department, User
 from repositories import department_repo, organization_repo, product_repo, user_repo
 from services.document_import import infer_uom, parse_csv_products, suggest_department
-from services.product_lifecycle import create_product as lifecycle_create
+from catalog.application.product_lifecycle import create_product as lifecycle_create
 
 import logging
 

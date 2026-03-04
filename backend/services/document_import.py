@@ -7,7 +7,7 @@ import io
 import re
 from typing import Optional, Tuple
 
-from models.product import ALLOWED_BASE_UNITS
+from catalog.domain.product import ALLOWED_BASE_UNITS
 
 
 def resolve_uom(item: dict) -> Tuple[str, str, int]:

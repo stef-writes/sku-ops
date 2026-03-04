@@ -12,7 +12,7 @@ from fastapi import HTTPException
 from shared.domain.exceptions import InsufficientStockError
 from models.stock import StockTransaction, StockTransactionType
 from models.withdrawal import WithdrawalItem
-from repositories.product_repo import product_repo
+from catalog.infrastructure.product_repo import product_repo
 from repositories.stock_repo import stock_repo
 
 

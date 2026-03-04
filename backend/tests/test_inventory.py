@@ -4,7 +4,7 @@ import pytest
 from shared.domain.exceptions import InsufficientStockError
 from models.withdrawal import WithdrawalItem
 from services.inventory import process_withdrawal_stock_changes
-from services.product_lifecycle import create_product
+from catalog.application.product_lifecycle import create_product
 
 
 @pytest.mark.asyncio

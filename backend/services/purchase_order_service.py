@@ -8,7 +8,7 @@ from typing import Optional
 
 from fastapi import HTTPException
 
-from models.product import ALLOWED_BASE_UNITS
+from catalog.domain.product import ALLOWED_BASE_UNITS
 from repositories import department_repo, product_repo, vendor_repo
 from repositories.po_repo import (
     create_po as _create_po,
@@ -21,7 +21,7 @@ from repositories.po_repo import (
 from services.document_import import infer_uom, suggest_department
 from services.document_enrichment import enrich_for_import
 from services.inventory import process_receiving_stock_changes
-from services.product_lifecycle import create_product as lifecycle_create
+from catalog.application.product_lifecycle import create_product as lifecycle_create
 from services.uom_classifier import classify_uom_batch
 
 

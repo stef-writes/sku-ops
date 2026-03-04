@@ -13,7 +13,7 @@ from shared.domain.exceptions import DuplicateBarcodeError, InvalidBarcodeError,
 from models import Product
 from repositories import department_repo, product_repo, vendor_repo
 from services.inventory import process_import_stock_changes
-from services.sku_service import generate_sku
+from catalog.application.sku_service import generate_sku
 
 
 async def create_product(

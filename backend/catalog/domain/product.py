@@ -5,13 +5,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-ALLOWED_BASE_UNITS = {
-    "each", "case", "box", "pack", "bag", "roll", "kit",
-    "gallon", "quart", "pint", "liter",
-    "pound", "ounce",
-    "foot", "meter", "yard",
-    "sqft",
-}
+from shared.domain.value_objects import ALLOWED_BASE_UNITS
 
 
 def _validate_unit(v: str) -> str:

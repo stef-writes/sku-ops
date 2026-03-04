@@ -4,7 +4,7 @@ import pytest_asyncio
 
 from shared.infrastructure.database import get_connection
 from repositories import department_repo, product_repo
-from services.product_lifecycle import create_product, update_product, delete_product
+from catalog.application.product_lifecycle import create_product, update_product, delete_product
 from shared.domain.exceptions import DuplicateBarcodeError, InvalidBarcodeError, ResourceNotFoundError
 
 

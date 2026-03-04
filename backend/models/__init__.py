@@ -6,9 +6,9 @@ from identity.domain.user import (
     UserLogin,
     UserUpdate,
 )
-from .department import Department, DepartmentCreate
-from .vendor import Vendor, VendorCreate
-from .product import (
+from catalog.domain.department import Department, DepartmentCreate
+from catalog.domain.vendor import Vendor, VendorCreate
+from catalog.domain.product import (
     Product,
     ProductCreate,
     ProductUpdate,

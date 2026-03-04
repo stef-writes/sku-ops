@@ -6,7 +6,7 @@ from shared.infrastructure.database import get_connection
 from fastapi import HTTPException
 from models import MaterialWithdrawalCreate, WithdrawalItem
 from repositories import product_repo, stock_repo, withdrawal_repo
-from services.product_lifecycle import create_product
+from catalog.application.product_lifecycle import create_product
 from services.withdrawal_service import create_withdrawal
 
 

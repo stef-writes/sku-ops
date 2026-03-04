@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from identity.application.auth_service import get_current_user
 from models import Department
 from repositories import department_repo, sku_repo
-from services.sku_slug import slug_from_name
-from services.sku_service import generate_sku
+from catalog.application.sku_service import slug_from_name
+from catalog.application.sku_service import generate_sku
 
 router = APIRouter(tags=["sku"])
 
