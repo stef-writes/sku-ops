@@ -7,7 +7,7 @@ from identity.application.auth_service import require_role
 from models import InvoiceCreate, InvoiceUpdate, InvoiceSyncXeroBulk
 from repositories import invoice_repo
 from identity.infrastructure.org_settings_repo import get_org_settings
-from adapters.xero_factory import get_xero_gateway
+from finance.adapters.xero_factory import get_xero_gateway
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
 

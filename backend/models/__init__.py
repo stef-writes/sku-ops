@@ -25,7 +25,7 @@ from operations.domain.material_request import (
     MaterialRequestProcess,
 )
 from inventory.domain.stock import StockTransaction, StockTransactionType
-from .invoice import Invoice, InvoiceLineItem, InvoiceCreate, InvoiceUpdate, InvoiceWithDetails, InvoiceSyncXeroBulk
+from finance.domain.invoice import Invoice, InvoiceLineItem, InvoiceCreate, InvoiceUpdate, InvoiceWithDetails, InvoiceSyncXeroBulk
 
 __all__ = [
     "ROLES",

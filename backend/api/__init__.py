@@ -10,20 +10,20 @@ from operations.api.contractors import router as contractors_router
 from .dashboard import router as dashboard_router
 from catalog.api.departments import router as departments_router
 from .documents import router as documents_router
-from .financials import router as financials_router
-from .invoices import router as invoices_router
-from .payments import router as payments_router
+from finance.api.financials import router as financials_router
+from finance.api.invoices import router as invoices_router
+from finance.api.payments import router as payments_router
 from catalog.api.products import router as products_router
 from .reports import router as reports_router
 from catalog.api.sku import router as sku_router
 from catalog.api.vendors import router as vendors_router
-from .webhooks import router as webhooks_router
+from finance.api.webhooks import router as webhooks_router
 from operations.api.withdrawals import router as withdrawals_router
 from operations.api.material_requests import router as material_requests_router
 from purchasing.api.purchase_orders import router as purchase_orders_router
 from identity.api.seed import router as seed_router
 from identity.api.settings import router as settings_router
-from .xero_auth import router as xero_auth_router
+from finance.api.xero_auth import router as xero_auth_router
 
 api_router = APIRouter(prefix="/api")
 

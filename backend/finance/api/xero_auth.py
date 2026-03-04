@@ -102,7 +102,7 @@ async def list_xero_tenants(current_user: dict = Depends(require_role("admin")))
     if not settings.xero_access_token:
         raise HTTPException(status_code=400, detail="Xero not connected for this org")
 
-    from adapters.xero_adapter import XeroAdapter
+    from finance.adapters.xero_adapter import XeroAdapter
     adapter = XeroAdapter()
     try:
         tenants = await adapter.get_tenants(settings.xero_access_token)
@@ -142,7 +142,7 @@ async def list_tracking_categories(current_user: dict = Depends(require_role("ad
     if not settings.xero_access_token:
         raise HTTPException(status_code=400, detail="Xero not connected for this org")
 
-    from adapters.xero_factory import get_xero_gateway
+    from finance.adapters.xero_factory import get_xero_gateway
     gateway = get_xero_gateway(settings)
     try:
         categories = await gateway.list_tracking_categories(settings)

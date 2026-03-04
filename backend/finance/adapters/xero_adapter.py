@@ -6,7 +6,7 @@ from typing import Optional
 import requests
 
 from identity.domain.org_settings import OrgSettings
-from ports.xero import XeroSyncResult
+from finance.ports.xero_port import XeroSyncResult
 
 logger = logging.getLogger(__name__)
 

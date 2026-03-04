@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 
-from adapters.payment_factory import get_payment_gateway
+from finance.adapters.payment_factory import get_payment_gateway
 from repositories import invoice_repo, payment_repo, withdrawal_repo
 
 logger = logging.getLogger(__name__)

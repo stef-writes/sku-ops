@@ -1,7 +1,7 @@
 """Stub payment adapter for dev and tests. No-op payment flow with fake session IDs."""
 import uuid
 
-from ports.payment import CheckoutResult, CheckoutStatusResult, WebhookResult
+from finance.ports.payment_port import CheckoutResult, CheckoutStatusResult, WebhookResult
 
 
 class StubPaymentAdapter:

@@ -1,6 +1,6 @@
 """Stripe payment adapter - implements PaymentGateway using emergentintegrations Stripe checkout."""
 
-from ports.payment import CheckoutResult, CheckoutStatusResult, WebhookResult
+from finance.ports.payment_port import CheckoutResult, CheckoutStatusResult, WebhookResult
 
 
 class StripePaymentAdapter:
