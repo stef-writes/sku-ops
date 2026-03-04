@@ -9,7 +9,7 @@ from shared.infrastructure.database import get_connection, transaction
 from models import MaterialWithdrawal, MaterialWithdrawalCreate
 from repositories import invoice_repo, product_repo, withdrawal_repo
 from shared.domain.exceptions import InsufficientStockError
-from services.inventory import process_withdrawal_stock_changes
+from inventory.application.inventory_service import process_withdrawal_stock_changes
 
 
 async def create_withdrawal(

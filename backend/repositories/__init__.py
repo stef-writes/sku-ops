@@ -8,7 +8,7 @@ from .withdrawal_repo import withdrawal_repo
 from .material_request_repo import material_request_repo
 from .payment_repo import payment_repo
 from catalog.infrastructure.sku_repo import sku_repo
-from .stock_repo import stock_repo
+from inventory.infrastructure.stock_repo import stock_repo
 from .invoice_repo import invoice_repo
 
 __all__ = [

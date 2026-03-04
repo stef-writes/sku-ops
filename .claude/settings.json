@@ -32,10 +32,12 @@
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\); print\\(str\\(d\\)[:300]\\)\")",
       "Bash(grep -r \"current_user\\\\|org_id\\\\|organization\" /Users/nooz/products/sku-ops/backend/api/*.py)",
       "Bash(git add DDD_MIGRATION.md)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(python -m pytest tests/ -q)"
     ],
     "additionalDirectories": [
-      "/Users/nooz/products/sku-ops/backend/shared"
+      "/Users/nooz/products/sku-ops/backend/shared",
+      "/Users/nooz/products/sku-ops/backend/inventory"
     ]
   }
 }

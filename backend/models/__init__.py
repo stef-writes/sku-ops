@@ -24,7 +24,7 @@ from .material_request import (
     MaterialRequestCreate,
     MaterialRequestProcess,
 )
-from .stock import StockTransaction, StockTransactionType
+from inventory.domain.stock import StockTransaction, StockTransactionType
 from .invoice import Invoice, InvoiceLineItem, InvoiceCreate, InvoiceUpdate, InvoiceWithDetails, InvoiceSyncXeroBulk
 
 __all__ = [

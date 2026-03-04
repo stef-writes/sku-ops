@@ -10,10 +10,10 @@ from typing import List, Optional, Tuple
 from fastapi import HTTPException
 
 from shared.domain.exceptions import InsufficientStockError
-from models.stock import StockTransaction, StockTransactionType
+from inventory.domain.stock import StockTransaction, StockTransactionType
 from models.withdrawal import WithdrawalItem
 from catalog.infrastructure.product_repo import product_repo
-from repositories.stock_repo import stock_repo
+from inventory.infrastructure.stock_repo import stock_repo
 
 
 async def _record_stock_transaction(

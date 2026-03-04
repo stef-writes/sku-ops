@@ -11,10 +11,10 @@ from catalog.domain.product import ALLOWED_BASE_UNITS
 from repositories import department_repo, product_repo, vendor_repo
 from services.document_import import infer_uom, resolve_uom, suggest_department
 from services.document_enrichment import enrich_for_import
-from services.inventory import process_receiving_stock_changes
+from inventory.application.inventory_service import process_receiving_stock_changes
 from catalog.domain.barcode import validate_barcode
 from catalog.application.product_lifecycle import create_product as lifecycle_create
-from services.uom_classifier import classify_uom_batch
+from inventory.application.uom_classifier import classify_uom_batch
 
 
 async def import_document(

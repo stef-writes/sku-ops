@@ -12,7 +12,7 @@ from catalog.domain.barcode import validate_barcode
 from shared.domain.exceptions import DuplicateBarcodeError, InvalidBarcodeError, ResourceNotFoundError
 from models import Product
 from repositories import department_repo, product_repo, vendor_repo
-from services.inventory import process_import_stock_changes
+from inventory.application.inventory_service import process_import_stock_changes
 from catalog.application.sku_service import generate_sku
 
 
