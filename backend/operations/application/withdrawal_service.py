@@ -9,7 +9,7 @@ from shared.infrastructure.database import transaction
 from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalCreate
 from operations.infrastructure.withdrawal_repo import withdrawal_repo as _default_withdrawal_repo
 from operations.ports.withdrawal_repo_port import WithdrawalRepoPort
-from shared.domain.exceptions import InsufficientStockError
+from inventory.domain.errors import InsufficientStockError
 
 CreateInvoiceFn = Optional[Callable[..., Awaitable[dict]]]
 ListProductsFn = Callable[..., Awaitable[list]]

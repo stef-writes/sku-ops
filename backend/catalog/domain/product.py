@@ -1,11 +1,10 @@
 """Product models."""
-from datetime import datetime, timezone
 from typing import Optional
-from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, field_validator
 
-from shared.domain.value_objects import ALLOWED_BASE_UNITS
+from kernel.entity import AuditedEntity
+from catalog.domain.units import ALLOWED_BASE_UNITS
 
 
 def _validate_unit(v: str) -> str:
@@ -74,9 +73,7 @@ class ProductUpdate(BaseModel):
         return v
 
 
-class Product(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid4()))
+class Product(AuditedEntity):
     sku: str
     name: str
     description: str = ""
@@ -94,8 +91,6 @@ class Product(BaseModel):
     base_unit: str = "each"
     sell_uom: str = "each"
     pack_qty: int = 1
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     @property
     def is_low_stock(self) -> bool:

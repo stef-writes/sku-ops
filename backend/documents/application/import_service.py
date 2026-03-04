@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from dataclasses import dataclass
 from typing import Any, Callable, Awaitable
 
-from shared.domain.value_objects import ALLOWED_BASE_UNITS
+from catalog.domain.units import ALLOWED_BASE_UNITS
 from documents.application.import_parser import infer_uom, resolve_uom, suggest_department
 from documents.application.enrichment_service import enrich_for_import
 

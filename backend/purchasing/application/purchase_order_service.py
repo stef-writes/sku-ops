@@ -11,7 +11,7 @@ from fastapi import HTTPException
 from dataclasses import dataclass
 from typing import Any, Callable, Awaitable, Tuple
 
-from shared.domain.value_objects import ALLOWED_BASE_UNITS
+from catalog.domain.units import ALLOWED_BASE_UNITS
 from purchasing.infrastructure.po_repo import (
     create_po as _create_po,
     create_po_items,

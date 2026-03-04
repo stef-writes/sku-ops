@@ -1,9 +1,9 @@
 """User and auth models."""
-from datetime import datetime, timezone
 from typing import Optional
-from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel
+
+from kernel.entity import Entity
 
 ROLES = ["admin", "warehouse_manager", "contractor"]
 
@@ -32,9 +32,7 @@ class UserLogin(BaseModel):
     password: str
 
 
-class User(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid4()))
+class User(Entity):
     email: str
     name: str
     role: str = "warehouse_manager"
@@ -43,4 +41,3 @@ class User(BaseModel):
     phone: Optional[str] = None
     is_active: bool = True
     organization_id: Optional[str] = None
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())

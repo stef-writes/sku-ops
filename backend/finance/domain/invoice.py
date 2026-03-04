@@ -1,9 +1,10 @@
 """Invoice models."""
-from datetime import datetime, timezone
 from typing import ClassVar, List, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from kernel.entity import AuditedEntity
 
 
 class InvoiceLineItem(BaseModel):
@@ -50,9 +51,7 @@ class InvoiceUpdate(BaseModel):
     line_items: Optional[List[InvoiceLineItem]] = None
 
 
-class Invoice(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid4()))
+class Invoice(AuditedEntity):
     invoice_number: str = ""
     billing_entity: str = ""
     contact_name: str = ""
@@ -63,8 +62,6 @@ class Invoice(BaseModel):
     total: float = 0.0
     notes: Optional[str] = None
     xero_invoice_id: Optional[str] = None
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     ALLOWED_TRANSITIONS: ClassVar[dict[str, set[str]]] = {
         "draft": {"sent", "paid"},

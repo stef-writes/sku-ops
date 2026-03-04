@@ -16,7 +16,7 @@ import logging
 
 from shared.infrastructure.config import CORS_ORIGINS, cors_warn_in_deployed, is_deployed, is_test
 from shared.infrastructure.database import init_db, close_db
-from shared.domain.exceptions import InsufficientStockError, ResourceNotFoundError
+from kernel.errors import DomainError
 from shared.infrastructure.middleware.request_id import RequestIDMiddleware
 from shared.infrastructure.middleware.security_headers import SecurityHeadersMiddleware
 from shared.infrastructure.middleware.rate_limit import setup_rate_limiting
@@ -66,14 +66,9 @@ setup_prometheus(app)
 
 # ── Exception handlers ────────────────────────────────────────────────────────
 
-@app.exception_handler(ResourceNotFoundError)
-async def resource_not_found_handler(request, exc: ResourceNotFoundError):
-    return JSONResponse(status_code=404, content={"detail": str(exc)})
-
-
-@app.exception_handler(InsufficientStockError)
-async def insufficient_stock_handler(request, exc: InsufficientStockError):
-    return JSONResponse(status_code=400, content={"detail": str(exc)})
+@app.exception_handler(DomainError)
+async def domain_error_handler(request, exc: DomainError):
+    return JSONResponse(status_code=exc.status_hint, content={"detail": str(exc)})
 
 
 # ── Middleware (outermost first → executes first on request) ──────────────────

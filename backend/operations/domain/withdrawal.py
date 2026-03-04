@@ -1,9 +1,9 @@
 """Material withdrawal (POS) models."""
-from datetime import datetime, timezone
 from typing import List, Optional
-from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel
+
+from kernel.entity import Entity
 
 
 class WithdrawalItem(BaseModel):
@@ -28,9 +28,7 @@ class MaterialWithdrawalCreate(BaseModel):
     notes: Optional[str] = None
 
 
-class MaterialWithdrawal(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    id: str = Field(default_factory=lambda: str(uuid4()))
+class MaterialWithdrawal(Entity):
     items: List[WithdrawalItem]
     job_id: str
     service_address: str
@@ -48,7 +46,6 @@ class MaterialWithdrawal(BaseModel):
     paid_at: Optional[str] = None
     processed_by_id: str
     processed_by_name: str = ""
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def compute_totals(self, tax_rate: float = 0.08) -> None:
         """Calculate subtotal, tax, total, and cost_total from line items."""

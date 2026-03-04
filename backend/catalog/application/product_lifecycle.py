@@ -9,7 +9,8 @@ from typing import Any, Callable, Awaitable, Optional
 
 from shared.infrastructure.database import transaction
 from catalog.domain.barcode import validate_barcode
-from shared.domain.exceptions import DuplicateBarcodeError, InvalidBarcodeError, ResourceNotFoundError
+from kernel.errors import ResourceNotFoundError
+from catalog.domain.errors import DuplicateBarcodeError, InvalidBarcodeError
 from catalog.domain.product import Product
 from catalog.infrastructure.department_repo import department_repo
 from catalog.infrastructure.product_repo import product_repo
