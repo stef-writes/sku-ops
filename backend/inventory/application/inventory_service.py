@@ -16,7 +16,8 @@ from catalog.application.queries import (
     get_product_by_id, atomic_decrement_product,
     increment_product_quantity, add_product_quantity, atomic_adjust_product,
 )
-from inventory.infrastructure.stock_repo import stock_repo
+from inventory.infrastructure.stock_repo import stock_repo as _default_stock_repo
+from inventory.ports.stock_repo_port import StockRepoPort
 
 
 async def _record_stock_transaction(
@@ -32,6 +33,7 @@ async def _record_stock_transaction(
     reason: Optional[str] = None,
     organization_id: Optional[str] = None,
     conn=None,
+    repo: StockRepoPort = _default_stock_repo,
 ) -> None:
     """Append an immutable transaction to the stock ledger."""
     quantity_after = quantity_before + quantity_delta
@@ -51,7 +53,7 @@ async def _record_stock_transaction(
     )
     tx_dict = tx.model_dump()
     tx_dict["organization_id"] = organization_id or "default"
-    await stock_repo.insert_transaction(tx_dict, conn=conn)
+    await repo.insert_transaction(tx_dict, conn=conn)
 
 
 async def process_withdrawal_stock_changes(
@@ -166,7 +168,7 @@ async def get_stock_history(
     limit: int = 50,
 ) -> List[dict]:
     """Get stock transaction history for a product."""
-    return await stock_repo.list_by_product(product_id, limit)
+    return await _default_stock_repo.list_by_product(product_id, limit)
 
 
 async def process_adjustment_stock_changes(

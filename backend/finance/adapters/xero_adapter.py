@@ -7,7 +7,7 @@ import httpx
 
 from identity.application.org_service import upsert_org_settings
 from identity.domain.org_settings import OrgSettings
-from finance.ports.xero_port import XeroSyncResult
+from finance.ports.invoicing_port import InvoiceSyncResult
 from shared.infrastructure.config import XERO_CLIENT_ID, XERO_CLIENT_SECRET
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ class XeroAdapter:
         resp.raise_for_status()
         return resp.json()
 
-    async def sync_invoice(self, invoice: dict, settings: OrgSettings) -> XeroSyncResult:
+    async def sync_invoice(self, invoice: dict, settings: OrgSettings) -> InvoiceSyncResult:
         if self._is_token_expired(settings):
             settings = await self.refresh_token(settings)
 
@@ -128,7 +128,7 @@ class XeroAdapter:
         result = resp.json()
         invoices = result.get("Invoices", [])
         if not invoices:
-            return XeroSyncResult(success=False, error="Xero returned no invoice in response")
+            return InvoiceSyncResult(success=False, error="Xero returned no invoice in response")
 
         xero_invoice_id = invoices[0].get("InvoiceID")
 
@@ -136,7 +136,7 @@ class XeroAdapter:
         first_job_id = next((li.get("job_id") for li in line_items if li.get("job_id")), None)
         journal_id = await self._post_cogs_journal(invoice, settings, xero_invoice_id, first_job_id)
 
-        return XeroSyncResult(
+        return InvoiceSyncResult(
             success=True,
             xero_invoice_id=xero_invoice_id,
             xero_journal_id=journal_id,
@@ -179,7 +179,7 @@ class XeroAdapter:
         journals = resp.json().get("ManualJournals", [])
         return journals[0].get("ManualJournalID") if journals else None
 
-    async def sync_po_receipt(self, po: dict, cost_total: float, settings: OrgSettings) -> XeroSyncResult:
+    async def sync_po_receipt(self, po: dict, cost_total: float, settings: OrgSettings) -> InvoiceSyncResult:
         if self._is_token_expired(settings):
             settings = await self.refresh_token(settings)
 
@@ -211,7 +211,7 @@ class XeroAdapter:
         resp.raise_for_status()
         journals = resp.json().get("ManualJournals", [])
         journal_id = journals[0].get("ManualJournalID") if journals else None
-        return XeroSyncResult(success=True, xero_journal_id=journal_id)
+        return InvoiceSyncResult(success=True, xero_journal_id=journal_id)
 
     async def list_tracking_categories(self, settings: OrgSettings) -> list[dict]:
         if self._is_token_expired(settings):

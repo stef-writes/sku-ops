@@ -16,6 +16,10 @@ class WithdrawalItem(BaseModel):
     subtotal: float
     unit: str = "each"  # sell_uom from product for display
 
+    @property
+    def computed_subtotal(self) -> float:
+        return round(self.price * self.quantity, 2)
+
 
 class MaterialWithdrawalCreate(BaseModel):
     items: List[WithdrawalItem]
@@ -45,3 +49,10 @@ class MaterialWithdrawal(BaseModel):
     processed_by_id: str
     processed_by_name: str = ""
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    def compute_totals(self, tax_rate: float = 0.08) -> None:
+        """Calculate subtotal, tax, total, and cost_total from line items."""
+        self.subtotal = sum(i.subtotal for i in self.items)
+        self.cost_total = sum(i.cost * i.quantity for i in self.items)
+        self.tax = round(self.subtotal * tax_rate, 2)
+        self.total = round(self.subtotal + self.tax, 2)

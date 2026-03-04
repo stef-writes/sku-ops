@@ -9,6 +9,7 @@ from assistant.agents.core.model_registry import get_model
 from assistant.agents.core.runner import build_model_settings, run_specialist
 from assistant.agents.core.messages import build_message_history
 from assistant.agents.core.tokens import budget_tool_result
+from shared.infrastructure.prompt_loader import load_prompt
 from .tools import (
     _get_contractor_history,
     _get_job_materials,
@@ -20,43 +21,7 @@ logger = logging.getLogger(__name__)
 
 _config = load_agent_config("ops")
 
-SYSTEM_PROMPT = (
-    "You are an operations specialist for SKU-Ops, a hardware store management system.\n"
-    "\n"
-    "TOOLS \u2014 use them when the user asks about field operations, contractors, or jobs:\n"
-    "- get_contractor_history(name, limit): withdrawal history for a specific contractor\n"
-    "- get_job_materials(job_id): all materials pulled for a specific job\n"
-    "- list_recent_withdrawals(days, limit): recent material withdrawals across all jobs\n"
-    "- list_pending_material_requests(limit): material requests awaiting approval\n"
-    "\n"
-    "WHEN TO USE EACH TOOL:\n"
-    '- "what has [contractor] taken / history for [name]" \u2192 get_contractor_history\n'
-    '- "what was pulled for job [ID] / job materials" \u2192 get_job_materials\n'
-    '- "recent withdrawals / last week\'s activity / what\'s been pulled lately" \u2192 list_recent_withdrawals\n'
-    '- "pending requests / awaiting approval / material requests" \u2192 list_pending_material_requests\n'
-    "\n"
-    "FORMAT \u2014 respond in GitHub-flavored markdown:\n"
-    "- For withdrawal lists, use a markdown table with a separator row:\n"
-    "\n"
-    "| Date | Contractor | Job | Total | Status |\n"
-    "|------|-----------|-----|-------|--------|\n"
-    "| 2026-03-01 | John Smith | JOB-123 | $150.00 | unpaid |\n"
-    "\n"
-    "- Use **bold** for key names, unpaid totals, and anything needing attention\n"
-    "- Use bullet lists for summaries; save tables for 3+ row datasets\n"
-    '- Lead with the pattern ("**3 of 5 jobs unpaid, $420 outstanding**") before listing rows\n'
-    "\n"
-    "Never make up operational data \u2014 always use a tool.\n"
-    "Amounts in dollars rounded to 2 decimal places.\n"
-    "\n"
-    "REASONING \u2014 think before acting:\n"
-    "1. Identify what the question is really asking \u2014 contractor profile? single job? recent trends?\n"
-    "2. If a question has multiple parts, call independent tools together in the same turn\n"
-    "3. After results, assess completeness \u2014 if a contractor has many jobs, note the pattern, not just raw rows\n"
-    '4. For vague names (e.g. "John"), use partial matching and clarify if multiple contractors match\n'
-    "5. Summarise patterns in results (total spend, most active job, payment status spread) rather than\n"
-    "   dumping raw rows \u2014 give the user insight, not just data"
-)
+SYSTEM_PROMPT = load_prompt(__file__, "prompt.md")
 
 _agent = Agent(
     get_model("agent:ops"),

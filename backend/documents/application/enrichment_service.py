@@ -10,6 +10,7 @@ import logging
 from typing import List
 
 from shared.infrastructure.config import LLM_AVAILABLE
+from shared.infrastructure.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ Return ONLY the JSON array, no other text."""
         response = await asyncio.to_thread(
             generate_text,
             prompt,
-            system_instruction="You are a data enrichment assistant. Return only valid JSON.",
+            system_instruction=load_prompt(__file__, "enrichment_prompt.md"),
         )
         if not response:
             return items

@@ -16,7 +16,7 @@ from identity.application.org_service import (
     upsert_org_settings,
 )
 from finance.adapters.xero_adapter import XeroAdapter
-from finance.adapters.xero_factory import get_xero_gateway
+from finance.adapters.invoicing_factory import get_invoicing_gateway
 
 router = APIRouter(prefix="/xero", tags=["xero"])
 
@@ -163,7 +163,7 @@ async def list_tracking_categories(current_user: dict = Depends(require_role("ad
     if not settings.xero_access_token:
         raise HTTPException(status_code=400, detail="Xero not connected for this org")
 
-    gateway = get_xero_gateway(settings)
+    gateway = get_invoicing_gateway(settings)
     try:
         categories = await gateway.list_tracking_categories(settings)
         return {"tracking_categories": categories}

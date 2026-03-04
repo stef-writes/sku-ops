@@ -1,6 +1,6 @@
 """Invoice models."""
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import ClassVar, List, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,6 +17,16 @@ class InvoiceLineItem(BaseModel):
     cost: float = 0.0
     product_id: Optional[str] = None
     job_id: Optional[str] = None
+
+    @property
+    def margin(self) -> float:
+        return self.amount - (self.cost * self.quantity)
+
+    @property
+    def margin_pct(self) -> Optional[float]:
+        if self.amount <= 0:
+            return None
+        return round(self.margin / self.amount * 100, 2)
 
 
 class InvoiceCreate(BaseModel):
@@ -55,6 +65,15 @@ class Invoice(BaseModel):
     xero_invoice_id: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    ALLOWED_TRANSITIONS: ClassVar[dict[str, set[str]]] = {
+        "draft": {"sent", "paid"},
+        "sent": {"paid"},
+        "paid": set(),
+    }
+
+    def can_transition_to(self, target: str) -> bool:
+        return target in self.ALLOWED_TRANSITIONS.get(self.status, set())
 
 
 class InvoiceWithDetails(Invoice):

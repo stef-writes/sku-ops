@@ -97,6 +97,27 @@ class Product(BaseModel):
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
+    @property
+    def is_low_stock(self) -> bool:
+        return self.quantity <= self.min_stock
+
+    @property
+    def margin_pct(self) -> Optional[float]:
+        if self.price <= 0:
+            return None
+        return round((self.price - self.cost) / self.price * 100, 2)
+
+    def reorder_urgency(self, days_of_stock: Optional[float] = None) -> str:
+        if not self.is_low_stock:
+            return "ok"
+        if days_of_stock is None:
+            return "no_velocity_data"
+        if days_of_stock <= 3:
+            return "critical"
+        if days_of_stock <= 7:
+            return "high"
+        return "medium"
+
 
 class ExtractedProduct(BaseModel):
     name: str

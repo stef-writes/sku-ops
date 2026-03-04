@@ -16,6 +16,7 @@ import logging
 from pydantic_ai import Agent as SynthAgent
 
 from shared.infrastructure.config import ANTHROPIC_AVAILABLE, OPENROUTER_AVAILABLE, LLM_SETUP_URL
+from shared.infrastructure.prompt_loader import load_prompt
 from assistant.infrastructure.llm.catalog import resolve_tier_model
 from assistant.infrastructure.llm import get_model
 from assistant.agents.core.deps import AgentDeps
@@ -169,10 +170,7 @@ async def _synthesize_dag_results(query: str, sections: dict) -> str:
 
         synth = SynthAgent(
             get_model(model_id),
-            system_prompt=(
-                "You synthesize structured data into a clear markdown report. "
-                "Use ## headers, tables, and bold for key figures. Be concise."
-            ),
+            system_prompt=load_prompt(__file__, "dag_synthesis_prompt.md"),
         )
         result = await asyncio.wait_for(
             synth.run(f"Question: {query}\n\nData:\n{json.dumps(sections, indent=2)}"),

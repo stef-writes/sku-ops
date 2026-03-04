@@ -7,7 +7,8 @@ from fastapi import HTTPException
 
 from shared.infrastructure.database import transaction
 from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalCreate
-from operations.infrastructure.withdrawal_repo import withdrawal_repo
+from operations.infrastructure.withdrawal_repo import withdrawal_repo as _default_withdrawal_repo
+from operations.ports.withdrawal_repo_port import WithdrawalRepoPort
 from shared.domain.exceptions import InsufficientStockError
 
 CreateInvoiceFn = Optional[Callable[..., Awaitable[dict]]]
@@ -23,6 +24,7 @@ async def create_withdrawal(
     list_products: ListProductsFn,
     process_stock_changes: StockChangesFn,
     create_invoice: CreateInvoiceFn = None,
+    withdrawal_repo: WithdrawalRepoPort = _default_withdrawal_repo,
     conn=None,
 ) -> dict:
     """
@@ -41,20 +43,12 @@ async def create_withdrawal(
         enriched_items.append(item)
     data = data.model_copy(update={"items": enriched_items})
 
-    subtotal = sum(item.subtotal for item in data.items)
-    cost_total = sum(item.cost * item.quantity for item in data.items)
-    tax = round(subtotal * 0.08, 2)
-    total = round(subtotal + tax, 2)
-
     withdrawal = MaterialWithdrawal(
         items=data.items,
         job_id=data.job_id,
         service_address=data.service_address,
         notes=data.notes,
-        subtotal=subtotal,
-        tax=tax,
-        total=total,
-        cost_total=cost_total,
+        subtotal=0, tax=0, total=0, cost_total=0,
         contractor_id=contractor["id"],
         contractor_name=contractor.get("name", ""),
         contractor_company=contractor.get("company", ""),
@@ -63,6 +57,7 @@ async def create_withdrawal(
         processed_by_id=current_user["id"],
         processed_by_name=current_user.get("name", ""),
     )
+    withdrawal.compute_totals()
 
     async def _do_create(tx_conn):
         try:

@@ -9,6 +9,8 @@ import json
 import re
 import logging
 
+from shared.infrastructure.prompt_loader import load_prompt
+
 logger = logging.getLogger(__name__)
 
 # Type aliases for injected dependencies
@@ -90,7 +92,7 @@ Return ONLY valid JSON: {{"base_unit": "...", "sell_uom": "...", "pack_qty": 1}}
         response = await asyncio.to_thread(
             generate_text,
             prompt,
-            "You are a UOM classifier. Return only valid JSON.",
+            load_prompt(__file__, "uom_classifier_prompt.md"),
         )
         if response:
             json_match = re.search(r"\{[^{}]*\}", response)
@@ -151,7 +153,7 @@ Return ONLY a JSON array, one object per product in same order: [{{"base_unit":"
         response = await asyncio.to_thread(
             generate_text,
             prompt,
-            "You are a UOM classifier. Return only a valid JSON array.",
+            load_prompt(__file__, "uom_classifier_batch_prompt.md"),
         )
         if response:
             json_match = re.search(r"\[[\s\S]*\]", response)

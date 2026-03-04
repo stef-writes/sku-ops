@@ -1,19 +1,19 @@
 """Stub Xero adapter — used in dev/test when no Xero credentials are configured."""
 from identity.domain.org_settings import OrgSettings
-from finance.ports.xero_port import XeroSyncResult
+from finance.ports.invoicing_port import InvoiceSyncResult
 
 
 class StubXeroAdapter:
-    async def sync_invoice(self, invoice: dict, _settings: OrgSettings) -> XeroSyncResult:
+    async def sync_invoice(self, invoice: dict, _settings: OrgSettings) -> InvoiceSyncResult:
         inv_id = invoice.get("id", "unknown")
-        return XeroSyncResult(
+        return InvoiceSyncResult(
             success=True,
             xero_invoice_id=f"XERO-STUB-{inv_id}",
             xero_journal_id=f"XERO-STUB-JNL-{inv_id}",
         )
 
-    async def sync_po_receipt(self, po: dict, _cost_total: float, _settings: OrgSettings) -> XeroSyncResult:
-        return XeroSyncResult(
+    async def sync_po_receipt(self, po: dict, _cost_total: float, _settings: OrgSettings) -> InvoiceSyncResult:
+        return InvoiceSyncResult(
             success=True,
             xero_journal_id=f"XERO-STUB-PO-{po.get('id', 'unknown')}",
         )

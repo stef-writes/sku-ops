@@ -1,21 +1,25 @@
 """Invoice application services — safe for cross-context import."""
 import logging
 
-from finance.infrastructure.invoice_repo import invoice_repo
+from finance.infrastructure.invoice_repo import invoice_repo as _default_invoice_repo
+from finance.ports.invoice_repo_port import InvoiceRepoPort
 from identity.application.org_service import get_org_settings
-from finance.adapters.xero_factory import get_xero_gateway
+from finance.adapters.invoicing_factory import get_invoicing_gateway
 
 logger = logging.getLogger(__name__)
 
 
-async def sync_invoice(inv_id: str, org_id: str) -> dict:
+async def sync_invoice(
+    inv_id: str, org_id: str,
+    invoice_repo: InvoiceRepoPort = _default_invoice_repo,
+) -> dict:
     """Sync a single invoice to Xero. Returns a result dict."""
     inv = await invoice_repo.get_by_id(inv_id, org_id)
     if not inv:
         return {"invoice_id": inv_id, "error": "Invoice not found", "success": False}
 
     settings = await get_org_settings(org_id)
-    gateway = get_xero_gateway(settings)
+    gateway = get_invoicing_gateway(settings)
 
     try:
         result = await gateway.sync_invoice(inv, settings)
@@ -35,17 +39,30 @@ async def sync_invoice(inv_id: str, org_id: str) -> dict:
     }
 
 
-async def mark_paid_for_withdrawal(withdrawal_id: str) -> None:
+async def mark_paid_for_withdrawal(
+    withdrawal_id: str,
+    invoice_repo: InvoiceRepoPort = _default_invoice_repo,
+) -> None:
     await invoice_repo.mark_paid_for_withdrawal(withdrawal_id)
 
 
-async def create_invoice_from_withdrawals(withdrawal_ids: list, organization_id: str = None, conn=None) -> dict:
+async def create_invoice_from_withdrawals(
+    withdrawal_ids: list, organization_id: str = None, conn=None,
+    invoice_repo: InvoiceRepoPort = _default_invoice_repo,
+) -> dict:
     return await invoice_repo.create_from_withdrawals(withdrawal_ids, organization_id=organization_id, conn=conn)
 
 
-async def list_invoices(organization_id: str, **kwargs):
+async def list_invoices(
+    organization_id: str,
+    invoice_repo: InvoiceRepoPort = _default_invoice_repo,
+    **kwargs,
+):
     return await invoice_repo.list_invoices(organization_id=organization_id, **kwargs)
 
 
-async def get_invoice(invoice_id: str, org_id: str):
+async def get_invoice(
+    invoice_id: str, org_id: str,
+    invoice_repo: InvoiceRepoPort = _default_invoice_repo,
+):
     return await invoice_repo.get_by_id(invoice_id, org_id)

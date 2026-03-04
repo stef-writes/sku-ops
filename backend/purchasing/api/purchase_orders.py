@@ -135,12 +135,12 @@ async def receive_items(
         current_user=current_user,
     )
     if result.get("cost_total", 0) > 0:
-        from finance.adapters.xero_factory import get_xero_gateway
+        from finance.adapters.invoicing_factory import get_invoicing_gateway
         from identity.application.org_service import get_org_settings
         org_id = current_user.get("organization_id") or "default"
         try:
             settings = await get_org_settings(org_id)
-            gateway = get_xero_gateway(settings)
+            gateway = get_invoicing_gateway(settings)
             po_data = await get_po(po_id, org_id)
             if po_data:
                 await gateway.sync_po_receipt(po_data, result["cost_total"], settings)
