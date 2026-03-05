@@ -1,14 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Plus, Edit2, Trash2, HardHat, Mail, Phone,
   Building2, DollarSign, ToggleLeft, ToggleRight, Search,
@@ -16,6 +10,7 @@ import {
 import { PageHeader } from "@/components/PageHeader";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { EntityFormDialog } from "@/components/EntityFormDialog";
 import { ROLES } from "@/lib/constants";
 import { getErrorMessage } from "@/lib/api-client";
 import {
@@ -25,12 +20,38 @@ import {
   useDeleteContractor,
 } from "@/hooks/useContractors";
 
-const INITIAL_FORM = { name: "", email: "", password: "", company: "", billing_entity: "", phone: "" };
+const createSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Valid email required"),
+  password: z.string().min(1, "Password is required"),
+  company: z.string().optional().default(""),
+  billing_entity: z.string().optional().default(""),
+  phone: z.string().optional().default(""),
+});
+
+const editSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Valid email required"),
+  password: z.string().optional().default(""),
+  company: z.string().optional().default(""),
+  billing_entity: z.string().optional().default(""),
+  phone: z.string().optional().default(""),
+});
+
+const FIELDS = [
+  { name: "name", label: "Full Name *", placeholder: "John Smith" },
+  { name: "email", label: "Email *", type: "email", placeholder: "john@company.com", disabled: (isEditing) => isEditing },
+  { name: "password", label: "Password *", type: "password", placeholder: "••••••••" },
+  { name: "company", label: "Company", placeholder: "On Point / Stone & Timber / Independent" },
+  { name: "billing_entity", label: "Billing Entity", placeholder: "Entity to invoice for materials" },
+  { name: "phone", label: "Phone", placeholder: "(555) 123-4567" },
+];
+
+const DEFAULTS = { name: "", email: "", password: "", company: "", billing_entity: "", phone: "" };
 
 const Contractors = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingContractor, setEditingContractor] = useState(null);
-  const [form, setForm] = useState(INITIAL_FORM);
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, contractor: null });
   const [search, setSearch] = useState("");
 
@@ -38,57 +59,30 @@ const Contractors = () => {
   const createMutation = useCreateContractor();
   const updateMutation = useUpdateContractor();
   const deleteMutation = useDeleteContractor();
-  const saving = createMutation.isPending || updateMutation.isPending;
 
   const openDialog = (contractor = null) => {
-    if (contractor) {
-      setEditingContractor(contractor);
-      setForm({
-        name: contractor.name,
-        email: contractor.email,
-        password: "",
-        company: contractor.company || "",
-        billing_entity: contractor.billing_entity || "",
-        phone: contractor.phone || "",
-      });
-    } else {
-      setEditingContractor(null);
-      setForm(INITIAL_FORM);
-    }
+    setEditingContractor(contractor);
     setDialogOpen(true);
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!form.name || !form.email) {
-      toast.error("Name and email are required");
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      toast.error("Please enter a valid email address");
-      return;
-    }
-    if (!editingContractor && !form.password) {
-      toast.error("Password is required for new contractors");
-      return;
-    }
+  const visibleFields = useMemo(
+    () => editingContractor ? FIELDS.filter((f) => f.name !== "password") : FIELDS,
+    [editingContractor]
+  );
 
-    if (editingContractor) {
-      updateMutation.mutate(
-        { id: editingContractor.id, data: { name: form.name, company: form.company, billing_entity: form.billing_entity, phone: form.phone } },
-        {
-          onSuccess: () => { toast.success("Contractor updated!"); setDialogOpen(false); },
-          onError: (err) => toast.error(getErrorMessage(err)),
-        }
-      );
-    } else {
-      createMutation.mutate(
-        { ...form, role: ROLES.CONTRACTOR },
-        {
-          onSuccess: () => { toast.success("Contractor created!"); setDialogOpen(false); },
-          onError: (err) => toast.error(getErrorMessage(err)),
-        }
-      );
+  const handleSubmit = async (data, isEditing) => {
+    try {
+      if (isEditing) {
+        const { email, password, ...rest } = data;
+        await updateMutation.mutateAsync({ id: editingContractor.id, data: rest });
+        toast.success("Contractor updated!");
+      } else {
+        await createMutation.mutateAsync({ ...data, role: ROLES.CONTRACTOR });
+        toast.success("Contractor created!");
+      }
+      setDialogOpen(false);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
     }
   };
 
@@ -191,49 +185,18 @@ const Contractors = () => {
         </div>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md" data-testid="contractor-dialog">
-          <DialogHeader>
-            <DialogTitle className="font-heading font-bold text-xl uppercase tracking-wider">
-              {editingContractor ? "Edit Contractor" : "Add New Contractor"}
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-            <div>
-              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">Full Name *</Label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="John Smith" className="input-workshop mt-2" data-testid="contractor-name-input" />
-            </div>
-            <div>
-              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">Email *</Label>
-              <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="john@company.com" className="input-workshop mt-2" disabled={!!editingContractor} data-testid="contractor-email-input" />
-            </div>
-            {!editingContractor && (
-              <div>
-                <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">Password *</Label>
-                <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" className="input-workshop mt-2" data-testid="contractor-password-input" />
-              </div>
-            )}
-            <div>
-              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">Company</Label>
-              <Input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="On Point / Stone & Timber / Independent" className="input-workshop mt-2" data-testid="contractor-company-input" />
-            </div>
-            <div>
-              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">Billing Entity</Label>
-              <Input value={form.billing_entity} onChange={(e) => setForm({ ...form, billing_entity: e.target.value })} placeholder="Entity to invoice for materials" className="input-workshop mt-2" data-testid="contractor-billing-input" />
-            </div>
-            <div>
-              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">Phone</Label>
-              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="(555) 123-4567" className="input-workshop mt-2" data-testid="contractor-phone-input" />
-            </div>
-            <div className="flex gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 btn-secondary h-12" data-testid="contractor-cancel-btn">Cancel</Button>
-              <Button type="submit" disabled={saving} className="flex-1 btn-primary h-12" data-testid="contractor-save-btn">
-                {saving ? "Saving..." : editingContractor ? "Update" : "Create"}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <EntityFormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        title="Contractor"
+        schema={editingContractor ? editSchema : createSchema}
+        fields={visibleFields}
+        defaults={DEFAULTS}
+        entity={editingContractor}
+        onSubmit={handleSubmit}
+        saving={createMutation.isPending || updateMutation.isPending}
+        testIdPrefix="contractor"
+      />
 
       <ConfirmDialog
         open={deleteConfirm.open}

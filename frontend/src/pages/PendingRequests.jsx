@@ -6,6 +6,8 @@ import { Label } from "../components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { HardHat, Package, Clock, AlertTriangle } from "lucide-react";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
+import { JobPicker } from "@/components/JobPicker";
+import { AddressPicker } from "@/components/AddressPicker";
 import { useMaterialRequests, useProcessMaterialRequest } from "@/hooks/useMaterialRequests";
 import { getErrorMessage } from "@/lib/api-client";
 
@@ -126,8 +128,8 @@ const PendingRequests = () => {
           {selectedRequest && (
             <div className="space-y-4 pt-2">
               <p className="text-sm text-slate-500">Processing request from <strong className="text-slate-700">{selectedRequest.contractor_name}</strong></p>
-              <div><Label className="text-sm">Job ID *</Label><Input value={jobId} onChange={(e) => setJobId(e.target.value)} placeholder="Job or reference number" className="mt-1.5" data-testid="process-job-id" /></div>
-              <div><Label className="text-sm">Service address *</Label><Input value={serviceAddress} onChange={(e) => setServiceAddress(e.target.value)} placeholder="Pickup or delivery location" className="mt-1.5" data-testid="process-service-address" /></div>
+              <div><Label className="text-sm">Job ID *</Label><div className="mt-1.5"><JobPicker value={jobId} onChange={setJobId} placeholder="Job or reference number" required /></div></div>
+              <div><Label className="text-sm">Service address *</Label><div className="mt-1.5"><AddressPicker value={serviceAddress} onChange={setServiceAddress} placeholder="Pickup or delivery location" required /></div></div>
               <div><Label className="text-sm">Notes (optional)</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Additional notes..." className="mt-1.5" /></div>
               <Button onClick={handleProcess} disabled={processRequest.isPending || !jobId.trim() || !serviceAddress.trim()} className="w-full h-11">{processRequest.isPending ? "Processing…" : "Create Withdrawal"}</Button>
             </div>

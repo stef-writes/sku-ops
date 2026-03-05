@@ -78,11 +78,10 @@ const api = {
   // ── Withdrawals ─────────────────────────────────────────────────────
   withdrawals: {
     list: (params) => axios.get(`${API}/withdrawals`, { params }).then((r) => r.data),
+    get: (id) => axios.get(`${API}/withdrawals/${id}`).then((r) => r.data),
     create: (data) => axios.post(`${API}/withdrawals`, data).then((r) => r.data),
     createForContractor: (contractorId, data) =>
       axios.post(`${API}/withdrawals/for-contractor`, data, { params: { contractor_id: contractorId } }).then((r) => r.data),
-    markPaid: (id, data) => axios.put(`${API}/withdrawals/${id}/mark-paid`, data).then((r) => r.data),
-    bulkMarkPaid: (ids) => axios.put(`${API}/withdrawals/bulk-mark-paid`, ids).then((r) => r.data),
   },
 
   // ── Returns ─────────────────────────────────────────────────────────
@@ -106,6 +105,13 @@ const api = {
     receive: (id, data) => axios.post(`${API}/purchase-orders/${id}/receive`, data).then((r) => r.data),
   },
 
+  // ── Payments ───────────────────────────────────────────────────────
+  payments: {
+    list: (params) => axios.get(`${API}/payments`, { params }).then((r) => r.data),
+    get: (id) => axios.get(`${API}/payments/${id}`).then((r) => r.data),
+    create: (data) => axios.post(`${API}/payments`, data).then((r) => r.data),
+  },
+
   // ── Financials ──────────────────────────────────────────────────────
   financials: {
     summary: (params) => axios.get(`${API}/financials/summary`, { params }).then((r) => r.data),
@@ -123,8 +129,36 @@ const api = {
     bulkSyncXero: (ids) => axios.post(`${API}/invoices/sync-xero-bulk`, { invoice_ids: ids }).then((r) => r.data),
   },
 
+  // ── Addresses ──────────────────────────────────────────────────────
+  addresses: {
+    list: (params) => axios.get(`${API}/addresses`, { params }).then((r) => r.data),
+    get: (id) => axios.get(`${API}/addresses/${id}`).then((r) => r.data),
+    create: (data) => axios.post(`${API}/addresses`, data).then((r) => r.data),
+    search: (params) => axios.get(`${API}/addresses/search`, { params }).then((r) => r.data),
+  },
+
+  // ── Billing Entities ────────────────────────────────────────────────
+  billingEntities: {
+    list: (params) => axios.get(`${API}/billing-entities`, { params }).then((r) => r.data),
+    get: (id) => axios.get(`${API}/billing-entities/${id}`).then((r) => r.data),
+    create: (data) => axios.post(`${API}/billing-entities`, data).then((r) => r.data),
+    update: (id, data) => axios.put(`${API}/billing-entities/${id}`, data).then((r) => r.data),
+    search: (params) => axios.get(`${API}/billing-entities/search`, { params }).then((r) => r.data),
+  },
+
+  // ── Jobs ────────────────────────────────────────────────────────────
+  jobs: {
+    list: (params) => axios.get(`${API}/jobs`, { params }).then((r) => r.data),
+    get: (id) => axios.get(`${API}/jobs/${id}`).then((r) => r.data),
+    create: (data) => axios.post(`${API}/jobs`, data).then((r) => r.data),
+    update: (id, data) => axios.put(`${API}/jobs/${id}`, data).then((r) => r.data),
+    search: (params) => axios.get(`${API}/jobs/search`, { params }).then((r) => r.data),
+  },
+
   // ── Documents ───────────────────────────────────────────────────────
   documents: {
+    list: (params) => axios.get(`${API}/documents`, { params }).then((r) => r.data),
+    get: (id) => axios.get(`${API}/documents/${id}`).then((r) => r.data),
     parse: (formData, useAi) =>
       axios.post(`${API}/documents/parse${useAi ? "?use_ai=true" : ""}`, formData).then((r) => r.data),
   },

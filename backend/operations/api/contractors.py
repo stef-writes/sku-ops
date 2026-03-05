@@ -14,6 +14,7 @@ from identity.application.user_service import (
     update_user,
     delete_contractor as do_delete_contractor,
 )
+from identity.infrastructure.billing_entity_repo import billing_entity_repo
 
 router = APIRouter(prefix="/contractors", tags=["contractors"])
 
@@ -33,17 +34,21 @@ async def create_contractor(data: UserCreate, current_user: CurrentUser = Depend
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    billing_name = data.billing_entity or data.company or "Independent"
+    be = await billing_entity_repo.ensure_billing_entity(billing_name, current_user.organization_id)
+
     contractor = User(
         email=data.email,
         name=data.name,
         role="contractor",
         company=data.company or "Independent",
-        billing_entity=data.billing_entity or data.company or "Independent",
+        billing_entity=billing_name,
         phone=data.phone,
     )
     contractor_dict = contractor.model_dump()
     contractor_dict["password"] = hash_password(data.password)
     contractor_dict["organization_id"] = current_user.organization_id
+    contractor_dict["billing_entity_id"] = be.get("id") if be else None
 
     await insert_user(contractor_dict)
 

@@ -4,7 +4,6 @@ import { useAuth } from "../context/AuthContext";
 import {
   DollarSign,
   ShoppingCart,
-  Package,
   AlertTriangle,
   ArrowRight,
   BarChart3,
@@ -12,7 +11,7 @@ import {
   TrendingUp,
   Truck,
 } from "lucide-react";
-import { AreaChart, BarChart } from "@tremor/react";
+import { AreaChart } from "@tremor/react";
 import { format } from "date-fns";
 import { valueFormatter } from "@/lib/chartConfig";
 import { ROLES, ADMIN_ROLES, DATE_PRESETS } from "@/lib/constants";
@@ -20,6 +19,7 @@ import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { StatCard } from "@/components/StatCard";
 import { StockHistoryModal } from "@/components/StockHistoryModal";
 import { RecentTransactions } from "@/components/RecentTransactions";
+import { WithdrawalDetailPanel } from "@/components/WithdrawalDetailPanel";
 import { StatusBadge } from "@/components/StatusBadge";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { useDashboardStats } from "@/hooks/useDashboard";
@@ -103,6 +103,7 @@ const Dashboard = () => {
   const defaultRange = DATE_PRESETS[1].getValue();
   const [dateRange, setDateRange] = useState(defaultRange);
   const [stockHistoryProduct, setStockHistoryProduct] = useState(null);
+  const [detailWithdrawalId, setDetailWithdrawalId] = useState(null);
 
   const statsParams = useMemo(() => {
     const p = {};
@@ -138,7 +139,7 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <StatCard label="Total Withdrawals" value={stats?.total_withdrawals || 0} />
           <StatCard label="Total Value" value={valueFormatter(stats?.total_spent || 0)} accent="emerald" />
-          <StatCard label="Unpaid Balance" value={valueFormatter(stats?.unpaid_balance || 0)} accent="amber" />
+          <StatCard label="Uninvoiced" value={valueFormatter(stats?.unpaid_balance || 0)} accent="amber" />
         </div>
 
         <Panel>
@@ -153,7 +154,7 @@ const Dashboard = () => {
                   </div>
                   <div className="text-right flex items-center gap-3">
                     <span className="font-semibold text-slate-900 tabular-nums">${w.total?.toFixed(2)}</span>
-                    <StatusBadge status={w.payment_status} />
+                    <StatusBadge status={w.invoice_id ? "invoiced" : "uninvoiced"} />
                   </div>
                 </div>
               ))}
@@ -194,22 +195,13 @@ const Dashboard = () => {
       </div>
 
       {/* ── Alerts ── */}
-      {(stats?.low_stock_count > 0 || (isAdmin && stats?.unpaid_total > 0)) && (
+      {stats?.low_stock_count > 0 && (
         <div className="flex flex-wrap gap-2 mb-6">
-          {stats?.low_stock_count > 0 && (
-            <Link to="/inventory?low_stock=1" className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 text-sm">
-              <AlertTriangle className="w-4 h-4 text-amber-600" />
-              <span>{stats.low_stock_count} items low on stock</span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-            </Link>
-          )}
-          {isAdmin && stats?.unpaid_total > 0 && (
-            <Link to="/financials" className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 text-sm">
-              <DollarSign className="w-4 h-4 text-slate-600" />
-              <span>{valueFormatter(stats.unpaid_total)} unpaid</span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-            </Link>
-          )}
+          <Link to="/inventory?low_stock=1" className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 text-sm">
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+            <span>{stats.low_stock_count} items low on stock</span>
+            <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+          </Link>
         </div>
       )}
 
@@ -221,7 +213,7 @@ const Dashboard = () => {
 
         <StatCard label="Profit (this period)" value={valueFormatter(stats?.range_gross_profit || 0)} icon={TrendingUp} accent={stats?.range_margin_pct >= 30 ? "emerald" : "orange"} note={`${stats?.range_margin_pct || 0}% margin`} />
 
-        <StatCard label="Unpaid" value={valueFormatter(stats?.unpaid_total || 0)} icon={DollarSign} accent={stats?.unpaid_total > 0 ? "rose" : "slate"} note={`${stats?.low_stock_count || 0} items low stock`} />
+        <StatCard label="Uninvoiced" value={valueFormatter(stats?.unpaid_total || 0)} icon={DollarSign} accent={stats?.unpaid_total > 0 ? "amber" : "slate"} note={`${stats?.low_stock_count || 0} items low stock`} />
       </div>
 
       {/* ── Row 2: Chart + Department Margins ── */}
@@ -302,12 +294,22 @@ const Dashboard = () => {
 
       {/* ── Row 4: Recent Transactions ── */}
       {ADMIN_ROLES.includes(user?.role) && (
-        <RecentTransactions dateRange={dateRange} onProductStockHistory={setStockHistoryProduct} />
+        <RecentTransactions
+          dateRange={dateRange}
+          onProductStockHistory={setStockHistoryProduct}
+          onWithdrawalClick={setDetailWithdrawalId}
+        />
       )}
 
       {ADMIN_ROLES.includes(user?.role) && (
         <StockHistoryModal product={stockHistoryProduct} open={!!stockHistoryProduct} onOpenChange={(open) => !open && setStockHistoryProduct(null)} />
       )}
+
+      <WithdrawalDetailPanel
+        withdrawalId={detailWithdrawalId}
+        open={!!detailWithdrawalId}
+        onOpenChange={(open) => !open && setDetailWithdrawalId(null)}
+      />
     </div>
   );
 };

@@ -1,4 +1,5 @@
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Tooltip,
   TooltipContent,
@@ -29,19 +30,17 @@ export function InventoryFilters({
             data-testid="inventory-search-input"
           />
         </div>
-        <select
-          value={filterDept}
-          onChange={(e) => onFilterDeptChange(e.target.value)}
-          className="input-workshop px-4 min-w-[180px]"
-          data-testid="inventory-dept-filter"
-        >
-          <option value="">All Departments</option>
-          {departments.map((dept) => (
-            <option key={dept.id} value={dept.id}>
-              {dept.name}
-            </option>
-          ))}
-        </select>
+        <Select value={filterDept || "all"} onValueChange={(v) => onFilterDeptChange(v === "all" ? "" : v)}>
+          <SelectTrigger className="min-w-[180px] h-11" data-testid="inventory-dept-filter">
+            <SelectValue placeholder="All Departments" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Departments</SelectItem>
+            {departments.map((dept) => (
+              <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Tooltip>
           <TooltipTrigger asChild>
             <button

@@ -14,6 +14,7 @@ TABLES: list[str] = [
         received_at TEXT,
         received_by_id TEXT,
         received_by_name TEXT,
+        document_id TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT,
         organization_id TEXT

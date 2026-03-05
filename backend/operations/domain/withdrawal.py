@@ -33,6 +33,7 @@ class MaterialWithdrawal(Entity):
     contractor_name: str = ""
     contractor_company: str = ""
     billing_entity: str = ""
+    billing_entity_id: Optional[str] = None
     payment_status: str = "unpaid"
     invoice_id: Optional[str] = None
     paid_at: Optional[str] = None

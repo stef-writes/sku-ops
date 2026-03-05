@@ -4,12 +4,21 @@ import api from "@/lib/api-client";
 export const withdrawalKeys = {
   all: ["withdrawals"],
   list: (params) => ["withdrawals", "list", params],
+  detail: (id) => ["withdrawals", "detail", id],
 };
 
 export function useWithdrawals(params) {
   return useQuery({
     queryKey: withdrawalKeys.list(params),
     queryFn: () => api.withdrawals.list(params),
+  });
+}
+
+export function useWithdrawal(id) {
+  return useQuery({
+    queryKey: withdrawalKeys.detail(id),
+    queryFn: () => api.withdrawals.get(id),
+    enabled: !!id,
   });
 }
 
@@ -29,18 +38,3 @@ export function useCreateWithdrawalForContractor() {
   });
 }
 
-export function useMarkPaid() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, data }) => api.withdrawals.markPaid(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: withdrawalKeys.all }),
-  });
-}
-
-export function useBulkMarkPaid() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (ids) => api.withdrawals.bulkMarkPaid(ids),
-    onSuccess: () => qc.invalidateQueries({ queryKey: withdrawalKeys.all }),
-  });
-}

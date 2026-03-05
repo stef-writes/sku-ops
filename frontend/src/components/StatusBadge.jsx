@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 const VARIANTS = {
   paid:       "badge-success",
   unpaid:     "badge-warning",
+  uninvoiced: "bg-amber-50 text-amber-700 border border-amber-200",
   overdue:    "badge-error",
   invoiced:   "bg-blue-50 text-blue-700 border border-blue-200",
   draft:      "bg-slate-100 text-slate-600 border border-slate-200",

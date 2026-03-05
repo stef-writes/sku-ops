@@ -1,71 +1,64 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Plus, Edit2, Trash2, Users, Mail, Phone, MapPin, FileUp } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { EntityFormDialog } from "@/components/EntityFormDialog";
 import { getErrorMessage } from "@/lib/api-client";
 import { useVendors, useCreateVendor, useUpdateVendor, useDeleteVendor } from "@/hooks/useVendors";
 
-const INITIAL_FORM = { name: "", contact_name: "", email: "", phone: "", address: "" };
+const vendorSchema = z.object({
+  name: z.string().min(1, "Vendor name is required"),
+  contact_name: z.string().optional().default(""),
+  email: z.string().email("Invalid email").or(z.literal("")).optional().default(""),
+  phone: z.string().optional().default(""),
+  address: z.string().optional().default(""),
+});
+
+const FIELDS = [
+  { name: "name", label: "Company Name *", placeholder: "e.g., ABC Hardware Supply" },
+  { name: "contact_name", label: "Contact Name", placeholder: "e.g., John Smith" },
+  { name: "email", label: "Email", type: "email", placeholder: "vendor@example.com" },
+  { name: "phone", label: "Phone", placeholder: "(555) 123-4567" },
+  { name: "address", label: "Address", placeholder: "123 Main St, City, State" },
+];
+
+const DEFAULTS = { name: "", contact_name: "", email: "", phone: "", address: "" };
 
 const Vendors = () => {
   const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState(null);
-  const [form, setForm] = useState(INITIAL_FORM);
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, vendor: null });
 
   const { data: vendors = [], isLoading } = useVendors();
   const createMutation = useCreateVendor();
   const updateMutation = useUpdateVendor();
   const deleteMutation = useDeleteVendor();
-  const saving = createMutation.isPending || updateMutation.isPending;
 
   const openDialog = (vendor = null) => {
-    if (vendor) {
-      setEditingVendor(vendor);
-      setForm({
-        name: vendor.name,
-        contact_name: vendor.contact_name || "",
-        email: vendor.email || "",
-        phone: vendor.phone || "",
-        address: vendor.address || "",
-      });
-    } else {
-      setEditingVendor(null);
-      setForm(INITIAL_FORM);
-    }
+    setEditingVendor(vendor);
     setDialogOpen(true);
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!form.name) {
-      toast.error("Vendor name is required");
-      return;
+  const handleSubmit = async (data, isEditing) => {
+    try {
+      if (isEditing) {
+        await updateMutation.mutateAsync({ id: editingVendor.id, data });
+        toast.success("Vendor updated!");
+      } else {
+        await createMutation.mutateAsync(data);
+        toast.success("Vendor created!");
+      }
+      setDialogOpen(false);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
     }
-    const mutation = editingVendor ? updateMutation : createMutation;
-    const arg = editingVendor ? { id: editingVendor.id, data: form } : form;
-
-    mutation.mutate(arg, {
-      onSuccess: () => {
-        toast.success(editingVendor ? "Vendor updated!" : "Vendor created!");
-        setDialogOpen(false);
-      },
-      onError: (err) => toast.error(getErrorMessage(err)),
-    });
   };
 
   const handleDeleteConfirm = async () => {
@@ -147,43 +140,18 @@ const Vendors = () => {
         </div>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md" data-testid="vendor-dialog">
-          <DialogHeader>
-            <DialogTitle className="font-heading font-bold text-xl uppercase tracking-wider">
-              {editingVendor ? "Edit Vendor" : "Add New Vendor"}
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-            <div>
-              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">Company Name *</Label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g., ABC Hardware Supply" className="input-workshop mt-2" data-testid="vendor-name-input" />
-            </div>
-            <div>
-              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">Contact Name</Label>
-              <Input value={form.contact_name} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} placeholder="e.g., John Smith" className="input-workshop mt-2" data-testid="vendor-contact-input" />
-            </div>
-            <div>
-              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">Email</Label>
-              <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="vendor@example.com" className="input-workshop mt-2" data-testid="vendor-email-input" />
-            </div>
-            <div>
-              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">Phone</Label>
-              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="(555) 123-4567" className="input-workshop mt-2" data-testid="vendor-phone-input" />
-            </div>
-            <div>
-              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">Address</Label>
-              <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="123 Main St, City, State" className="input-workshop mt-2" data-testid="vendor-address-input" />
-            </div>
-            <div className="flex gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 btn-secondary h-12" data-testid="vendor-cancel-btn">Cancel</Button>
-              <Button type="submit" disabled={saving} className="flex-1 btn-primary h-12" data-testid="vendor-save-btn">
-                {saving ? "Saving..." : editingVendor ? "Update Vendor" : "Create Vendor"}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <EntityFormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        title="Vendor"
+        schema={vendorSchema}
+        fields={FIELDS}
+        defaults={DEFAULTS}
+        entity={editingVendor}
+        onSubmit={handleSubmit}
+        saving={createMutation.isPending || updateMutation.isPending}
+        testIdPrefix="vendor"
+      />
 
       <ConfirmDialog
         open={deleteConfirm.open}

@@ -24,9 +24,9 @@ async def insert(withdrawal: Union[MaterialWithdrawal, dict], conn=None) -> None
     items_json = json.dumps([i if isinstance(i, dict) else i.model_dump() for i in withdrawal_dict["items"]])
     await conn.execute(
         """INSERT INTO withdrawals (id, items, job_id, service_address, notes, subtotal, tax, tax_rate, total, cost_total,
-           contractor_id, contractor_name, contractor_company, billing_entity, payment_status, invoice_id, paid_at,
+           contractor_id, contractor_name, contractor_company, billing_entity, billing_entity_id, payment_status, invoice_id, paid_at,
            processed_by_id, processed_by_name, organization_id, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             withdrawal_dict["id"],
             items_json,
@@ -42,6 +42,7 @@ async def insert(withdrawal: Union[MaterialWithdrawal, dict], conn=None) -> None
             withdrawal_dict.get("contractor_name", ""),
             withdrawal_dict.get("contractor_company", ""),
             withdrawal_dict.get("billing_entity", ""),
+            withdrawal_dict.get("billing_entity_id"),
             withdrawal_dict.get("payment_status", "unpaid"),
             withdrawal_dict.get("invoice_id"),
             withdrawal_dict.get("paid_at"),

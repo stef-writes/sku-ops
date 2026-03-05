@@ -4,20 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, ExternalLink, Filter, X } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import api from "@/lib/api-client";
 import { dashboardKeys } from "@/hooks/useDashboard";
 import { dateToISO, endOfDayISO } from "@/lib/utils";
 
-const PAYMENT_STATUSES = [
-  { value: "", label: "All statuses" },
-  { value: "unpaid", label: "Unpaid" },
-  { value: "invoiced", label: "Invoiced" },
-  { value: "paid", label: "Paid" },
-];
-
-export function RecentTransactions({ dateRange, onProductStockHistory }) {
+export function RecentTransactions({ dateRange, onProductStockHistory, onWithdrawalClick }) {
   const [contractorId, setContractorId] = useState("");
-  const [paymentStatus, setPaymentStatus] = useState("");
+  const [invoiceStatus, setInvoiceStatus] = useState("");
   const [offset, setOffset] = useState(0);
   const [allRows, setAllRows] = useState([]);
 
@@ -32,9 +26,9 @@ export function RecentTransactions({ dateRange, onProductStockHistory }) {
     if (dateRange?.from) p.start_date = dateToISO(dateRange.from);
     if (dateRange?.to) p.end_date = endOfDayISO(dateRange.to);
     if (contractorId) p.contractor_id = contractorId;
-    if (paymentStatus) p.payment_status = paymentStatus;
+    if (invoiceStatus) p.payment_status = invoiceStatus;
     return p;
-  }, [dateRange, contractorId, paymentStatus, offset]);
+  }, [dateRange, contractorId, invoiceStatus, offset]);
 
   const { data, isLoading, isFetching } = useQuery({
     queryKey: dashboardKeys.transactions(params),
@@ -50,14 +44,14 @@ export function RecentTransactions({ dateRange, onProductStockHistory }) {
   useEffect(() => {
     setOffset(0);
     setAllRows([]);
-  }, [dateRange, contractorId, paymentStatus]);
+  }, [dateRange, contractorId, invoiceStatus]);
 
   const hasMore = data?.has_more ?? false;
-  const activeFilterCount = (contractorId ? 1 : 0) + (paymentStatus ? 1 : 0);
+  const activeFilterCount = (contractorId ? 1 : 0) + (invoiceStatus ? 1 : 0);
 
   const clearFilters = () => {
     setContractorId("");
-    setPaymentStatus("");
+    setInvoiceStatus("");
   };
 
   return (
@@ -78,26 +72,24 @@ export function RecentTransactions({ dateRange, onProductStockHistory }) {
           <span className="text-xs font-medium uppercase tracking-wide">Filter</span>
         </div>
 
-        <select
-          value={contractorId}
-          onChange={(e) => setContractorId(e.target.value)}
-          className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
-        >
-          <option value="">All contractors</option>
-          {(contractors || []).map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
+        <Select value={contractorId || "all"} onValueChange={(v) => setContractorId(v === "all" ? "" : v)}>
+          <SelectTrigger className="h-8 w-[160px]"><SelectValue placeholder="All contractors" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All contractors</SelectItem>
+            {(contractors || []).map((c) => (
+              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-        <select
-          value={paymentStatus}
-          onChange={(e) => setPaymentStatus(e.target.value)}
-          className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
-        >
-          {PAYMENT_STATUSES.map((s) => (
-            <option key={s.value} value={s.value}>{s.label}</option>
-          ))}
-        </select>
+        <Select value={invoiceStatus || "all"} onValueChange={(v) => setInvoiceStatus(v === "all" ? "" : v)}>
+          <SelectTrigger className="h-8 w-[140px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="unpaid">Uninvoiced</SelectItem>
+            <SelectItem value="invoiced">Invoiced</SelectItem>
+          </SelectContent>
+        </Select>
 
         {activeFilterCount > 0 && (
           <button
@@ -129,6 +121,7 @@ export function RecentTransactions({ dateRange, onProductStockHistory }) {
                 key={w.id}
                 withdrawal={w}
                 onProductStockHistory={onProductStockHistory}
+                onClick={() => onWithdrawalClick?.(w.id)}
               />
             ))}
           </div>
@@ -149,16 +142,20 @@ export function RecentTransactions({ dateRange, onProductStockHistory }) {
   );
 }
 
-function WithdrawalBlock({ withdrawal: w, onProductStockHistory }) {
-  const statusClasses = {
-    paid: "bg-emerald-100 text-emerald-700",
-    invoiced: "bg-blue-100 text-blue-700",
-    unpaid: "bg-amber-100 text-amber-700",
-  };
+function WithdrawalBlock({ withdrawal: w, onProductStockHistory, onClick }) {
+  const isInvoiced = !!w.invoice_id;
+  const statusClass = isInvoiced
+    ? "bg-blue-100 text-blue-700"
+    : "bg-amber-100 text-amber-700";
+  const statusLabel = isInvoiced ? "invoiced" : "uninvoiced";
 
   return (
-    <div className="rounded-lg border border-slate-200 overflow-hidden bg-white">
-      <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-100">
+    <div className="rounded-lg border border-slate-200 overflow-hidden bg-white hover:border-slate-300 transition-colors">
+      <button
+        type="button"
+        onClick={onClick}
+        className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-100 hover:bg-slate-100 transition-colors text-left cursor-pointer"
+      >
         <div className="flex flex-col gap-0.5 min-w-0">
           <span className="text-slate-800 font-semibold truncate">
             {w.contractor_name || "—"}
@@ -171,15 +168,11 @@ function WithdrawalBlock({ withdrawal: w, onProductStockHistory }) {
           <span className="text-lg font-bold text-slate-900 tabular-nums">
             ${(w.total || 0).toFixed(2)}
           </span>
-          <span
-            className={`text-xs px-2 py-0.5 rounded font-medium ${
-              statusClasses[w.payment_status] || statusClasses.unpaid
-            }`}
-          >
-            {w.payment_status}
+          <span className={`text-xs px-2 py-0.5 rounded font-medium ${statusClass}`}>
+            {statusLabel}
           </span>
         </div>
-      </div>
+      </button>
 
       <ul className="divide-y divide-slate-100">
         {(w.items || []).map((item, j) => (

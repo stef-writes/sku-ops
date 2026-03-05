@@ -1,7 +1,10 @@
-"""Document domain models for receipt/invoice parsing."""
+"""Document domain models for receipt/invoice parsing and archival."""
+from enum import Enum
 from typing import List, Optional
 
 from pydantic import BaseModel
+
+from kernel.entity import AuditedEntity
 
 
 class DocumentLineItem(BaseModel):
@@ -28,3 +31,30 @@ class DocumentImportRequest(BaseModel):
     create_vendor_if_missing: bool = True
     department_id: Optional[str] = None
     products: List[DocumentLineItem]
+
+
+class DocumentType(str, Enum):
+    RECEIPT = "receipt"
+    INVOICE = "invoice"
+    PACKING_SLIP = "packing_slip"
+    OTHER = "other"
+
+
+class DocumentStatus(str, Enum):
+    PARSED = "parsed"
+    IMPORTED = "imported"
+    REJECTED = "rejected"
+
+
+class Document(AuditedEntity):
+    """Persisted record of an uploaded and parsed document."""
+    filename: str
+    document_type: str = DocumentType.OTHER
+    vendor_name: Optional[str] = None
+    file_hash: str = ""
+    file_size: int = 0
+    mime_type: str = ""
+    parsed_data: Optional[str] = None
+    po_id: Optional[str] = None
+    status: str = DocumentStatus.PARSED
+    uploaded_by_id: str

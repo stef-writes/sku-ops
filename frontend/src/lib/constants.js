@@ -6,6 +6,33 @@ export const ROLES = {
 
 export const ADMIN_ROLES = [ROLES.ADMIN, ROLES.WAREHOUSE_MANAGER];
 
+export const JOB_STATUSES = {
+  ACTIVE: "active",
+  COMPLETED: "completed",
+  CANCELLED: "cancelled",
+};
+
+export const PAYMENT_METHODS = [
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "check", label: "Check" },
+  { value: "cash", label: "Cash" },
+  { value: "credit_card", label: "Credit Card" },
+  { value: "other", label: "Other" },
+];
+
+export const INVOICE_STATUSES = {
+  DRAFT: "draft",
+  APPROVED: "approved",
+  SENT: "sent",
+  PAID: "paid",
+};
+
+export const DOCUMENT_STATUSES = {
+  PARSED: "parsed",
+  IMPORTED: "imported",
+  REJECTED: "rejected",
+};
+
 export const UOM_OPTIONS = [
   "each", "case", "box", "pack", "bag", "roll", "gallon", "quart", "pint",
   "liter", "pound", "ounce", "foot", "meter", "yard", "sqft", "kit",

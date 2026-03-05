@@ -7,6 +7,8 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Search, Trash2, ShoppingCart, Send, Barcode } from "lucide-react";
+import { JobPicker } from "@/components/JobPicker";
+import { AddressPicker } from "@/components/AddressPicker";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { QuantityControl } from "@/components/QuantityControl";
 import { useProducts } from "@/hooks/useProducts";
@@ -203,8 +205,8 @@ const RequestMaterials = () => {
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Submit material request</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
-            <div><Label className="text-sm">Job ID (optional)</Label><Input value={jobId} onChange={(e) => setJobId(e.target.value)} placeholder="Job or reference number" className="mt-1.5" /></div>
-            <div><Label className="text-sm">Service address (optional)</Label><Input value={serviceAddress} onChange={(e) => setServiceAddress(e.target.value)} placeholder="Pickup or delivery location" className="mt-1.5" /></div>
+            <div><Label className="text-sm">Job ID (optional)</Label><div className="mt-1.5"><JobPicker value={jobId} onChange={setJobId} placeholder="Job or reference number" /></div></div>
+            <div><Label className="text-sm">Service address (optional)</Label><div className="mt-1.5"><AddressPicker value={serviceAddress} onChange={setServiceAddress} placeholder="Pickup or delivery location" /></div></div>
             <div><Label className="text-sm">Notes (optional)</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Additional notes..." className="mt-1.5" /></div>
             <Button onClick={handleSubmitRequest} disabled={createRequest.isPending} className="w-full h-11">{createRequest.isPending ? "Submitting…" : "Submit Request"}</Button>
           </div>

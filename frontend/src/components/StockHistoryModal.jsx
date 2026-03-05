@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import axios from "axios";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -16,22 +15,17 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { API } from "@/lib/api";
+import api from "@/lib/api-client";
 import { TX_TYPE_LABELS } from "@/lib/constants";
 
 export function StockHistoryModal({ product, open, onOpenChange }) {
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { data, isLoading } = useQuery({
+    queryKey: ["stockHistory", product?.id],
+    queryFn: () => api.products.stockHistory(product.id),
+    enabled: open && !!product?.id,
+  });
 
-  useEffect(() => {
-    if (!open || !product?.id) return;
-    setLoading(true);
-    axios
-      .get(`${API}/stock/${product.id}/history`)
-      .then((res) => setHistory(res.data.history || []))
-      .catch(() => setHistory([]))
-      .finally(() => setLoading(false));
-  }, [open, product?.id]);
+  const history = data?.history || [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -40,16 +34,12 @@ export function StockHistoryModal({ product, open, onOpenChange }) {
           <DialogTitle className="font-heading font-bold text-xl uppercase tracking-wider">
             Stock History — {product?.sku || ""}
           </DialogTitle>
-          {product?.name && (
-            <p className="text-sm text-slate-500">{product.name}</p>
-          )}
+          {product?.name && <p className="text-sm text-slate-500">{product.name}</p>}
         </DialogHeader>
         <div className="flex-1 overflow-auto mt-4">
-          {loading ? (
+          {isLoading ? (
             <div className="space-y-2">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
+              {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
             </div>
           ) : history.length === 0 ? (
             <p className="text-slate-500 text-center py-8">No transactions yet</p>
@@ -69,28 +59,13 @@ export function StockHistoryModal({ product, open, onOpenChange }) {
               <TableBody>
                 {history.map((tx) => (
                   <TableRow key={tx.id}>
-                    <TableCell className="text-sm">
-                      {tx.created_at
-                        ? format(new Date(tx.created_at), "MMM d, yyyy HH:mm")
-                        : "—"}
-                    </TableCell>
-                    <TableCell>
-                      {TX_TYPE_LABELS[tx.transaction_type] || tx.transaction_type}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {tx.quantity_delta > 0 ? "+" : ""}
-                      {tx.quantity_delta}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {tx.quantity_before}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {tx.quantity_after}
-                    </TableCell>
+                    <TableCell className="text-sm">{tx.created_at ? format(new Date(tx.created_at), "MMM d, yyyy HH:mm") : "—"}</TableCell>
+                    <TableCell>{TX_TYPE_LABELS[tx.transaction_type] || tx.transaction_type}</TableCell>
+                    <TableCell className="text-right font-mono">{tx.quantity_delta > 0 ? "+" : ""}{tx.quantity_delta}</TableCell>
+                    <TableCell className="text-right font-mono">{tx.quantity_before}</TableCell>
+                    <TableCell className="text-right font-mono">{tx.quantity_after}</TableCell>
                     <TableCell className="text-sm">{tx.user_name || "—"}</TableCell>
-                    <TableCell className="text-sm font-mono text-slate-500">
-                      {tx.reference_id?.slice(0, 8) || tx.reason || "—"}
-                    </TableCell>
+                    <TableCell className="text-sm font-mono text-slate-500">{tx.reference_id?.slice(0, 8) || tx.reason || "—"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

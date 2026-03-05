@@ -1,8 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
-import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "../components/ui/button";
-import { CheckCircle, FileText, HardHat, Building2, Download } from "lucide-react";
+import { FileText, HardHat, Building2, DollarSign as DollarSignIcon, Briefcase } from "lucide-react";
 import { format } from "date-fns";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -11,8 +10,11 @@ import { DataTable } from "@/components/DataTable";
 import { ViewToolbar } from "@/components/ViewToolbar";
 import { StatCard } from "@/components/StatCard";
 import { CreateInvoiceModal } from "../components/CreateInvoiceModal";
+import { WithdrawalDetailPanel } from "@/components/WithdrawalDetailPanel";
+import { InvoiceDetailModal } from "@/components/InvoiceDetailModal";
+import { JobDetailPanel } from "@/components/JobDetailPanel";
 import { useFinancialSummary } from "@/hooks/useFinancials";
-import { useWithdrawals, useMarkPaid, useBulkMarkPaid } from "@/hooks/useWithdrawals";
+import { useWithdrawals } from "@/hooks/useWithdrawals";
 import { useViewController } from "@/hooks/useViewController";
 import { valueFormatter } from "@/lib/chartConfig";
 import { dateToISO, endOfDayISO } from "@/lib/utils";
@@ -25,6 +27,9 @@ const Financials = () => {
   }));
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [createInvoiceModalOpen, setCreateInvoiceModalOpen] = useState(false);
+  const [detailWithdrawalId, setDetailWithdrawalId] = useState(null);
+  const [detailInvoiceId, setDetailInvoiceId] = useState(null);
+  const [detailJobId, setDetailJobId] = useState(null);
 
   const syncFiltersToURL = useCallback(
     (updates) => {
@@ -50,48 +55,34 @@ const Financials = () => {
 
   const { data: summary, isLoading: summaryLoading } = useFinancialSummary(dateParams);
   const { data: withdrawals = [], isLoading: wdLoading } = useWithdrawals(dateParams);
-  const markPaid = useMarkPaid();
-  const bulkMarkPaid = useBulkMarkPaid();
 
-  const handleMarkPaid = async (id, e) => {
-    e?.stopPropagation();
-    try {
-      await markPaid.mutateAsync({ id });
-      toast.success("Marked as paid");
-    } catch {
-      toast.error("Failed to mark as paid");
-    }
-  };
-
-  const handleBulkMarkPaid = async () => {
-    if (selectedIds.size === 0) return;
-    try {
-      await bulkMarkPaid.mutateAsync(Array.from(selectedIds));
-      toast.success(`Marked ${selectedIds.size} as paid`);
-      setSelectedIds(new Set());
-    } catch {
-      toast.error("Failed to mark as paid");
-    }
-  };
-
-  const selectAllUnpaid = () => {
+  const selectAllUninvoiced = () => {
     setSelectedIds(
       new Set(
         withdrawals
-          .filter((w) => w.payment_status === "unpaid" && !w.invoice_id)
+          .filter((w) => !w.invoice_id)
           .map((w) => w.id)
       )
     );
   };
 
-  const selectedUnpaidIds = useMemo(
+  const selectedUninvoicedIds = useMemo(
     () =>
       [...selectedIds].filter((id) => {
         const w = withdrawals.find((x) => x.id === id);
-        return w?.payment_status === "unpaid" && !w?.invoice_id;
+        return w && !w.invoice_id;
       }),
     [selectedIds, withdrawals]
   );
+
+  const invoiceTotals = useMemo(() => {
+    const uninvoiced = withdrawals.filter((w) => !w.invoice_id);
+    const invoiced = withdrawals.filter((w) => !!w.invoice_id);
+    return {
+      uninvoicedTotal: uninvoiced.reduce((s, w) => s + (w.total || 0), 0),
+      invoicedTotal: invoiced.reduce((s, w) => s + (w.total || 0), 0),
+    };
+  }, [withdrawals]);
 
   const columns = useMemo(
     () => [
@@ -126,7 +117,15 @@ const Financials = () => {
         key: "job_id",
         label: "Job",
         type: "text",
-        render: (row) => <span className="font-mono text-xs">{row.job_id}</span>,
+        render: (row) => row.job_id ? (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setDetailJobId(row.job_id); }}
+            className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline"
+          >
+            {row.job_id}
+          </button>
+        ) : <span className="text-xs text-slate-400">—</span>,
       },
       {
         key: "billing_entity",
@@ -173,12 +172,13 @@ const Financials = () => {
           ((row.total || 0) - (row.cost_total || 0)).toFixed(2),
       },
       {
-        key: "payment_status",
+        key: "_invoice_status",
         label: "Status",
         type: "enum",
-        filterValues: ["unpaid", "paid", "invoiced"],
+        sortable: false,
+        filterable: false,
         render: (row) =>
-          row.payment_status === "invoiced" && row.invoice_id ? (
+          row.invoice_id ? (
             <Link
               to="/invoices"
               className="inline-block"
@@ -187,9 +187,9 @@ const Financials = () => {
               <StatusBadge status="invoiced" />
             </Link>
           ) : (
-            <StatusBadge status={row.payment_status} />
+            <StatusBadge status="uninvoiced" />
           ),
-        exportValue: (row) => row.payment_status,
+        exportValue: (row) => (row.invoice_id ? "invoiced" : "uninvoiced"),
       },
     ],
     []
@@ -197,33 +197,6 @@ const Financials = () => {
 
   const view = useViewController({ columns });
   const processedWithdrawals = view.apply(withdrawals);
-
-  const paymentBreakdown = useMemo(() => {
-    const paid = summary?.total_paid || 0;
-    const unpaid = summary?.total_unpaid || 0;
-    const invoiced = summary?.total_invoiced || 0;
-    const total = paid + unpaid + invoiced || 1;
-    return [
-      {
-        label: "Paid",
-        value: paid,
-        pct: ((paid / total) * 100).toFixed(0),
-        color: "bg-emerald-400",
-      },
-      {
-        label: "Invoiced",
-        value: invoiced,
-        pct: ((invoiced / total) * 100).toFixed(0),
-        color: "bg-blue-400",
-      },
-      {
-        label: "Unpaid",
-        value: unpaid,
-        pct: ((unpaid / total) * 100).toFixed(0),
-        color: "bg-orange-400",
-      },
-    ].filter((d) => d.value > 0);
-  }, [summary]);
 
   if (summaryLoading && wdLoading) return <PageSkeleton />;
 
@@ -236,7 +209,7 @@ const Financials = () => {
               Financials
             </h1>
             <p className="text-slate-500 mt-1 text-sm">
-              Payments, invoicing, and exports
+              Invoicing, margins, and exports
             </p>
           </div>
           <div className="flex gap-2">
@@ -265,14 +238,14 @@ const Financials = () => {
         data-testid="summary-cards"
       >
         <StatCard
-          label="Unpaid"
-          value={valueFormatter(summary?.total_unpaid || 0)}
-          accent="rose"
+          label="Uninvoiced"
+          value={valueFormatter(invoiceTotals.uninvoicedTotal)}
+          accent="amber"
         />
         <StatCard
-          label="Paid"
-          value={valueFormatter(summary?.total_paid || 0)}
-          accent="emerald"
+          label="Invoiced"
+          value={valueFormatter(invoiceTotals.invoicedTotal)}
+          accent="blue"
         />
         <StatCard
           label="Total Revenue"
@@ -284,36 +257,6 @@ const Financials = () => {
           accent="violet"
         />
       </div>
-
-      {paymentBreakdown.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm mb-6">
-          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 mb-3">
-            Payment Status
-          </p>
-          <div className="flex h-2.5 rounded-full overflow-hidden gap-px mb-3">
-            {paymentBreakdown.map((d) => (
-              <div
-                key={d.label}
-                className={`${d.color} transition-all duration-500`}
-                style={{ width: `${d.pct}%` }}
-                title={`${d.label}: ${valueFormatter(d.value)}`}
-              />
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-4">
-            {paymentBreakdown.map((d) => (
-              <div key={d.label} className="flex items-center gap-1.5 text-xs">
-                <div className={`w-2 h-2 rounded-full ${d.color}`} />
-                <span className="text-slate-500">{d.label}</span>
-                <span className="font-semibold text-slate-700 tabular-nums">
-                  {valueFormatter(d.value)}
-                </span>
-                <span className="text-slate-400">({d.pct}%)</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {summary?.by_contractor?.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm mb-6">
@@ -376,15 +319,9 @@ const Financials = () => {
                     </div>
                     <div className="space-y-0.5 text-xs">
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Total</span>
+                        <span className="text-slate-500">Revenue</span>
                         <span className="font-mono tabular-nums">
                           ${(data.total ?? 0).toFixed(2)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-red-500">Unpaid</span>
-                        <span className="font-mono tabular-nums text-red-600">
-                          ${(data.ar_balance ?? 0).toFixed(2)}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -409,17 +346,17 @@ const Financials = () => {
         className="mb-3"
         actions={
           <button
-            onClick={selectAllUnpaid}
-            className="text-xs text-orange-500 hover:text-orange-600 font-medium"
+            onClick={selectAllUninvoiced}
+            className="text-xs text-amber-500 hover:text-amber-600 font-medium"
           >
-            Select All Unpaid
+            Select All Uninvoiced
           </button>
         }
       />
 
       {selectedIds.size > 0 && (
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-4 flex items-center justify-between">
-          <span className="text-sm font-semibold text-orange-700">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 flex items-center justify-between">
+          <span className="text-sm font-semibold text-amber-700">
             {selectedIds.size} selected
           </span>
           <div className="flex gap-2">
@@ -430,7 +367,7 @@ const Financials = () => {
             >
               Clear
             </Button>
-            {selectedUnpaidIds.length > 0 && (
+            {selectedUninvoicedIds.length > 0 && (
               <Button
                 variant="outline"
                 size="sm"
@@ -438,18 +375,9 @@ const Financials = () => {
                 className="gap-1"
               >
                 <FileText className="w-3.5 h-3.5" />
-                Invoice ({selectedUnpaidIds.length})
+                Create Invoice ({selectedUninvoicedIds.length})
               </Button>
             )}
-            <Button
-              size="sm"
-              onClick={handleBulkMarkPaid}
-              data-testid="bulk-mark-paid-btn"
-              className="gap-1"
-            >
-              <CheckCircle className="w-3.5 h-3.5" />
-              Mark Paid
-            </Button>
           </div>
         </div>
       )}
@@ -460,7 +388,7 @@ const Financials = () => {
         onCreated={() => {
           setSelectedIds(new Set());
         }}
-        preselectedIds={selectedUnpaidIds}
+        preselectedIds={selectedUninvoicedIds}
       />
 
       <DataTable
@@ -473,19 +401,36 @@ const Financials = () => {
         selectedIds={selectedIds}
         onSelectionChange={setSelectedIds}
         isSelectable={(row) => !row.invoice_id}
+        onRowClick={(row) => setDetailWithdrawalId(row.id)}
         disableSort
-        rowActions={(w) =>
-          w.payment_status === "unpaid" ? (
-            <button
-              onClick={(e) => handleMarkPaid(w.id, e)}
-              className="text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1"
-              data-testid={`mark-paid-${w.id}`}
-            >
-              <CheckCircle className="w-3.5 h-3.5" />
-              Paid
-            </button>
-          ) : null
-        }
+      />
+
+      <WithdrawalDetailPanel
+        withdrawalId={detailWithdrawalId}
+        open={!!detailWithdrawalId}
+        onOpenChange={(open) => !open && setDetailWithdrawalId(null)}
+        onViewInvoice={(invoiceId) => {
+          setDetailWithdrawalId(null);
+          setDetailInvoiceId(invoiceId);
+        }}
+        onViewJob={(jobId) => {
+          setDetailWithdrawalId(null);
+          setDetailJobId(jobId);
+        }}
+      />
+
+      <InvoiceDetailModal
+        invoiceId={detailInvoiceId}
+        open={!!detailInvoiceId}
+        onOpenChange={(open) => !open && setDetailInvoiceId(null)}
+        onSaved={() => {}}
+        onDeleted={() => setDetailInvoiceId(null)}
+      />
+
+      <JobDetailPanel
+        jobId={detailJobId}
+        open={!!detailJobId}
+        onOpenChange={(open) => !open && setDetailJobId(null)}
       />
     </div>
   );

@@ -1,18 +1,12 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Plus, Edit2, Trash2, Layers, Package } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { EntityFormDialog } from "@/components/EntityFormDialog";
 import { getErrorMessage } from "@/lib/api-client";
 import { getDeptColor } from "@/lib/constants";
 import {
@@ -23,12 +17,32 @@ import {
   useDeleteDepartment,
 } from "@/hooks/useDepartments";
 
-const INITIAL_FORM = { name: "", code: "", description: "" };
+const deptSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  code: z.string().length(3, "Code must be exactly 3 characters"),
+  description: z.string().optional().default(""),
+});
+
+const FIELDS = [
+  { name: "name", label: "Department Name *", placeholder: "e.g., Lumber" },
+  {
+    name: "code",
+    label: "Code (3 characters) *",
+    placeholder: "e.g., LUM",
+    maxLength: 3,
+    className: "font-mono uppercase",
+    disabled: (isEditing) => isEditing,
+    note: "Code cannot be changed after creation",
+    transform: (v) => v.toUpperCase().slice(0, 3),
+  },
+  { name: "description", label: "Description", placeholder: "Optional description" },
+];
+
+const DEFAULTS = { name: "", code: "", description: "" };
 
 const Departments = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingDept, setEditingDept] = useState(null);
-  const [form, setForm] = useState(INITIAL_FORM);
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, dept: null });
 
   const { data: departments = [], isLoading } = useDepartments();
@@ -36,39 +50,25 @@ const Departments = () => {
   const createMutation = useCreateDepartment();
   const updateMutation = useUpdateDepartment();
   const deleteMutation = useDeleteDepartment();
-  const saving = createMutation.isPending || updateMutation.isPending;
 
   const openDialog = (dept = null) => {
-    if (dept) {
-      setEditingDept(dept);
-      setForm({ name: dept.name, code: dept.code, description: dept.description || "" });
-    } else {
-      setEditingDept(null);
-      setForm(INITIAL_FORM);
-    }
+    setEditingDept(dept);
     setDialogOpen(true);
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!form.name || !form.code) {
-      toast.error("Name and code are required");
-      return;
+  const handleSubmit = async (data, isEditing) => {
+    try {
+      if (isEditing) {
+        await updateMutation.mutateAsync({ id: editingDept.id, data });
+        toast.success("Department updated!");
+      } else {
+        await createMutation.mutateAsync(data);
+        toast.success("Department created!");
+      }
+      setDialogOpen(false);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
     }
-    if (form.code.length !== 3) {
-      toast.error("Code must be exactly 3 characters");
-      return;
-    }
-    const mutation = editingDept ? updateMutation : createMutation;
-    const arg = editingDept ? { id: editingDept.id, data: form } : form;
-
-    mutation.mutate(arg, {
-      onSuccess: () => {
-        toast.success(editingDept ? "Department updated!" : "Department created!");
-        setDialogOpen(false);
-      },
-      onError: (err) => toast.error(getErrorMessage(err)),
-    });
   };
 
   const handleDeleteConfirm = async () => {
@@ -147,44 +147,18 @@ const Departments = () => {
         </div>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md" data-testid="department-dialog">
-          <DialogHeader>
-            <DialogTitle className="font-heading font-bold text-xl uppercase tracking-wider">
-              {editingDept ? "Edit Department" : "Add New Department"}
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-            <div>
-              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">Department Name *</Label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g., Lumber" className="input-workshop mt-2" data-testid="dept-name-input" />
-            </div>
-            <div>
-              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">Code (3 characters) *</Label>
-              <Input
-                value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase().slice(0, 3) })}
-                placeholder="e.g., LUM"
-                maxLength={3}
-                className="input-workshop mt-2 font-mono uppercase"
-                disabled={!!editingDept}
-                data-testid="dept-code-input"
-              />
-              {editingDept && <p className="text-xs text-slate-400 mt-1">Code cannot be changed after creation</p>}
-            </div>
-            <div>
-              <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">Description</Label>
-              <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Optional description" className="input-workshop mt-2" data-testid="dept-description-input" />
-            </div>
-            <div className="flex gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="flex-1 btn-secondary h-12" data-testid="dept-cancel-btn">Cancel</Button>
-              <Button type="submit" disabled={saving} className="flex-1 btn-primary h-12" data-testid="dept-save-btn">
-                {saving ? "Saving..." : editingDept ? "Update" : "Create"}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <EntityFormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        title="Department"
+        schema={deptSchema}
+        fields={FIELDS}
+        defaults={DEFAULTS}
+        entity={editingDept}
+        onSubmit={handleSubmit}
+        saving={createMutation.isPending || updateMutation.isPending}
+        testIdPrefix="dept"
+      />
 
       <ConfirmDialog
         open={deleteConfirm.open}

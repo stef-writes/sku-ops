@@ -25,7 +25,8 @@ from documents.application.import_parser import infer_uom as rule_infer_uom
 from shared.infrastructure.config import LLM_AVAILABLE as _LLM_AVAILABLE
 from shared.infrastructure.prompt_loader import load_prompt
 
-from documents.domain.document import DocumentImportRequest
+from documents.domain.document import DocumentImportRequest, Document
+from documents.infrastructure.document_repo import document_repo
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +38,34 @@ _PARSE_RETRY_DELAYS = (5, 15)  # seconds on rate limit
 _DOCUMENT_PARSE_SYSTEM = load_prompt(__file__, "document_parse_prompt.md")
 
 
+async def _persist_parsed_document(extracted: dict, filename: str, content_type: str, file_size: int, current_user: CurrentUser) -> dict:
+    """Save parsed document to the archive and return the extracted data with document_id."""
+    import hashlib
+    doc = Document(
+        filename=filename,
+        document_type="other",
+        vendor_name=extracted.get("vendor_name"),
+        file_hash=hashlib.sha256(filename.encode()).hexdigest()[:16],
+        file_size=file_size,
+        mime_type=content_type,
+        parsed_data=json.dumps(extracted),
+        status="parsed",
+        uploaded_by_id=current_user.id,
+        organization_id=current_user.organization_id,
+    )
+    try:
+        await document_repo.insert(doc)
+        extracted["document_id"] = doc.id
+    except Exception as e:
+        logger.warning(f"Failed to persist document record: {e}")
+    return extracted
+
+
 @router.post("/parse")
 async def parse_document(
     file: UploadFile = File(...),
     use_ai: bool = False,
-    _: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
+    current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
 ):
     """Parse image or PDF. use_ai=true uses Claude (requires ANTHROPIC_API_KEY); default uses free OCR."""
     contents = await file.read()
@@ -60,7 +84,7 @@ async def parse_document(
                     p["ordered_qty"] = qty
                 if "delivered_qty" not in p or p["delivered_qty"] is None:
                     p["delivered_qty"] = qty
-            return extracted
+            return await _persist_parsed_document(extracted, filename, content_type, len(contents), current_user)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
@@ -130,7 +154,7 @@ async def parse_document(
             # Signal downstream: skip redundant LLM re-enrichment
             p["_ai_parsed"] = True
 
-        return extracted
+        return await _persist_parsed_document(extracted, filename, content_type, len(contents), current_user)
     except json.JSONDecodeError as e:
         logger.error(f"Document parse JSON error: {e}")
         raise HTTPException(status_code=422, detail="Could not parse document data")
@@ -142,6 +166,32 @@ async def parse_document(
     except Exception as e:
         logger.error(f"Document parse error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("")
+async def list_documents(
+    status: str = None,
+    vendor_name: str = None,
+    po_id: str = None,
+    limit: int = 100,
+    offset: int = 0,
+    current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
+):
+    """List uploaded/parsed documents."""
+    return await document_repo.list_documents(
+        organization_id=current_user.organization_id,
+        status=status, vendor_name=vendor_name, po_id=po_id,
+        limit=limit, offset=offset,
+    )
+
+
+@router.get("/{doc_id}")
+async def get_document(doc_id: str, current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager"))):
+    doc = await document_repo.get_by_id(doc_id, current_user.organization_id)
+    if not doc:
+        from fastapi import HTTPException as _E
+        raise _E(status_code=404, detail="Document not found")
+    return doc
 
 
 async def _wired_classify_uom_batch(products):

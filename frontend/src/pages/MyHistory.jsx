@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
-import { Package, MapPin, ChevronDown, Send, Clock, CheckCircle, FileText, X } from "lucide-react";
+import { Package, MapPin, ChevronDown, Send, Clock, FileText, X } from "lucide-react";
 import { format } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { StatCard } from "@/components/StatCard";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -9,13 +10,6 @@ import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { useWithdrawals } from "@/hooks/useWithdrawals";
 import { useMaterialRequests } from "@/hooks/useMaterialRequests";
 import { dateToISO, endOfDayISO } from "@/lib/utils";
-
-const PAYMENT_OPTIONS = [
-  { value: "", label: "All statuses" },
-  { value: "unpaid", label: "Unpaid" },
-  { value: "invoiced", label: "Invoiced" },
-  { value: "paid", label: "Paid" },
-];
 
 const MyHistory = () => {
   const { user } = useAuth();
@@ -34,7 +28,7 @@ const MyHistory = () => {
 
   const requests = allRequests.filter?.((r) => r.status === "pending") || [];
   const totalSpent = withdrawals.reduce((sum, w) => sum + (w.total || 0), 0);
-  const totalUnpaid = withdrawals.filter((w) => w.payment_status === "unpaid").reduce((sum, w) => sum + (w.total || 0), 0);
+  const totalUninvoiced = withdrawals.filter((w) => !w.invoice_id).reduce((sum, w) => sum + (w.total || 0), 0);
 
   const hasFilters = dateRange.from || dateRange.to || paymentStatus;
 
@@ -53,7 +47,7 @@ const MyHistory = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <StatCard label="Total Withdrawals" value={withdrawals.length} />
         <StatCard label="Total Value" value={`$${totalSpent.toLocaleString("en-US", { minimumFractionDigits: 2 })}`} accent="emerald" />
-        <StatCard label="Unpaid Balance" value={`$${totalUnpaid.toLocaleString("en-US", { minimumFractionDigits: 2 })}`} accent="amber" />
+        <StatCard label="Uninvoiced" value={`$${totalUninvoiced.toLocaleString("en-US", { minimumFractionDigits: 2 })}`} accent="amber" />
       </div>
 
       {requests.length > 0 && (
@@ -82,15 +76,14 @@ const MyHistory = () => {
       <div data-testid="withdrawals-list">
         <div className="flex flex-wrap items-center gap-3 mb-3">
           <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Withdrawals</p>
-          <select
-            value={paymentStatus}
-            onChange={(e) => setPaymentStatus(e.target.value)}
-            className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
-          >
-            {PAYMENT_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+          <Select value={paymentStatus || "all"} onValueChange={(v) => setPaymentStatus(v === "all" ? "" : v)}>
+            <SelectTrigger className="h-8 w-[140px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="unpaid">Uninvoiced</SelectItem>
+              <SelectItem value="invoiced">Invoiced</SelectItem>
+            </SelectContent>
+          </Select>
           {hasFilters && (
             <button
               type="button"
@@ -114,11 +107,11 @@ const MyHistory = () => {
               <div key={w.id} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden" data-testid={`withdrawal-${w.id}`}>
                 <button className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50/80 transition-colors" onClick={() => setExpandedId(expandedId === w.id ? null : w.id)}>
                   <div className="flex items-center gap-3 min-w-0">
-                    <StatusIcon status={w.payment_status} />
+                    <StatusIcon status={w.invoice_id ? "invoiced" : "uninvoiced"} />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs text-slate-400">{w.id.slice(0, 8).toUpperCase()}</span>
-                        <StatusBadge status={w.payment_status} />
+                        <StatusBadge status={w.invoice_id ? "invoiced" : "uninvoiced"} />
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">{format(new Date(w.created_at), "MMM d, yyyy")} · Job: {w.job_id || "—"} · {w.items?.length || 0} items</p>
                     </div>
@@ -165,9 +158,9 @@ const MyHistory = () => {
 };
 
 function StatusIcon({ status }) {
-  const map = { paid: "bg-emerald-50 text-emerald-500", invoiced: "bg-blue-50 text-blue-500", unpaid: "bg-amber-50 text-amber-500" };
-  const Icon = status === "paid" ? CheckCircle : status === "invoiced" ? FileText : Clock;
-  return <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${map[status] || map.unpaid}`}><Icon className="w-4 h-4" /></div>;
+  const map = { invoiced: "bg-blue-50 text-blue-500", uninvoiced: "bg-amber-50 text-amber-500" };
+  const Icon = status === "invoiced" ? FileText : Clock;
+  return <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${map[status] || map.uninvoiced}`}><Icon className="w-4 h-4" /></div>;
 }
 
 export default MyHistory;

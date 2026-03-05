@@ -5,6 +5,7 @@ TABLES: list[str] = [
         id TEXT PRIMARY KEY,
         invoice_number TEXT UNIQUE NOT NULL,
         billing_entity TEXT NOT NULL DEFAULT '',
+        billing_entity_id TEXT,
         contact_name TEXT NOT NULL DEFAULT '',
         contact_email TEXT NOT NULL DEFAULT '',
         status TEXT NOT NULL DEFAULT 'draft',
@@ -58,6 +59,7 @@ TABLES: list[str] = [
         invoice_id TEXT,
         return_id TEXT,
         billing_entity TEXT NOT NULL DEFAULT '',
+        billing_entity_id TEXT,
         status TEXT NOT NULL DEFAULT 'draft',
         subtotal REAL NOT NULL DEFAULT 0,
         tax REAL NOT NULL DEFAULT 0,
@@ -80,6 +82,28 @@ TABLES: list[str] = [
         product_id TEXT
     )""",
 
+    """CREATE TABLE IF NOT EXISTS payments (
+        id TEXT PRIMARY KEY,
+        invoice_id TEXT,
+        billing_entity_id TEXT,
+        amount REAL NOT NULL,
+        method TEXT NOT NULL DEFAULT 'bank_transfer',
+        reference TEXT NOT NULL DEFAULT '',
+        payment_date TEXT NOT NULL,
+        notes TEXT,
+        recorded_by_id TEXT NOT NULL,
+        xero_payment_id TEXT,
+        organization_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )""",
+
+    """CREATE TABLE IF NOT EXISTS payment_withdrawals (
+        payment_id TEXT NOT NULL REFERENCES payments(id),
+        withdrawal_id TEXT NOT NULL REFERENCES withdrawals(id),
+        PRIMARY KEY (payment_id, withdrawal_id)
+    )""",
+
     """CREATE TABLE IF NOT EXISTS financial_ledger (
         id TEXT PRIMARY KEY,
         journal_id TEXT,
@@ -88,6 +112,7 @@ TABLES: list[str] = [
         department TEXT,
         job_id TEXT,
         billing_entity TEXT,
+        billing_entity_id TEXT,
         contractor_id TEXT,
         vendor_name TEXT,
         product_id TEXT,
@@ -116,5 +141,10 @@ INDEXES: list[str] = [
     "CREATE INDEX IF NOT EXISTS idx_fl_job ON financial_ledger(job_id, account)",
     "CREATE INDEX IF NOT EXISTS idx_fl_entity ON financial_ledger(billing_entity, account)",
     "CREATE INDEX IF NOT EXISTS idx_fl_journal ON financial_ledger(journal_id)",
+    "CREATE INDEX IF NOT EXISTS idx_payments_org ON payments(organization_id)",
+    "CREATE INDEX IF NOT EXISTS idx_payments_invoice ON payments(invoice_id)",
+    "CREATE INDEX IF NOT EXISTS idx_payments_entity ON payments(billing_entity_id)",
+    "CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(payment_date)",
+    "CREATE INDEX IF NOT EXISTS idx_payment_withdrawals_wid ON payment_withdrawals(withdrawal_id)",
     "CREATE INDEX IF NOT EXISTS idx_invoices_due_date ON invoices(due_date)",
 ]

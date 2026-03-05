@@ -16,6 +16,9 @@ import {
   History,
   FileText,
   ClipboardList,
+  Briefcase,
+  Building2,
+  CreditCard,
 } from "lucide-react";
 import ChatAssistant from "./ChatAssistant";
 
@@ -47,6 +50,7 @@ const Layout = ({ children }) => {
       { path: "/pos", icon: ShoppingCart, label: "Issue Materials" },
       { path: "/pending-requests", icon: ClipboardList, label: "Pending Requests" },
       { path: "/contractors", icon: HardHat, label: "Contractors" },
+      { path: "/jobs", icon: Briefcase, label: "Jobs" },
     ];
 
     const inventoryItems = [
@@ -65,6 +69,8 @@ const Layout = ({ children }) => {
       analyticsItems.push(
         { path: "/financials", icon: DollarSign, label: "Financials" },
         { path: "/invoices", icon: FileText, label: "Invoices" },
+        { path: "/payments", icon: CreditCard, label: "Payments" },
+        { path: "/billing-entities", icon: Building2, label: "Billing Entities" },
       );
     }
 

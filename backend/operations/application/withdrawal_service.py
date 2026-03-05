@@ -9,6 +9,8 @@ from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalC
 from operations.infrastructure.withdrawal_repo import withdrawal_repo as _default_withdrawal_repo
 from operations.ports.withdrawal_repo_port import WithdrawalRepoPort
 from finance.application.ledger_service import record_withdrawal as _record_ledger
+from jobs.infrastructure.job_repo import job_repo as _job_repo
+from identity.infrastructure.billing_entity_repo import billing_entity_repo as _be_repo
 
 CreateInvoiceFn = Optional[Callable[..., Awaitable[dict]]]
 ListProductsFn = Callable[..., Awaitable[list]]
@@ -48,6 +50,8 @@ async def create_withdrawal(
     Returns withdrawal dict with optional invoice_id.
     """
     org_id = current_user.organization_id
+    if data.job_id:
+        await _job_repo.ensure_job(data.job_id, org_id)
     products = await list_products(organization_id=org_id)
     product_map = {p["id"]: p for p in products}
     dept_map = {p["id"]: p.get("department_name", "") for p in products}
@@ -73,6 +77,12 @@ async def create_withdrawal(
         enriched_items.append(item)
     data = data.model_copy(update={"items": enriched_items})
 
+    billing_entity_name = contractor.get("billing_entity", "")
+    billing_entity_id = contractor.get("billing_entity_id")
+    if billing_entity_name and not billing_entity_id:
+        be = await _be_repo.ensure_billing_entity(billing_entity_name, org_id)
+        billing_entity_id = be.get("id") if be else None
+
     withdrawal = MaterialWithdrawal(
         items=data.items,
         job_id=data.job_id,
@@ -82,7 +92,8 @@ async def create_withdrawal(
         contractor_id=contractor["id"],
         contractor_name=contractor.get("name", ""),
         contractor_company=contractor.get("company", ""),
-        billing_entity=contractor.get("billing_entity", ""),
+        billing_entity=billing_entity_name,
+        billing_entity_id=billing_entity_id,
         payment_status="unpaid",
         processed_by_id=current_user.id,
         processed_by_name=current_user.name,

@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { ChevronDown, ChevronRight, CheckCircle, Clock, Loader2, Truck, BoxIcon, Filter, X } from "lucide-react";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -117,15 +118,14 @@ export default function PurchaseOrders() {
           <Filter className="w-3.5 h-3.5" />
           <span className="text-xs font-medium uppercase tracking-wide">Filter</span>
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
-        >
-          {PO_STATUSES.map((s) => (
-            <option key={s.value} value={s.value}>{s.label}</option>
-          ))}
-        </select>
+        <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
+          <SelectTrigger className="h-8 w-[140px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
+          <SelectContent>
+            {PO_STATUSES.map((s) => (
+              <SelectItem key={s.value || "all"} value={s.value || "all"}>{s.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {statusFilter && (
           <button
             type="button"

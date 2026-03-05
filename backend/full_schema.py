@@ -30,6 +30,14 @@ from purchasing.infrastructure.schema import (
     TABLES as _purchasing_tables,
     INDEXES as _purchasing_indexes,
 )
+from documents.infrastructure.schema import (
+    TABLES as _documents_tables,
+    INDEXES as _documents_indexes,
+)
+from jobs.infrastructure.schema import (
+    TABLES as _jobs_tables,
+    INDEXES as _jobs_indexes,
+)
 from assistant.infrastructure.schema import (
     TABLES as _assistant_tables,
     INDEXES as _assistant_indexes,
@@ -44,6 +52,8 @@ _ALL_TABLES: list[str] = (
     + _operations_tables
     + _finance_tables
     + _purchasing_tables
+    + _documents_tables
+    + _jobs_tables
     + _assistant_tables
 )
 
@@ -54,6 +64,8 @@ _ALL_INDEXES: list[str] = (
     + _operations_indexes
     + _finance_indexes
     + _purchasing_indexes
+    + _documents_indexes
+    + _jobs_indexes
     + _assistant_indexes
 )
 

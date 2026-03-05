@@ -6,6 +6,13 @@ import {
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Columns3,
   Search,
   ArrowUp,
@@ -76,18 +83,17 @@ function PillFilter({ label, value, onChange, options }) {
 
 function DropdownFilter({ label, value, onChange, options }) {
   return (
-    <select
-      value={value || ""}
-      onChange={(e) => onChange(e.target.value || null)}
-      className="h-7 px-2 pr-6 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_4px_center]"
-    >
-      <option value="">All {label}</option>
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+    <Select value={value || "__all__"} onValueChange={(v) => onChange(v === "__all__" ? null : v)}>
+      <SelectTrigger className="h-7 text-xs w-auto min-w-[100px]">
+        <SelectValue placeholder={`All ${label}`} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__all__">All {label}</SelectItem>
+        {options.map((opt) => (
+          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -95,18 +101,17 @@ function SortDropdown({ columns, sortBy, sortDir, onSortChange }) {
   if (columns.length === 0) return null;
   return (
     <div className="flex items-center gap-1">
-      <select
-        value={sortBy || ""}
-        onChange={(e) => onSortChange(e.target.value || null, sortDir)}
-        className="h-7 px-2 pr-6 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[right_4px_center]"
-      >
-        <option value="">Sort by…</option>
-        {columns.map((col) => (
-          <option key={col.key} value={col.key}>
-            {col.label}
-          </option>
-        ))}
-      </select>
+      <Select value={sortBy || "__none__"} onValueChange={(v) => onSortChange(v === "__none__" ? null : v, sortDir)}>
+        <SelectTrigger className="h-7 text-xs w-auto min-w-[90px]">
+          <SelectValue placeholder="Sort by…" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">Sort by…</SelectItem>
+          {columns.map((col) => (
+            <SelectItem key={col.key} value={col.key}>{col.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       {sortBy && (
         <button
           onClick={() =>

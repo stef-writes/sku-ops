@@ -49,6 +49,23 @@ class LineItem(BaseModel):
         return round_money(self.cost * self.quantity)
 
 
+class Address(BaseModel):
+    """Structured address value object."""
+    model_config = ConfigDict(extra="ignore")
+    line1: str = ""
+    line2: str = ""
+    city: str = ""
+    state: str = ""
+    postal_code: str = ""
+    country: str = "US"
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def display(self) -> str:
+        parts = [p for p in [self.line1, self.line2, self.city, self.state, self.postal_code] if p]
+        return ", ".join(parts)
+
+
 class CurrentUser(BaseModel):
     """Authenticated user context threaded through every request."""
     model_config = ConfigDict(extra="ignore")

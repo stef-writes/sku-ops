@@ -5,7 +5,9 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Search, Trash2, Check, HardHat, MapPin, FileText, Clock, Loader2, ScanLine, Plus } from "lucide-react";
+import { Search, Trash2, Check, HardHat, Clock, Loader2, ScanLine, Plus } from "lucide-react";
+import { JobPicker } from "@/components/JobPicker";
+import { AddressPicker } from "@/components/AddressPicker";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { QuantityControl } from "@/components/QuantityControl";
 import { useProducts } from "@/hooks/useProducts";
@@ -158,12 +160,12 @@ const IssueMaterials = () => {
             </div>
           )}
           <div>
-            <Label className="text-slate-600 font-medium text-sm mb-2 block"><FileText className="w-4 h-4 inline mr-1" />Job ID *</Label>
-            <Input value={jobId} onChange={(e) => setJobId(e.target.value)} placeholder="e.g. JOB-2024-001" data-testid="job-id-input" />
+            <Label className="text-slate-600 font-medium text-sm mb-2 block">Job ID *</Label>
+            <JobPicker value={jobId} onChange={setJobId} required />
           </div>
           <div>
-            <Label className="text-slate-600 font-medium text-sm mb-2 block"><MapPin className="w-4 h-4 inline mr-1" />Service Address *</Label>
-            <Input value={serviceAddress} onChange={(e) => setServiceAddress(e.target.value)} placeholder="Where are these going?" data-testid="service-address-input" />
+            <Label className="text-slate-600 font-medium text-sm mb-2 block">Service Address *</Label>
+            <AddressPicker value={serviceAddress} onChange={setServiceAddress} required />
           </div>
         </div>
       </div>

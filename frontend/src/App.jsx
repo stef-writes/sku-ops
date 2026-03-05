@@ -8,20 +8,18 @@ import { ROLES, ADMIN_ROLES } from "./lib/constants";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
-import POS from "./pages/POS";
 import Inventory from "./pages/inventory";
 import Vendors from "./pages/Vendors";
 import Departments from "./pages/Departments";
 import ReceiptImport from "./pages/ReceiptImport";
 import PurchaseOrders from "./pages/PurchaseOrders";
 import Reports from "./pages/Reports";
-import Contractors from "./pages/Contractors";
-import Financials from "./pages/Financials";
-import Invoices from "./pages/Invoices";
 import MyHistory from "./pages/MyHistory";
-import RequestMaterials from "./pages/RequestMaterials";
-import PendingRequests from "./pages/PendingRequests";
 import Layout from "./components/Layout";
+
+import { POS, PendingRequests, RequestMaterials, Contractors, Jobs } from "./pages/operations";
+import { Financials, Invoices, Payments } from "./pages/finance";
+import { BillingEntities } from "./pages/identity";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -65,8 +63,11 @@ function App() {
                           <Route path="/purchase-orders" element={<ProtectedRoute allowedRoles={ADMIN_ROLES}><PurchaseOrders /></ProtectedRoute>} />
                           <Route path="/reports" element={<ProtectedRoute allowedRoles={ADMIN_ROLES}><Reports /></ProtectedRoute>} />
                           <Route path="/contractors" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><Contractors /></ProtectedRoute>} />
+                          <Route path="/jobs" element={<ProtectedRoute allowedRoles={ADMIN_ROLES}><Jobs /></ProtectedRoute>} />
                           <Route path="/financials" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><Financials /></ProtectedRoute>} />
                           <Route path="/invoices" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><Invoices /></ProtectedRoute>} />
+                          <Route path="/payments" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><Payments /></ProtectedRoute>} />
+                          <Route path="/billing-entities" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><BillingEntities /></ProtectedRoute>} />
                           <Route path="/my-history" element={<ProtectedRoute allowedRoles={[ROLES.CONTRACTOR]}><MyHistory /></ProtectedRoute>} />
                         </Routes>
                       </ErrorBoundary>
