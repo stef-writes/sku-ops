@@ -54,7 +54,8 @@ async def seed_standard_departments(organization_id: str = "default") -> None:
     ]
     for d in standard:
         if not await get_department_by_code(d["code"], organization_id):
-            d_dict = Department(**d).model_dump()
+            dept = Department(name=d["name"], code=d["code"], description=d.get("description", ""))
+            d_dict = dept.model_dump()
             d_dict["organization_id"] = organization_id
             await insert_department(d_dict)
 

@@ -1,42 +1,23 @@
-import { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/ui/select";
-import {
-  Upload,
-  FileImage,
-  ClipboardList,
-  XCircle,
-  CheckCircle,
-  Package,
-  Loader2,
-  Trash2,
-  Sparkles,
-  FileSpreadsheet,
-  FileText,
-  Search,
-  Link2,
-  Plus,
-} from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Upload, FileImage, ClipboardList, XCircle, CheckCircle, Package, Loader2, Trash2, Sparkles, FileSpreadsheet, FileText } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { API } from "@/lib/api";
 import { UOM_OPTIONS } from "@/lib/constants";
+import api from "@/lib/api-client";
+import { getErrorMessage } from "@/lib/api-client";
+import { useDepartments } from "@/hooks/useDepartments";
+import { useVendors } from "@/hooks/useVendors";
 
 const ReceiptImport = () => {
   const navigate = useNavigate();
-  const [departments, setDepartments] = useState([]);
-  const [vendors, setVendors] = useState([]);
+  const { data: departments = [] } = useDepartments();
+  const { data: vendors = [] } = useVendors();
   const [selectedDept, setSelectedDept] = useState("");
   const [selectedVendor, setSelectedVendor] = useState("");
   const [file, setFile] = useState(null);
@@ -50,31 +31,7 @@ const ReceiptImport = () => {
   const [csvFile, setCsvFile] = useState(null);
   const [csvImporting, setCsvImporting] = useState(false);
   const [csvResult, setCsvResult] = useState(null);
-  // product_id → { matched: product|null, options: [], searching: false, query: "" }
   const [productMatches, setProductMatches] = useState({});
-
-  useEffect(() => {
-    fetchDepartments();
-    fetchVendors();
-  }, []);
-
-  const fetchDepartments = async () => {
-    try {
-      const response = await axios.get(`${API}/departments`);
-      setDepartments(response.data);
-    } catch (error) {
-      console.error("Error fetching departments:", error);
-    }
-  };
-
-  const fetchVendors = async () => {
-    try {
-      const response = await axios.get(`${API}/vendors`);
-      setVendors(response.data);
-    } catch (error) {
-      console.error("Error fetching vendors:", error);
-    }
-  };
 
   const isImageOrPdf = (file) => {
     if (!file) return false;
@@ -127,14 +84,11 @@ const ReceiptImport = () => {
       const formData = new FormData();
       formData.append("file", file);
 
-      const url = `${API}/documents/parse${useAi ? "?use_ai=true" : ""}`;
-      const response = await axios.post(url, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const response = await api.documents.parse(formData, useAi);
 
-      setExtractedData(response.data);
-      setVendorName(response.data.vendor_name || "");
-      const mapped = (response.data.products || []).map((p, idx) => ({
+      setExtractedData(response);
+      setVendorName(response.vendor_name || "");
+      const mapped = (response.products || []).map((p, idx) => ({
         ...p,
         id: idx,
         selected: true,
@@ -214,7 +168,7 @@ const ReceiptImport = () => {
 
     setImporting(true);
     try {
-      await axios.post(`${API}/purchase-orders`, {
+      await api.purchaseOrders.create({
         vendor_name: vName,
         create_vendor_if_missing: createVendorIfMissing,
         department_id: selectedDept || null,
@@ -231,7 +185,7 @@ const ReceiptImport = () => {
       setVendorName("");
       navigate("/purchase-orders");
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Failed to save purchase order");
+      toast.error(getErrorMessage(error));
     } finally {
       setImporting(false);
     }
@@ -253,8 +207,8 @@ const ReceiptImport = () => {
       products.map(async (p) => {
         if (!p.name?.trim()) return;
         try {
-          const res = await axios.get(`${API}/products?search=${encodeURIComponent(p.name)}&limit=5`);
-          const options = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+          const data = await api.products.list({ search: p.name, limit: 5 });
+          const options = Array.isArray(data) ? data : (data?.items || []);
           updates[p.id] = { matched: null, options, searching: false, query: "" };
         } catch {
           updates[p.id] = { matched: null, options: [], searching: false, query: "" };
@@ -267,8 +221,8 @@ const ReceiptImport = () => {
   const searchMatch = async (itemId, query) => {
     setProductMatches((prev) => ({ ...prev, [itemId]: { ...prev[itemId], searching: true, query } }));
     try {
-      const res = await axios.get(`${API}/products?search=${encodeURIComponent(query)}&limit=5`);
-      const options = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+      const data = await api.products.list({ search: query, limit: 5 });
+      const options = Array.isArray(data) ? data : (data?.items || []);
       setProductMatches((prev) => ({ ...prev, [itemId]: { ...prev[itemId], options, searching: false } }));
     } catch {
       setProductMatches((prev) => ({ ...prev, [itemId]: { ...prev[itemId], searching: false } }));
@@ -308,20 +262,14 @@ const ReceiptImport = () => {
       formData.append("department_id", selectedDept);
       if (selectedVendor) formData.append("vendor_id", selectedVendor);
 
-      const response = await axios.post(`${API}/products/import-csv`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const result = await api.products.importCsv(formData);
 
-      setCsvResult(response.data);
-      toast.success(`Imported ${response.data.imported} products`);
-      if (response.data.errors > 0) {
-        toast.warning(`${response.data.errors} rows had errors`);
-      }
-      if (response.data.warnings?.length > 0) {
-        toast.info(`${response.data.warnings.length} product(s) had invalid barcode; SKU used instead`);
-      }
+      setCsvResult(result);
+      toast.success(`Imported ${result.imported} products`);
+      if (result.errors > 0) toast.warning(`${result.errors} rows had errors`);
+      if (result.warnings?.length > 0) toast.info(`${result.warnings.length} product(s) had invalid barcode`);
     } catch (error) {
-      toast.error(error.response?.data?.detail || "CSV import failed");
+      toast.error(getErrorMessage(error));
     } finally {
       setCsvImporting(false);
     }
@@ -329,18 +277,9 @@ const ReceiptImport = () => {
 
   return (
     <div className="p-8" data-testid="receipt-import-page">
-      {/* Header with AI badge */}
       <div className="mb-8">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 mb-4">
-          <Package className="w-4 h-4 text-slate-600" />
-          <span className="text-sm font-medium text-slate-700">Inventory</span>
-        </div>
-        <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
-          Receive Inventory
-        </h1>
-        <p className="text-slate-500 mt-1 text-sm">
-          Upload a delivery receipt or vendor invoice to add products to stock; or bulk import from CSV
-        </p>
+        <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Receive / Import</h1>
+        <p className="text-slate-500 mt-1 text-sm">Upload a delivery receipt or vendor invoice to add products, or bulk import from CSV</p>
       </div>
 
       <Tabs defaultValue="receipt" className="mt-4">

@@ -48,7 +48,8 @@ async def extract_and_save(
             system=_EXTRACT_SYSTEM,
             messages=[{"role": "user", "content": "\n\n".join(turns)}],
         )
-        raw = (response.content[0].text or "").strip()
+        block = response.content[0]
+        raw = (block.text if hasattr(block, "text") else "").strip()  # type: ignore[union-attr]
 
         if raw.startswith("```"):
             raw = raw.split("```")[1].lstrip("json").strip()

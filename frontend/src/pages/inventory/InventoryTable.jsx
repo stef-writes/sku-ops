@@ -113,8 +113,13 @@ export function InventoryTable({
                   </td>
                   <td>{product.department_name}</td>
                   <td className="text-sm text-slate-600">
-                    {product.sell_uom || "each"}
-                    {(product.pack_qty || 1) > 1 ? ` ×${product.pack_qty}` : ""}
+                    {product.base_unit || "each"}
+                    {product.sell_uom && product.sell_uom !== product.base_unit && (
+                      <span className="block text-xs text-slate-400">sell: {product.sell_uom}{(product.pack_qty || 1) > 1 ? ` ×${product.pack_qty}` : ""}</span>
+                    )}
+                    {product.sell_uom === product.base_unit && (product.pack_qty || 1) > 1 && (
+                      <span className="block text-xs text-slate-400">×{product.pack_qty}</span>
+                    )}
                   </td>
                   <td className="font-mono">${product.price.toFixed(2)}</td>
                   <td className="font-mono text-slate-500">${(product.cost || 0).toFixed(2)}</td>

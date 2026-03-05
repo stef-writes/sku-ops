@@ -160,15 +160,15 @@ async def update_product(
             update_data["vendor_name"] = ""
 
     async with transaction() as conn:
-        # Adjust department product_count if department changed
         if "department_id" in update_data:
-            old_dept = product.get("department_id")
-            new_dept = update_data["department_id"]
+            old_dept: str | None = product.get("department_id")
+            new_dept: str | None = update_data["department_id"]
             if old_dept != new_dept:
-                await department_repo.increment_product_count(old_dept, -1, conn=conn)
-                await department_repo.increment_product_count(new_dept, 1, conn=conn)
+                if old_dept:
+                    await department_repo.increment_product_count(old_dept, -1, conn=conn)
+                if new_dept:
+                    await department_repo.increment_product_count(new_dept, 1, conn=conn)
 
-        # Adjust vendor product_count if vendor changed
         if "vendor_id" in update_data:
             old_vendor = product.get("vendor_id") or ""
             new_vendor = update_data.get("vendor_id") or ""
@@ -179,6 +179,8 @@ async def update_product(
                     await vendor_repo.increment_product_count(new_vendor, 1, conn=conn)
 
         result = await product_repo.update(product_id, update_data, conn=conn)
+    if not result:
+        raise ResourceNotFoundError("Product", product_id)
     return result
 
 

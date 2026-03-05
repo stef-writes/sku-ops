@@ -4,11 +4,11 @@ from __future__ import annotations
 import os
 import re
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from typing import AsyncIterator, Sequence
 
 import asyncpg
 
-from shared.infrastructure.db.protocol import DictRow
+from shared.infrastructure.db.protocol import Connection, DictRow
 
 
 # ── Placeholder conversion ────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ class PgPoolProxy:
                 status = await conn.execute(converted, *params)
                 return PgCursor([], status or "")
 
-    async def executemany(self, sql: str, params_list: list[tuple | list]) -> None:
+    async def executemany(self, sql: str, params_list: Sequence[tuple | list]) -> None:
         converted = _convert_sql(sql)
         async with self._pool.acquire() as conn:
             await conn.executemany(converted, params_list)
@@ -125,7 +125,7 @@ class PgTransactionProxy:
             status = await self._conn.execute(converted, *params)
             return PgCursor([], status or "")
 
-    async def executemany(self, sql: str, params_list: list[tuple | list]) -> None:
+    async def executemany(self, sql: str, params_list: Sequence[tuple | list]) -> None:
         converted = _convert_sql(sql)
         await self._conn.executemany(converted, params_list)
 
@@ -153,13 +153,13 @@ class PostgresBackend:
             max_size=max_size,
         )
 
-    def connection(self) -> PgPoolProxy:
+    def connection(self) -> Connection:
         if self._pool is None:
             raise RuntimeError("Database not initialized. Call connect() at startup.")
         return PgPoolProxy(self._pool)
 
     @asynccontextmanager
-    async def transaction(self) -> AsyncIterator[PgTransactionProxy]:
+    async def transaction(self) -> AsyncIterator[Connection]:
         if self._pool is None:
             raise RuntimeError("Database not initialized. Call connect() at startup.")
         async with self._pool.acquire() as conn:

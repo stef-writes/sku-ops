@@ -50,7 +50,7 @@ def assert_tool_called(tool_name: str, tool_calls: list[dict]) -> AssertionResul
 
 def assert_min_tools_called(n: int, tool_calls: list[dict]) -> AssertionResult:
     """Check that at least N distinct tools were invoked."""
-    unique = set(tc.get("tool") for tc in tool_calls)
+    unique: set[str] = {tc["tool"] for tc in tool_calls if tc.get("tool") is not None}
     ok = len(unique) >= n
     return AssertionResult(
         name=f"min_tools_called:{n}",

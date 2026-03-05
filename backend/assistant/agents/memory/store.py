@@ -8,6 +8,7 @@ import json
 import logging
 import uuid
 from datetime import datetime, timezone, timedelta
+from typing import Any
 
 from shared.infrastructure.database import get_connection
 
@@ -23,7 +24,7 @@ async def save(org_id: str, user_id: str, session_id: str, artifacts: list[dict]
     conn = get_connection()
     now = datetime.now(timezone.utc).isoformat()
     expires_at = (datetime.now(timezone.utc) + timedelta(days=_DEFAULT_TTL_DAYS)).isoformat()
-    rows = [
+    rows: list[tuple[Any, ...]] = [
         (
             str(uuid.uuid4()),
             org_id,

@@ -26,23 +26,19 @@ async def _get_withdrawal(wid: str, org_id: str) -> Optional[dict]:
     return await _withdrawal_getter(wid, organization_id=org_id)
 
 
-def _invoice_row_to_dict(row) -> Optional[dict]:
-    if row is None:
-        return None
-    return dict(row) if hasattr(row, "keys") else None
+def _invoice_row_to_dict(row) -> dict:
+    return dict(row)
 
 
-def _line_item_row_to_dict(row) -> Optional[dict]:
-    if row is None:
-        return None
-    d = dict(row) if hasattr(row, "keys") else None
-    if d and "quantity" in d:
+def _line_item_row_to_dict(row) -> dict:
+    d = dict(row)
+    if "quantity" in d:
         d["quantity"] = float(d["quantity"])
-    if d and "unit_price" in d:
+    if "unit_price" in d:
         d["unit_price"] = float(d["unit_price"])
-    if d and "amount" in d:
+    if "amount" in d:
         d["amount"] = float(d["amount"])
-    if d and "cost" in d:
+    if "cost" in d:
         d["cost"] = float(d["cost"])
     return d
 
@@ -69,7 +65,7 @@ async def _next_invoice_number(organization_id: Optional[str] = None, conn=None)
     return f"INV-{str(num).zfill(5)}"
 
 
-async def insert(invoice: Union[Invoice, dict]) -> dict:
+async def insert(invoice: Union[Invoice, dict]) -> Optional[dict]:
     invoice_dict = invoice if isinstance(invoice, dict) else invoice.model_dump()
     conn = get_connection()
     org_id = invoice_dict.get("organization_id") or "default"
@@ -198,7 +194,6 @@ async def update(
     now = datetime.now(timezone.utc).isoformat()
 
     if line_items is not None:
-        # Replace line items
         await conn.execute("DELETE FROM invoice_line_items WHERE invoice_id = ?", (invoice_id,))
         subtotal = 0.0
         for item in line_items:
@@ -220,16 +215,15 @@ async def update(
                 ),
             )
             subtotal += amt
-        tax_val = tax if tax is not None else inv.get("tax", 0)
+        tax_val = tax if tax is not None else float(inv.get("tax", 0))
         total = round(subtotal + tax_val, 2)
         await conn.execute(
             """UPDATE invoices SET subtotal = ?, tax = ?, total = ?, updated_at = ? WHERE id = ?""",
             (subtotal, tax_val, total, now, invoice_id),
         )
     else:
-        # Update fields only
-        updates = []
-        params = []
+        updates: list[str] = []
+        params: list[str | float] = []
         if billing_entity is not None:
             updates.append("billing_entity = ?")
             params.append(billing_entity)
@@ -246,7 +240,7 @@ async def update(
             updates.append("notes = ?")
             params.append(notes)
         if tax is not None:
-            inv_subtotal = inv.get("subtotal", 0)
+            inv_subtotal = float(inv.get("subtotal", 0))
             total = round(inv_subtotal + tax, 2)
             updates.append("tax = ?")
             params.append(tax)

@@ -28,7 +28,6 @@ async def get_financial_summary(
 ):
     """P&L summary sourced from the financial ledger."""
     org_id = current_user.organization_id
-    kw = dict(org_id=org_id, start_date=start_date, end_date=end_date)
 
     (
         accounts,
@@ -38,12 +37,12 @@ async def get_financial_summary(
         ar_aging_rows,
         counts,
     ) = await asyncio.gather(
-        ledger_repo.summary_by_account(**kw),
-        ledger_repo.summary_by_department(**kw),
-        ledger_repo.summary_by_billing_entity(**kw),
-        ledger_repo.summary_by_contractor(**kw),
+        ledger_repo.summary_by_account(org_id, start_date=start_date, end_date=end_date),
+        ledger_repo.summary_by_department(org_id, start_date=start_date, end_date=end_date),
+        ledger_repo.summary_by_billing_entity(org_id, start_date=start_date, end_date=end_date),
+        ledger_repo.summary_by_contractor(org_id, start_date=start_date, end_date=end_date),
         ledger_repo.ar_aging(org_id),
-        ledger_repo.reference_counts(**kw),
+        ledger_repo.reference_counts(org_id, start_date=start_date, end_date=end_date),
     )
 
     revenue = accounts.get("revenue", 0)

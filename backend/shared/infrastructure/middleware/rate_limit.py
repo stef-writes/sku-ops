@@ -22,7 +22,7 @@ limiter = Limiter(key_func=get_remote_address, default_limits=[_API_LIMIT])
 def setup_rate_limiting(app: FastAPI) -> None:
     """Attach the limiter to the app and register the error handler."""
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
 
 # Decorators for use in route modules:

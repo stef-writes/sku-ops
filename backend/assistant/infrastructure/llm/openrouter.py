@@ -29,11 +29,9 @@ class OpenRouterProvider:
     @lru_cache(maxsize=32)
     def _cached_model(self, model_id: str) -> Any:
         from pydantic_ai.models.openai import OpenAIModel
-        return OpenAIModel(
-            model_id,
-            base_url=self._base_url,
-            api_key=self._api_key,
-        )
+        from pydantic_ai.providers.openai import OpenAIProvider
+        provider = OpenAIProvider(api_key=self._api_key, base_url=self._base_url)
+        return OpenAIModel(model_id, provider=provider)
 
     def estimate_cost(
         self,

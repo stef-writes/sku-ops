@@ -8,6 +8,7 @@ from kernel.errors import ResourceNotFoundError
 from kernel.types import CurrentUser
 from catalog.domain.errors import DuplicateBarcodeError, InvalidBarcodeError
 from catalog.domain.product import Product, ProductCreate, ProductUpdate
+from catalog.domain.units import compute_sell_fields
 from catalog.infrastructure.department_repo import department_repo
 from catalog.infrastructure.product_repo import product_repo
 from catalog.infrastructure.vendor_repo import vendor_repo
@@ -21,9 +22,22 @@ from catalog.api.schemas import SuggestUomRequest
 router = APIRouter(prefix="/products", tags=["products"])
 
 _CONTRACTOR_HIDDEN_FIELDS = {
-    "cost", "vendor_id", "vendor_name", "min_stock",
+    "cost", "sell_cost", "vendor_id", "vendor_name", "min_stock",
     "original_sku", "vendor_barcode", "pack_qty", "organization_id",
 }
+
+
+def _enrich_sell_fields(product: dict) -> dict:
+    """Add pre-computed sell_price, sell_cost, sell_quantity for POS display."""
+    product.update(compute_sell_fields(
+        price=product.get("price", 0.0),
+        cost=product.get("cost", 0.0),
+        quantity=product.get("quantity", 0),
+        base_unit=product.get("base_unit", "each"),
+        sell_uom=product.get("sell_uom", "each"),
+        pack_qty=product.get("pack_qty", 1),
+    ))
+    return product
 
 
 def _strip_for_contractor(product: dict) -> dict:
@@ -50,6 +64,7 @@ async def get_products(
         offset=offset,
         organization_id=org_id,
     )
+    items = [_enrich_sell_fields(p) for p in items]
     if is_contractor:
         items = [_strip_for_contractor(p) for p in items]
     if limit is not None:
@@ -70,6 +85,7 @@ async def get_product_by_barcode(barcode: str, current_user: CurrentUser = Depen
     product = await product_repo.find_by_barcode(barcode.strip(), organization_id=org_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+    _enrich_sell_fields(product)
     if current_user.role == "contractor":
         return _strip_for_contractor(product)
     return product
@@ -81,6 +97,7 @@ async def get_product(product_id: str, current_user: CurrentUser = Depends(get_c
     product = await product_repo.get_by_id(product_id, organization_id=org_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+    _enrich_sell_fields(product)
     if current_user.role == "contractor":
         return _strip_for_contractor(product)
     return product
@@ -97,7 +114,7 @@ async def suggest_uom(data: SuggestUomRequest, current_user: CurrentUser = Depen
     return result
 
 
-@router.post("", response_model=Product)
+@router.post("")
 async def create_product(data: ProductCreate, current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager"))):
     org_id = current_user.organization_id
     department = await department_repo.get_by_id(data.department_id, org_id)
@@ -132,14 +149,14 @@ async def create_product(data: ProductCreate, current_user: CurrentUser = Depend
             organization_id=org_id,
             on_stock_import=process_import_stock_changes,
         )
-        return product
+        return _enrich_sell_fields(product.model_dump())
     except DuplicateBarcodeError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except InvalidBarcodeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.put("/{product_id}", response_model=Product)
+@router.put("/{product_id}")
 async def update_product(product_id: str, data: ProductUpdate, current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager"))):
     org_id = current_user.organization_id
     product = await product_repo.get_by_id(product_id, organization_id=org_id)
@@ -155,7 +172,7 @@ async def update_product(product_id: str, data: ProductUpdate, current_user: Cur
         raise HTTPException(status_code=409, detail=str(e))
     except InvalidBarcodeError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return result
+    return _enrich_sell_fields(result)
 
 
 @router.delete("/{product_id}")

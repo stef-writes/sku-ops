@@ -1,8 +1,8 @@
 """Database protocol — interface contract for SQLite and PostgreSQL adapters."""
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
-from typing import AsyncIterator, Protocol, runtime_checkable
+from contextlib import AbstractAsyncContextManager
+from typing import Protocol, Sequence, runtime_checkable
 
 
 class DictRow(dict):
@@ -46,7 +46,7 @@ class Connection(Protocol):
 
     async def execute(self, sql: str, params: tuple | list = ()) -> Cursor: ...
 
-    async def executemany(self, sql: str, params_list: list[tuple | list]) -> None: ...
+    async def executemany(self, sql: str, params_list: Sequence[tuple | list]) -> None: ...
 
     async def commit(self) -> None: ...
 
@@ -62,7 +62,6 @@ class DatabaseBackend(Protocol):
 
     def connection(self) -> Connection: ...
 
-    @asynccontextmanager
-    async def transaction(self) -> AsyncIterator[Connection]: ...
+    def transaction(self) -> AbstractAsyncContextManager[Connection]: ...
 
     async def close(self) -> None: ...

@@ -1,5 +1,5 @@
 """Invoice repository port — testable contract for invoice persistence."""
-from typing import List, Optional, Protocol, runtime_checkable
+from typing import List, Optional, Protocol, Union, runtime_checkable
 
 from finance.domain.invoice import Invoice, InvoiceLineItem
 
@@ -7,7 +7,7 @@ from finance.domain.invoice import Invoice, InvoiceLineItem
 @runtime_checkable
 class InvoiceRepoPort(Protocol):
 
-    async def insert(self, invoice: Invoice) -> dict: ...
+    async def insert(self, invoice: Union[Invoice, dict]) -> Optional[dict]: ...
 
     async def get_by_id(
         self, invoice_id: str, organization_id: Optional[str] = None,

@@ -25,7 +25,7 @@ class ImportDeps:
     get_product_by_id: Callable[..., Awaitable[Any]]
     find_product_by_sku_and_vendor: Callable[..., Awaitable[Any]]
     find_product_by_name_and_vendor: Callable[..., Awaitable[Any]]
-    update_product: Callable[..., Awaitable[None]]
+    update_product: Callable[..., Awaitable[Any]]
     validate_barcode: Callable[..., Any]
     create_product: Callable[..., Awaitable[Any]]
     process_receiving_stock_changes: Callable[..., Awaitable[None]]

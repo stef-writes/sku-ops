@@ -97,22 +97,26 @@ async def _get_inventory_stats(org_id: str) -> str:
         "SELECT COUNT(*) FROM products WHERE (organization_id = ? OR organization_id IS NULL)",
         (org_id,),
     )
-    total_skus = (await cur.fetchone())[0]
+    row = await cur.fetchone()
+    total_skus = row[0] if row else 0
     cur = await conn.execute(
         "SELECT COALESCE(SUM(quantity * cost), 0) FROM products WHERE (organization_id = ? OR organization_id IS NULL)",
         (org_id,),
     )
-    total_value = round(float((await cur.fetchone())[0] or 0), 2)
+    row = await cur.fetchone()
+    total_value = round(float(row[0] if row else 0), 2)
     cur = await conn.execute(
         "SELECT COUNT(*) FROM products WHERE quantity <= min_stock AND (organization_id = ? OR organization_id IS NULL)",
         (org_id,),
     )
-    low_count = (await cur.fetchone())[0]
+    row = await cur.fetchone()
+    low_count = row[0] if row else 0
     cur = await conn.execute(
         "SELECT COUNT(*) FROM products WHERE quantity = 0 AND (organization_id = ? OR organization_id IS NULL)",
         (org_id,),
     )
-    out_of_stock = (await cur.fetchone())[0]
+    row = await cur.fetchone()
+    out_of_stock = row[0] if row else 0
     return json.dumps({
         "total_skus": total_skus,
         "_note": "total_skus is the count of distinct product lines. No meaningful total unit count exists because products are measured in different units (each, gallon, box, etc.).",

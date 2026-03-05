@@ -80,7 +80,7 @@ async def list_runs(
         f"SELECT * FROM agent_runs WHERE {where} ORDER BY created_at DESC LIMIT ?",
         params,
     )
-    return await cur.fetchall()
+    return [dict(r) for r in await cur.fetchall()]
 
 
 async def get_stats(*, hours: int = 24) -> dict:
@@ -141,7 +141,7 @@ async def get_session_trace(session_id: str) -> list[dict]:
         "SELECT * FROM agent_runs WHERE session_id = ? ORDER BY created_at ASC",
         (session_id,),
     )
-    rows = await cur.fetchall()
+    rows: list[dict] = [dict(r) for r in await cur.fetchall()]
     for r in rows:
         if isinstance(r.get("tool_calls"), str):
             r["tool_calls"] = json.loads(r["tool_calls"])
@@ -167,4 +167,4 @@ async def get_cost_breakdown(*, days: int = 7, group_by: str = "agent") -> list[
             ORDER BY day DESC, cost DESC""",
         list(since_params),
     )
-    return await cur.fetchall()
+    return [dict(r) for r in await cur.fetchall()]

@@ -40,4 +40,3 @@ class User(Entity):
     billing_entity: Optional[str] = None
     phone: Optional[str] = None
     is_active: bool = True
-    organization_id: Optional[str] = None

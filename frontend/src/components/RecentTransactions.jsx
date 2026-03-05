@@ -1,53 +1,80 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
-import axios from "axios";
-import { toast } from "sonner";
-import { ArrowRight, ExternalLink } from "lucide-react";
-import { Card } from "@tremor/react";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowRight, ExternalLink, Filter, X } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { API } from "@/lib/api";
+import api from "@/lib/api-client";
+import { dashboardKeys } from "@/hooks/useDashboard";
 
-/**
- * RecentTransactions — self-contained card that fetches and displays
- * recent withdrawals with itemized line items. Structure: withdrawal (parent) → items (children).
- */
-export function RecentTransactions({ onProductStockHistory }) {
-  const [withdrawals, setWithdrawals] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [timeRange, setTimeRange] = useState("24h");
-  const [hasMore, setHasMore] = useState(false);
-  const withdrawalsRef = useRef([]);
-  withdrawalsRef.current = withdrawals;
+const PAYMENT_STATUSES = [
+  { value: "", label: "All statuses" },
+  { value: "unpaid", label: "Unpaid" },
+  { value: "invoiced", label: "Invoiced" },
+  { value: "paid", label: "Paid" },
+];
 
-  const fetchTransactions = useCallback(
-    async (reset = true) => {
-      setLoading(true);
-      try {
-        const offset = reset ? 0 : withdrawalsRef.current.length;
-        const res = await axios.get(
-          `${API}/dashboard/transactions?limit=20&offset=${offset}&time_range=${timeRange}`
-        );
-        const next = res.data.withdrawals || [];
-        setHasMore(res.data.has_more ?? false);
-        setWithdrawals((prev) => (reset ? next : [...prev, ...next]));
-      } catch (err) {
-        toast.error("Failed to load transactions");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [timeRange]
-  );
+function dateToISO(d) {
+  if (!d) return undefined;
+  const dt = new Date(d);
+  dt.setHours(0, 0, 0, 0);
+  return dt.toISOString();
+}
+
+function endOfDayISO(d) {
+  if (!d) return undefined;
+  const dt = new Date(d);
+  dt.setHours(23, 59, 59, 999);
+  return dt.toISOString();
+}
+
+export function RecentTransactions({ dateRange, onProductStockHistory }) {
+  const [contractorId, setContractorId] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [allRows, setAllRows] = useState([]);
+
+  const { data: contractors } = useQuery({
+    queryKey: ["contractors"],
+    queryFn: () => api.contractors.list(),
+    staleTime: 60_000,
+  });
+
+  const params = useMemo(() => {
+    const p = { limit: 20, offset };
+    if (dateRange?.from) p.start_date = dateToISO(dateRange.from);
+    if (dateRange?.to) p.end_date = endOfDayISO(dateRange.to);
+    if (contractorId) p.contractor_id = contractorId;
+    if (paymentStatus) p.payment_status = paymentStatus;
+    return p;
+  }, [dateRange, contractorId, paymentStatus, offset]);
+
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: dashboardKeys.transactions(params),
+    queryFn: () => api.dashboard.transactions(params),
+    keepPreviousData: true,
+  });
 
   useEffect(() => {
-    fetchTransactions(true);
-  }, [fetchTransactions]);
+    if (!data) return;
+    setAllRows((prev) => (offset === 0 ? data.withdrawals : [...prev, ...data.withdrawals]));
+  }, [data, offset]);
 
-  const handleLoadMore = () => fetchTransactions(false);
+  useEffect(() => {
+    setOffset(0);
+    setAllRows([]);
+  }, [dateRange, contractorId, paymentStatus]);
+
+  const hasMore = data?.has_more ?? false;
+  const activeFilterCount = (contractorId ? 1 : 0) + (paymentStatus ? 1 : 0);
+
+  const clearFilters = () => {
+    setContractorId("");
+    setPaymentStatus("");
+  };
 
   return (
-    <Card className="card-workshop p-6 mb-6" data-testid="recent-transactions-terminal">
+    <div className="bg-white border border-slate-200 rounded-xl p-6 mb-6 shadow-sm" data-testid="recent-transactions-terminal">
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
         <h2 className="text-lg font-semibold text-slate-900">Recent Transactions</h2>
         <Link
@@ -58,35 +85,51 @@ export function RecentTransactions({ onProductStockHistory }) {
         </Link>
       </div>
 
-      <div className="flex items-center gap-2 mb-4">
-        {[
-          { value: "today", label: "Today" },
-          { value: "24h", label: "24h" },
-          { value: "7d", label: "7 days" },
-          { value: "all", label: "All" },
-        ].map(({ value, label }) => (
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="flex items-center gap-1.5 text-slate-400">
+          <Filter className="w-3.5 h-3.5" />
+          <span className="text-xs font-medium uppercase tracking-wide">Filter</span>
+        </div>
+
+        <select
+          value={contractorId}
+          onChange={(e) => setContractorId(e.target.value)}
+          className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
+        >
+          <option value="">All contractors</option>
+          {(contractors || []).map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+
+        <select
+          value={paymentStatus}
+          onChange={(e) => setPaymentStatus(e.target.value)}
+          className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
+        >
+          {PAYMENT_STATUSES.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
+
+        {activeFilterCount > 0 && (
           <button
-            key={value}
             type="button"
-            onClick={() => setTimeRange(value)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              timeRange === value
-                ? "bg-slate-900 text-white shadow-sm"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
+            onClick={clearFilters}
+            className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600"
           >
-            {label}
+            <X className="w-3 h-3" /> Clear
           </button>
-        ))}
+        )}
       </div>
 
-      {loading && withdrawals.length === 0 ? (
+      {isLoading && allRows.length === 0 ? (
         <div className="rounded-xl bg-slate-50/80 border border-slate-200 p-8 text-center text-slate-500 text-sm">
           Loading…
         </div>
-      ) : withdrawals.length === 0 ? (
+      ) : allRows.length === 0 ? (
         <div className="rounded-xl bg-slate-50/80 border border-slate-200 p-8 text-center text-slate-500 text-sm">
-          No transactions
+          No transactions match these filters
         </div>
       ) : (
         <>
@@ -94,7 +137,7 @@ export function RecentTransactions({ onProductStockHistory }) {
             className="rounded-xl border border-slate-200 overflow-y-auto overflow-x-hidden bg-slate-50/50 p-2 space-y-3"
             style={{ maxHeight: 360 }}
           >
-            {withdrawals.map((w) => (
+            {allRows.map((w) => (
               <WithdrawalBlock
                 key={w.id}
                 withdrawal={w}
@@ -107,15 +150,15 @@ export function RecentTransactions({ onProductStockHistory }) {
               variant="outline"
               size="sm"
               className="mt-3 w-full"
-              onClick={handleLoadMore}
-              disabled={loading}
+              onClick={() => setOffset(allRows.length)}
+              disabled={isFetching}
             >
-              {loading ? "Loading…" : "Load more"}
+              {isFetching ? "Loading…" : "Load more"}
             </Button>
           )}
         </>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -128,7 +171,6 @@ function WithdrawalBlock({ withdrawal: w, onProductStockHistory }) {
 
   return (
     <div className="rounded-lg border border-slate-200 overflow-hidden bg-white">
-      {/* Header: withdrawal summary */}
       <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-100">
         <div className="flex flex-col gap-0.5 min-w-0">
           <span className="text-slate-800 font-semibold truncate">
@@ -152,7 +194,6 @@ function WithdrawalBlock({ withdrawal: w, onProductStockHistory }) {
         </div>
       </div>
 
-      {/* Items: nested under withdrawal */}
       <ul className="divide-y divide-slate-100">
         {(w.items || []).map((item, j) => (
           <WithdrawalItem

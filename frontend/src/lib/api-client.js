@@ -25,6 +25,8 @@ const api = {
     adjust: (id, data) => axios.post(`${API}/stock/${id}/adjust`, data).then((r) => r.data),
     suggestUom: (data) => axios.post(`${API}/products/suggest-uom`, data).then((r) => r.data),
     stockHistory: (id) => axios.get(`${API}/stock/${id}/history`).then((r) => r.data),
+    byBarcode: (barcode) => axios.get(`${API}/products/by-barcode`, { params: { barcode } }).then((r) => r.data),
+    importCsv: (formData) => axios.post(`${API}/products/import-csv`, formData).then((r) => r.data),
   },
 
   // ── SKU ───────────────────────────────────────────────────────────────
@@ -57,21 +59,85 @@ const api = {
     delete: (id) => axios.delete(`${API}/contractors/${id}`),
   },
 
-  // ── Dashboard ─────────────────────────────────────────────────────────
-  dashboard: {
-    stats: () => axios.get(`${API}/dashboard/stats`).then((r) => r.data),
+  // ── Withdrawals ─────────────────────────────────────────────────────
+  withdrawals: {
+    list: (params) => axios.get(`${API}/withdrawals`, { params }).then((r) => r.data),
+    create: (data) => axios.post(`${API}/withdrawals`, data).then((r) => r.data),
+    createForContractor: (contractorId, data) =>
+      axios.post(`${API}/withdrawals/for-contractor`, data, { params: { contractor_id: contractorId } }).then((r) => r.data),
+    markPaid: (id, data) => axios.put(`${API}/withdrawals/${id}/mark-paid`, data).then((r) => r.data),
+    bulkMarkPaid: (ids) => axios.put(`${API}/withdrawals/bulk-mark-paid`, ids).then((r) => r.data),
   },
 
-  // ── Reports ───────────────────────────────────────────────────────────
+  // ── Returns ─────────────────────────────────────────────────────────
+  returns: {
+    create: (data) => axios.post(`${API}/returns`, data).then((r) => r.data),
+  },
+
+  // ── Material Requests ───────────────────────────────────────────────
+  materialRequests: {
+    list: (params) => axios.get(`${API}/material-requests`, { params }).then((r) => r.data),
+    create: (data) => axios.post(`${API}/material-requests`, data).then((r) => r.data),
+    process: (id, data) => axios.post(`${API}/material-requests/${id}/process`, data).then((r) => r.data),
+  },
+
+  // ── Purchase Orders ─────────────────────────────────────────────────
+  purchaseOrders: {
+    list: () => axios.get(`${API}/purchase-orders`).then((r) => r.data),
+    get: (id) => axios.get(`${API}/purchase-orders/${id}`).then((r) => r.data),
+    create: (data) => axios.post(`${API}/purchase-orders`, data).then((r) => r.data),
+    markDelivery: (id, data) => axios.post(`${API}/purchase-orders/${id}/delivery`, data).then((r) => r.data),
+    receive: (id, data) => axios.post(`${API}/purchase-orders/${id}/receive`, data).then((r) => r.data),
+  },
+
+  // ── Financials ──────────────────────────────────────────────────────
+  financials: {
+    summary: (params) => axios.get(`${API}/financials/summary`, { params }).then((r) => r.data),
+    export: (params) => axios.get(`${API}/financials/export`, { params, responseType: "blob" }).then((r) => r.data),
+  },
+
+  // ── Invoices ────────────────────────────────────────────────────────
+  invoices: {
+    list: (params) => axios.get(`${API}/invoices`, { params }).then((r) => r.data),
+    get: (id) => axios.get(`${API}/invoices/${id}`).then((r) => r.data),
+    create: (data) => axios.post(`${API}/invoices`, data).then((r) => r.data),
+    update: (id, data) => axios.put(`${API}/invoices/${id}`, data).then((r) => r.data),
+    delete: (id) => axios.delete(`${API}/invoices/${id}`),
+    syncXero: (id) => axios.post(`${API}/invoices/${id}/sync-xero`).then((r) => r.data),
+    bulkSyncXero: (ids) => axios.post(`${API}/invoices/sync-xero-bulk`, { invoice_ids: ids }).then((r) => r.data),
+  },
+
+  // ── Documents ───────────────────────────────────────────────────────
+  documents: {
+    parse: (formData, useAi) =>
+      axios.post(`${API}/documents/parse${useAi ? "?use_ai=true" : ""}`, formData).then((r) => r.data),
+  },
+
+  // ── Dashboard ───────────────────────────────────────────────────────
+  dashboard: {
+    stats: (params) => axios.get(`${API}/dashboard/stats`, { params }).then((r) => r.data),
+    transactions: (params) => axios.get(`${API}/dashboard/transactions`, { params }).then((r) => r.data),
+  },
+
+  // ── Reports ─────────────────────────────────────────────────────────
   reports: {
     sales: (params) => axios.get(`${API}/reports/sales`, { params }).then((r) => r.data),
     inventory: () => axios.get(`${API}/reports/inventory`).then((r) => r.data),
     trends: (params) => axios.get(`${API}/reports/trends`, { params }).then((r) => r.data),
     productMargins: (params) => axios.get(`${API}/reports/product-margins`, { params }).then((r) => r.data),
     jobPl: (params) => axios.get(`${API}/reports/job-pl`, { params }).then((r) => r.data),
+    kpis: (params) => axios.get(`${API}/reports/kpis`, { params }).then((r) => r.data),
+    productPerformance: (params) => axios.get(`${API}/reports/product-performance`, { params }).then((r) => r.data),
   },
 
-  // ── Auth / Seed ───────────────────────────────────────────────────────
+  // ── Chat ────────────────────────────────────────────────────────────
+  chat: {
+    status: () => axios.get(`${API}/chat/status`).then((r) => r.data),
+    send: (data) => axios.post(`${API}/chat`, data).then((r) => r.data),
+    deleteSession: (id) => axios.delete(`${API}/chat/sessions/${id}`),
+  },
+
+  // ── Auth / Seed ─────────────────────────────────────────────────────
   auth: {
     me: () => axios.get(`${API}/auth/me`).then((r) => r.data),
     login: (data) => axios.post(`${API}/auth/login`, data).then((r) => r.data),

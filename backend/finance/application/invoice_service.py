@@ -1,5 +1,6 @@
 """Invoice application services — safe for cross-context import."""
 import logging
+from typing import Any, Optional
 
 from finance.infrastructure.invoice_repo import invoice_repo as _default_invoice_repo
 from finance.ports.invoice_repo_port import InvoiceRepoPort
@@ -47,7 +48,7 @@ async def mark_paid_for_withdrawal(
 
 
 async def create_invoice_from_withdrawals(
-    withdrawal_ids: list, organization_id: str = None, conn=None,
+    withdrawal_ids: list, organization_id: Optional[str] = None, conn: Any = None,
     invoice_repo: InvoiceRepoPort = _default_invoice_repo,
 ) -> dict:
     return await invoice_repo.create_from_withdrawals(withdrawal_ids, organization_id=organization_id, conn=conn)

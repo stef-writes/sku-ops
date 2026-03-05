@@ -16,8 +16,6 @@ import {
   History,
   FileText,
   ClipboardList,
-  Network,
-  TrendingUp,
 } from "lucide-react";
 import ChatAssistant from "./ChatAssistant";
 
@@ -55,49 +53,26 @@ const Layout = ({ children }) => {
       { path: "/inventory", icon: Package, label: "Inventory" },
       { path: "/vendors", icon: Users, label: "Vendors" },
       { path: "/departments", icon: Layers, label: "Departments" },
-      { path: "/import", icon: Truck, label: "Receive Inventory" },
+      { path: "/import", icon: Truck, label: "Receive / Import" },
       { path: "/purchase-orders", icon: ClipboardList, label: "Purchase Orders" },
     ];
 
-    const systemItems = [
-      { path: "/graphs", icon: Network, label: "Graphs" },
+    const analyticsItems = [
+      { path: "/reports", icon: BarChart3, label: "Reports" },
     ];
 
-    if (role === ROLES.WAREHOUSE_MANAGER) {
-      return [
-        { items: [{ path: "/", icon: LayoutDashboard, label: "Dashboard" }] },
-        { section: "Operations", items: operationsItems },
-        { section: "Inventory", items: inventoryItems },
-        {
-          section: "Analytics",
-          items: [
-            { path: "/reports", icon: BarChart3, label: "Reports" },
-            { path: "/product-performance", icon: TrendingUp, label: "Product Performance" },
-          ],
-        },
-        { section: "System", items: systemItems },
-      ];
+    if (role === ROLES.ADMIN) {
+      analyticsItems.push(
+        { path: "/financials", icon: DollarSign, label: "Financials" },
+        { path: "/invoices", icon: FileText, label: "Invoices" },
+      );
     }
 
     return [
       { items: [{ path: "/", icon: LayoutDashboard, label: "Dashboard" }] },
       { section: "Operations", items: operationsItems },
       { section: "Inventory", items: inventoryItems },
-      {
-        section: "Finance",
-        items: [
-          { path: "/financials", icon: DollarSign, label: "Financials" },
-          { path: "/invoices", icon: FileText, label: "Invoices" },
-        ],
-      },
-      {
-        section: "Analytics",
-        items: [
-          { path: "/reports", icon: BarChart3, label: "Reports" },
-          { path: "/product-performance", icon: TrendingUp, label: "Product Performance" },
-        ],
-      },
-      { section: "System", items: systemItems },
+      { section: "Analytics & Finance", items: analyticsItems },
     ];
   };
 
@@ -119,27 +94,19 @@ const Layout = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-slate-50/80 flex" data-testid="app-layout">
-      {/* Sidebar */}
-      <aside
-        className="w-60 bg-slate-900 text-white flex flex-col border-r border-slate-800"
-        data-testid="sidebar"
-      >
-        {/* Logo */}
+      <aside className="w-60 bg-slate-900 text-white flex flex-col border-r border-slate-800" data-testid="sidebar">
         <div className="p-5 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-sm">
               <Wrench className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="font-semibold text-slate-50 tracking-tight">
-                Supply Yard
-              </h1>
+              <h1 className="font-semibold text-slate-50 tracking-tight">Supply Yard</h1>
               <p className="text-xs text-slate-400">Material management</p>
             </div>
           </div>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 py-4 px-3 overflow-y-auto" data-testid="sidebar-nav">
           {navGroups.map((group, gi) => (
             <div key={gi} className={gi > 0 ? "mt-4" : ""}>
@@ -166,26 +133,15 @@ const Layout = ({ children }) => {
           ))}
         </nav>
 
-        {/* User Section */}
         <div className="p-4 border-t border-slate-800">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="font-medium text-sm text-slate-100 truncate">
-                {user?.name}
-              </p>
+              <p className="font-medium text-sm text-slate-100 truncate">{user?.name}</p>
               <div className="flex items-center gap-2 mt-0.5">
-                <span
-                  className={`w-2 h-2 rounded-full shrink-0 ${getRoleBadge()}`}
-                />
-                <p className="text-xs text-slate-400 truncate">
-                  {getRoleLabel()}
-                </p>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${getRoleBadge()}`} />
+                <p className="text-xs text-slate-400 truncate">{getRoleLabel()}</p>
               </div>
-              {user?.company && (
-                <p className="text-xs text-slate-500 truncate mt-0.5">
-                  {user.company}
-                </p>
-              )}
+              {user?.company && <p className="text-xs text-slate-500 truncate mt-0.5">{user.company}</p>}
             </div>
             <button
               onClick={handleLogout}
@@ -198,11 +154,7 @@ const Layout = ({ children }) => {
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main
-        className="flex-1 min-h-0 overflow-auto bg-slate-50/50 flex flex-col"
-        data-testid="main-content"
-      >
+      <main className="flex-1 min-h-0 overflow-auto bg-slate-50/50 flex flex-col" data-testid="main-content">
         {children}
       </main>
 

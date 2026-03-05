@@ -60,4 +60,4 @@ def classify_domain(message: str) -> str:
     if not hits:
         return "inventory"
 
-    return max(hits, key=hits.get)
+    return max(hits, key=lambda k: hits[k])

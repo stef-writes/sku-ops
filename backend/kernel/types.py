@@ -26,12 +26,12 @@ class LineItem(BaseModel):
     cost: float = 0.0
     unit: str = "each"
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def subtotal(self) -> float:
         return round(self.unit_price * self.quantity, 2)
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def cost_total(self) -> float:
         return round(self.cost * self.quantity, 2)

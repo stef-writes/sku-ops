@@ -3,11 +3,11 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncIterator
+from typing import AsyncIterator, Sequence
 
 import aiosqlite
 
-from shared.infrastructure.db.protocol import DictRow
+from shared.infrastructure.db.protocol import Connection, DictRow
 
 
 # ── Cursor wrapper ────────────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ class SqliteConnection:
         cursor = await self._conn.execute(sql, params)
         return SqliteCursor(cursor)
 
-    async def executemany(self, sql: str, params_list: list[tuple | list]) -> None:
+    async def executemany(self, sql: str, params_list: Sequence[tuple | list]) -> None:
         await self._conn.executemany(sql, params_list)
 
     async def executescript(self, sql: str) -> None:
@@ -80,20 +80,22 @@ class SqliteBackend:
         await self._conn.execute("PRAGMA journal_mode=WAL")
         await self._conn.execute("PRAGMA foreign_keys=ON")
 
-    def connection(self) -> SqliteConnection:
+    def connection(self) -> Connection:
         if self._conn is None:
             raise RuntimeError("Database not initialized. Call connect() at startup.")
         return SqliteConnection(self._conn)
 
     @asynccontextmanager
-    async def transaction(self) -> AsyncIterator[SqliteConnection]:
-        conn = self.connection()
-        await conn._conn.execute("BEGIN")
+    async def transaction(self) -> AsyncIterator[Connection]:
+        if self._conn is None:
+            raise RuntimeError("Database not initialized. Call connect() at startup.")
+        wrapper = SqliteConnection(self._conn)
+        await self._conn.execute("BEGIN")
         try:
-            yield conn
-            await conn.commit()
+            yield wrapper
+            await wrapper.commit()
         except Exception:
-            await conn.rollback()
+            await wrapper.rollback()
             raise
 
     async def close(self) -> None:

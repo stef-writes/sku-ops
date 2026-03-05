@@ -86,3 +86,35 @@ def are_compatible(unit_a: str, unit_b: str) -> bool:
     fa = _UNIT_TO_FAMILY.get(unit_a.lower())
     fb = _UNIT_TO_FAMILY.get(unit_b.lower())
     return fa is not None and fa == fb
+
+
+def compute_sell_fields(
+    price: float,
+    cost: float,
+    quantity: float,
+    base_unit: str,
+    sell_uom: str,
+    pack_qty: int = 1,
+) -> dict[str, float]:
+    """Derive sell_price, sell_cost, sell_quantity from base_unit stored values.
+
+    sell_price / sell_cost = what the customer pays/costs per sell-unit
+    (a sell-unit is ``pack_qty`` of ``sell_uom``).
+    sell_quantity = available stock expressed in sell-units.
+    """
+    pack_qty = max(pack_qty, 1)
+    base_unit = (base_unit or "each").lower()
+    sell_uom = (sell_uom or "each").lower()
+
+    if base_unit != sell_uom and are_compatible(base_unit, sell_uom):
+        base_per_sell = convert_quantity(1, sell_uom, base_unit)
+        sell_per_base = convert_quantity(1, base_unit, sell_uom)
+    else:
+        base_per_sell = 1.0
+        sell_per_base = 1.0
+
+    return {
+        "sell_price": round(price * base_per_sell * pack_qty, 4),
+        "sell_cost": round(cost * base_per_sell * pack_qty, 4),
+        "sell_quantity": round(quantity * sell_per_base / pack_qty, 6),
+    }

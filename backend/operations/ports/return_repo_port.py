@@ -1,9 +1,9 @@
 """Return repository port."""
-from typing import Optional, Protocol
+from typing import Any, Optional, Protocol
 
 
 class ReturnRepoPort(Protocol):
-    async def insert(self, ret: ..., conn=None) -> None: ...
+    async def insert(self, ret: Any, conn: Any = None) -> None: ...
     async def get_by_id(self, return_id: str, organization_id: Optional[str] = None) -> Optional[dict]: ...
     async def list_returns(
         self,

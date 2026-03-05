@@ -14,8 +14,10 @@ import os
 import sys
 from contextvars import ContextVar
 
+_BaseJsonFormatter: type
 try:
-    from pythonjsonlogger.json import JsonFormatter as _BaseJsonFormatter
+    from pythonjsonlogger.json import JsonFormatter
+    _BaseJsonFormatter = JsonFormatter
 except ImportError:
     from pythonjsonlogger import jsonlogger
     _BaseJsonFormatter = jsonlogger.JsonFormatter
@@ -108,6 +110,7 @@ def setup_logging() -> None:
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(level)
 
+    formatter: logging.Formatter
     if is_deployed:
         formatter = ContextJsonFormatter(
             fmt="%(asctime)s %(level)s %(logger)s %(message)s",

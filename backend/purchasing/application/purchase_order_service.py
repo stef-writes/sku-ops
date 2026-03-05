@@ -35,7 +35,7 @@ class PurchasingDeps:
     get_product_by_id: Callable[..., Awaitable[Any]]
     find_product_by_sku_and_vendor: Callable[..., Awaitable[Any]]
     find_product_by_name_and_vendor: Callable[..., Awaitable[Any]]
-    update_product: Callable[..., Awaitable[None]]
+    update_product: Callable[..., Awaitable[Any]]
     create_product: Callable[..., Awaitable[Any]]
     process_receiving_stock_changes: Callable[..., Awaitable[None]]
     classify_uom_batch: Callable[..., Awaitable[list]]
@@ -246,7 +246,7 @@ async def receive_po_items(
     if not po:
         raise ResourceNotFoundError("PurchaseOrder", po_id)
 
-    vendor_id = po.get("vendor_id")
+    vendor_id: str = po.get("vendor_id") or ""
     departments = await deps.list_departments()
     default_dept = await deps.get_department_by_code("HDW") or (departments[0] if departments else None)
     dept_by_code = {d["code"].upper(): d for d in departments}

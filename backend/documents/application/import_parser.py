@@ -227,7 +227,7 @@ def parse_csv_products(content: bytes) -> list:
         if name.lower().startswith("current inventory") or name.lower().startswith("for the period"):
             continue
 
-        qty = 0
+        qty = 0.0
         try:
             qty = float((row[col_map.get("quantity", 3)] or "0").replace(",", ""))
         except (ValueError, TypeError, IndexError):

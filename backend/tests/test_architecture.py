@@ -25,7 +25,7 @@ COMPOSITION_ROOTS = frozenset({"server.py", "api/__init__.py", "full_schema.py"}
 # Each entry is "relative/path/from/backend:imported.module".
 # The test fails if NEW violations appear; add entries here only as a last resort.
 # All pre-DDD violations resolved — contexts now communicate via application-layer query services.
-KNOWN_CROSS_INFRA_VIOLATIONS = frozenset()
+KNOWN_CROSS_INFRA_VIOLATIONS: frozenset[str] = frozenset()
 
 
 def _get_context(path: Path) -> str | None:

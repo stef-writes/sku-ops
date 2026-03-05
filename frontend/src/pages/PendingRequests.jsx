@@ -1,42 +1,26 @@
-import { useState, useEffect } from "react";
-import axios from "axios";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "../components/ui/dialog";
-import { HardHat, Package, Loader2, Clock, AlertTriangle } from "lucide-react";
-import { API } from "@/lib/api";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { HardHat, Package, Clock, AlertTriangle } from "lucide-react";
+import { PageSkeleton } from "@/components/LoadingSkeleton";
+import { useMaterialRequests, useProcessMaterialRequest } from "@/hooks/useMaterialRequests";
+import { getErrorMessage } from "@/lib/api-client";
 
 const PendingRequests = () => {
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { data: allRequests, isLoading } = useMaterialRequests(undefined, { refetchInterval: 30000 });
+  const processRequest = useProcessMaterialRequest();
+
   const [processOpen, setProcessOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [jobId, setJobId] = useState("");
   const [serviceAddress, setServiceAddress] = useState("");
   const [notes, setNotes] = useState("");
-  const [processing, setProcessing] = useState(false);
 
-  useEffect(() => {
-    fetchRequests();
-  }, []);
-
-  const fetchRequests = async () => {
-    try {
-      const res = await axios.get(`${API}/material-requests`);
-      setRequests(res.data.filter((r) => r.status === "pending"));
-    } catch (error) {
-      toast.error("Failed to load requests");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const requests = (allRequests || []).filter((r) => r.status === "pending");
+  const sorted = [...requests].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
   const openProcess = (req) => {
     setSelectedRequest(req);
@@ -49,155 +33,87 @@ const PendingRequests = () => {
   const closeProcess = () => {
     setProcessOpen(false);
     setSelectedRequest(null);
-    setJobId("");
-    setServiceAddress("");
-    setNotes("");
+    setJobId(""); setServiceAddress(""); setNotes("");
   };
 
   const handleProcess = async () => {
-    if (!selectedRequest) return;
-    if (!jobId.trim()) {
-      toast.error("Job ID is required");
-      return;
-    }
-    if (!serviceAddress.trim()) {
-      toast.error("Service address is required");
-      return;
-    }
-    setProcessing(true);
+    if (!selectedRequest || !jobId.trim() || !serviceAddress.trim()) return;
     try {
-      await axios.post(`${API}/material-requests/${selectedRequest.id}/process`, {
-        job_id: jobId.trim(),
-        service_address: serviceAddress.trim(),
-        notes: notes.trim() || null,
+      await processRequest.mutateAsync({
+        id: selectedRequest.id,
+        data: { job_id: jobId.trim(), service_address: serviceAddress.trim(), notes: notes.trim() || null },
       });
       toast.success("Request processed. Withdrawal created.");
       closeProcess();
-      fetchRequests();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Failed to process");
-    } finally {
-      setProcessing(false);
+      toast.error(getErrorMessage(error));
     }
   };
 
   const ageLabel = (dateStr) => {
-    const ms = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(ms / 60000);
+    const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
     if (mins < 60) return `${mins}m ago`;
     const hours = Math.floor(mins / 60);
     if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    return `${Math.floor(hours / 24)}d ago`;
   };
 
-  const ageHours = (dateStr) =>
-    (Date.now() - new Date(dateStr).getTime()) / 3600000;
+  const ageHours = (dateStr) => (Date.now() - new Date(dateStr).getTime()) / 3600000;
 
-  // Sort oldest first so staff sees the most urgent requests at the top
-  const sortedRequests = [...requests].sort(
-    (a, b) => new Date(a.created_at) - new Date(b.created_at)
-  );
-
-  const itemCount = (req) => {
-    const items = req.items || [];
-    return items.reduce((sum, i) => sum + (i.quantity || 0), 0);
-  };
-
-  const totalAmount = (req) => {
-    const items = req.items || [];
-    const subtotal = items.reduce((sum, i) => sum + (i.subtotal || 0), 0);
-    return (subtotal * 1.08).toFixed(2);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-      </div>
-    );
-  }
+  if (isLoading) return <PageSkeleton />;
 
   return (
     <div className="p-8" data-testid="pending-requests-page">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Pending Material Requests</h1>
-          <p className="text-slate-600 mt-1">Process contractor requests into withdrawals at pickup · Oldest first</p>
+          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Pending Requests</h1>
+          <p className="text-slate-500 mt-1 text-sm">Process contractor requests into withdrawals at pickup</p>
         </div>
-        {requests.length > 0 && (
-          <span className="text-sm font-medium text-slate-500">
-            {requests.length} pending
-          </span>
-        )}
+        {requests.length > 0 && <span className="text-sm font-medium text-slate-400">{requests.length} pending</span>}
       </div>
 
       {requests.length === 0 ? (
-        <div className="card-workshop p-12 text-center">
-          <Package className="w-16 h-16 mx-auto text-slate-300 mb-4" />
+        <div className="bg-white border border-slate-200 rounded-xl p-16 text-center shadow-sm">
+          <Package className="w-12 h-12 mx-auto text-slate-300 mb-3" />
           <p className="font-medium text-slate-600">No pending requests</p>
-          <p className="text-sm text-slate-500 mt-1">Contractors will appear here when they submit requests</p>
+          <p className="text-sm text-slate-400 mt-1">Requests appear here when contractors submit them</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedRequests.map((req) => {
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {sorted.map((req) => {
             const hours = ageHours(req.created_at);
-            const urgentBorder =
-              hours >= 48
-                ? "border-red-300 bg-red-50/30"
-                : hours >= 24
-                ? "border-orange-300 bg-orange-50/20"
-                : "border-slate-200";
-            const ageBadgeClass =
-              hours >= 48
-                ? "text-red-600 bg-red-50 border border-red-200"
-                : hours >= 24
-                ? "text-orange-600 bg-orange-50 border border-orange-200"
-                : "text-slate-500";
+            const border = hours >= 48 ? "border-red-200 bg-red-50/30" : hours >= 24 ? "border-orange-200 bg-orange-50/20" : "border-slate-200";
+            const ageCls = hours >= 48 ? "text-red-600 bg-red-50" : hours >= 24 ? "text-orange-600 bg-orange-50" : "text-slate-500";
+            const itemCount = (req.items || []).reduce((s, i) => s + (i.quantity || 0), 0);
             return (
-              <div
-                key={req.id}
-                className={`card-workshop p-6 border hover:border-amber-300 transition-colors ${urgentBorder}`}
-              >
-                <div className="flex items-start justify-between">
+              <div key={req.id} className={`bg-white border rounded-xl p-5 shadow-sm ${border}`}>
+                <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
-                      <HardHat className="w-6 h-6 text-amber-600" />
+                    <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+                      <HardHat className="w-5 h-5 text-amber-600" />
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-900">{req.contractor_name || "Unknown"}</p>
-                      <p className="text-sm text-slate-500">{itemCount(req)} items · ${totalAmount(req)}</p>
+                      <p className="font-semibold text-slate-900 text-sm">{req.contractor_name || "Unknown"}</p>
+                      <p className="text-xs text-slate-500">{itemCount} items</p>
                     </div>
                   </div>
-                  <Button onClick={() => openProcess(req)} size="sm" data-testid={`process-request-${req.id}`}>
-                    Process
-                  </Button>
+                  <Button onClick={() => openProcess(req)} size="sm" data-testid={`process-request-${req.id}`}>Process</Button>
                 </div>
-
-                <div className="mt-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <Clock className="w-3.5 h-3.5" />
-                    {new Date(req.created_at).toLocaleString()}
-                  </div>
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${ageBadgeClass}`}>
-                    {hours >= 24 && <AlertTriangle className="w-3 h-3" />}
-                    {ageLabel(req.created_at)}
-                  </span>
-                </div>
-
-                {req.items && req.items.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-slate-100">
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Items</p>
-                    <ul className="space-y-0.5 text-sm text-slate-700">
+                {req.items?.length > 0 && (
+                  <div className="border-t border-slate-100 pt-2 mb-2">
+                    <ul className="space-y-0.5 text-xs text-slate-600">
                       {req.items.map((i, idx) => (
-                        <li key={idx} className="flex justify-between">
-                          <span>{i.name}</span>
-                          <span className="font-mono text-slate-500">×{i.quantity}</span>
-                        </li>
+                        <li key={idx} className="flex justify-between"><span className="truncate">{i.name}</span><span className="font-mono text-slate-400 ml-2 shrink-0">x{i.quantity}</span></li>
                       ))}
                     </ul>
                   </div>
                 )}
+                <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
+                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(req.created_at).toLocaleDateString()}</span>
+                  <span className={`font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${ageCls}`}>
+                    {hours >= 24 && <AlertTriangle className="w-3 h-3" />}{ageLabel(req.created_at)}
+                  </span>
+                </div>
               </div>
             );
           })}
@@ -205,51 +121,15 @@ const PendingRequests = () => {
       )}
 
       <Dialog open={processOpen} onOpenChange={(open) => !open && closeProcess()}>
-        <DialogContent className="sm:max-w-lg rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Process request</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Process request</DialogTitle></DialogHeader>
           {selectedRequest && (
-            <div className="space-y-4 pt-4">
-              <p className="text-sm text-slate-600">
-                Processing request from <strong>{selectedRequest.contractor_name}</strong>. Enter job details below.
-              </p>
-              <div>
-                <Label>Job ID *</Label>
-                <Input
-                  value={jobId}
-                  onChange={(e) => setJobId(e.target.value)}
-                  placeholder="Job or reference number"
-                  className="mt-2"
-                  data-testid="process-job-id"
-                />
-              </div>
-              <div>
-                <Label>Service address *</Label>
-                <Input
-                  value={serviceAddress}
-                  onChange={(e) => setServiceAddress(e.target.value)}
-                  placeholder="Pickup or delivery location"
-                  className="mt-2"
-                  data-testid="process-service-address"
-                />
-              </div>
-              <div>
-                <Label>Notes (optional)</Label>
-                <Input
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Additional notes..."
-                  className="mt-2"
-                />
-              </div>
-              <Button
-                onClick={handleProcess}
-                disabled={processing || !jobId.trim() || !serviceAddress.trim()}
-                className="w-full h-12"
-              >
-                {processing ? "Processing…" : "Create Withdrawal"}
-              </Button>
+            <div className="space-y-4 pt-2">
+              <p className="text-sm text-slate-500">Processing request from <strong className="text-slate-700">{selectedRequest.contractor_name}</strong></p>
+              <div><Label className="text-sm">Job ID *</Label><Input value={jobId} onChange={(e) => setJobId(e.target.value)} placeholder="Job or reference number" className="mt-1.5" data-testid="process-job-id" /></div>
+              <div><Label className="text-sm">Service address *</Label><Input value={serviceAddress} onChange={(e) => setServiceAddress(e.target.value)} placeholder="Pickup or delivery location" className="mt-1.5" data-testid="process-service-address" /></div>
+              <div><Label className="text-sm">Notes (optional)</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Additional notes..." className="mt-1.5" /></div>
+              <Button onClick={handleProcess} disabled={processRequest.isPending || !jobId.trim() || !serviceAddress.trim()} className="w-full h-11">{processRequest.isPending ? "Processing…" : "Create Withdrawal"}</Button>
             </div>
           )}
         </DialogContent>

@@ -573,7 +573,11 @@ async def _014_refresh_tokens_and_audit(conn, *, dialect: str = "sqlite") -> Non
 
 # ── Migration registries ─────────────────────────────────────────────────────
 
-_SQLITE_MIGRATIONS: list[tuple[str, object]] = [
+from typing import Any, Callable
+
+MigrationFn = Callable[..., Any]
+
+_SQLITE_MIGRATIONS: list[tuple[str, MigrationFn]] = [
     ("001_initial_schema", _sqlite_001_initial_schema),
     ("002_vendor_barcode", _sqlite_002_vendor_barcode),
     ("003_uom_columns", _sqlite_003_uom_columns),
@@ -751,7 +755,7 @@ async def _018_financial_ledger(conn, *, dialect: str = "sqlite") -> None:
     await conn.commit()
 
 
-_COMMON_MIGRATIONS: list[tuple[str, object]] = [
+_COMMON_MIGRATIONS: list[tuple[str, MigrationFn]] = [
     ("014_refresh_tokens_and_audit", _014_refresh_tokens_and_audit),
     ("015_decimal_quantities_and_stock_unit", _015_decimal_quantities_and_stock_unit),
     ("016_returns_and_credit_notes", _016_returns_and_credit_notes),

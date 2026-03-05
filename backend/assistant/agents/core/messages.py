@@ -15,7 +15,7 @@ def build_message_history(history: list[dict] | None) -> list | None:
     """Convert text-only {role, content} pairs to PydanticAI ModelMessage list."""
     if not history:
         return None
-    messages = []
+    messages: list[ModelRequest | ModelResponse] = []
     for h in history:
         content = (h.get("content") or "").strip()
         if not content:
@@ -27,20 +27,20 @@ def build_message_history(history: list[dict] | None) -> list | None:
     return messages or None
 
 
-def extract_text_history(messages) -> list[dict]:
+def extract_text_history(messages) -> list[dict]:  # type: ignore[type-arg]
     """Extract text-only turns from PydanticAI all_messages() for session storage."""
-    out = []
+    out: list[dict] = []
     for msg in messages:
         if isinstance(msg, ModelRequest):
-            for part in msg.parts:
-                if isinstance(part, UserPromptPart):
-                    text = part.content if isinstance(part.content, str) else ""
+            for req_part in msg.parts:
+                if isinstance(req_part, UserPromptPart):
+                    text = req_part.content if isinstance(req_part.content, str) else ""
                     if text:
                         out.append({"role": "user", "content": text})
         elif isinstance(msg, ModelResponse):
-            for part in msg.parts:
-                if isinstance(part, TextPart) and part.content:
-                    out.append({"role": "assistant", "content": part.content})
+            for resp_part in msg.parts:
+                if isinstance(resp_part, TextPart) and resp_part.content:
+                    out.append({"role": "assistant", "content": resp_part.content})
     return out
 
 
@@ -65,21 +65,21 @@ def extract_tool_calls_detailed(messages) -> list[dict]:
                     ret = part.content if isinstance(part.content, str) else str(part.content)
                     return_map[part.tool_call_id] = ret[:500]
 
-    out = []
+    out: list[dict] = []
     for msg in messages:
         if isinstance(msg, ModelResponse):
-            for part in msg.parts:
-                if isinstance(part, ToolCallPart):
-                    args_raw = part.args
+            for resp_part in msg.parts:
+                if isinstance(resp_part, ToolCallPart):
+                    args_raw = resp_part.args
                     if isinstance(args_raw, str):
                         try:
                             args_raw = json.loads(args_raw)
                         except (json.JSONDecodeError, TypeError):
                             pass
                     entry = {
-                        "tool": part.tool_name,
+                        "tool": resp_part.tool_name,
                         "args": args_raw,
-                        "result_preview": return_map.get(part.tool_call_id, ""),
+                        "result_preview": return_map.get(resp_part.tool_call_id, ""),
                     }
                     out.append(entry)
     return out

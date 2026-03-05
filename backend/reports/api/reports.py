@@ -24,12 +24,11 @@ async def get_sales_report(
     current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
 ):
     org_id = current_user.organization_id
-    kw = dict(org_id=org_id, start_date=start_date, end_date=end_date)
 
     accounts, top_products, counts = await asyncio.gather(
-        ledger_repo.summary_by_account(**kw),
-        ledger_repo.product_margins(**kw, limit=10),
-        ledger_repo.reference_counts(**kw),
+        ledger_repo.summary_by_account(org_id, start_date=start_date, end_date=end_date),
+        ledger_repo.product_margins(org_id, start_date=start_date, end_date=end_date, limit=10),
+        ledger_repo.reference_counts(org_id, start_date=start_date, end_date=end_date),
     )
 
     revenue = accounts.get("revenue", 0)

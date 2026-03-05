@@ -4,7 +4,7 @@ from typing import Optional
 from shared.infrastructure.database import get_connection
 
 
-def _row_to_dict(row) -> dict:
+def _row_to_dict(row) -> Optional[dict]:
     if row is None:
         return None
     d = dict(row) if hasattr(row, "keys") else {}

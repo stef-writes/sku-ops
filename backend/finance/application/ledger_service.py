@@ -44,37 +44,35 @@ async def _record_sale_event(
     if await entries_exist(reference_type.value, reference_id, conn=conn):
         return
     entries: List[FinancialEntry] = []
-    common = dict(
-        job_id=job_id,
-        billing_entity=billing_entity,
-        contractor_id=contractor_id,
-        reference_type=reference_type,
-        reference_id=reference_id,
-        organization_id=organization_id,
-    )
 
     for item in items:
         qty, unit_price, cost, dept, pid = _extract_item(item)
         entries.append(FinancialEntry(
             account=Account.REVENUE,
             amount=round(sign * unit_price * qty, 2),
-            department=dept, product_id=pid, **common,
+            department=dept, product_id=pid,
+            job_id=job_id, billing_entity=billing_entity, contractor_id=contractor_id,
+            reference_type=reference_type, reference_id=reference_id, organization_id=organization_id,
         ))
         entries.append(FinancialEntry(
             account=Account.COGS,
             amount=round(sign * cost * qty, 2),
-            department=dept, product_id=pid, **common,
+            department=dept, product_id=pid,
+            job_id=job_id, billing_entity=billing_entity, contractor_id=contractor_id,
+            reference_type=reference_type, reference_id=reference_id, organization_id=organization_id,
         ))
 
     entries.append(FinancialEntry(
         account=Account.TAX_COLLECTED,
         amount=round(sign * tax, 2),
-        **common,
+        job_id=job_id, billing_entity=billing_entity, contractor_id=contractor_id,
+        reference_type=reference_type, reference_id=reference_id, organization_id=organization_id,
     ))
     entries.append(FinancialEntry(
         account=Account.ACCOUNTS_RECEIVABLE,
         amount=round(sign * total, 2),
-        **common,
+        job_id=job_id, billing_entity=billing_entity, contractor_id=contractor_id,
+        reference_type=reference_type, reference_id=reference_id, organization_id=organization_id,
     ))
 
     await insert_entries(entries, conn=conn)
@@ -145,16 +143,18 @@ async def record_po_receipt(
         if amount == 0:
             continue
 
-        common = dict(
-            department=item.get("department") or item.get("suggested_department"),
-            vendor_name=vendor_name,
-            product_id=item.get("product_id"),
-            reference_type=ReferenceType.PO_RECEIPT,
-            reference_id=po_id,
-            organization_id=organization_id,
-        )
-        entries.append(FinancialEntry(account=Account.INVENTORY, amount=amount, **common))
-        entries.append(FinancialEntry(account=Account.ACCOUNTS_PAYABLE, amount=amount, **common))
+        dept = item.get("department") or item.get("suggested_department")
+        pid = item.get("product_id")
+        entries.append(FinancialEntry(
+            account=Account.INVENTORY, amount=amount,
+            department=dept, vendor_name=vendor_name, product_id=pid,
+            reference_type=ReferenceType.PO_RECEIPT, reference_id=po_id, organization_id=organization_id,
+        ))
+        entries.append(FinancialEntry(
+            account=Account.ACCOUNTS_PAYABLE, amount=amount,
+            department=dept, vendor_name=vendor_name, product_id=pid,
+            reference_type=ReferenceType.PO_RECEIPT, reference_id=po_id, organization_id=organization_id,
+        ))
 
     if entries:
         await insert_entries(entries, conn=conn)
@@ -181,16 +181,17 @@ async def record_adjustment(
         return
 
     sign = -1 if quantity_delta < 0 else 1
-    common = dict(
-        department=department,
-        product_id=product_id,
-        reference_type=ReferenceType.ADJUSTMENT,
-        reference_id=adjustment_ref_id,
-        organization_id=organization_id,
-    )
     entries = [
-        FinancialEntry(account=Account.INVENTORY, amount=sign * amount, **common),
-        FinancialEntry(account=Account.SHRINKAGE, amount=-sign * amount, **common),
+        FinancialEntry(
+            account=Account.INVENTORY, amount=sign * amount,
+            department=department, product_id=product_id,
+            reference_type=ReferenceType.ADJUSTMENT, reference_id=adjustment_ref_id, organization_id=organization_id,
+        ),
+        FinancialEntry(
+            account=Account.SHRINKAGE, amount=-sign * amount,
+            department=department, product_id=product_id,
+            reference_type=ReferenceType.ADJUSTMENT, reference_id=adjustment_ref_id, organization_id=organization_id,
+        ),
     ]
     await insert_entries(entries, conn=conn)
 

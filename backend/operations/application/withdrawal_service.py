@@ -4,6 +4,7 @@ from typing import Callable, Awaitable, Optional
 from kernel.types import CurrentUser
 from shared.infrastructure.database import transaction
 from inventory.domain.stock import StockDecrement
+from catalog.domain.units import are_compatible, convert_quantity
 from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalCreate
 from operations.infrastructure.withdrawal_repo import withdrawal_repo as _default_withdrawal_repo
 from operations.ports.withdrawal_repo_port import WithdrawalRepoPort
@@ -12,6 +13,22 @@ from finance.application.ledger_service import record_withdrawal as _record_ledg
 CreateInvoiceFn = Optional[Callable[..., Awaitable[dict]]]
 ListProductsFn = Callable[..., Awaitable[list]]
 StockChangesFn = Callable[..., Awaitable[None]]
+
+
+def _convert_price_per_unit(
+    price_per_base: float, base_unit: str, requested_unit: str,
+) -> float:
+    """Convert a per-base_unit price to a per-requested_unit price.
+
+    1 yard = 3 feet, so price_per_foot = price_per_yard / 3.
+    Generalized: convert 1 of requested_unit to base_unit to get the ratio.
+    """
+    if base_unit == requested_unit:
+        return price_per_base
+    if not are_compatible(base_unit, requested_unit):
+        return price_per_base
+    base_qty_per_one_requested = convert_quantity(1, requested_unit, base_unit)
+    return round(price_per_base * base_qty_per_one_requested, 6)
 
 
 async def create_withdrawal(
@@ -32,12 +49,27 @@ async def create_withdrawal(
     """
     org_id = current_user.organization_id
     products = await list_products(organization_id=org_id)
-    cost_map = {p["id"]: p.get("cost", 0.0) for p in products}
+    product_map = {p["id"]: p for p in products}
     dept_map = {p["id"]: p.get("department_name", "") for p in products}
     enriched_items = []
     for item in data.items:
-        if item.cost == 0.0 and item.product_id in cost_map:
-            item = item.model_copy(update={"cost": cost_map[item.product_id]})
+        p = product_map.get(item.product_id, {})
+        base_unit = (p.get("base_unit") or "each").lower()
+        req_unit = (item.unit or base_unit).lower()
+
+        updates: dict = {}
+        if item.cost == 0.0 and p.get("cost", 0):
+            updates["cost"] = _convert_price_per_unit(p["cost"], base_unit, req_unit)
+        elif item.cost != 0.0 and req_unit != base_unit and are_compatible(base_unit, req_unit):
+            updates["cost"] = _convert_price_per_unit(p.get("cost", item.cost), base_unit, req_unit)
+
+        if item.unit_price == 0.0 and p.get("price", 0):
+            updates["unit_price"] = _convert_price_per_unit(p["price"], base_unit, req_unit)
+        elif item.unit_price != 0.0 and req_unit != base_unit and are_compatible(base_unit, req_unit):
+            updates["unit_price"] = _convert_price_per_unit(p.get("price", item.unit_price), base_unit, req_unit)
+
+        if updates:
+            item = item.model_copy(update=updates)
         enriched_items.append(item)
     data = data.model_copy(update={"items": enriched_items})
 

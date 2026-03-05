@@ -26,9 +26,7 @@ async def _next_credit_note_number(organization_id: Optional[str] = None, conn=N
     return f"CN-{str(num).zfill(5)}"
 
 
-def _row_to_dict(row) -> Optional[dict]:
-    if row is None:
-        return None
+def _row_to_dict(row) -> dict:
     d = dict(row) if hasattr(row, "keys") else {}
     for fld in ("quantity", "unit_price", "amount", "cost", "subtotal", "tax", "total", "cost_total"):
         if fld in d and d[fld] is not None:
@@ -101,7 +99,10 @@ async def insert_credit_note(
     if not in_transaction:
         await conn.commit()
 
-    return await get_by_id(cn_id)
+    result = await get_by_id(cn_id)
+    if not result:
+        raise RuntimeError(f"Credit note {cn_id} missing immediately after insert")
+    return result
 
 
 async def get_by_id(credit_note_id: str, organization_id: Optional[str] = None) -> Optional[dict]:
