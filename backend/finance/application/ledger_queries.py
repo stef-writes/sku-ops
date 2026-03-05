@@ -5,6 +5,7 @@ Other bounded contexts import from here, never from finance.infrastructure direc
 
 from finance.infrastructure.ledger_repo import (
     ar_aging,
+    get_journal,
     product_margins,
     purchase_spend,
     reference_counts,
@@ -14,10 +15,12 @@ from finance.infrastructure.ledger_repo import (
     summary_by_department,
     summary_by_job,
     trend_series,
+    trial_balance,
 )
 
 __all__ = [
     "ar_aging",
+    "get_journal",
     "product_margins",
     "purchase_spend",
     "reference_counts",
@@ -27,4 +30,5 @@ __all__ = [
     "summary_by_department",
     "summary_by_job",
     "trend_series",
+    "trial_balance",
 ]

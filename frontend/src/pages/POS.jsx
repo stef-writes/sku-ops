@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Search, Trash2, Check, HardHat, MapPin, FileText, Clock, Loader2, ScanLine, Plus } from "lucide-react";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { QuantityControl } from "@/components/QuantityControl";
-import { StatusBadge } from "@/components/StatusBadge";
 import { useProducts } from "@/hooks/useProducts";
 import { useContractors } from "@/hooks/useContractors";
 import { useCreateWithdrawal, useCreateWithdrawalForContractor } from "@/hooks/useWithdrawals";

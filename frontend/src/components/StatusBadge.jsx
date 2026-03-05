@@ -6,6 +6,7 @@ const VARIANTS = {
   overdue:    "badge-error",
   invoiced:   "bg-blue-50 text-blue-700 border border-blue-200",
   draft:      "bg-slate-100 text-slate-600 border border-slate-200",
+  approved:   "bg-amber-50 text-amber-700 border border-amber-200",
   sent:       "bg-blue-50 text-blue-700 border border-blue-200",
   authorised: "bg-emerald-50 text-emerald-700 border border-emerald-200",
   voided:     "bg-red-50 text-red-700 border border-red-200",

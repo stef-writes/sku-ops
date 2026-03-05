@@ -6,9 +6,6 @@ export const reportKeys = {
   inventory: () => ["reports", "inventory"],
   trends: (params) => ["reports", "trends", params],
   productMargins: (params) => ["reports", "productMargins", params],
-  jobPl: (params) => ["reports", "jobPl", params],
-  kpis: (params) => ["reports", "kpis", params],
-  productPerformance: (params) => ["reports", "productPerformance", params],
   pl: (params) => ["reports", "pl", params],
   arAging: () => ["reports", "arAging"],
 };
@@ -40,30 +37,6 @@ export function useReportMargins(params) {
   return useQuery({
     queryKey: reportKeys.productMargins(params),
     queryFn: () => api.reports.productMargins(params),
-    enabled: !!params,
-  });
-}
-
-export function useReportJobPl(params) {
-  return useQuery({
-    queryKey: reportKeys.jobPl(params),
-    queryFn: () => api.reports.jobPl(params),
-    enabled: !!params,
-  });
-}
-
-export function useReportKpis(params) {
-  return useQuery({
-    queryKey: reportKeys.kpis(params),
-    queryFn: () => api.reports.kpis(params),
-    enabled: !!params,
-  });
-}
-
-export function useReportProductPerformance(params) {
-  return useQuery({
-    queryKey: reportKeys.productPerformance(params),
-    queryFn: () => api.reports.productPerformance(params),
     enabled: !!params,
   });
 }

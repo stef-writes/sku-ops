@@ -1,26 +1,42 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { DollarSign, CheckCircle, Download, FileText, HardHat, Building2, ArrowRight } from "lucide-react";
+import { CheckCircle, FileText, HardHat, Building2 } from "lucide-react";
 import { format } from "date-fns";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { DataTable } from "@/components/DataTable";
+import { StatCard } from "@/components/StatCard";
 import { CreateInvoiceModal } from "../components/CreateInvoiceModal";
 import { useFinancialSummary } from "@/hooks/useFinancials";
 import { useWithdrawals, useMarkPaid, useBulkMarkPaid } from "@/hooks/useWithdrawals";
-import api from "@/lib/api-client";
 import { valueFormatter } from "@/lib/chartConfig";
 import { dateToISO, endOfDayISO } from "@/lib/utils";
 
 const Financials = () => {
-  const [statusFilter, setStatusFilter] = useState("");
-  const [entityFilter, setEntityFilter] = useState("");
-  const [dateRange, setDateRange] = useState({ from: null, to: null });
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
+  const [entityFilter, setEntityFilter] = useState(searchParams.get("entity") || "");
+  const [dateRange, setDateRange] = useState(() => ({
+    from: searchParams.get("from") ? new Date(searchParams.get("from")) : null,
+    to: searchParams.get("to") ? new Date(searchParams.get("to")) : null,
+  }));
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [createInvoiceModalOpen, setCreateInvoiceModalOpen] = useState(false);
+
+  const syncFiltersToURL = useCallback((updates) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      for (const [key, val] of Object.entries(updates)) {
+        if (val) next.set(key, val);
+        else next.delete(key);
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const params = useMemo(() => ({
     payment_status: statusFilter || undefined,
@@ -34,7 +50,8 @@ const Financials = () => {
   const markPaid = useMarkPaid();
   const bulkMarkPaid = useBulkMarkPaid();
 
-  const handleMarkPaid = async (id) => {
+  const handleMarkPaid = async (id, e) => {
+    e?.stopPropagation();
     try {
       await markPaid.mutateAsync({ id });
       toast.success("Marked as paid");
@@ -42,31 +59,28 @@ const Financials = () => {
   };
 
   const handleBulkMarkPaid = async () => {
-    if (selectedIds.length === 0) return;
+    if (selectedIds.size === 0) return;
     try {
-      await bulkMarkPaid.mutateAsync(selectedIds);
-      toast.success(`Marked ${selectedIds.length} as paid`);
-      setSelectedIds([]);
+      await bulkMarkPaid.mutateAsync(Array.from(selectedIds));
+      toast.success(`Marked ${selectedIds.size} as paid`);
+      setSelectedIds(new Set());
     } catch { toast.error("Failed to mark as paid"); }
   };
 
-  const handleExport = async () => {
-    try {
-      const blob = await api.financials.export(params);
-      const url = window.URL.createObjectURL(new Blob([blob]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `financials_${format(new Date(), "yyyyMMdd")}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      toast.success("Export downloaded");
-    } catch { toast.error("Failed to export"); }
+  const selectAllUnpaid = () => {
+    setSelectedIds(new Set(
+      withdrawals.filter((w) => w.payment_status === "unpaid" && !w.invoice_id).map((w) => w.id)
+    ));
   };
 
-  const toggleSelect = (id) => setSelectedIds((prev) => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]);
-  const selectAllUnpaid = () => setSelectedIds(withdrawals.filter((w) => w.payment_status === "unpaid" && !w.invoice_id).map((w) => w.id));
-  const selectedUnpaidIds = selectedIds.filter((id) => { const w = withdrawals.find((x) => x.id === id); return w?.payment_status === "unpaid" && !w?.invoice_id; });
+  const selectedUnpaidIds = useMemo(
+    () => [...selectedIds].filter((id) => {
+      const w = withdrawals.find((x) => x.id === id);
+      return w?.payment_status === "unpaid" && !w?.invoice_id;
+    }),
+    [selectedIds, withdrawals]
+  );
+
   const billingEntities = [...new Set(withdrawals.map((w) => w.billing_entity).filter(Boolean))];
 
   const paymentBreakdown = useMemo(() => {
@@ -81,6 +95,70 @@ const Financials = () => {
     ].filter((d) => d.value > 0);
   }, [summary]);
 
+  const columns = useMemo(() => [
+    {
+      key: "created_at",
+      label: "Date",
+      render: (row) => <span className="font-mono text-xs text-slate-500">{new Date(row.created_at).toLocaleDateString()}</span>,
+      exportValue: (row) => row.created_at,
+    },
+    {
+      key: "contractor_name",
+      label: "Contractor",
+      render: (row) => (
+        <div className="flex items-center gap-2">
+          <HardHat className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <div>
+            <p className="font-medium text-slate-800">{row.contractor_name}</p>
+            <p className="text-[10px] text-slate-400">{row.contractor_company}</p>
+          </div>
+        </div>
+      ),
+      exportValue: (row) => `${row.contractor_name} (${row.contractor_company || ""})`,
+    },
+    {
+      key: "job_id",
+      label: "Job",
+      render: (row) => <span className="font-mono text-xs">{row.job_id}</span>,
+    },
+    {
+      key: "total",
+      label: "Total",
+      align: "right",
+      render: (row) => <span className="font-semibold tabular-nums">${(row.total || 0).toFixed(2)}</span>,
+      exportValue: (row) => (row.total || 0).toFixed(2),
+    },
+    {
+      key: "cost_total",
+      label: "Cost",
+      align: "right",
+      render: (row) => <span className="text-slate-500 tabular-nums">${(row.cost_total || 0).toFixed(2)}</span>,
+      exportValue: (row) => (row.cost_total || 0).toFixed(2),
+    },
+    {
+      key: "_margin",
+      label: "Margin",
+      align: "right",
+      sortable: false,
+      searchable: false,
+      render: (row) => <span className="text-emerald-600 tabular-nums">${((row.total || 0) - (row.cost_total || 0)).toFixed(2)}</span>,
+      exportValue: (row) => ((row.total || 0) - (row.cost_total || 0)).toFixed(2),
+    },
+    {
+      key: "payment_status",
+      label: "Status",
+      render: (row) =>
+        row.payment_status === "invoiced" && row.invoice_id ? (
+          <Link to="/invoices" className="inline-block" onClick={(e) => e.stopPropagation()}>
+            <StatusBadge status="invoiced" />
+          </Link>
+        ) : (
+          <StatusBadge status={row.payment_status} />
+        ),
+      exportValue: (row) => row.payment_status,
+    },
+  ], []);
+
   if (summaryLoading && wdLoading) return <PageSkeleton />;
 
   return (
@@ -93,17 +171,19 @@ const Financials = () => {
           </div>
           <div className="flex gap-2">
             <Link to="/invoices"><Button variant="outline" size="sm" className="gap-2"><FileText className="w-4 h-4" />Invoices</Button></Link>
-            <Button variant="outline" size="sm" onClick={handleExport} className="gap-2" data-testid="export-btn"><Download className="w-4 h-4" />Export CSV</Button>
           </div>
         </div>
-        <DateRangeFilter value={dateRange} onChange={setDateRange} />
+        <DateRangeFilter value={dateRange} onChange={(r) => {
+          setDateRange(r);
+          syncFiltersToURL({ from: r.from?.toISOString()?.slice(0, 10), to: r.to?.toISOString()?.slice(0, 10) });
+        }} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" data-testid="summary-cards">
-        <MetricCard label="Unpaid" value={valueFormatter(summary?.total_unpaid || 0)} accent="rose" />
-        <MetricCard label="Paid" value={valueFormatter(summary?.total_paid || 0)} accent="emerald" />
-        <MetricCard label="Total Revenue" value={valueFormatter(summary?.total_revenue || 0)} />
-        <MetricCard label="Gross Margin" value={valueFormatter(summary?.gross_margin || 0)} accent="violet" />
+        <StatCard label="Unpaid" value={valueFormatter(summary?.total_unpaid || 0)} accent="rose" />
+        <StatCard label="Paid" value={valueFormatter(summary?.total_paid || 0)} accent="emerald" />
+        <StatCard label="Total Revenue" value={valueFormatter(summary?.total_revenue || 0)} />
+        <StatCard label="Gross Margin" value={valueFormatter(summary?.gross_margin || 0)} accent="violet" />
       </div>
 
       {paymentBreakdown.length > 0 && (
@@ -167,7 +247,7 @@ const Financials = () => {
       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm mb-4" data-testid="filters">
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Filter</span>
-          <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
+          <Select value={statusFilter || "all"} onValueChange={(v) => { const val = v === "all" ? "" : v; setStatusFilter(val); syncFiltersToURL({ status: val }); }}>
             <SelectTrigger className="w-[140px] h-9"><SelectValue placeholder="All Status" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
@@ -176,7 +256,7 @@ const Financials = () => {
               <SelectItem value="invoiced">Invoiced</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={entityFilter || "all"} onValueChange={(v) => setEntityFilter(v === "all" ? "" : v)}>
+          <Select value={entityFilter || "all"} onValueChange={(v) => { const val = v === "all" ? "" : v; setEntityFilter(val); syncFiltersToURL({ entity: val }); }}>
             <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="All Entities" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Entities</SelectItem>
@@ -184,16 +264,16 @@ const Financials = () => {
             </SelectContent>
           </Select>
           {(statusFilter || entityFilter) && (
-            <button onClick={() => { setStatusFilter(""); setEntityFilter(""); }} className="text-xs text-slate-400 hover:text-slate-600">Clear</button>
+            <button onClick={() => { setStatusFilter(""); setEntityFilter(""); syncFiltersToURL({ status: "", entity: "" }); }} className="text-xs text-slate-400 hover:text-slate-600">Clear</button>
           )}
         </div>
       </div>
 
-      {selectedIds.length > 0 && (
+      {selectedIds.size > 0 && (
         <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-4 flex items-center justify-between">
-          <span className="text-sm font-semibold text-orange-700">{selectedIds.length} selected</span>
+          <span className="text-sm font-semibold text-orange-700">{selectedIds.size} selected</span>
           <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>Clear</Button>
+            <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Clear</Button>
             {selectedUnpaidIds.length > 0 && (
               <Button variant="outline" size="sm" onClick={() => setCreateInvoiceModalOpen(true)} className="gap-1"><FileText className="w-3.5 h-3.5" />Invoice ({selectedUnpaidIds.length})</Button>
             )}
@@ -202,63 +282,32 @@ const Financials = () => {
         </div>
       )}
 
-      <CreateInvoiceModal open={createInvoiceModalOpen} onOpenChange={setCreateInvoiceModalOpen} onCreated={() => { setSelectedIds([]); }} preselectedIds={selectedUnpaidIds} />
+      <CreateInvoiceModal open={createInvoiceModalOpen} onOpenChange={setCreateInvoiceModalOpen} onCreated={() => { setSelectedIds(new Set()); }} preselectedIds={selectedUnpaidIds} />
 
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden" data-testid="transactions-table">
-        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Transactions ({withdrawals.length})</p>
+      <DataTable
+        data={withdrawals}
+        columns={columns}
+        title="Transactions"
+        emptyMessage="No transactions found"
+        searchable
+        exportable
+        exportFilename={`financials-${format(new Date(), "yyyyMMdd")}.csv`}
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
+        isSelectable={(row) => !row.invoice_id}
+        headerActions={
           <button onClick={selectAllUnpaid} className="text-xs text-orange-500 hover:text-orange-600 font-medium">Select All Unpaid</button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-slate-100">
-              <th className="w-10 px-3 py-2.5" /><th className="text-left text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-2.5">Date</th><th className="text-left text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-2.5">Contractor</th><th className="text-left text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-2.5">Job</th><th className="text-right text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-2.5">Total</th><th className="text-right text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-2.5">Cost</th><th className="text-right text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-2.5">Margin</th><th className="text-left text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-2.5">Status</th><th className="w-24 px-3 py-2.5" />
-            </tr></thead>
-            <tbody className="divide-y divide-slate-50">
-              {withdrawals.length === 0 ? (
-                <tr><td colSpan="9" className="text-center py-12 text-slate-400 text-sm">No transactions found</td></tr>
-              ) : withdrawals.map((w) => (
-                <tr key={w.id} className="hover:bg-slate-50/60 transition-colors" data-testid={`transaction-row-${w.id}`}>
-                  <td className="px-3 py-2.5"><input type="checkbox" checked={selectedIds.includes(w.id)} onChange={() => toggleSelect(w.id)} disabled={!!w.invoice_id} className="w-4 h-4 rounded border-slate-300 accent-orange-500 disabled:opacity-30" /></td>
-                  <td className="px-3 py-2.5 font-mono text-xs text-slate-500">{new Date(w.created_at).toLocaleDateString()}</td>
-                  <td className="px-3 py-2.5"><div className="flex items-center gap-2"><HardHat className="w-3.5 h-3.5 text-slate-400" /><div><p className="font-medium text-slate-800">{w.contractor_name}</p><p className="text-[10px] text-slate-400">{w.contractor_company}</p></div></div></td>
-                  <td className="px-3 py-2.5 font-mono text-xs">{w.job_id}</td>
-                  <td className="px-3 py-2.5 text-right font-semibold tabular-nums">${(w.total || 0).toFixed(2)}</td>
-                  <td className="px-3 py-2.5 text-right text-slate-500 tabular-nums">${(w.cost_total || 0).toFixed(2)}</td>
-                  <td className="px-3 py-2.5 text-right text-emerald-600 tabular-nums">${((w.total || 0) - (w.cost_total || 0)).toFixed(2)}</td>
-                  <td className="px-3 py-2.5">
-                    {w.payment_status === "invoiced" && w.invoice_id ? (
-                      <Link to="/invoices" className="inline-block"><StatusBadge status="invoiced" /></Link>
-                    ) : (
-                      <StatusBadge status={w.payment_status} />
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {w.payment_status === "unpaid" && (
-                      <button onClick={() => handleMarkPaid(w.id)} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1" data-testid={`mark-paid-${w.id}`}>
-                        <CheckCircle className="w-3.5 h-3.5" />Paid
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+        }
+        rowActions={(w) =>
+          w.payment_status === "unpaid" ? (
+            <button onClick={(e) => handleMarkPaid(w.id, e)} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1" data-testid={`mark-paid-${w.id}`}>
+              <CheckCircle className="w-3.5 h-3.5" />Paid
+            </button>
+          ) : null
+        }
+      />
     </div>
   );
 };
-
-function MetricCard({ label, value, accent = "slate" }) {
-  const bar = { rose: "bg-rose-400", emerald: "bg-emerald-400", violet: "bg-violet-400", slate: "bg-slate-200" }[accent] || "bg-slate-200";
-  return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm relative overflow-hidden">
-      <div className={`absolute top-0 left-0 right-0 h-[2px] ${bar}`} />
-      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 mb-3">{label}</p>
-      <p className="text-2xl font-bold text-slate-900 tabular-nums leading-none">{value}</p>
-    </div>
-  );
-}
 
 export default Financials;

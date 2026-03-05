@@ -9,29 +9,11 @@ import { AreaChart } from "@tremor/react";
 import { valueFormatter } from "@/lib/chartConfig";
 import { DATE_PRESETS } from "@/lib/constants";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
+import { StatCard } from "@/components/StatCard";
+import { DataTable } from "@/components/DataTable";
 import { useReportSales, useReportInventory, useReportTrends, useReportMargins, useReportPL, useReportArAging } from "@/hooks/useReports";
 
-const Stat = ({ label, value, icon: Icon, accent = "amber", note }) => {
-  const cfg = {
-    amber: { bar: "bg-amber-400", icon: "bg-amber-50 text-amber-600" },
-    emerald: { bar: "bg-emerald-400", icon: "bg-emerald-50 text-emerald-600" },
-    blue: { bar: "bg-blue-400", icon: "bg-blue-50 text-blue-600" },
-    orange: { bar: "bg-orange-400", icon: "bg-orange-50 text-orange-600" },
-    violet: { bar: "bg-violet-400", icon: "bg-violet-50 text-violet-600" },
-    slate: { bar: "bg-slate-300", icon: "bg-slate-50 text-slate-500" },
-  }[accent] || { bar: "bg-amber-400", icon: "bg-amber-50 text-amber-600" };
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 relative overflow-hidden shadow-sm">
-      <div className={`absolute top-0 left-0 right-0 h-[2px] ${cfg.bar}`} />
-      <div className="flex items-start justify-between mb-4">
-        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{label}</p>
-        {Icon && <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${cfg.icon}`}><Icon className="w-4 h-4" /></div>}
-      </div>
-      <p className="text-2xl font-bold text-slate-900 tabular-nums leading-none">{value}</p>
-      {note && <p className="text-xs text-slate-400 mt-2">{note}</p>}
-    </div>
-  );
-};
+const Stat = StatCard;
 
 const ProductBars = ({ products }) => {
   const max = useMemo(() => Math.max(...products.map((p) => p.revenue), 1), [products]);
@@ -178,6 +160,81 @@ const PL_COLUMNS = {
   product: { label: "Product", key: "product_id" },
 };
 
+const PLBreakdownTable = ({ plDimension, rows }) => {
+  const colCfg = PL_COLUMNS[plDimension];
+  const columns = useMemo(() => {
+    const cols = [
+      {
+        key: colCfg?.key || "name",
+        label: colCfg?.label || "Name",
+        render: (row) => <span className="font-medium text-slate-700 truncate max-w-[200px] block">{row[colCfg?.key] || "—"}</span>,
+      },
+    ];
+    if (plDimension === "job") {
+      cols.push(
+        { key: "billing_entity", label: "Customer", render: (row) => <span className="text-slate-500 truncate max-w-[160px] block">{row.billing_entity || "—"}</span> },
+        { key: "withdrawal_count", label: "Orders", align: "right", render: (row) => <span className="tabular-nums text-slate-500">{row.withdrawal_count || row.transaction_count}</span> },
+      );
+    }
+    cols.push(
+      { key: "revenue", label: "Revenue", align: "right", render: (row) => <span className="tabular-nums font-semibold text-slate-900">{valueFormatter(row.revenue)}</span> },
+      { key: "cost", label: "COGS", align: "right", render: (row) => <span className="tabular-nums text-slate-500">{valueFormatter(row.cost)}</span> },
+      { key: "profit", label: "Profit", align: "right", render: (row) => <span className="tabular-nums font-semibold text-slate-900">{valueFormatter(row.profit)}</span> },
+      {
+        key: "margin_pct",
+        label: "Margin",
+        align: "right",
+        render: (row) => {
+          const isHigh = (row.margin_pct || 0) >= 40;
+          const isLow = (row.margin_pct || 0) < 30;
+          return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold tabular-nums ${isHigh ? "bg-emerald-50 text-emerald-700" : isLow ? "bg-orange-50 text-orange-700" : "bg-blue-50 text-blue-700"}`}>{row.margin_pct}%</span>;
+        },
+      },
+    );
+    return cols;
+  }, [plDimension, colCfg]);
+
+  const dataWithId = useMemo(() => rows.map((r, i) => ({ ...r, id: r[colCfg?.key] || i })), [rows, colCfg]);
+
+  return (
+    <DataTable
+      data={dataWithId}
+      columns={columns}
+      title={`Breakdown — ${PL_DIMENSIONS.find((d) => d.value === plDimension)?.label || plDimension}`}
+      emptyMessage="No P&L data"
+      searchable
+      exportable
+      exportFilename={`pl-${plDimension}.csv`}
+      pageSize={20}
+    />
+  );
+};
+
+const AR_AGING_COLUMNS = [
+  { key: "billing_entity", label: "Entity", render: (row) => <span className="font-medium text-slate-700">{row.billing_entity}</span> },
+  { key: "total_ar", label: "Total AR", align: "right", render: (row) => <span className="tabular-nums font-semibold">{valueFormatter(row.total_ar)}</span> },
+  { key: "current_not_due", label: "Current", align: "right", render: (row) => <span className="tabular-nums text-slate-500">{valueFormatter(row.current_not_due)}</span> },
+  { key: "overdue_1_30", label: "1–30d", align: "right", render: (row) => <span className="tabular-nums text-amber-500">{valueFormatter(row.overdue_1_30)}</span> },
+  { key: "overdue_31_60", label: "31–60d", align: "right", render: (row) => <span className="tabular-nums text-amber-600">{valueFormatter(row.overdue_31_60)}</span> },
+  { key: "overdue_61_90", label: "61–90d", align: "right", render: (row) => <span className="tabular-nums text-orange-600">{valueFormatter(row.overdue_61_90)}</span> },
+  { key: "overdue_90_plus", label: "90d+", align: "right", render: (row) => <span className="tabular-nums text-red-600 font-semibold">{valueFormatter(row.overdue_90_plus)}</span> },
+];
+
+const ARAgingTable = ({ data }) => {
+  const dataWithId = useMemo(() => data.map((r, i) => ({ ...r, id: r.billing_entity || i })), [data]);
+  return (
+    <DataTable
+      data={dataWithId}
+      columns={AR_AGING_COLUMNS}
+      title="Accounts Receivable Aging"
+      emptyMessage="No AR data"
+      searchable
+      exportable
+      exportFilename="ar-aging.csv"
+    />
+  );
+};
+
 const Reports = () => {
   const [activeTab, setActiveTab] = useState("pl");
   const [trendsGroupBy, setTrendsGroupBy] = useState("day");
@@ -311,73 +368,11 @@ const Reports = () => {
           )}
 
           {plDimension !== "overall" && plData?.rows?.length > 0 && (
-            <Panel>
-              <SectionHead title={`Breakdown — ${PL_DIMENSIONS.find((d) => d.value === plDimension)?.label || plDimension}`} />
-              <div className="overflow-x-auto -mx-6 px-6">
-                <table className="w-full text-sm">
-                  <thead><tr className="border-b border-slate-100">
-                    <th className="text-left text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 pb-3 pr-4">{PL_COLUMNS[plDimension]?.label || "Name"}</th>
-                    {plDimension === "job" && <th className="text-left text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 pb-3 pr-4">Customer</th>}
-                    {plDimension === "job" && <th className="text-right text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 pb-3 pr-4">Orders</th>}
-                    <th className="text-right text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 pb-3 pr-4">Revenue</th>
-                    <th className="text-right text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 pb-3 pr-4">COGS</th>
-                    <th className="text-right text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 pb-3 pr-4">Profit</th>
-                    <th className="text-right text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 pb-3">Margin</th>
-                  </tr></thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {plData.rows.map((row, i) => {
-                      const colCfg = PL_COLUMNS[plDimension];
-                      const labelVal = row[colCfg?.key] || "—";
-                      const isHigh = (row.margin_pct || 0) >= 40;
-                      const isLow = (row.margin_pct || 0) < 30;
-                      return (
-                        <tr key={i} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-3 pr-4 font-medium text-slate-700 max-w-[200px] truncate">{labelVal}</td>
-                          {plDimension === "job" && <td className="py-3 pr-4 text-slate-500 max-w-[160px] truncate">{row.billing_entity || "—"}</td>}
-                          {plDimension === "job" && <td className="py-3 pr-4 text-right tabular-nums text-slate-500">{row.withdrawal_count || row.transaction_count}</td>}
-                          <td className="py-3 pr-4 text-right tabular-nums font-semibold text-slate-900">{valueFormatter(row.revenue)}</td>
-                          <td className="py-3 pr-4 text-right tabular-nums text-slate-500">{valueFormatter(row.cost)}</td>
-                          <td className="py-3 pr-4 text-right tabular-nums font-semibold text-slate-900">{valueFormatter(row.profit)}</td>
-                          <td className="py-3 text-right">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold tabular-nums ${isHigh ? "bg-emerald-50 text-emerald-700" : isLow ? "bg-orange-50 text-orange-700" : "bg-blue-50 text-blue-700"}`}>{row.margin_pct}%</span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </Panel>
+            <PLBreakdownTable plDimension={plDimension} rows={plData.rows} />
           )}
 
           {plDimension === "overall" && plData?.rows?.length === 0 && arAging?.length > 0 && (
-            <Panel>
-              <SectionHead title="Accounts Receivable Aging" />
-              <div className="overflow-x-auto -mx-6 px-6">
-                <table className="w-full text-sm">
-                  <thead><tr className="border-b border-slate-100">
-                    <th className="text-left text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 pb-3 pr-4">Entity</th>
-                    <th className="text-right text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 pb-3 pr-4">Total AR</th>
-                    <th className="text-right text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 pb-3 pr-4">Current</th>
-                    <th className="text-right text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 pb-3 pr-4">31–60d</th>
-                    <th className="text-right text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 pb-3 pr-4">61–90d</th>
-                    <th className="text-right text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 pb-3">90d+</th>
-                  </tr></thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {arAging.map((row, i) => (
-                      <tr key={i} className="hover:bg-slate-50">
-                        <td className="py-3 pr-4 font-medium text-slate-700">{row.billing_entity}</td>
-                        <td className="py-3 pr-4 text-right tabular-nums font-semibold">{valueFormatter(row.total_ar)}</td>
-                        <td className="py-3 pr-4 text-right tabular-nums text-slate-500">{valueFormatter(row.current_0_30)}</td>
-                        <td className="py-3 pr-4 text-right tabular-nums text-amber-600">{valueFormatter(row.overdue_31_60)}</td>
-                        <td className="py-3 pr-4 text-right tabular-nums text-orange-600">{valueFormatter(row.overdue_61_90)}</td>
-                        <td className="py-3 text-right tabular-nums text-red-600 font-semibold">{valueFormatter(row.overdue_90_plus)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Panel>
+            <ARAgingTable data={arAging} />
           )}
 
           {plDimension !== "overall" && (!plData?.rows || plData.rows.length === 0) && (

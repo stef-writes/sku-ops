@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -8,22 +8,73 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Download,
+  CheckSquare,
+  Square,
+  Search,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "./EmptyState";
 
-const PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 15;
+
+function exportCSV(columns, data, filename = "export.csv") {
+  const visibleCols = columns.filter((c) => c.key !== "_actions");
+  const header = visibleCols.map((c) => `"${c.label}"`).join(",");
+  const rows = data.map((row) =>
+    visibleCols
+      .map((c) => {
+        const val = c.exportValue ? c.exportValue(row) : row[c.key];
+        return `"${String(val ?? "").replace(/"/g, '""')}"`;
+      })
+      .join(",")
+  );
+  const csv = [header, ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 /**
- * DataTable with sorting and pagination.
+ * Dynamic data table with sorting, pagination, selection, search, and CSV export.
+ *
+ * Column shape:
+ *   { key, label, sortable?, render?, exportValue?, align?, className?, searchable? }
+ *
  * @param {Object} props
- * @param {Array} props.data - Array of row objects
- * @param {Array<{key: string, label: string, sortable?: boolean, render?: (row) => ReactNode}>} props.columns
- * @param {string} [props.emptyMessage] - Message when no data
- * @param {React.ComponentType} [props.emptyIcon] - Icon when no data
- * @param {function(row): ReactNode} [props.rowActions] - Render action buttons for each row
- * @param {number} [props.pageSize] - Rows per page
- * @param {string} [props.className] - Additional classes
+ * @param {Array} props.data
+ * @param {Array} props.columns
+ * @param {string} [props.emptyMessage]
+ * @param {React.ComponentType} [props.emptyIcon]
+ * @param {function(row): ReactNode} [props.rowActions] - Render action buttons per row
+ * @param {function(row): void} [props.onRowClick]
+ * @param {number} [props.pageSize]
+ * @param {string} [props.className]
+ *
+ * Selection:
+ * @param {Set|Array} [props.selectedIds] - Controlled selected row IDs
+ * @param {function(Set): void} [props.onSelectionChange]
+ * @param {function(row): boolean} [props.isSelectable] - Per-row selectability
+ *
+ * Header:
+ * @param {string} [props.title]
+ * @param {ReactNode} [props.headerActions] - Extra buttons beside export
+ * @param {boolean} [props.exportable] - Show CSV export button
+ * @param {string} [props.exportFilename]
+ * @param {boolean} [props.searchable] - Show search input
+ *
+ * Server-side pagination (optional — bypasses client-side paging):
+ * @param {{ page: number, total: number, pageSize: number, onPageChange: (page: number) => void }} [props.serverPagination]
  */
 export function DataTable({
   data = [],
@@ -31,27 +82,82 @@ export function DataTable({
   emptyMessage = "No data",
   emptyIcon,
   rowActions,
-  pageSize = PAGE_SIZE,
+  onRowClick,
+  pageSize = DEFAULT_PAGE_SIZE,
   className,
+  selectedIds: controlledSelected,
+  onSelectionChange,
+  isSelectable,
+  title,
+  headerActions,
+  exportable = false,
+  exportFilename = "export.csv",
+  searchable = false,
+  serverPagination,
 }) {
   const [sortKey, setSortKey] = useState(null);
   const [sortDir, setSortDir] = useState("asc");
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+
+  const selectable = !!onSelectionChange;
+  const selectedSet = useMemo(
+    () =>
+      controlledSelected instanceof Set
+        ? controlledSelected
+        : new Set(controlledSelected ?? []),
+    [controlledSelected]
+  );
+
+  const searchLower = search.toLowerCase().trim();
+  const searchableKeys = useMemo(
+    () => columns.filter((c) => c.searchable !== false).map((c) => c.key),
+    [columns]
+  );
+
+  const filteredData = useMemo(() => {
+    if (!searchLower) return data;
+    return data.filter((row) =>
+      searchableKeys.some((key) =>
+        String(row[key] ?? "")
+          .toLowerCase()
+          .includes(searchLower)
+      )
+    );
+  }, [data, searchLower, searchableKeys]);
 
   const sortedData = useMemo(() => {
-    if (!sortKey) return data;
-    return [...data].sort((a, b) => {
+    if (!sortKey) return filteredData;
+    return [...filteredData].sort((a, b) => {
       const va = a[sortKey];
       const vb = b[sortKey];
-      const cmp = typeof va === "number" && typeof vb === "number"
-        ? va - vb
-        : String(va ?? "").localeCompare(String(vb ?? ""));
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      const cmp =
+        typeof va === "number" && typeof vb === "number"
+          ? va - vb
+          : String(va).localeCompare(String(vb));
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [data, sortKey, sortDir]);
+  }, [filteredData, sortKey, sortDir]);
 
-  const totalPages = Math.ceil(sortedData.length / pageSize) || 1;
-  const paginatedData = sortedData.slice((page - 1) * pageSize, page * pageSize);
+  const isServerPaged = !!serverPagination;
+  const effectivePageSize = isServerPaged ? serverPagination.pageSize : pageSize;
+  const totalItems = isServerPaged ? serverPagination.total : sortedData.length;
+  const totalPages = Math.ceil(totalItems / effectivePageSize) || 1;
+  const currentPage = isServerPaged ? serverPagination.page + 1 : Math.min(page, totalPages);
+  const paginatedData = isServerPaged
+    ? sortedData
+    : sortedData.slice((currentPage - 1) * effectivePageSize, currentPage * effectivePageSize);
+
+  const goToPage = (p) => {
+    if (isServerPaged) {
+      serverPagination.onPageChange(p - 1);
+    } else {
+      setPage(p);
+    }
+  };
 
   const handleSort = (key) => {
     if (sortKey === key) {
@@ -63,19 +169,43 @@ export function DataTable({
     setPage(1);
   };
 
+  const toggleRow = useCallback(
+    (id, e) => {
+      e?.stopPropagation();
+      const next = new Set(selectedSet);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      onSelectionChange?.(next);
+    },
+    [selectedSet, onSelectionChange]
+  );
+
+  const toggleAll = useCallback(() => {
+    const selectableRows = isSelectable
+      ? filteredData.filter(isSelectable)
+      : filteredData;
+    const allSelected =
+      selectableRows.length > 0 &&
+      selectableRows.every((r) => selectedSet.has(r.id));
+    onSelectionChange?.(
+      allSelected ? new Set() : new Set(selectableRows.map((r) => r.id))
+    );
+  }, [filteredData, selectedSet, isSelectable, onSelectionChange]);
+
   const SortIcon = ({ col }) => {
     if (col.sortable === false) return null;
-    if (sortKey !== col.key) {
-      return <ArrowUpDown className="w-4 h-4 ml-1 opacity-50" />;
-    }
+    if (sortKey !== col.key)
+      return <ArrowUpDown className="w-3.5 h-3.5 ml-1 opacity-40" />;
     return sortDir === "asc" ? (
-      <ArrowUp className="w-4 h-4 ml-1" />
+      <ArrowUp className="w-3.5 h-3.5 ml-1" />
     ) : (
-      <ArrowDown className="w-4 h-4 ml-1" />
+      <ArrowDown className="w-3.5 h-3.5 ml-1" />
     );
   };
 
-  if (data.length === 0) {
+  const showHeader = title || headerActions || exportable || searchable;
+
+  if (data.length === 0 && !showHeader) {
     return (
       <EmptyState
         icon={emptyIcon}
@@ -86,70 +216,213 @@ export function DataTable({
   }
 
   return (
-    <div className={cn("space-y-4", className)}>
-      <div className="rounded-lg border border-slate-200 overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-slate-50 hover:bg-slate-50">
-              {columns.map((col) => (
-                <TableHead
-                  key={col.key}
-                  className={cn(
-                    "font-semibold text-slate-700 uppercase text-xs tracking-wider",
-                    col.sortable !== false && "cursor-pointer select-none"
-                  )}
-                  onClick={() => col.sortable !== false && handleSort(col.key)}
+    <div className={cn("space-y-0", className)}>
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        {showHeader && (
+          <div className="px-5 py-3 border-b border-slate-100 flex flex-wrap items-center gap-3 justify-between">
+            <div className="flex items-center gap-3">
+              {title && (
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                  {title}
+                  {filteredData.length !== data.length
+                    ? ` (${filteredData.length}/${data.length})`
+                    : ` (${data.length})`}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {searchable && (
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search…"
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setPage(1);
+                    }}
+                    className="h-8 pl-8 pr-3 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400 w-48"
+                  />
+                </div>
+              )}
+              {headerActions}
+              {exportable && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 h-8"
+                  onClick={() =>
+                    exportCSV(columns, sortedData, exportFilename)
+                  }
                 >
-                  <span className="flex items-center">
-                    {col.label}
-                    <SortIcon col={col} />
-                  </span>
-                </TableHead>
-              ))}
-              {rowActions && <TableHead className="w-[100px] text-right">Actions</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paginatedData.map((row, idx) => (
-              <TableRow key={row.id ?? idx} className="hover:bg-slate-50/50">
+                  <Download className="w-3.5 h-3.5" />
+                  CSV
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
+                {selectable && (
+                  <TableHead className="w-10 px-3">
+                    <button
+                      type="button"
+                      onClick={toggleAll}
+                      className="text-slate-400 hover:text-slate-600"
+                    >
+                      {filteredData.length > 0 &&
+                      (isSelectable
+                        ? filteredData.filter(isSelectable)
+                        : filteredData
+                      ).every((r) => selectedSet.has(r.id)) ? (
+                        <CheckSquare className="w-4 h-4 text-blue-600" />
+                      ) : (
+                        <Square className="w-4 h-4" />
+                      )}
+                    </button>
+                  </TableHead>
+                )}
                 {columns.map((col) => (
-                  <TableCell key={col.key} className="py-3">
-                    {col.render ? col.render(row) : row[col.key]}
-                  </TableCell>
+                  <TableHead
+                    key={col.key}
+                    className={cn(
+                      "text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-2.5",
+                      col.align === "right" && "text-right",
+                      col.align === "center" && "text-center",
+                      col.sortable !== false &&
+                        "cursor-pointer select-none hover:text-slate-600",
+                      col.className
+                    )}
+                    onClick={() =>
+                      col.sortable !== false && handleSort(col.key)
+                    }
+                  >
+                    <span
+                      className={cn(
+                        "inline-flex items-center",
+                        col.align === "right" && "justify-end w-full"
+                      )}
+                    >
+                      {col.label}
+                      <SortIcon col={col} />
+                    </span>
+                  </TableHead>
                 ))}
                 {rowActions && (
-                  <TableCell className="text-right py-3">{rowActions(row)}</TableCell>
+                  <TableHead className="w-[140px] px-3 py-2.5" />
                 )}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between px-1">
-          <p className="text-sm text-slate-500">
-            Page {page} of {totalPages} ({sortedData.length} items)
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
+            </TableHeader>
+            <TableBody>
+              {paginatedData.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={
+                      columns.length +
+                      (selectable ? 1 : 0) +
+                      (rowActions ? 1 : 0)
+                    }
+                    className="text-center py-12 text-slate-400 text-sm"
+                  >
+                    {searchLower ? "No results match your search" : emptyMessage}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedData.map((row, idx) => {
+                  const rowSelectable = isSelectable
+                    ? isSelectable(row)
+                    : true;
+                  const isSelected = selectedSet.has(row.id);
+                  return (
+                    <TableRow
+                      key={row.id ?? idx}
+                      className={cn(
+                        "hover:bg-slate-50/60 transition-colors",
+                        onRowClick && "cursor-pointer",
+                        isSelected && "bg-blue-50/40"
+                      )}
+                      onClick={() => onRowClick?.(row)}
+                    >
+                      {selectable && (
+                        <TableCell
+                          className="px-3 py-2.5"
+                          onClick={(e) => toggleRow(row.id, e)}
+                        >
+                          {rowSelectable ? (
+                            isSelected ? (
+                              <CheckSquare className="w-4 h-4 text-blue-600" />
+                            ) : (
+                              <Square className="w-4 h-4 text-slate-300" />
+                            )
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-200 opacity-30" />
+                          )}
+                        </TableCell>
+                      )}
+                      {columns.map((col) => (
+                        <TableCell
+                          key={col.key}
+                          className={cn(
+                            "px-3 py-2.5",
+                            col.align === "right" && "text-right",
+                            col.align === "center" && "text-center",
+                            col.cellClassName
+                          )}
+                        >
+                          {col.render ? col.render(row) : row[col.key]}
+                        </TableCell>
+                      ))}
+                      {rowActions && (
+                        <TableCell className="px-3 py-2.5 text-right">
+                          {rowActions(row)}
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
         </div>
-      )}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
+            <p className="text-xs text-slate-400 tabular-nums">
+              {(currentPage - 1) * effectivePageSize + 1}–
+              {Math.min(currentPage * effectivePageSize, totalItems)} of{" "}
+              {totalItems}
+            </p>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => goToPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage <= 1}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-xs text-slate-500 tabular-nums min-w-[4rem] text-center">
+                {currentPage} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => goToPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage >= totalPages}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

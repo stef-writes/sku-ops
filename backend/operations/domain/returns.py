@@ -5,6 +5,7 @@ from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 
 from kernel.entity import AuditedEntity
+from kernel.types import round_money
 
 
 class ReturnReason(str, Enum):
@@ -31,11 +32,11 @@ class ReturnItem(BaseModel):
 
     @property
     def refund_amount(self) -> float:
-        return round(self.unit_price * self.quantity, 2)
+        return round_money(self.unit_price * self.quantity)
 
     @property
     def cost_total(self) -> float:
-        return round(self.cost * self.quantity, 2)
+        return round_money(self.cost * self.quantity)
 
 
 class ReturnCreate(BaseModel):
@@ -65,7 +66,7 @@ class MaterialReturn(AuditedEntity):
     processed_by_name: str = ""
 
     def compute_totals(self, tax_rate: float = 0.10) -> None:
-        self.subtotal = sum(i.refund_amount for i in self.items)
-        self.cost_total = sum(i.cost_total for i in self.items)
-        self.tax = round(self.subtotal * tax_rate, 2)
-        self.total = round(self.subtotal + self.tax, 2)
+        self.subtotal = round_money(sum(i.refund_amount for i in self.items))
+        self.cost_total = round_money(sum(i.cost_total for i in self.items))
+        self.tax = round_money(self.subtotal * tax_rate)
+        self.total = round_money(self.subtotal + self.tax)

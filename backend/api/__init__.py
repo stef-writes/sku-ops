@@ -25,6 +25,7 @@ from shared.infrastructure.config import is_development, is_test
 from identity.api.settings import router as settings_router
 from finance.api.xero_auth import router as xero_auth_router
 from finance.api.credit_notes import router as credit_notes_router
+from finance.api.fiscal_periods import router as fiscal_periods_router
 from inventory.api.stock import router as stock_router
 from assistant.api.monitoring import router as monitoring_router
 
@@ -48,6 +49,7 @@ api_router.include_router(financials_router)
 api_router.include_router(invoices_router)
 api_router.include_router(returns_router)
 api_router.include_router(credit_notes_router)
+api_router.include_router(fiscal_periods_router)
 api_router.include_router(reports_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(documents_router)

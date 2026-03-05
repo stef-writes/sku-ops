@@ -26,6 +26,26 @@ async def insert_credit_note(
     )
 
 
+async def apply_credit_note(
+    credit_note_id: str,
+    organization_id: Optional[str] = None,
+    performed_by_user_id: Optional[str] = None,
+) -> dict:
+    """Apply a credit note to its linked invoice and write AR ledger entry."""
+    cn = await _repo.apply_credit_note(credit_note_id, organization_id)
+
+    from finance.application.ledger_service import record_credit_note_application
+    await record_credit_note_application(
+        credit_note_id=credit_note_id,
+        amount=float(cn.get("total", 0)),
+        billing_entity=cn.get("billing_entity", ""),
+        contractor_id="",
+        organization_id=organization_id or "default",
+        performed_by_user_id=performed_by_user_id,
+    )
+    return cn
+
+
 async def list_credit_notes(
     invoice_id: Optional[str] = None,
     billing_entity: Optional[str] = None,

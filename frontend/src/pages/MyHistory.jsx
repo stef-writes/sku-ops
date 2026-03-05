@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { Package, MapPin, ChevronDown, Send, Clock, CheckCircle, FileText, X } from "lucide-react";
 import { format } from "date-fns";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
+import { StatCard } from "@/components/StatCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { useWithdrawals } from "@/hooks/useWithdrawals";
@@ -50,9 +51,9 @@ const MyHistory = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <SummaryCard label="Total Withdrawals" value={withdrawals.length} />
-        <SummaryCard label="Total Value" value={`$${totalSpent.toLocaleString("en-US", { minimumFractionDigits: 2 })}`} accent="emerald" />
-        <SummaryCard label="Unpaid Balance" value={`$${totalUnpaid.toLocaleString("en-US", { minimumFractionDigits: 2 })}`} accent="amber" />
+        <StatCard label="Total Withdrawals" value={withdrawals.length} />
+        <StatCard label="Total Value" value={`$${totalSpent.toLocaleString("en-US", { minimumFractionDigits: 2 })}`} accent="emerald" />
+        <StatCard label="Unpaid Balance" value={`$${totalUnpaid.toLocaleString("en-US", { minimumFractionDigits: 2 })}`} accent="amber" />
       </div>
 
       {requests.length > 0 && (
@@ -162,17 +163,6 @@ const MyHistory = () => {
     </div>
   );
 };
-
-function SummaryCard({ label, value, accent = "slate" }) {
-  const bar = { emerald: "bg-emerald-400", amber: "bg-amber-400", slate: "bg-slate-200" }[accent] || "bg-slate-200";
-  return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm relative overflow-hidden">
-      <div className={`absolute top-0 left-0 right-0 h-[2px] ${bar}`} />
-      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 mb-3">{label}</p>
-      <p className="text-2xl font-bold text-slate-900 tabular-nums leading-none">{value}</p>
-    </div>
-  );
-}
 
 function StatusIcon({ status }) {
   const map = { paid: "bg-emerald-50 text-emerald-500", invoiced: "bg-blue-50 text-blue-500", unpaid: "bg-amber-50 text-amber-500" };

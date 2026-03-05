@@ -10,8 +10,20 @@ so the transaction can be verified as balanced.
 from typing import List, Optional
 from uuid import uuid4
 
+from kernel.types import round_money
 from finance.domain.ledger import Account, FinancialEntry, ReferenceType
 from finance.infrastructure.ledger_repo import entries_exist, insert_entries
+
+
+async def _check_fiscal_period(organization_id: str) -> None:
+    """Check that the current date is not in a closed fiscal period."""
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        from finance.api.fiscal_periods import check_period_open
+        await check_period_open(now, organization_id)
+    except ImportError:
+        pass
 
 
 def _extract_item(item) -> tuple:
@@ -53,6 +65,7 @@ async def _record_sale_event(
     """
     if await entries_exist(reference_type.value, reference_id, conn=conn):
         return
+    await _check_fiscal_period(organization_id)
     journal_id = str(uuid4())
     common = dict(
         journal_id=journal_id,
@@ -66,27 +79,27 @@ async def _record_sale_event(
         qty, unit_price, cost, dept, pid = _extract_item(item)
         entries.append(FinancialEntry(
             account=Account.REVENUE,
-            amount=round(sign * unit_price * qty, 2),
+            amount=round_money(sign * unit_price * qty),
             department=dept, product_id=pid, **common,
         ))
         entries.append(FinancialEntry(
             account=Account.COGS,
-            amount=round(sign * cost * qty, 2),
+            amount=round_money(sign * cost * qty),
             department=dept, product_id=pid, **common,
         ))
         entries.append(FinancialEntry(
             account=Account.INVENTORY,
-            amount=round(-sign * cost * qty, 2),
+            amount=round_money(-sign * cost * qty),
             department=dept, product_id=pid, **common,
         ))
 
     entries.append(FinancialEntry(
         account=Account.TAX_COLLECTED,
-        amount=round(sign * tax, 2), **common,
+        amount=round_money(sign * tax), **common,
     ))
     entries.append(FinancialEntry(
         account=Account.ACCOUNTS_RECEIVABLE,
-        amount=round(sign * total, 2), **common,
+        amount=round_money(sign * total), **common,
     ))
 
     await insert_entries(entries, conn=conn)
@@ -153,13 +166,14 @@ async def record_po_receipt(
     """Write inventory + AP entries for each received PO line item."""
     if await entries_exist(ReferenceType.PO_RECEIPT.value, po_id, conn=conn):
         return
+    await _check_fiscal_period(organization_id)
     journal_id = str(uuid4())
     entries: List[FinancialEntry] = []
 
     for item in items:
         cost = float(item.get("cost", 0) or 0)
         delivered = float(item.get("delivered_qty", 0) or item.get("quantity", 0) or 0)
-        amount = round(cost * delivered, 2)
+        amount = round_money(cost * delivered)
         if amount == 0:
             continue
 
@@ -201,20 +215,24 @@ async def record_adjustment(
     """
     if await entries_exist(ReferenceType.ADJUSTMENT.value, adjustment_ref_id, conn=conn):
         return
-    amount = round(abs(quantity_delta) * product_cost, 2)
+    await _check_fiscal_period(organization_id)
+    amount = round_money(abs(quantity_delta) * product_cost)
     if amount == 0:
         return
 
+    journal_id = str(uuid4())
     sign = -1 if quantity_delta < 0 else 1
     entries = [
         FinancialEntry(
             account=Account.INVENTORY, amount=sign * amount,
+            journal_id=journal_id,
             department=department, product_id=product_id,
             performed_by_user_id=performed_by_user_id,
             reference_type=ReferenceType.ADJUSTMENT, reference_id=adjustment_ref_id, organization_id=organization_id,
         ),
         FinancialEntry(
             account=Account.SHRINKAGE, amount=-sign * amount,
+            journal_id=journal_id,
             department=department, product_id=product_id,
             performed_by_user_id=performed_by_user_id,
             reference_type=ReferenceType.ADJUSTMENT, reference_id=adjustment_ref_id, organization_id=organization_id,
@@ -235,15 +253,45 @@ async def record_payment(
     """Write AR reduction when a withdrawal is marked paid."""
     if await entries_exist(ReferenceType.PAYMENT.value, withdrawal_id, conn=conn):
         return
+    journal_id = str(uuid4())
     await insert_entries([
         FinancialEntry(
             account=Account.ACCOUNTS_RECEIVABLE,
-            amount=-round(amount, 2),
+            amount=-round_money(amount),
+            journal_id=journal_id,
             billing_entity=billing_entity,
             contractor_id=contractor_id,
             performed_by_user_id=performed_by_user_id,
             reference_type=ReferenceType.PAYMENT,
             reference_id=withdrawal_id,
+            organization_id=organization_id,
+        ),
+    ], conn=conn)
+
+
+async def record_credit_note_application(
+    credit_note_id: str,
+    amount: float,
+    billing_entity: str,
+    contractor_id: str,
+    organization_id: str,
+    performed_by_user_id: Optional[str] = None,
+    conn=None,
+) -> None:
+    """Write AR reduction when a credit note is applied to an invoice."""
+    if await entries_exist(ReferenceType.CREDIT_NOTE.value, credit_note_id, conn=conn):
+        return
+    journal_id = str(uuid4())
+    await insert_entries([
+        FinancialEntry(
+            account=Account.ACCOUNTS_RECEIVABLE,
+            amount=-round_money(amount),
+            journal_id=journal_id,
+            billing_entity=billing_entity,
+            contractor_id=contractor_id,
+            performed_by_user_id=performed_by_user_id,
+            reference_type=ReferenceType.CREDIT_NOTE,
+            reference_id=credit_note_id,
             organization_id=organization_id,
         ),
     ], conn=conn)

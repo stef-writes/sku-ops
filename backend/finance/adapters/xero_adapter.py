@@ -234,4 +234,4 @@ class XeroAdapter:
 
 
 def _xero_status(sku_status: str) -> str:
-    return {"draft": "DRAFT", "sent": "SUBMITTED", "paid": "AUTHORISED"}.get(sku_status, "DRAFT")
+    return {"draft": "DRAFT", "approved": "SUBMITTED", "sent": "SUBMITTED", "paid": "AUTHORISED"}.get(sku_status, "DRAFT")

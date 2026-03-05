@@ -1,22 +1,38 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { FileText, Plus, Send, ArrowRight, CheckSquare, Square } from "lucide-react";
+import { FileText, Plus, Send, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
+import { DataTable } from "@/components/DataTable";
 import { CreateInvoiceModal } from "../components/CreateInvoiceModal";
 import { InvoiceDetailModal } from "../components/InvoiceDetailModal";
 import { useInvoices, useSyncXero, useBulkSyncXero } from "@/hooks/useInvoices";
 import { dateToISO, endOfDayISO } from "@/lib/utils";
 
 const Invoices = () => {
-  const [statusFilter, setStatusFilter] = useState("");
-  const [entityFilter, setEntityFilter] = useState("");
-  const [dateRange, setDateRange] = useState({ from: null, to: null });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
+  const [entityFilter, setEntityFilter] = useState(searchParams.get("entity") || "");
+  const [dateRange, setDateRange] = useState(() => ({
+    from: searchParams.get("from") ? new Date(searchParams.get("from")) : null,
+    to: searchParams.get("to") ? new Date(searchParams.get("to")) : null,
+  }));
+
+  const syncFiltersToURL = useCallback((updates) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      for (const [key, val] of Object.entries(updates)) {
+        if (val) next.set(key, val);
+        else next.delete(key);
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [detailInvoiceId, setDetailInvoiceId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -52,13 +68,6 @@ const Invoices = () => {
     } catch { toast.error("Failed to bulk send to Xero"); }
   };
 
-  const toggleSelect = (id, e) => {
-    e?.stopPropagation();
-    setSelectedIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
-  };
-
-  const toggleSelectAll = () => setSelectedIds(selectedIds.size >= invoices.length ? new Set() : new Set(invoices.map((i) => i.id)));
-
   const statusSummary = useMemo(() => {
     const groups = { draft: [], approved: [], sent: [], paid: [] };
     invoices.forEach((i) => groups[i.status]?.push(i));
@@ -66,6 +75,63 @@ const Invoices = () => {
       status, count: arr.length, total: arr.reduce((s, i) => s + (i.total ?? 0), 0),
     }));
   }, [invoices]);
+
+  const columns = useMemo(() => [
+    {
+      key: "invoice_number",
+      label: "Invoice #",
+      render: (row) => <span className="font-mono text-xs font-medium">{row.invoice_number}</span>,
+      exportValue: (row) => row.invoice_number,
+    },
+    {
+      key: "billing_entity",
+      label: "Entity",
+      render: (row) => <span className="text-slate-600">{row.billing_entity || "—"}</span>,
+    },
+    {
+      key: "total",
+      label: "Total",
+      align: "right",
+      render: (row) => <span className="font-semibold tabular-nums">${(row.total ?? 0).toFixed(2)}</span>,
+      exportValue: (row) => (row.total ?? 0).toFixed(2),
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (row) => <StatusBadge status={row.status} />,
+      exportValue: (row) => row.status,
+    },
+    {
+      key: "invoice_date",
+      label: "Date",
+      render: (row) => {
+        const d = row.invoice_date || row.created_at;
+        return <span className="font-mono text-xs text-slate-500">{d ? format(new Date(d), "MMM d, yyyy") : "—"}</span>;
+      },
+      exportValue: (row) => row.invoice_date || row.created_at || "",
+    },
+    {
+      key: "due_date",
+      label: "Due",
+      render: (row) => {
+        if (!row.due_date) return "—";
+        const overdue = row.status !== "paid" && new Date(row.due_date) < new Date();
+        return (
+          <span className={`font-mono text-xs ${overdue ? "text-red-600 font-semibold" : "text-slate-500"}`}>
+            {format(new Date(row.due_date), "MMM d, yyyy")}
+          </span>
+        );
+      },
+      exportValue: (row) => row.due_date || "",
+    },
+    {
+      key: "withdrawal_count",
+      label: "Wds",
+      align: "right",
+      render: (row) => <span className="font-mono text-slate-500">{row.withdrawal_count ?? 0}</span>,
+      sortable: true,
+    },
+  ], []);
 
   if (isLoading) return <PageSkeleton />;
 
@@ -79,7 +145,10 @@ const Invoices = () => {
           </div>
           <Button onClick={() => setCreateModalOpen(true)} size="sm" className="gap-2" data-testid="create-invoice-btn"><Plus className="w-4 h-4" />Create Invoice</Button>
         </div>
-        <DateRangeFilter value={dateRange} onChange={setDateRange} />
+        <DateRangeFilter value={dateRange} onChange={(r) => {
+          setDateRange(r);
+          syncFiltersToURL({ from: r.from?.toISOString()?.slice(0, 10), to: r.to?.toISOString()?.slice(0, 10) });
+        }} />
       </div>
 
       {statusSummary.length > 0 && (
@@ -94,7 +163,7 @@ const Invoices = () => {
       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm mb-4">
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Filter</span>
-          <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
+          <Select value={statusFilter || "all"} onValueChange={(v) => { const val = v === "all" ? "" : v; setStatusFilter(val); syncFiltersToURL({ status: val }); }}>
             <SelectTrigger className="w-[130px] h-9"><SelectValue placeholder="All Status" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
@@ -104,14 +173,14 @@ const Invoices = () => {
               <SelectItem value="paid">Paid</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={entityFilter || "all"} onValueChange={(v) => setEntityFilter(v === "all" ? "" : v)}>
+          <Select value={entityFilter || "all"} onValueChange={(v) => { const val = v === "all" ? "" : v; setEntityFilter(val); syncFiltersToURL({ entity: val }); }}>
             <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="All Entities" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Entities</SelectItem>
               {billingEntities.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
             </SelectContent>
           </Select>
-          {(statusFilter || entityFilter) && <button onClick={() => { setStatusFilter(""); setEntityFilter(""); }} className="text-xs text-slate-400 hover:text-slate-600">Clear dropdowns</button>}
+          {(statusFilter || entityFilter) && <button onClick={() => { setStatusFilter(""); setEntityFilter(""); syncFiltersToURL({ status: "", entity: "" }); }} className="text-xs text-slate-400 hover:text-slate-600">Clear dropdowns</button>}
         </div>
       </div>
 
@@ -125,45 +194,25 @@ const Invoices = () => {
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead><tr className="border-b border-slate-100">
-              <th className="w-10 px-3 py-2.5"><button type="button" onClick={toggleSelectAll} className="text-slate-400 hover:text-slate-600">{selectedIds.size >= invoices.length && invoices.length > 0 ? <CheckSquare className="w-4 h-4 text-blue-600" /> : <Square className="w-4 h-4" />}</button></th>
-              <th className="text-left text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-2.5">Invoice #</th>
-              <th className="text-left text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-2.5">Entity</th>
-              <th className="text-right text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-2.5">Total</th>
-              <th className="text-left text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-2.5">Status</th>
-              <th className="text-left text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-2.5">Date</th>
-              <th className="text-left text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-2.5">Due</th>
-              <th className="text-right text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-2.5">Wds</th>
-              <th className="w-[140px] px-3 py-2.5" />
-            </tr></thead>
-            <tbody className="divide-y divide-slate-50">
-              {invoices.length === 0 ? (
-                <tr><td colSpan="9" className="text-center py-12 text-slate-400 text-sm">No invoices yet</td></tr>
-              ) : invoices.map((inv) => (
-                <tr key={inv.id} className={`cursor-pointer hover:bg-slate-50/60 transition-colors ${selectedIds.has(inv.id) ? "bg-blue-50/40" : ""}`} onClick={() => setDetailInvoiceId(inv.id)}>
-                  <td className="px-3 py-2.5" onClick={(e) => toggleSelect(inv.id, e)}>{selectedIds.has(inv.id) ? <CheckSquare className="w-4 h-4 text-blue-600" /> : <Square className="w-4 h-4 text-slate-300" />}</td>
-                  <td className="px-3 py-2.5 font-mono text-xs font-medium">{inv.invoice_number}</td>
-                  <td className="px-3 py-2.5 text-slate-600">{inv.billing_entity || "—"}</td>
-                  <td className="px-3 py-2.5 text-right font-semibold tabular-nums">${(inv.total ?? 0).toFixed(2)}</td>
-                  <td className="px-3 py-2.5"><StatusBadge status={inv.status} /></td>
-                  <td className="px-3 py-2.5 font-mono text-xs text-slate-500">{inv.invoice_date ? format(new Date(inv.invoice_date), "MMM d, yyyy") : inv.created_at ? format(new Date(inv.created_at), "MMM d, yyyy") : "—"}</td>
-                  <td className="px-3 py-2.5 font-mono text-xs">{inv.due_date ? <span className={inv.status !== "paid" && new Date(inv.due_date) < new Date() ? "text-red-600 font-semibold" : "text-slate-500"}>{format(new Date(inv.due_date), "MMM d, yyyy")}</span> : "—"}</td>
-                  <td className="px-3 py-2.5 text-right font-mono text-slate-500">{inv.withdrawal_count ?? 0}</td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-1 justify-end">
-                      <button onClick={(e) => { e.stopPropagation(); setDetailInvoiceId(inv.id); }} className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"><FileText className="w-3.5 h-3.5" />View</button>
-                      <button onClick={(e) => handleSendToXero(inv.id, e)} disabled={syncXero.isPending} className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1 ml-2"><Send className="w-3.5 h-3.5" />Xero</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        data={invoices}
+        columns={columns}
+        title="Invoices"
+        emptyMessage="No invoices yet"
+        emptyIcon={FileText}
+        searchable
+        exportable
+        exportFilename={`invoices-${format(new Date(), "yyyyMMdd")}.csv`}
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
+        onRowClick={(row) => setDetailInvoiceId(row.id)}
+        rowActions={(inv) => (
+          <div className="flex items-center gap-1 justify-end">
+            <button onClick={(e) => { e.stopPropagation(); setDetailInvoiceId(inv.id); }} className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"><FileText className="w-3.5 h-3.5" />View</button>
+            <button onClick={(e) => handleSendToXero(inv.id, e)} disabled={syncXero.isPending} className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1 ml-2"><Send className="w-3.5 h-3.5" />Xero</button>
+          </div>
+        )}
+      />
 
       <CreateInvoiceModal open={createModalOpen} onOpenChange={setCreateModalOpen} onCreated={(inv) => setDetailInvoiceId(inv?.id)} />
       <InvoiceDetailModal invoiceId={detailInvoiceId} open={!!detailInvoiceId} onOpenChange={(open) => !open && setDetailInvoiceId(null)} onSaved={() => {}} onDeleted={() => setDetailInvoiceId(null)} />

@@ -10,7 +10,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends
 
 from identity.application.auth_service import require_role
-from kernel.types import CurrentUser
+from kernel.types import CurrentUser, round_money
 from catalog.application.queries import list_products
 from finance.application import ledger_queries as ledger_repo
 
@@ -34,24 +34,24 @@ async def get_sales_report(
     revenue = accounts.get("revenue", 0)
     cogs = accounts.get("cogs", 0)
     tax = accounts.get("tax_collected", 0)
-    gross_profit = round(revenue - cogs, 2)
+    gross_profit = round_money(revenue - cogs)
     tx_count = counts.get("withdrawal", 0)
     return_count = counts.get("return", 0)
 
     return {
-        "gross_revenue": round(revenue, 2),
+        "gross_revenue": round_money(revenue),
         "returns_total": 0,
-        "net_revenue": round(revenue, 2),
-        "total_cogs": round(cogs, 2),
+        "net_revenue": round_money(revenue),
+        "total_cogs": round_money(cogs),
         "gross_profit": gross_profit,
         "gross_margin_pct": round(gross_profit / revenue * 100, 1) if revenue > 0 else 0,
-        "total_tax": round(tax, 2),
+        "total_tax": round_money(tax),
         "total_transactions": tx_count,
         "return_count": return_count,
-        "average_transaction": round(revenue / tx_count, 2) if tx_count > 0 else 0,
+        "average_transaction": round_money(revenue / tx_count) if tx_count > 0 else 0,
         "by_payment_status": {},
         "top_products": top_products,
-        "total_revenue": round(revenue, 2),
+        "total_revenue": round_money(revenue),
     }
 
 
@@ -61,8 +61,8 @@ async def get_inventory_report(current_user: CurrentUser = Depends(require_role(
     products = await list_products(organization_id=org_id)
 
     total_products = len(products)
-    total_value = sum(p.get("price", 0) * p.get("quantity", 0) for p in products)
-    total_cost = sum(p.get("cost", 0) * p.get("quantity", 0) for p in products)
+    total_value = round_money(sum(p.get("price", 0) * p.get("quantity", 0) for p in products))
+    total_cost = round_money(sum(p.get("cost", 0) * p.get("quantity", 0) for p in products))
     low_stock = [p for p in products if p.get("quantity", 0) <= p.get("min_stock", 5)]
     out_of_stock = [p for p in products if p.get("quantity", 0) == 0]
 
@@ -77,9 +77,9 @@ async def get_inventory_report(current_user: CurrentUser = Depends(require_role(
 
     return {
         "total_products": total_products,
-        "total_retail_value": round(total_value, 2),
-        "total_cost_value": round(total_cost, 2),
-        "potential_profit": round(total_value - total_cost, 2),
+        "total_retail_value": total_value,
+        "total_cost_value": total_cost,
+        "potential_profit": round_money(total_value - total_cost),
         "low_stock_count": len(low_stock),
         "out_of_stock_count": len(out_of_stock),
         "low_stock_items": low_stock[:20],
@@ -101,9 +101,9 @@ async def get_trends_report(
     )
 
     totals = {
-        "revenue": round(sum(r["revenue"] for r in series), 2),
-        "cost": round(sum(r["cost"] for r in series), 2),
-        "profit": round(sum(r["profit"] for r in series), 2),
+        "revenue": round_money(sum(r["revenue"] for r in series)),
+        "cost": round_money(sum(r["cost"] for r in series)),
+        "profit": round_money(sum(r["profit"] for r in series)),
     }
     return {"series": series, "totals": totals}
 
@@ -141,9 +141,9 @@ async def get_job_pl(
 
     return {
         "jobs": jobs,
-        "total_revenue": round(total_revenue, 2),
-        "total_cost": round(total_cost, 2),
-        "total_profit": round(total_profit, 2),
+        "total_revenue": round_money(total_revenue),
+        "total_cost": round_money(total_cost),
+        "total_profit": round_money(total_profit),
         "total_margin_pct": round((total_profit / total_revenue * 100) if total_revenue > 0 else 0, 1),
     }
 
@@ -166,14 +166,14 @@ async def get_pl(
         cogs = accounts.get("cogs", 0)
         tax = accounts.get("tax_collected", 0)
         shrinkage = accounts.get("shrinkage", 0)
-        profit = round(revenue - cogs - shrinkage, 2)
+        profit = round_money(revenue - cogs - shrinkage)
         return {
             "group_by": "overall",
             "summary": {
-                "revenue": round(revenue, 2),
-                "cogs": round(cogs, 2),
-                "tax_collected": round(tax, 2),
-                "shrinkage": round(shrinkage, 2),
+                "revenue": round_money(revenue),
+                "cogs": round_money(cogs),
+                "tax_collected": round_money(tax),
+                "shrinkage": round_money(shrinkage),
                 "gross_profit": profit,
                 "margin_pct": round(profit / revenue * 100, 1) if revenue > 0 else 0,
             },
@@ -201,13 +201,13 @@ async def get_pl(
 
     total_revenue = sum(r.get("revenue", 0) for r in rows)
     total_cost = sum(r.get("cost", 0) for r in rows)
-    total_profit = round(total_revenue - total_cost, 2)
+    total_profit = round_money(total_revenue - total_cost)
 
     return {
         "group_by": group_by,
         "summary": {
-            "revenue": round(total_revenue, 2),
-            "cogs": round(total_cost, 2),
+            "revenue": round_money(total_revenue),
+            "cogs": round_money(total_cost),
             "gross_profit": total_profit,
             "margin_pct": round(total_profit / total_revenue * 100, 1) if total_revenue > 0 else 0,
         },
@@ -263,11 +263,11 @@ async def get_kpis(
 
     return {
         "period_days": period_days,
-        "total_revenue": round(total_revenue, 2),
-        "total_cogs": round(total_cogs, 2),
-        "gross_profit": round(total_revenue - total_cogs, 2),
+        "total_revenue": round_money(total_revenue),
+        "total_cogs": round_money(total_cogs),
+        "gross_profit": round_money(total_revenue - total_cogs),
         "gross_margin_pct": round(gross_margin_pct, 1),
-        "inventory_cost_value": round(inventory_cost_value, 2),
+        "inventory_cost_value": round_money(inventory_cost_value),
         "inventory_turnover": round(inventory_turnover, 2),
         "dio": round(dio, 1),
         "sell_through_pct": round(sell_through_pct, 1),

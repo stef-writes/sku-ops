@@ -14,6 +14,7 @@ import { format } from "date-fns";
 import { valueFormatter } from "@/lib/chartConfig";
 import { ROLES, ADMIN_ROLES, DATE_PRESETS } from "@/lib/constants";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
+import { StatCard } from "@/components/StatCard";
 import { StockHistoryModal } from "@/components/StockHistoryModal";
 import { RecentTransactions } from "@/components/RecentTransactions";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -127,7 +128,7 @@ const Dashboard = () => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Revenue" value={valueFormatter(stats?.range_revenue || 0)} sub={`${stats?.range_transactions || 0} withdrawals`} accent="emerald" />
+        <StatCard label="Revenue" value={valueFormatter(stats?.range_revenue || 0)} note={`${stats?.range_transactions || 0} withdrawals`} accent="emerald" />
         <StatCard label="Unpaid" value={valueFormatter(stats?.unpaid_total || 0)} accent={stats?.unpaid_total > 0 ? "orange" : "slate"} />
         <StatCard label="Total Products" value={stats?.total_products || 0} />
         <StatCard label="Low Stock" value={stats?.low_stock_count || 0} accent={stats?.low_stock_count > 0 ? "amber" : "slate"} />
@@ -180,21 +181,5 @@ const Dashboard = () => {
     </div>
   );
 };
-
-function StatCard({ label, value, sub, accent = "slate" }) {
-  const barColor = {
-    emerald: "bg-emerald-400", blue: "bg-blue-400", amber: "bg-amber-400",
-    orange: "bg-orange-400", slate: "bg-slate-200",
-  }[accent] || "bg-slate-200";
-
-  return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm relative overflow-hidden">
-      <div className={`absolute top-0 left-0 right-0 h-[2px] ${barColor}`} />
-      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 mb-3">{label}</p>
-      <p className="text-2xl font-bold text-slate-900 tabular-nums leading-none">{value}</p>
-      {sub && <p className="text-xs text-slate-400 mt-2">{sub}</p>}
-    </div>
-  );
-}
 
 export default Dashboard;

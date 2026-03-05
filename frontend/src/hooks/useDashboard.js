@@ -10,12 +10,7 @@ export function useDashboardStats(params = {}) {
   return useQuery({
     queryKey: dashboardKeys.stats(params),
     queryFn: () => api.dashboard.stats(params),
+    refetchInterval: 60_000,
   });
 }
 
-export function useDashboardTransactions(params = {}) {
-  return useQuery({
-    queryKey: dashboardKeys.transactions(params),
-    queryFn: () => api.dashboard.transactions(params),
-  });
-}

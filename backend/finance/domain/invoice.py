@@ -6,7 +6,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field
 
 from kernel.entity import AuditedEntity
-from kernel.types import LineItem
+from kernel.types import LineItem, round_money
 
 PAYMENT_TERMS_DAYS: dict[str, int] = {
     "due_on_receipt": 0,
@@ -46,7 +46,7 @@ class InvoiceLineItem(BaseModel):
 
     @property
     def margin(self) -> float:
-        return self.amount - (self.cost * self.quantity)
+        return round_money(self.amount - (self.cost * self.quantity))
 
     @property
     def margin_pct(self) -> Optional[float]:
@@ -135,7 +135,7 @@ class Invoice(AuditedEntity):
 
     @property
     def balance_due(self) -> float:
-        return round(self.total - self.amount_credited, 2)
+        return round_money(self.total - self.amount_credited)
 
 
 class InvoiceWithDetails(Invoice):

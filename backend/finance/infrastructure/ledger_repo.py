@@ -5,6 +5,7 @@ No Python loops, no loading all rows, no silent zero-defaults.
 """
 from typing import List, Optional
 
+from kernel.types import round_money
 from shared.infrastructure.database import get_connection
 from shared.infrastructure.db.sql_compat import date_group_expr
 from finance.domain.ledger import FinancialEntry
@@ -31,7 +32,7 @@ async def insert_entries(entries: List[FinancialEntry], conn=None) -> None:
                 reference_type, reference_id, organization_id, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                e.id, e.journal_id, e.account.value, round(e.amount, 2),
+                e.id, e.journal_id, e.account.value, round_money(e.amount),
                 e.department, e.job_id, e.billing_entity,
                 e.contractor_id, e.vendor_name, e.product_id,
                 e.performed_by_user_id,

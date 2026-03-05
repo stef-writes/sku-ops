@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
 from identity.application.auth_service import require_role
-from kernel.types import CurrentUser
+from kernel.types import CurrentUser, round_money
 from operations.application.queries import list_withdrawals
 from finance.application import ledger_queries as ledger_repo
 
@@ -51,7 +51,7 @@ async def get_financial_summary(
     ar = accounts.get("accounts_receivable", 0)
     shrinkage = accounts.get("shrinkage", 0)
 
-    gross_profit = round(revenue - cogs, 2)
+    gross_profit = round_money(revenue - cogs)
     margin_pct = round(gross_profit / revenue * 100, 1) if revenue > 0 else 0
 
     by_entity = {}
@@ -74,25 +74,25 @@ async def get_financial_summary(
         }
 
     return {
-        "gross_revenue": round(revenue, 2),
+        "gross_revenue": round_money(revenue),
         "returns_total": 0,
-        "net_revenue": round(revenue, 2),
-        "total_cost": round(cogs, 2),
+        "net_revenue": round_money(revenue),
+        "total_cost": round_money(cogs),
         "gross_profit": gross_profit,
         "gross_margin_pct": margin_pct,
-        "tax_collected": round(tax, 2),
-        "total_unpaid": round(ar, 2),
+        "tax_collected": round_money(tax),
+        "total_unpaid": round_money(ar),
         "total_paid": 0,
         "total_invoiced": 0,
         "total_credits": 0,
-        "shrinkage": round(shrinkage, 2),
+        "shrinkage": round_money(shrinkage),
         "transaction_count": counts.get("withdrawal", 0),
         "return_count": counts.get("return", 0),
         "by_billing_entity": by_entity,
         "by_contractor": by_contractor_rows,
         "by_department": dept_dict,
         "ar_aging": ar_aging_rows,
-        "total_revenue": round(revenue, 2),
+        "total_revenue": round_money(revenue),
         "gross_margin": gross_profit,
     }
 
@@ -140,7 +140,7 @@ async def export_financials(
             w.get("tax", 0),
             w.get("total", 0),
             w.get("cost_total", 0),
-            round(w.get("total", 0) - w.get("cost_total", 0), 2),
+            round_money(w.get("total", 0) - w.get("cost_total", 0)),
             w.get("payment_status", ""),
             items_str
         ])

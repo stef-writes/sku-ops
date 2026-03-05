@@ -152,10 +152,54 @@ async def delete_invoice(invoice_id: str, request: Request, current_user: Curren
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.post("/{invoice_id}/approve")
+async def approve_invoice(
+    invoice_id: str,
+    request: Request,
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    """Approve a draft invoice, locking it for Xero sync."""
+    org_id = current_user.organization_id
+    inv = await invoice_repo.get_by_id(invoice_id, org_id)
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    if inv.get("status") != "draft":
+        raise HTTPException(status_code=400, detail=f"Cannot approve invoice in '{inv.get('status')}' status")
+
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+    updated = await invoice_repo.update(
+        invoice_id,
+        status="approved",
+    )
+
+    from shared.infrastructure.database import get_connection
+    conn = get_connection()
+    await conn.execute(
+        "UPDATE invoices SET approved_by_id = ?, approved_at = ? WHERE id = ?",
+        (current_user.id, now, invoice_id),
+    )
+    await conn.commit()
+
+    await audit_log(
+        user_id=current_user.id, action="invoice.approve",
+        resource_type="invoice", resource_id=invoice_id,
+        details={"invoice_number": inv.get("invoice_number")},
+        request=request, org_id=org_id,
+    )
+    return await invoice_repo.get_by_id(invoice_id, org_id)
+
+
 @router.post("/{invoice_id}/sync-xero")
 async def sync_invoice_to_xero(invoice_id: str, request: Request, current_user: CurrentUser = Depends(require_role("admin"))):
-    """Sync a single invoice to Xero. Posts invoice + COGS journal."""
+    """Sync a single invoice to Xero. Requires approved or sent status."""
     org_id = current_user.organization_id
+    inv = await invoice_repo.get_by_id(invoice_id, org_id)
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    if inv.get("status") not in ("approved", "sent", "paid"):
+        raise HTTPException(status_code=400, detail="Invoice must be approved before syncing to Xero")
+
     result = await sync_invoice(invoice_id, org_id)
     if result.get("error") and not result.get("success"):
         status_code = 404 if result["error"] == "Invoice not found" else 502

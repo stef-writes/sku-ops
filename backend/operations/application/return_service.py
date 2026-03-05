@@ -143,6 +143,17 @@ async def create_return(
                     conn=conn,
                 )
                 result["credit_note_id"] = cn.get("id")
+
+                # Auto-apply the credit note against the invoice
+                from finance.application.credit_note_service import apply_credit_note as _apply_cn
+                try:
+                    await _apply_cn(
+                        credit_note_id=cn["id"],
+                        organization_id=org_id,
+                        performed_by_user_id=current_user.id,
+                    )
+                except Exception:
+                    pass
             except Exception:
                 pass
 

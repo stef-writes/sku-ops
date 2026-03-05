@@ -165,10 +165,62 @@ async def list_credit_notes(
     return [_row_to_dict(r) for r in rows]
 
 
+async def apply_credit_note(credit_note_id: str, organization_id: Optional[str] = None) -> dict:
+    """Apply a draft credit note against its linked invoice.
+
+    Increases invoices.amount_credited, sets credit note status to 'applied'.
+    If the invoice balance_due reaches 0, auto-marks the invoice as paid.
+    Returns the updated credit note.
+    """
+    conn = get_connection()
+    cn = await get_by_id(credit_note_id, organization_id)
+    if not cn:
+        raise ValueError("Credit note not found")
+    if cn.get("status") != "draft":
+        raise ValueError(f"Credit note is already {cn.get('status')}")
+    if not cn.get("invoice_id"):
+        raise ValueError("Credit note has no linked invoice")
+
+    inv_id = cn["invoice_id"]
+    cn_total = float(cn.get("total", 0))
+
+    cursor = await conn.execute("SELECT total, amount_credited, status FROM invoices WHERE id = ?", (inv_id,))
+    inv_row = await cursor.fetchone()
+    if not inv_row:
+        raise ValueError(f"Linked invoice {inv_id} not found")
+    inv = dict(inv_row)
+    new_credited = round(float(inv.get("amount_credited", 0)) + cn_total, 2)
+    balance_due = round(float(inv["total"]) - new_credited, 2)
+    now = datetime.now(timezone.utc).isoformat()
+
+    await conn.execute(
+        "UPDATE invoices SET amount_credited = ?, updated_at = ? WHERE id = ?",
+        (new_credited, now, inv_id),
+    )
+
+    if balance_due <= 0 and inv.get("status") not in ("paid",):
+        await conn.execute(
+            "UPDATE invoices SET status = 'paid', updated_at = ? WHERE id = ?",
+            (now, inv_id),
+        )
+        await conn.execute(
+            "UPDATE withdrawals SET payment_status = 'paid', paid_at = ? WHERE invoice_id = ?",
+            (now, inv_id),
+        )
+
+    await conn.execute(
+        "UPDATE credit_notes SET status = 'applied', updated_at = ? WHERE id = ?",
+        (now, credit_note_id),
+    )
+    await conn.commit()
+    return (await get_by_id(credit_note_id)) or {}
+
+
 class CreditNoteRepo:
     insert_credit_note = staticmethod(insert_credit_note)
     get_by_id = staticmethod(get_by_id)
     list_credit_notes = staticmethod(list_credit_notes)
+    apply_credit_note = staticmethod(apply_credit_note)
 
 
 credit_note_repo = CreditNoteRepo()

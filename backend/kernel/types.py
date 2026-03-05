@@ -4,7 +4,19 @@ These are the atoms that every domain module shares. If you're moving
 a quantity of a product through the system, you use LineItem. If you're
 identifying the authenticated caller, you use CurrentUser.
 """
+from decimal import Decimal, ROUND_HALF_EVEN
+
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, computed_field, field_validator
+
+
+def round_money(value: float) -> float:
+    """Round to 2 decimal places using banker's rounding (IEEE 754 standard).
+
+    Uses Python's Decimal for exact intermediate arithmetic, then converts
+    back to float for storage.  This avoids the rare half-penny drift that
+    plain ``round(x, 2)`` can introduce on IEEE 754 boundary values.
+    """
+    return float(Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_EVEN))
 
 
 class LineItem(BaseModel):
@@ -29,12 +41,12 @@ class LineItem(BaseModel):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def subtotal(self) -> float:
-        return round(self.unit_price * self.quantity, 2)
+        return round_money(self.unit_price * self.quantity)
 
     @computed_field  # type: ignore[prop-decorator]
     @property
     def cost_total(self) -> float:
-        return round(self.cost * self.quantity, 2)
+        return round_money(self.cost * self.quantity)
 
 
 class CurrentUser(BaseModel):

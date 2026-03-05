@@ -4,7 +4,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from kernel.entity import Entity
-from kernel.types import LineItem
+from kernel.types import LineItem, round_money
 
 
 class WithdrawalItem(LineItem):
@@ -42,7 +42,7 @@ class MaterialWithdrawal(Entity):
     def compute_totals(self, tax_rate: float = 0.10) -> None:
         """Calculate subtotal, tax, total, and cost_total from line items."""
         self.tax_rate = tax_rate
-        self.subtotal = sum(i.subtotal for i in self.items)
-        self.cost_total = sum(i.cost_total for i in self.items)
-        self.tax = round(self.subtotal * tax_rate, 2)
-        self.total = round(self.subtotal + self.tax, 2)
+        self.subtotal = round_money(sum(i.subtotal for i in self.items))
+        self.cost_total = round_money(sum(i.cost_total for i in self.items))
+        self.tax = round_money(self.subtotal * tax_rate)
+        self.total = round_money(self.subtotal + self.tax)
