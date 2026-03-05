@@ -1,6 +1,8 @@
 import axios from "axios";
 import { toast } from "sonner";
-import { API } from "./api";
+
+const base = import.meta.env.VITE_BACKEND_URL || "";
+export const API = base ? `${base}/api` : "/api";
 
 /**
  * Extract a human-readable error message from an Axios error.

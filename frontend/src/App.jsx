@@ -9,15 +9,13 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Inventory from "./pages/inventory";
-import Vendors from "./pages/Vendors";
-import Departments from "./pages/Departments";
-import ReceiptImport from "./pages/ReceiptImport";
-import PurchaseOrders from "./pages/PurchaseOrders";
 import Reports from "./pages/Reports";
-import MyHistory from "./pages/MyHistory";
 import Layout from "./components/Layout";
 
-import { POS, PendingRequests, RequestMaterials, Contractors, Jobs } from "./pages/operations";
+import {
+  POS, PendingRequests, RequestMaterials, Contractors, Departments,
+  Vendors, PurchaseOrders, MyHistory, ReceiptImport, Jobs,
+} from "./pages/operations";
 import { Financials, Invoices, Payments } from "./pages/finance";
 import { BillingEntities } from "./pages/identity";
 

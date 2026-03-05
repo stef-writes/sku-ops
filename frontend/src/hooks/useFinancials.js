@@ -1,18 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api-client";
-
-export const financialKeys = {
-  all: ["financials"],
-  summary: (params) => ["financials", "summary", params],
-};
+import { keys } from "./queryKeys";
 
 export function useFinancialSummary(params) {
   return useQuery({
-    queryKey: financialKeys.summary(params),
+    queryKey: keys.financials.summary(params),
     queryFn: () => api.financials.summary(params),
   });
 }
 
-export function useExportFinancials(params) {
+export function exportFinancials(params) {
   return api.financials.export(params);
 }

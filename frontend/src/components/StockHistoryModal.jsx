@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -15,15 +14,11 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import api from "@/lib/api-client";
 import { TX_TYPE_LABELS } from "@/lib/constants";
+import { useStockHistory } from "@/hooks/useProducts";
 
 export function StockHistoryModal({ product, open, onOpenChange }) {
-  const { data, isLoading } = useQuery({
-    queryKey: ["stockHistory", product?.id],
-    queryFn: () => api.products.stockHistory(product.id),
-    enabled: open && !!product?.id,
-  });
+  const { data, isLoading } = useStockHistory(open ? product?.id : null);
 
   const history = data?.history || [];
 

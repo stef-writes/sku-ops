@@ -1,0 +1,35 @@
+---
+description: Core project architecture rules — pre-launch, no production data, no backward compat needed
+alwaysApply: true
+---
+
+# Project Architecture
+
+This is a **pre-launch product** with no production users and no live database to migrate.
+
+## Database / Schema
+
+- **No migrations.** Schema changes go directly in the context's `{context}/infrastructure/schema.py` file.
+- `full_schema.py` aggregates all context schemas for fresh DB bootstrap. The runner reads it once on startup if the DB is empty.
+- Never add migration functions to `runner.py`. Never assume backward compatibility with existing data.
+
+## Dependency hygiene
+
+- Never install packages, UI libraries, or dependencies speculatively. Only add what is needed for the feature being built right now.
+- Before creating anything, check what already exists. Reuse existing hooks, components, patterns, and utilities.
+
+## Bounded contexts (DDD)
+
+Each context (`identity`, `operations`, `finance`, `catalog`, `purchasing`, `jobs`, `documents`) owns its own domain, infrastructure, and API layers. Cross-context access must go through an application-layer facade, never through a direct import of another context's infrastructure.
+
+```
+# ❌ BAD — direct infra import across contexts
+from identity.infrastructure.billing_entity_repo import billing_entity_repo
+
+# ✅ GOOD — application facade
+from identity.application.billing_entity_service import ensure_billing_entity
+```
+
+## File size
+
+Keep files under 300 lines. Split by responsibility when a file grows beyond that.

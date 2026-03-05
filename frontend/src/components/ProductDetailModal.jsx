@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
 import {
   Dialog,
   DialogContent,
@@ -17,38 +16,11 @@ import {
   Printer,
   History,
   Package,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
 } from "lucide-react";
 import { format } from "date-fns";
-import { API } from "@/lib/api";
 import { TX_TYPE_LABELS } from "@/lib/constants";
-
-function StatusBadge({ product }) {
-  if (product.quantity === 0) {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
-        <XCircle className="w-3.5 h-3.5" />
-        Out of Stock
-      </span>
-    );
-  }
-  if (product.quantity <= product.min_stock) {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-        <AlertTriangle className="w-3.5 h-3.5" />
-        Low Stock
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-      <CheckCircle className="w-3.5 h-3.5" />
-      In Stock
-    </span>
-  );
-}
+import { useStockHistory } from "@/hooks/useProducts";
+import { StockBadge } from "@/components/StatusBadge";
 
 export function ProductDetailModal({
   product,
@@ -60,22 +32,13 @@ export function ProductDetailModal({
   onPrintLabels,
   onViewHistory,
 }) {
-  const [recentHistory, setRecentHistory] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
   const [printQty, setPrintQty] = useState(1);
+
+  const { data: historyData, isLoading: historyLoading } = useStockHistory(open ? product?.id : null);
+  const recentHistory = (historyData?.history || []).slice(0, 5);
 
   useEffect(() => {
     if (open && product) setPrintQty(1);
-  }, [open, product?.id]);
-
-  useEffect(() => {
-    if (!open || !product?.id) return;
-    setHistoryLoading(true);
-    axios
-      .get(`${API}/stock/${product.id}/history`)
-      .then((res) => setRecentHistory((res.data.history || []).slice(0, 5)))
-      .catch(() => setRecentHistory([]))
-      .finally(() => setHistoryLoading(false));
   }, [open, product?.id]);
 
   const hasBarcode = (product?.barcode || product?.sku)?.toString().trim();
@@ -100,7 +63,7 @@ export function ProductDetailModal({
           <DialogTitle className="flex items-center gap-3">
             <Package className="w-5 h-5 text-slate-500" />
             <span>{product.name}</span>
-            <StatusBadge product={product} />
+            <StockBadge product={product} />
           </DialogTitle>
           <div className="rounded-lg bg-slate-100 border border-slate-200/60 px-3 py-2 mt-2 inline-block">
             <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">SKU (permanent ID)</p>

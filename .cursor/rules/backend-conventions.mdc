@@ -1,0 +1,46 @@
+---
+description: Backend Python conventions — FastAPI, DDD, schema, repos
+globs: backend/**/*.py
+alwaysApply: false
+---
+
+# Backend Conventions
+
+## Schema
+
+Each bounded context owns its schema in `{context}/infrastructure/schema.py`. The aggregated `full_schema.py` is the single source of truth for DB bootstrap.
+
+```python
+# ❌ BAD — adding a migration function
+async def _sqlite_027_add_column(conn):
+    await conn.execute("ALTER TABLE foo ADD COLUMN bar TEXT")
+
+# ✅ GOOD — update schema.py directly
+# In jobs/infrastructure/schema.py:
+CREATE TABLE IF NOT EXISTS jobs (
+    id TEXT PRIMARY KEY,
+    bar TEXT,   # just add it here
+    ...
+);
+```
+
+## Repos vs queries
+
+Repos handle persistence (read one, write). Analytics and report queries belong in a separate `_queries.py` or `application/ledger_queries.py` module.
+
+```python
+# ❌ BAD — report query inside a repo
+async def summary_by_account(org_id): ...  # inside ledger_repo.py
+
+# ✅ GOOD — put it in the application layer
+# finance/application/ledger_queries.py
+async def summary_by_account(org_id): ...
+```
+
+## Cross-context access
+
+Never import from another context's `infrastructure/` layer. Use the context's `application/` facade.
+
+## API layer
+
+FastAPI routers live in `{context}/api/`. Each router file should be focused on one resource. Keep routes thin — delegate logic to domain services or application layer, not inline in the route handler.

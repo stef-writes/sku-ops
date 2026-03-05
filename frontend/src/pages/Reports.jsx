@@ -134,16 +134,8 @@ const MarginList = ({ margins }) => (
   </div>
 );
 
-const SectionHead = ({ title, action }) => (
-  <div className="flex items-center justify-between mb-4">
-    <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400 border-l-2 border-amber-400 pl-3">{title}</h3>
-    {action}
-  </div>
-);
-
-const Panel = ({ children, className = "" }) => (
-  <div className={`bg-white rounded-xl border border-slate-200 shadow-sm p-6 ${className}`}>{children}</div>
-);
+import { Panel, SectionHead as SectionHeadBase } from "@/components/Panel";
+const SectionHead = ({ title, action }) => <SectionHeadBase title={title} action={action} variant="report" />;
 
 const PL_DIMENSIONS = [
   { value: "overall", label: "Overall" },

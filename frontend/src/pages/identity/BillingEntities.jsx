@@ -2,25 +2,33 @@ import { useState, useMemo } from "react";
 import { Building2, Plus, Mail, CreditCard, User } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/PageHeader";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { StatusBadge } from "@/components/StatusBadge";
-import { BillingEntityDetailPanel } from "@/components/BillingEntityDetailPanel";
+import { EntityFormDialog } from "@/components/EntityFormDialog";
+import { BillingEntityDetailPanel } from "./_BillingEntityDetailPanel";
 import { useBillingEntities, useCreateBillingEntity } from "@/hooks/useBillingEntities";
+import { getErrorMessage } from "@/lib/api-client";
+
+const createSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  contact_name: z.string().optional().default(""),
+  contact_email: z.string().email("Invalid email").or(z.literal("")).optional().default(""),
+});
+
+const FIELDS = [
+  { name: "name", label: "Name *", placeholder: "e.g. Acme Construction LLC" },
+  { name: "contact_name", label: "Contact Name", placeholder: "Optional" },
+  { name: "contact_email", label: "Contact Email", type: "email", placeholder: "Optional" },
+];
+
+const DEFAULTS = { name: "", contact_name: "", contact_email: "" };
 
 const BillingEntities = () => {
   const [detailId, setDetailId] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({ name: "", contact_name: "", contact_email: "" });
 
   const { data: entities = [], isLoading } = useBillingEntities();
   const createEntity = useCreateBillingEntity();
@@ -30,20 +38,14 @@ const BillingEntities = () => {
     [entities]
   );
 
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    if (!createForm.name.trim()) {
-      toast.error("Name is required");
-      return;
-    }
+  const handleCreate = async (data) => {
     try {
-      const entity = await createEntity.mutateAsync(createForm);
-      toast.success(`Billing entity "${createForm.name}" created`);
+      const entity = await createEntity.mutateAsync(data);
+      toast.success(`Billing entity "${data.name}" created`);
       setCreateOpen(false);
-      setCreateForm({ name: "", contact_name: "", contact_email: "" });
       setDetailId(entity.id);
-    } catch {
-      toast.error("Failed to create billing entity");
+    } catch (err) {
+      toast.error(getErrorMessage(err));
     }
   };
 
@@ -124,53 +126,17 @@ const BillingEntities = () => {
         onOpenChange={(open) => !open && setDetailId(null)}
       />
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-slate-500" />
-              New Billing Entity
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-4 pt-2">
-            <div>
-              <Label className="text-xs text-slate-500">Name *</Label>
-              <Input
-                value={createForm.name}
-                onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="e.g. Acme Construction LLC"
-                className="mt-1"
-                autoFocus
-              />
-            </div>
-            <div>
-              <Label className="text-xs text-slate-500">Contact Name</Label>
-              <Input
-                value={createForm.contact_name}
-                onChange={(e) => setCreateForm((f) => ({ ...f, contact_name: e.target.value }))}
-                placeholder="Optional"
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label className="text-xs text-slate-500">Contact Email</Label>
-              <Input
-                type="email"
-                value={createForm.contact_email}
-                onChange={(e) => setCreateForm((f) => ({ ...f, contact_email: e.target.value }))}
-                placeholder="Optional"
-                className="mt-1"
-              />
-            </div>
-            <div className="flex gap-3 pt-2">
-              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} className="flex-1">Cancel</Button>
-              <Button type="submit" disabled={createEntity.isPending} className="flex-1">
-                {createEntity.isPending ? "Creating…" : "Create"}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <EntityFormDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        title="Billing Entity"
+        schema={createSchema}
+        fields={FIELDS}
+        defaults={DEFAULTS}
+        onSubmit={handleCreate}
+        saving={createEntity.isPending}
+        testIdPrefix="billing-entity"
+      />
     </div>
   );
 };

@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Button } from "../components/ui/button";
+import { Button } from "@/components/ui/button";
 import { FileText, HardHat, Building2, DollarSign as DollarSignIcon, Briefcase } from "lucide-react";
 import { format } from "date-fns";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
@@ -9,7 +9,7 @@ import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { DataTable } from "@/components/DataTable";
 import { ViewToolbar } from "@/components/ViewToolbar";
 import { StatCard } from "@/components/StatCard";
-import { CreateInvoiceModal } from "../components/CreateInvoiceModal";
+import { CreateInvoiceModal } from "@/components/CreateInvoiceModal";
 import { WithdrawalDetailPanel } from "@/components/WithdrawalDetailPanel";
 import { InvoiceDetailModal } from "@/components/InvoiceDetailModal";
 import { JobDetailPanel } from "@/components/JobDetailPanel";
@@ -18,6 +18,114 @@ import { useWithdrawals } from "@/hooks/useWithdrawals";
 import { useViewController } from "@/hooks/useViewController";
 import { valueFormatter } from "@/lib/chartConfig";
 import { dateToISO, endOfDayISO } from "@/lib/utils";
+
+const buildColumns = (onViewJob) => [
+  {
+    key: "created_at",
+    label: "Date",
+    type: "date",
+    render: (row) => (
+      <span className="font-mono text-xs text-slate-500">
+        {new Date(row.created_at).toLocaleDateString()}
+      </span>
+    ),
+    exportValue: (row) => row.created_at,
+  },
+  {
+    key: "contractor_name",
+    label: "Contractor",
+    type: "text",
+    render: (row) => (
+      <div className="flex items-center gap-2">
+        <HardHat className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+        <div>
+          <p className="font-medium text-slate-800">{row.contractor_name}</p>
+          <p className="text-[10px] text-slate-400">{row.contractor_company}</p>
+        </div>
+      </div>
+    ),
+    exportValue: (row) =>
+      `${row.contractor_name} (${row.contractor_company || ""})`,
+  },
+  {
+    key: "job_id",
+    label: "Job",
+    type: "text",
+    render: (row) => row.job_id ? (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onViewJob(row.job_id); }}
+        className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline"
+      >
+        {row.job_id}
+      </button>
+    ) : <span className="text-xs text-slate-400">—</span>,
+  },
+  {
+    key: "billing_entity",
+    label: "Entity",
+    type: "enum",
+  },
+  {
+    key: "total",
+    label: "Total",
+    type: "number",
+    align: "right",
+    render: (row) => (
+      <span className="font-semibold tabular-nums">
+        ${(row.total || 0).toFixed(2)}
+      </span>
+    ),
+    exportValue: (row) => (row.total || 0).toFixed(2),
+  },
+  {
+    key: "cost_total",
+    label: "Cost",
+    type: "number",
+    align: "right",
+    render: (row) => (
+      <span className="text-slate-500 tabular-nums">
+        ${(row.cost_total || 0).toFixed(2)}
+      </span>
+    ),
+    exportValue: (row) => (row.cost_total || 0).toFixed(2),
+  },
+  {
+    key: "_margin",
+    label: "Margin",
+    type: "number",
+    sortable: false,
+    filterable: false,
+    searchable: false,
+    render: (row) => (
+      <span className="text-emerald-600 tabular-nums">
+        ${((row.total || 0) - (row.cost_total || 0)).toFixed(2)}
+      </span>
+    ),
+    exportValue: (row) =>
+      ((row.total || 0) - (row.cost_total || 0)).toFixed(2),
+  },
+  {
+    key: "_invoice_status",
+    label: "Status",
+    type: "enum",
+    sortable: false,
+    filterable: false,
+    render: (row) =>
+      row.invoice_id ? (
+        <Link
+          to="/invoices"
+          className="inline-block"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <StatusBadge status="invoiced" />
+        </Link>
+      ) : (
+        <StatusBadge status="uninvoiced" />
+      ),
+    exportValue: (row) => (row.invoice_id ? "invoiced" : "uninvoiced"),
+  },
+];
 
 const Financials = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -84,116 +192,7 @@ const Financials = () => {
     };
   }, [withdrawals]);
 
-  const columns = useMemo(
-    () => [
-      {
-        key: "created_at",
-        label: "Date",
-        type: "date",
-        render: (row) => (
-          <span className="font-mono text-xs text-slate-500">
-            {new Date(row.created_at).toLocaleDateString()}
-          </span>
-        ),
-        exportValue: (row) => row.created_at,
-      },
-      {
-        key: "contractor_name",
-        label: "Contractor",
-        type: "text",
-        render: (row) => (
-          <div className="flex items-center gap-2">
-            <HardHat className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <div>
-              <p className="font-medium text-slate-800">{row.contractor_name}</p>
-              <p className="text-[10px] text-slate-400">{row.contractor_company}</p>
-            </div>
-          </div>
-        ),
-        exportValue: (row) =>
-          `${row.contractor_name} (${row.contractor_company || ""})`,
-      },
-      {
-        key: "job_id",
-        label: "Job",
-        type: "text",
-        render: (row) => row.job_id ? (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setDetailJobId(row.job_id); }}
-            className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline"
-          >
-            {row.job_id}
-          </button>
-        ) : <span className="text-xs text-slate-400">—</span>,
-      },
-      {
-        key: "billing_entity",
-        label: "Entity",
-        type: "enum",
-      },
-      {
-        key: "total",
-        label: "Total",
-        type: "number",
-        align: "right",
-        render: (row) => (
-          <span className="font-semibold tabular-nums">
-            ${(row.total || 0).toFixed(2)}
-          </span>
-        ),
-        exportValue: (row) => (row.total || 0).toFixed(2),
-      },
-      {
-        key: "cost_total",
-        label: "Cost",
-        type: "number",
-        align: "right",
-        render: (row) => (
-          <span className="text-slate-500 tabular-nums">
-            ${(row.cost_total || 0).toFixed(2)}
-          </span>
-        ),
-        exportValue: (row) => (row.cost_total || 0).toFixed(2),
-      },
-      {
-        key: "_margin",
-        label: "Margin",
-        type: "number",
-        sortable: false,
-        filterable: false,
-        searchable: false,
-        render: (row) => (
-          <span className="text-emerald-600 tabular-nums">
-            ${((row.total || 0) - (row.cost_total || 0)).toFixed(2)}
-          </span>
-        ),
-        exportValue: (row) =>
-          ((row.total || 0) - (row.cost_total || 0)).toFixed(2),
-      },
-      {
-        key: "_invoice_status",
-        label: "Status",
-        type: "enum",
-        sortable: false,
-        filterable: false,
-        render: (row) =>
-          row.invoice_id ? (
-            <Link
-              to="/invoices"
-              className="inline-block"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <StatusBadge status="invoiced" />
-            </Link>
-          ) : (
-            <StatusBadge status="uninvoiced" />
-          ),
-        exportValue: (row) => (row.invoice_id ? "invoiced" : "uninvoiced"),
-      },
-    ],
-    []
-  );
+  const columns = useMemo(() => buildColumns(setDetailJobId), [setDetailJobId]);
 
   const view = useViewController({ columns });
   const processedWithdrawals = view.apply(withdrawals);

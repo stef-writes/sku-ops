@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Plus, Briefcase, Search } from "lucide-react";
+import { Plus, Briefcase } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,52 @@ import { useJobs, useCreateJob } from "@/hooks/useJobs";
 import { useViewController } from "@/hooks/useViewController";
 import { JOB_STATUSES } from "@/lib/constants";
 
+const COLUMNS = [
+  {
+    key: "code",
+    label: "Code",
+    type: "text",
+    render: (row) => (
+      <span className="font-mono text-sm font-semibold text-slate-900">{row.code}</span>
+    ),
+  },
+  {
+    key: "name",
+    label: "Name",
+    type: "text",
+    render: (row) => (
+      <span className="text-slate-700">{row.name || "—"}</span>
+    ),
+  },
+  {
+    key: "status",
+    label: "Status",
+    type: "enum",
+    filterValues: Object.values(JOB_STATUSES),
+    render: (row) => <StatusBadge status={row.status} />,
+  },
+  {
+    key: "service_address",
+    label: "Address",
+    type: "text",
+    render: (row) => (
+      <span className="text-sm text-slate-500 truncate max-w-[200px] inline-block">
+        {row.service_address || "—"}
+      </span>
+    ),
+  },
+  {
+    key: "created_at",
+    label: "Created",
+    type: "date",
+    render: (row) => (
+      <span className="font-mono text-xs text-slate-500">
+        {row.created_at ? format(new Date(row.created_at), "MMM d, yyyy") : "—"}
+      </span>
+    ),
+  },
+];
+
 const Jobs = () => {
   const [detailJobId, setDetailJobId] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -29,56 +75,7 @@ const Jobs = () => {
   const { data: jobs = [], isLoading } = useJobs();
   const createJob = useCreateJob();
 
-  const columns = useMemo(
-    () => [
-      {
-        key: "code",
-        label: "Code",
-        type: "text",
-        render: (row) => (
-          <span className="font-mono text-sm font-semibold text-slate-900">{row.code}</span>
-        ),
-      },
-      {
-        key: "name",
-        label: "Name",
-        type: "text",
-        render: (row) => (
-          <span className="text-slate-700">{row.name || "—"}</span>
-        ),
-      },
-      {
-        key: "status",
-        label: "Status",
-        type: "enum",
-        filterValues: Object.values(JOB_STATUSES),
-        render: (row) => <StatusBadge status={row.status} />,
-      },
-      {
-        key: "service_address",
-        label: "Address",
-        type: "text",
-        render: (row) => (
-          <span className="text-sm text-slate-500 truncate max-w-[200px] inline-block">
-            {row.service_address || "—"}
-          </span>
-        ),
-      },
-      {
-        key: "created_at",
-        label: "Created",
-        type: "date",
-        render: (row) => (
-          <span className="font-mono text-xs text-slate-500">
-            {row.created_at ? format(new Date(row.created_at), "MMM d, yyyy") : "—"}
-          </span>
-        ),
-      },
-    ],
-    []
-  );
-
-  const view = useViewController({ columns });
+  const view = useViewController({ columns: COLUMNS });
   const processed = view.apply(jobs);
 
   const statusCounts = useMemo(() => {
@@ -137,7 +134,7 @@ const Jobs = () => {
 
       <ViewToolbar
         controller={view}
-        columns={columns}
+        columns={COLUMNS}
         data={jobs}
         resultCount={processed.length}
         className="mb-3"

@@ -1,32 +1,21 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api-client";
+import { createEntityHooks } from "./useEntityHooks";
+import { keys } from "./queryKeys";
 
-export const addressKeys = {
-  all: ["addresses"],
-  list: (params) => ["addresses", "list", params],
-  search: (q) => ["addresses", "search", q],
-};
+const { useList, useCreate } = createEntityHooks("addresses", api.addresses);
+
+export { useCreate as useCreateAddress };
 
 export function useAddresses(params) {
-  return useQuery({
-    queryKey: addressKeys.list(params),
-    queryFn: () => api.addresses.list(params),
-  });
+  return useList(params);
 }
 
 export function useAddressSearch(q) {
   return useQuery({
-    queryKey: addressKeys.search(q),
+    queryKey: keys.addresses.search(q),
     queryFn: () => api.addresses.search({ q, limit: 20 }),
     enabled: true,
     staleTime: 10_000,
-  });
-}
-
-export function useCreateAddress() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (data) => api.addresses.create(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: addressKeys.all }),
   });
 }

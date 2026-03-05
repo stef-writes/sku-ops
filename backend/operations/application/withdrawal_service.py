@@ -10,7 +10,7 @@ from operations.infrastructure.withdrawal_repo import withdrawal_repo as _defaul
 from operations.ports.withdrawal_repo_port import WithdrawalRepoPort
 from finance.application.ledger_service import record_withdrawal as _record_ledger
 from jobs.infrastructure.job_repo import job_repo as _job_repo
-from identity.infrastructure.billing_entity_repo import billing_entity_repo as _be_repo
+from identity.application.billing_entity_service import ensure_billing_entity
 
 CreateInvoiceFn = Optional[Callable[..., Awaitable[dict]]]
 ListProductsFn = Callable[..., Awaitable[list]]
@@ -80,7 +80,7 @@ async def create_withdrawal(
     billing_entity_name = contractor.get("billing_entity", "")
     billing_entity_id = contractor.get("billing_entity_id")
     if billing_entity_name and not billing_entity_id:
-        be = await _be_repo.ensure_billing_entity(billing_entity_name, org_id)
+        be = await ensure_billing_entity(billing_entity_name, org_id)
         billing_entity_id = be.get("id") if be else None
 
     withdrawal = MaterialWithdrawal(

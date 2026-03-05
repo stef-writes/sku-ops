@@ -1,46 +1,19 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api-client";
+import { createEntityHooks } from "./useEntityHooks";
+import { keys } from "./queryKeys";
 
-export const departmentKeys = {
-  all: ["departments"],
-  list: () => ["departments", "list"],
-  skuOverview: () => ["departments", "skuOverview"],
-};
+const { useList, useCreate, useUpdate, useDelete } = createEntityHooks("departments", api.departments);
+
+export { useCreate as useCreateDepartment, useUpdate as useUpdateDepartment, useDelete as useDeleteDepartment };
 
 export function useDepartments() {
-  return useQuery({
-    queryKey: departmentKeys.list(),
-    queryFn: api.departments.list,
-  });
+  return useList();
 }
 
 export function useSkuOverview() {
   return useQuery({
-    queryKey: departmentKeys.skuOverview(),
+    queryKey: keys.departments.skuOverview(),
     queryFn: () => api.sku.overview().catch(() => null),
-  });
-}
-
-export function useCreateDepartment() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (data) => api.departments.create(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: departmentKeys.all }),
-  });
-}
-
-export function useUpdateDepartment() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, data }) => api.departments.update(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: departmentKeys.all }),
-  });
-}
-
-export function useDeleteDepartment() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id) => api.departments.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: departmentKeys.all }),
   });
 }

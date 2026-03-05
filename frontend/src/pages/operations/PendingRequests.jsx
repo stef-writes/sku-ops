@@ -1,15 +1,11 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { HardHat, Package, Clock, AlertTriangle } from "lucide-react";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
-import { JobPicker } from "@/components/JobPicker";
-import { AddressPicker } from "@/components/AddressPicker";
 import { useMaterialRequests, useProcessMaterialRequest } from "@/hooks/useMaterialRequests";
 import { getErrorMessage } from "@/lib/api-client";
+import { ProcessRequestModal } from "./_ProcessRequestModal";
 
 const PendingRequests = () => {
   const { data: allRequests, isLoading } = useMaterialRequests(undefined, { refetchInterval: 30000 });
@@ -122,20 +118,19 @@ const PendingRequests = () => {
         </div>
       )}
 
-      <Dialog open={processOpen} onOpenChange={(open) => !open && closeProcess()}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Process request</DialogTitle></DialogHeader>
-          {selectedRequest && (
-            <div className="space-y-4 pt-2">
-              <p className="text-sm text-slate-500">Processing request from <strong className="text-slate-700">{selectedRequest.contractor_name}</strong></p>
-              <div><Label className="text-sm">Job ID *</Label><div className="mt-1.5"><JobPicker value={jobId} onChange={setJobId} placeholder="Job or reference number" required /></div></div>
-              <div><Label className="text-sm">Service address *</Label><div className="mt-1.5"><AddressPicker value={serviceAddress} onChange={setServiceAddress} placeholder="Pickup or delivery location" required /></div></div>
-              <div><Label className="text-sm">Notes (optional)</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Additional notes..." className="mt-1.5" /></div>
-              <Button onClick={handleProcess} disabled={processRequest.isPending || !jobId.trim() || !serviceAddress.trim()} className="w-full h-11">{processRequest.isPending ? "Processing…" : "Create Withdrawal"}</Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <ProcessRequestModal
+        open={processOpen}
+        onOpenChange={(open) => !open && closeProcess()}
+        request={selectedRequest}
+        jobId={jobId}
+        onJobIdChange={setJobId}
+        serviceAddress={serviceAddress}
+        onServiceAddressChange={setServiceAddress}
+        notes={notes}
+        onNotesChange={setNotes}
+        onSubmit={handleProcess}
+        isPending={processRequest.isPending}
+      />
     </div>
   );
 };

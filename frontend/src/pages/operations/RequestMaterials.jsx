@@ -1,29 +1,27 @@
 import { useState, useRef } from "react";
 import { toast } from "sonner";
-import { useAuth } from "../context/AuthContext";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { useAuth } from "@/context/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Trash2, ShoppingCart, Send, Barcode } from "lucide-react";
-import { JobPicker } from "@/components/JobPicker";
-import { AddressPicker } from "@/components/AddressPicker";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { QuantityControl } from "@/components/QuantityControl";
 import { useProducts } from "@/hooks/useProducts";
 import { useDepartments } from "@/hooks/useDepartments";
 import { useCreateMaterialRequest } from "@/hooks/useMaterialRequests";
+import { useCart } from "@/hooks/useCart";
 import { getErrorMessage } from "@/lib/api-client";
 import api from "@/lib/api-client";
+import { SubmitRequestModal } from "./_SubmitRequestModal";
 
 const RequestMaterials = () => {
   const { user } = useAuth();
   const barcodeRef = useRef(null);
 
+  const { items: cart, addItem: addToCart, updateQuantity, removeItem, clear: clearCart, total: subtotal } = useCart();
   const [search, setSearch] = useState("");
   const [selectedDept, setSelectedDept] = useState("all");
-  const [cart, setCart] = useState([]);
   const [barcodeInput, setBarcodeInput] = useState("");
   const [submitOpen, setSubmitOpen] = useState(false);
   const [jobId, setJobId] = useState("");
@@ -39,17 +37,6 @@ const RequestMaterials = () => {
   const rawProducts = Array.isArray(productsData) ? productsData : (productsData?.items || []);
   const products = rawProducts.filter((p) => (p.sell_quantity ?? p.quantity) > 0);
 
-  const addToCart = (product) => {
-    const sellPrice = product.sell_price ?? product.price;
-    const sellQty = product.sell_quantity ?? product.quantity;
-    const existing = cart.find((item) => item.product_id === product.id);
-    if (existing) {
-      if (existing.quantity >= sellQty) { toast.error("Not enough stock"); return; }
-      setCart(cart.map((item) => item.product_id === product.id ? { ...item, quantity: item.quantity + 1 } : item));
-    } else {
-      setCart([...cart, { product_id: product.id, sku: product.sku, name: product.name, unit_price: sellPrice, quantity: 1, max_quantity: sellQty, unit: product.sell_uom || "each" }]);
-    }
-  };
 
   const handleBarcodeSubmit = async (e) => {
     e?.preventDefault();
@@ -70,16 +57,6 @@ const RequestMaterials = () => {
     }
   };
 
-  const updateQuantity = (productId, newQty) => {
-    setCart(cart.map((item) => {
-      if (item.product_id !== productId) return item;
-      if (newQty <= 0) return null;
-      if (newQty > item.max_quantity) { toast.error("Not enough stock"); return item; }
-      return { ...item, quantity: newQty };
-    }).filter(Boolean));
-  };
-
-  const subtotal = cart.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
 
   const handleSubmitRequest = async () => {
     try {
@@ -92,7 +69,7 @@ const RequestMaterials = () => {
         notes: notes.trim() || null,
       });
       toast.success("Material request submitted!");
-      setCart([]); setSubmitOpen(false); setJobId(""); setServiceAddress(""); setNotes("");
+      clearCart(); setSubmitOpen(false); setJobId(""); setServiceAddress(""); setNotes("");
     } catch (error) {
       toast.error(getErrorMessage(error));
     }
@@ -106,7 +83,7 @@ const RequestMaterials = () => {
         <div className="p-5 border-b border-slate-200">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-slate-900">My Request</h2>
-            {cart.length > 0 && <button onClick={() => setCart([])} className="text-xs text-red-500 hover:underline">Clear</button>}
+            {cart.length > 0 && <button onClick={clearCart} className="text-xs text-red-500 hover:underline">Clear</button>}
           </div>
           {user?.company && <p className="text-xs text-slate-500 mt-0.5">{user.company}</p>}
         </div>
@@ -136,7 +113,7 @@ const RequestMaterials = () => {
                       <p className="font-mono text-[10px] text-slate-400">{item.sku}</p>
                       <p className="text-sm font-medium text-slate-900 truncate">{item.name}</p>
                     </div>
-                    <button onClick={() => setCart(cart.filter((c) => c.product_id !== item.product_id))} className="text-slate-300 hover:text-red-500 p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => removeItem(item.product_id)} className="text-slate-300 hover:text-red-500 p-1"><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
                   <div className="flex items-center justify-between">
                     <QuantityControl value={item.quantity} onChange={(v) => updateQuantity(item.product_id, v)} max={item.max_quantity} />
@@ -201,17 +178,18 @@ const RequestMaterials = () => {
         </div>
       </div>
 
-      <Dialog open={submitOpen} onOpenChange={setSubmitOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Submit material request</DialogTitle></DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div><Label className="text-sm">Job ID (optional)</Label><div className="mt-1.5"><JobPicker value={jobId} onChange={setJobId} placeholder="Job or reference number" /></div></div>
-            <div><Label className="text-sm">Service address (optional)</Label><div className="mt-1.5"><AddressPicker value={serviceAddress} onChange={setServiceAddress} placeholder="Pickup or delivery location" /></div></div>
-            <div><Label className="text-sm">Notes (optional)</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Additional notes..." className="mt-1.5" /></div>
-            <Button onClick={handleSubmitRequest} disabled={createRequest.isPending} className="w-full h-11">{createRequest.isPending ? "Submitting…" : "Submit Request"}</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <SubmitRequestModal
+        open={submitOpen}
+        onOpenChange={setSubmitOpen}
+        jobId={jobId}
+        onJobIdChange={setJobId}
+        serviceAddress={serviceAddress}
+        onServiceAddressChange={setServiceAddress}
+        notes={notes}
+        onNotesChange={setNotes}
+        onSubmit={handleSubmitRequest}
+        isPending={createRequest.isPending}
+      />
     </div>
   );
 };

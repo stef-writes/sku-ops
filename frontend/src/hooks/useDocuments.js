@@ -1,23 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api-client";
+import { createEntityHooks } from "./useEntityHooks";
 
-export const documentKeys = {
-  all: ["documents"],
-  list: (params) => ["documents", "list", params],
-  detail: (id) => ["documents", "detail", id],
-};
+const { useList, useDetail } = createEntityHooks("documents", api.documents);
 
 export function useDocuments(params) {
-  return useQuery({
-    queryKey: documentKeys.list(params),
-    queryFn: () => api.documents.list(params),
-  });
+  return useList(params);
 }
 
 export function useDocument(id) {
-  return useQuery({
-    queryKey: documentKeys.detail(id),
-    queryFn: () => api.documents.get(id),
-    enabled: !!id,
-  });
+  return useDetail(id);
 }

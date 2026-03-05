@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
-import { useAuth } from "../context/AuthContext";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { useAuth } from "@/context/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Trash2, Check, HardHat, Clock, Loader2, ScanLine, Plus } from "lucide-react";
 import { JobPicker } from "@/components/JobPicker";
 import { AddressPicker } from "@/components/AddressPicker";
@@ -13,6 +13,7 @@ import { QuantityControl } from "@/components/QuantityControl";
 import { useProducts } from "@/hooks/useProducts";
 import { useContractors } from "@/hooks/useContractors";
 import { useCreateWithdrawal, useCreateWithdrawalForContractor } from "@/hooks/useWithdrawals";
+import { useCart } from "@/hooks/useCart";
 import { getErrorMessage } from "@/lib/api-client";
 
 const IssueMaterials = () => {
@@ -29,10 +30,11 @@ const IssueMaterials = () => {
   const allProducts = Array.isArray(productsData) ? productsData : (productsData?.items || []);
   const contractors = (contractorsData || []).filter((c) => c.is_active !== false);
 
-  const [items, setItems] = useState([]);
+  const { items, addItem, updateQuantity, removeItem, clear: clearCart, total: displaySubtotal } = useCart({
+    getPrice: (p) => p.sell_price ?? p.price ?? 0,
+  });
   const [search, setSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
-  const [processing, setProcessing] = useState(false);
   const [selectedContractor, setSelectedContractor] = useState("");
   const [jobId, setJobId] = useState("");
   const [serviceAddress, setServiceAddress] = useState("");
@@ -57,46 +59,22 @@ const IssueMaterials = () => {
       }).slice(0, 8)
     : [];
 
-  const addItem = (product) => {
-    const sellQty = product.sell_quantity ?? product.quantity;
-    const existing = items.find((i) => i.product_id === product.id);
-    if (existing) {
-      if (existing.quantity >= sellQty) { toast.error("Not enough stock"); return; }
-      setItems(items.map((i) => i.product_id === product.id ? { ...i, quantity: i.quantity + 1 } : i));
-    } else {
-      setItems([...items, {
-        product_id: product.id,
-        sku: product.sku,
-        name: product.name,
-        quantity: 1,
-        max_quantity: sellQty,
-        unit: product.sell_uom || "each",
-        display_price: product.sell_price ?? product.price,
-      }]);
-    }
+  const handleAddItem = (product) => {
+    addItem(product);
     setSearch("");
     setShowDropdown(false);
     searchRef.current?.focus();
   };
 
-  const updateQuantity = (productId, newQty) => {
-    setItems(items.map((item) => {
-      if (item.product_id !== productId) return item;
-      if (newQty <= 0) return null;
-      if (newQty > item.max_quantity) { toast.error("Not enough stock"); return item; }
-      return { ...item, quantity: newQty };
-    }).filter(Boolean));
-  };
-
   const handleSearchKeyDown = (e) => {
     if (e.key === "Enter" && searchResults.length > 0) {
       const exact = searchResults.find((p) => p.sku.toLowerCase() === search.toLowerCase());
-      addItem(exact || searchResults[0]);
+      handleAddItem(exact || searchResults[0]);
     }
     if (e.key === "Escape") { setShowDropdown(false); setSearch(""); }
   };
 
-  const displaySubtotal = items.reduce((sum, i) => sum + i.quantity * i.display_price, 0);
+  const isSubmitting = createWithdrawal.isPending || createForContractor.isPending;
 
   const handleSubmit = async () => {
     if (items.length === 0) { toast.error("No items added"); return; }
@@ -104,7 +82,6 @@ const IssueMaterials = () => {
     if (!serviceAddress.trim()) { toast.error("Service address is required"); return; }
     if (!isContractor && !selectedContractor) { toast.error("Please select a contractor"); return; }
 
-    setProcessing(true);
     try {
       const payload = {
         items: items.map(({ product_id, sku, name, quantity, unit }) => ({
@@ -122,15 +99,13 @@ const IssueMaterials = () => {
       }
 
       toast.success("Withdrawal logged — charged to account.");
-      setItems([]);
+      clearCart();
       setJobId("");
       setServiceAddress("");
       setNotes("");
       if (!isContractor) setSelectedContractor("");
     } catch (error) {
       toast.error(getErrorMessage(error));
-    } finally {
-      setProcessing(false);
     }
   };
 
@@ -179,7 +154,7 @@ const IssueMaterials = () => {
           {showDropdown && search.trim().length > 0 && (
             <div ref={dropdownRef} className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden" data-testid="search-dropdown">
               {searchResults.length > 0 ? searchResults.map((product) => (
-                <button key={product.id} onClick={() => addItem(product)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-b-0 text-left transition-colors" data-testid={`search-result-${product.sku}`}>
+                <button key={product.id} onClick={() => handleAddItem(product)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-b-0 text-left transition-colors" data-testid={`search-result-${product.sku}`}>
                   <div>
                     <span className="font-mono text-xs text-slate-400 mr-2">{product.sku}</span>
                     <span className="font-medium text-slate-900">{product.name}</span>
@@ -209,13 +184,13 @@ const IssueMaterials = () => {
                 <div className="flex-1 min-w-0">
                   <p className="font-mono text-xs text-slate-400">{item.sku}</p>
                   <p className="font-medium text-slate-900 truncate">{item.name}</p>
-                  <p className="text-xs text-slate-400">${item.display_price.toFixed(2)} / {item.unit}</p>
+                  <p className="text-xs text-slate-400">${item.unit_price.toFixed(2)} / {item.unit}</p>
                 </div>
                 <QuantityControl value={item.quantity} onChange={(v) => updateQuantity(item.product_id, v)} max={item.max_quantity} unit={item.unit} />
                 <div className="w-20 text-right shrink-0">
-                  <p className="font-semibold text-slate-900 tabular-nums">${(item.quantity * item.display_price).toFixed(2)}</p>
+                  <p className="font-semibold text-slate-900 tabular-nums">${(item.quantity * item.unit_price).toFixed(2)}</p>
                 </div>
-                <button onClick={() => setItems(items.filter((i) => i.product_id !== item.product_id))} className="text-slate-300 hover:text-red-500 transition-colors shrink-0" data-testid={`remove-item-${item.sku}`}>
+                <button onClick={() => removeItem(item.product_id)} className="text-slate-300 hover:text-red-500 transition-colors shrink-0" data-testid={`remove-item-${item.sku}`}>
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
@@ -245,8 +220,8 @@ const IssueMaterials = () => {
               </div>
               <p className="text-xs text-slate-400">Final total (incl. tax) calculated on submit</p>
             </div>
-            <Button onClick={handleSubmit} disabled={processing} className="btn-primary h-12 px-8" data-testid="checkout-btn">
-              {processing ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing…</>) : (<><Check className="w-4 h-4 mr-2" />Log Withdrawal</>)}
+            <Button onClick={handleSubmit} disabled={isSubmitting} className="btn-primary h-12 px-8" data-testid="checkout-btn">
+              {isSubmitting ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing…</>) : (<><Check className="w-4 h-4 mr-2" />Log Withdrawal</>)}
             </Button>
           </div>
         </div>

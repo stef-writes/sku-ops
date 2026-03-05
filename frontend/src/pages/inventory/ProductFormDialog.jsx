@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,13 +37,24 @@ export function ProductFormDialog({
   vendors = [],
 }) {
   const [form, setForm] = useState(INITIAL_FORM);
-  const [skuPreview, setSkuPreview] = useState(null);
   const suggestTimeout = useRef(null);
 
   const createMutation = useCreateProduct();
   const updateMutation = useUpdateProduct();
   const suggestMutation = useSuggestUom();
   const saving = createMutation.isPending || updateMutation.isPending;
+
+  const skuPreviewEnabled = open && !editingProduct && !!form.department_id;
+  const { data: skuPreviewData } = useQuery({
+    queryKey: ["skuPreview", form.department_id, form.name],
+    queryFn: () => {
+      const params = { department_id: form.department_id };
+      if (form.name?.trim()) params.product_name = form.name.trim();
+      return api.sku.preview(params);
+    },
+    enabled: skuPreviewEnabled,
+  });
+  const skuPreview = skuPreviewData?.next_sku ?? null;
 
   useEffect(() => {
     if (!open) return;
@@ -64,18 +76,7 @@ export function ProductFormDialog({
     } else {
       setForm(INITIAL_FORM);
     }
-    setSkuPreview(null);
   }, [open, editingProduct]);
-
-  useEffect(() => {
-    if (!open || editingProduct || !form.department_id) {
-      setSkuPreview(null);
-      return;
-    }
-    const params = { department_id: form.department_id };
-    if (form.name?.trim()) params.product_name = form.name.trim();
-    api.sku.preview(params).then((d) => setSkuPreview(d.next_sku)).catch(() => setSkuPreview(null));
-  }, [open, editingProduct, form.department_id, form.name]);
 
   useEffect(() => {
     return () => {

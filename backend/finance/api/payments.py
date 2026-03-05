@@ -8,7 +8,7 @@ from kernel.types import CurrentUser
 from identity.application.auth_service import require_role, get_current_user
 from finance.domain.payment import Payment, PaymentCreate
 from finance.infrastructure.payment_repo import payment_repo
-from operations.infrastructure.withdrawal_repo import withdrawal_repo
+from operations.application.queries import get_withdrawal_by_id, mark_withdrawal_paid
 from finance.application.ledger_service import record_payment as _record_ledger_payment
 from finance.application.invoice_service import mark_paid_for_withdrawal
 from shared.infrastructure.middleware.audit import audit_log
@@ -34,7 +34,7 @@ async def create_payment(
     contractor_id = ""
 
     for wid in data.withdrawal_ids:
-        w = await withdrawal_repo.get_by_id(wid, org_id)
+        w = await get_withdrawal_by_id(wid, org_id)
         if not w:
             raise HTTPException(status_code=404, detail=f"Withdrawal {wid} not found")
         total_amount += w.get("total", 0)
@@ -60,9 +60,9 @@ async def create_payment(
 
     paid_at = data.payment_date or now
     for wid in data.withdrawal_ids:
-        await withdrawal_repo.mark_paid(wid, paid_at)
+        await mark_withdrawal_paid(wid, paid_at)
         await mark_paid_for_withdrawal(wid)
-        w = await withdrawal_repo.get_by_id(wid, org_id)
+        w = await get_withdrawal_by_id(wid, org_id)
         if w:
             await _record_ledger_payment(
                 withdrawal_id=wid,

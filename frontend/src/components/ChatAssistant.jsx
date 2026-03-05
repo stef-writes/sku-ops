@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import axios from "axios";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { MessageCircle, X, Send, ChevronDown, ChevronUp, Zap, Brain, Plus } from "lucide-react";
-import { API } from "@/lib/api";
+import api from "@/lib/api-client";
 
 const STORAGE_KEY = "sku-ops:chat:v3";
 
@@ -169,7 +168,7 @@ export default function ChatAssistant() {
   const prevAgentType = useRef(agentType);
 
   const clearSession = (sid) => {
-    if (sid) axios.delete(`${API}/chat/sessions/${sid}`).catch(() => {});
+    if (sid) api.chat.deleteSession(sid).catch(() => {});
   };
 
   // Clear session when navigating between sections
@@ -202,8 +201,8 @@ export default function ChatAssistant() {
 
   useEffect(() => {
     if (open && aiAvailable === null) {
-      axios.get(`${API}/chat/status`)
-        .then(({ data }) => { setAiAvailable(data.available); setSetupUrl(data.setup_url); })
+      api.chat.status()
+        .then((data) => { setAiAvailable(data.available); setSetupUrl(data.setup_url); })
         .catch(() => setAiAvailable(false));
     }
     if (open) setTimeout(() => inputRef.current?.focus(), 100);
@@ -216,7 +215,7 @@ export default function ChatAssistant() {
     setInput("");
     setLoading(true);
     try {
-      const { data } = await axios.post(`${API}/chat`, {
+      const data = await api.chat.send({
         message: text,
         session_id: sessionId,
         mode,

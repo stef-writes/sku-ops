@@ -46,7 +46,7 @@ const STATUS_OPTIONS = [
 
 const INITIAL_FORM = {
   billing_entity: "", contact_name: "", contact_email: "", notes: "",
-  tax: 0, tax_rate: 0, status: "draft", invoice_date: "", due_date: "",
+  tax_rate: 0, status: "draft", invoice_date: "", due_date: "",
   payment_terms: "net_30", billing_address: "", po_reference: "",
 };
 
@@ -67,7 +67,6 @@ export function InvoiceDetailModal({ invoiceId, open, onOpenChange, onSaved, onD
         contact_name: invoice.contact_name || "",
         contact_email: invoice.contact_email || "",
         notes: invoice.notes || "",
-        tax: invoice.tax ?? 0,
         tax_rate: invoice.tax_rate ?? 0,
         status: invoice.status || "draft",
         invoice_date: invoice.invoice_date ? invoice.invoice_date.slice(0, 10) : "",
@@ -92,7 +91,7 @@ export function InvoiceDetailModal({ invoiceId, open, onOpenChange, onSaved, onD
   };
 
   const subtotal = lineItems.reduce((sum, i) => sum + (i.amount ?? (i.quantity ?? 0) * (i.unit_price ?? 0)), 0);
-  const taxAmount = typeof form.tax === "number" ? form.tax : parseFloat(form.tax) || 0;
+  const taxAmount = Math.round(subtotal * (parseFloat(form.tax_rate) || 0) * 100) / 100;
   const total = Math.round((subtotal + taxAmount) * 100) / 100;
   const canEdit = invoice?.status === "draft" || invoice?.status === "approved";
 
@@ -113,7 +112,7 @@ export function InvoiceDetailModal({ invoiceId, open, onOpenChange, onSaved, onD
         id: invoiceId,
         data: {
           ...form,
-          tax: parseFloat(form.tax) || 0,
+          tax: taxAmount,
           tax_rate: parseFloat(form.tax_rate) || 0,
           invoice_date: form.invoice_date || undefined,
           due_date: form.due_date || undefined,
@@ -273,7 +272,7 @@ export function InvoiceDetailModal({ invoiceId, open, onOpenChange, onSaved, onD
                   <span className="text-slate-500">Tax Rate</span>
                   {canEdit ? (
                     <div className="flex items-center gap-1">
-                      <Input type="number" min={0} max={100} step={0.1} value={((parseFloat(form.tax_rate) || 0) * 100).toFixed(1)} onChange={(e) => { const rate = (parseFloat(e.target.value) || 0) / 100; setForm((f) => ({ ...f, tax_rate: rate, tax: Math.round(subtotal * rate * 100) / 100 })); }} className="w-20 h-8 text-right" />
+                      <Input type="number" min={0} max={100} step={0.1} value={((parseFloat(form.tax_rate) || 0) * 100).toFixed(1)} onChange={(e) => { const rate = (parseFloat(e.target.value) || 0) / 100; setForm((f) => ({ ...f, tax_rate: rate })); }} className="w-20 h-8 text-right" />
                       <span className="text-xs text-slate-400">%</span>
                     </div>
                   ) : (
@@ -282,7 +281,7 @@ export function InvoiceDetailModal({ invoiceId, open, onOpenChange, onSaved, onD
                 </div>
                 <div className="flex justify-between text-sm items-center">
                   <span className="text-slate-500">Tax</span>
-                  {canEdit ? <Input type="number" min={0} step={0.01} value={form.tax} onChange={(e) => setForm((f) => ({ ...f, tax: e.target.value }))} className="w-24 h-8 text-right" /> : <span className="font-mono">${(parseFloat(form.tax) || 0).toFixed(2)}</span>}
+                  <span className="font-mono">${taxAmount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between font-bold pt-2 border-t">
                   <span>Total</span>

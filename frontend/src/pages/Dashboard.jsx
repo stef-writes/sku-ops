@@ -24,17 +24,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { useDashboardStats } from "@/hooks/useDashboard";
 import { dateToISO, endOfDayISO } from "@/lib/utils";
-
-const Panel = ({ children, className = "" }) => (
-  <div className={`bg-white rounded-xl border border-slate-200 shadow-sm p-6 ${className}`}>{children}</div>
-);
-
-const SectionHead = ({ title, action }) => (
-  <div className="flex items-center justify-between mb-4">
-    <h3 className="text-sm font-medium text-slate-600">{title}</h3>
-    {action}
-  </div>
-);
+import { Panel, SectionHead } from "@/components/Panel";
 
 const DeptMarginBars = ({ data = [] }) => {
   const max = useMemo(() => Math.max(...data.map((d) => Math.max(d.revenue, d.cost)), 1), [data]);

@@ -2,11 +2,11 @@ import { useState } from "react";
 import { Building2, Save, Mail, User, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { DetailPanel, DetailSection, DetailField } from "./DetailPanel";
-import { StatusBadge } from "./StatusBadge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DetailPanel, DetailSection, DetailField } from "@/components/DetailPanel";
+import { StatusBadge } from "@/components/StatusBadge";
 import { useBillingEntity, useUpdateBillingEntity } from "@/hooks/useBillingEntities";
 
 export function BillingEntityDetailPanel({ entityId, open, onOpenChange }) {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, ExternalLink, Filter, X } from "lucide-react";
@@ -6,8 +6,9 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import api from "@/lib/api-client";
-import { dashboardKeys } from "@/hooks/useDashboard";
+import { keys } from "@/hooks/queryKeys";
 import { dateToISO, endOfDayISO } from "@/lib/utils";
+import { useContractors } from "@/hooks/useContractors";
 
 export function RecentTransactions({ dateRange, onProductStockHistory, onWithdrawalClick }) {
   const [contractorId, setContractorId] = useState("");
@@ -15,11 +16,7 @@ export function RecentTransactions({ dateRange, onProductStockHistory, onWithdra
   const [offset, setOffset] = useState(0);
   const [allRows, setAllRows] = useState([]);
 
-  const { data: contractors } = useQuery({
-    queryKey: ["contractors"],
-    queryFn: () => api.contractors.list(),
-    staleTime: 60_000,
-  });
+  const { data: contractors } = useContractors();
 
   const params = useMemo(() => {
     const p = { limit: 20, offset };
@@ -31,7 +28,7 @@ export function RecentTransactions({ dateRange, onProductStockHistory, onWithdra
   }, [dateRange, contractorId, invoiceStatus, offset]);
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: dashboardKeys.transactions(params),
+    queryKey: keys.dashboard.transactions(params),
     queryFn: () => api.dashboard.transactions(params),
     keepPreviousData: true,
   });

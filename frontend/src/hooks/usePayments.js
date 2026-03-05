@@ -1,26 +1,16 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import api from "@/lib/api-client";
-import { withdrawalKeys } from "./useWithdrawals";
+import { createEntityHooks } from "./useEntityHooks";
+import { keys } from "./queryKeys";
 
-export const paymentKeys = {
-  all: ["payments"],
-  list: (params) => ["payments", "list", params],
-  detail: (id) => ["payments", "detail", id],
-};
+const { useList, useDetail } = createEntityHooks("payments", api.payments);
 
 export function usePayments(params) {
-  return useQuery({
-    queryKey: paymentKeys.list(params),
-    queryFn: () => api.payments.list(params),
-  });
+  return useList(params);
 }
 
 export function usePayment(id) {
-  return useQuery({
-    queryKey: paymentKeys.detail(id),
-    queryFn: () => api.payments.get(id),
-    enabled: !!id,
-  });
+  return useDetail(id);
 }
 
 export function useCreatePayment() {
@@ -28,8 +18,8 @@ export function useCreatePayment() {
   return useMutation({
     mutationFn: (data) => api.payments.create(data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: paymentKeys.all });
-      qc.invalidateQueries({ queryKey: withdrawalKeys.all });
+      qc.invalidateQueries({ queryKey: keys.payments.all });
+      qc.invalidateQueries({ queryKey: keys.withdrawals.all });
     },
   });
 }

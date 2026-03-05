@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router-dom";
-import { Button } from "../components/ui/button";
+import { Button } from "@/components/ui/button";
 import { FileText, Plus, Send, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
@@ -9,11 +9,96 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { DataTable } from "@/components/DataTable";
 import { ViewToolbar } from "@/components/ViewToolbar";
-import { CreateInvoiceModal } from "../components/CreateInvoiceModal";
-import { InvoiceDetailModal } from "../components/InvoiceDetailModal";
+import { CreateInvoiceModal } from "@/components/CreateInvoiceModal";
+import { InvoiceDetailModal } from "@/components/InvoiceDetailModal";
 import { useInvoices, useSyncXero, useBulkSyncXero } from "@/hooks/useInvoices";
 import { useViewController } from "@/hooks/useViewController";
 import { dateToISO, endOfDayISO } from "@/lib/utils";
+
+const COLUMNS = [
+  {
+    key: "invoice_number",
+    label: "Invoice #",
+    type: "text",
+    render: (row) => (
+      <span className="font-mono text-xs font-medium">
+        {row.invoice_number}
+      </span>
+    ),
+    exportValue: (row) => row.invoice_number,
+  },
+  {
+    key: "billing_entity",
+    label: "Entity",
+    type: "enum",
+    render: (row) => (
+      <span className="text-slate-600">{row.billing_entity || "—"}</span>
+    ),
+  },
+  {
+    key: "total",
+    label: "Total",
+    type: "number",
+    align: "right",
+    render: (row) => (
+      <span className="font-semibold tabular-nums">
+        ${(row.total ?? 0).toFixed(2)}
+      </span>
+    ),
+    exportValue: (row) => (row.total ?? 0).toFixed(2),
+  },
+  {
+    key: "status",
+    label: "Status",
+    type: "enum",
+    filterValues: ["draft", "approved", "sent", "paid"],
+    render: (row) => <StatusBadge status={row.status} />,
+    exportValue: (row) => row.status,
+  },
+  {
+    key: "invoice_date",
+    label: "Date",
+    type: "date",
+    render: (row) => {
+      const d = row.invoice_date || row.created_at;
+      return (
+        <span className="font-mono text-xs text-slate-500">
+          {d ? format(new Date(d), "MMM d, yyyy") : "—"}
+        </span>
+      );
+    },
+    exportValue: (row) => row.invoice_date || row.created_at || "",
+  },
+  {
+    key: "due_date",
+    label: "Due",
+    type: "date",
+    render: (row) => {
+      if (!row.due_date) return "—";
+      const overdue =
+        row.status !== "paid" && new Date(row.due_date) < new Date();
+      return (
+        <span
+          className={`font-mono text-xs ${overdue ? "text-red-600 font-semibold" : "text-slate-500"}`}
+        >
+          {format(new Date(row.due_date), "MMM d, yyyy")}
+        </span>
+      );
+    },
+    exportValue: (row) => row.due_date || "",
+  },
+  {
+    key: "withdrawal_count",
+    label: "Wds",
+    type: "number",
+    align: "right",
+    render: (row) => (
+      <span className="font-mono text-slate-500">
+        {row.withdrawal_count ?? 0}
+      </span>
+    ),
+  },
+];
 
 const Invoices = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -85,95 +170,7 @@ const Invoices = () => {
       }));
   }, [invoices]);
 
-  const columns = useMemo(
-    () => [
-      {
-        key: "invoice_number",
-        label: "Invoice #",
-        type: "text",
-        render: (row) => (
-          <span className="font-mono text-xs font-medium">
-            {row.invoice_number}
-          </span>
-        ),
-        exportValue: (row) => row.invoice_number,
-      },
-      {
-        key: "billing_entity",
-        label: "Entity",
-        type: "enum",
-        render: (row) => (
-          <span className="text-slate-600">{row.billing_entity || "—"}</span>
-        ),
-      },
-      {
-        key: "total",
-        label: "Total",
-        type: "number",
-        align: "right",
-        render: (row) => (
-          <span className="font-semibold tabular-nums">
-            ${(row.total ?? 0).toFixed(2)}
-          </span>
-        ),
-        exportValue: (row) => (row.total ?? 0).toFixed(2),
-      },
-      {
-        key: "status",
-        label: "Status",
-        type: "enum",
-        filterValues: ["draft", "approved", "sent", "paid"],
-        render: (row) => <StatusBadge status={row.status} />,
-        exportValue: (row) => row.status,
-      },
-      {
-        key: "invoice_date",
-        label: "Date",
-        type: "date",
-        render: (row) => {
-          const d = row.invoice_date || row.created_at;
-          return (
-            <span className="font-mono text-xs text-slate-500">
-              {d ? format(new Date(d), "MMM d, yyyy") : "—"}
-            </span>
-          );
-        },
-        exportValue: (row) => row.invoice_date || row.created_at || "",
-      },
-      {
-        key: "due_date",
-        label: "Due",
-        type: "date",
-        render: (row) => {
-          if (!row.due_date) return "—";
-          const overdue =
-            row.status !== "paid" && new Date(row.due_date) < new Date();
-          return (
-            <span
-              className={`font-mono text-xs ${overdue ? "text-red-600 font-semibold" : "text-slate-500"}`}
-            >
-              {format(new Date(row.due_date), "MMM d, yyyy")}
-            </span>
-          );
-        },
-        exportValue: (row) => row.due_date || "",
-      },
-      {
-        key: "withdrawal_count",
-        label: "Wds",
-        type: "number",
-        align: "right",
-        render: (row) => (
-          <span className="font-mono text-slate-500">
-            {row.withdrawal_count ?? 0}
-          </span>
-        ),
-      },
-    ],
-    []
-  );
-
-  const view = useViewController({ columns });
+  const view = useViewController({ columns: COLUMNS });
   const processedInvoices = view.apply(invoices);
 
   if (isLoading) return <PageSkeleton />;
@@ -241,7 +238,7 @@ const Invoices = () => {
 
       <ViewToolbar
         controller={view}
-        columns={columns}
+        columns={COLUMNS}
         data={invoices}
         resultCount={processedInvoices.length}
         className="mb-3"

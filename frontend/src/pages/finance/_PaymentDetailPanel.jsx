@@ -1,6 +1,6 @@
 import { DollarSign, FileText, CreditCard } from "lucide-react";
 import { format } from "date-fns";
-import { DetailPanel, DetailSection, DetailField } from "./DetailPanel";
+import { DetailPanel, DetailSection, DetailField } from "@/components/DetailPanel";
 import { usePayment } from "@/hooks/usePayments";
 import { PAYMENT_METHODS } from "@/lib/constants";
 
