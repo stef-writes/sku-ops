@@ -1,16 +1,29 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { ChevronDown, ChevronRight, CheckCircle, Clock, Loader2, Truck, BoxIcon } from "lucide-react";
+import { ChevronDown, ChevronRight, CheckCircle, Clock, Loader2, Truck, BoxIcon, Filter, X } from "lucide-react";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { usePurchaseOrders, usePOItems, useMarkDelivery, useReceivePO } from "@/hooks/usePurchaseOrders";
 import api from "@/lib/api-client";
 import { getErrorMessage } from "@/lib/api-client";
 
+const PO_STATUSES = [
+  { value: "", label: "All statuses" },
+  { value: "ordered", label: "Ordered" },
+  { value: "partial", label: "Partial" },
+  { value: "received", label: "Received" },
+];
+
 export default function PurchaseOrders() {
-  const { data: orders = [], isLoading } = usePurchaseOrders();
+  const [statusFilter, setStatusFilter] = useState("");
+
+  const params = useMemo(() => ({
+    status: statusFilter || undefined,
+  }), [statusFilter]);
+
+  const { data: orders = [], isLoading } = usePurchaseOrders(params);
   const markDelivery = useMarkDelivery();
   const receivePO = useReceivePO();
 
@@ -83,6 +96,31 @@ export default function PurchaseOrders() {
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Purchase Orders</h1>
         <p className="text-slate-500 mt-1 text-sm">Track deliveries: ordered → at dock → received into inventory</p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 mb-6">
+        <div className="flex items-center gap-1.5 text-slate-400">
+          <Filter className="w-3.5 h-3.5" />
+          <span className="text-xs font-medium uppercase tracking-wide">Filter</span>
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
+        >
+          {PO_STATUSES.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
+        {statusFilter && (
+          <button
+            type="button"
+            onClick={() => setStatusFilter("")}
+            className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600"
+          >
+            <X className="w-3 h-3" /> Clear
+          </button>
+        )}
       </div>
 
       {orders.length === 0 ? (

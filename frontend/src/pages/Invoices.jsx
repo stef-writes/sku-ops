@@ -7,13 +7,16 @@ import { FileText, Plus, Send, ArrowRight, CheckSquare, Square } from "lucide-re
 import { format } from "date-fns";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { StatusBadge } from "@/components/StatusBadge";
+import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { CreateInvoiceModal } from "../components/CreateInvoiceModal";
 import { InvoiceDetailModal } from "../components/InvoiceDetailModal";
 import { useInvoices, useSyncXero, useBulkSyncXero } from "@/hooks/useInvoices";
+import { dateToISO, endOfDayISO } from "@/lib/utils";
 
 const Invoices = () => {
   const [statusFilter, setStatusFilter] = useState("");
   const [entityFilter, setEntityFilter] = useState("");
+  const [dateRange, setDateRange] = useState({ from: null, to: null });
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [detailInvoiceId, setDetailInvoiceId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -21,7 +24,9 @@ const Invoices = () => {
   const params = useMemo(() => ({
     status: statusFilter || undefined,
     billing_entity: entityFilter || undefined,
-  }), [statusFilter, entityFilter]);
+    start_date: dateToISO(dateRange.from),
+    end_date: endOfDayISO(dateRange.to),
+  }), [statusFilter, entityFilter, dateRange]);
 
   const { data: invoices = [], isLoading } = useInvoices(params);
   const syncXero = useSyncXero();
@@ -66,12 +71,15 @@ const Invoices = () => {
 
   return (
     <div className="p-8" data-testid="invoices-page">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Invoices</h1>
-          <Link to="/financials" className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 mt-1 transition-colors">Financials <ArrowRight className="w-3 h-3" /></Link>
+      <div className="flex flex-col gap-4 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Invoices</h1>
+            <Link to="/financials" className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 mt-1 transition-colors">Financials <ArrowRight className="w-3 h-3" /></Link>
+          </div>
+          <Button onClick={() => setCreateModalOpen(true)} size="sm" className="gap-2" data-testid="create-invoice-btn"><Plus className="w-4 h-4" />Create Invoice</Button>
         </div>
-        <Button onClick={() => setCreateModalOpen(true)} size="sm" className="gap-2" data-testid="create-invoice-btn"><Plus className="w-4 h-4" />Create Invoice</Button>
+        <DateRangeFilter value={dateRange} onChange={setDateRange} />
       </div>
 
       {statusSummary.length > 0 && (
@@ -102,7 +110,7 @@ const Invoices = () => {
               {billingEntities.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
             </SelectContent>
           </Select>
-          {(statusFilter || entityFilter) && <button onClick={() => { setStatusFilter(""); setEntityFilter(""); }} className="text-xs text-slate-400 hover:text-slate-600">Clear</button>}
+          {(statusFilter || entityFilter) && <button onClick={() => { setStatusFilter(""); setEntityFilter(""); }} className="text-xs text-slate-400 hover:text-slate-600">Clear dropdowns</button>}
         </div>
       </div>
 

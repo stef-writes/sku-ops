@@ -83,7 +83,7 @@ const api = {
 
   // ── Purchase Orders ─────────────────────────────────────────────────
   purchaseOrders: {
-    list: () => axios.get(`${API}/purchase-orders`).then((r) => r.data),
+    list: (params) => axios.get(`${API}/purchase-orders`, { params }).then((r) => r.data),
     get: (id) => axios.get(`${API}/purchase-orders/${id}`).then((r) => r.data),
     create: (data) => axios.post(`${API}/purchase-orders`, data).then((r) => r.data),
     markDelivery: (id, data) => axios.post(`${API}/purchase-orders/${id}/delivery`, data).then((r) => r.data),
@@ -128,6 +128,8 @@ const api = {
     jobPl: (params) => axios.get(`${API}/reports/job-pl`, { params }).then((r) => r.data),
     kpis: (params) => axios.get(`${API}/reports/kpis`, { params }).then((r) => r.data),
     productPerformance: (params) => axios.get(`${API}/reports/product-performance`, { params }).then((r) => r.data),
+    pl: (params) => axios.get(`${API}/reports/pl`, { params }).then((r) => r.data),
+    arAging: () => axios.get(`${API}/reports/ar-aging`).then((r) => r.data),
   },
 
   // ── Chat ────────────────────────────────────────────────────────────

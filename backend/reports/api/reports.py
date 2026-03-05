@@ -148,6 +148,82 @@ async def get_job_pl(
     }
 
 
+@router.get("/pl")
+async def get_pl(
+    group_by: str = "overall",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 100,
+    current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
+):
+    """Unified P&L endpoint. group_by: overall | job | contractor | department | entity | product."""
+    org_id = current_user.organization_id
+    date_kw = dict(start_date=start_date, end_date=end_date)
+
+    if group_by == "overall":
+        accounts = await ledger_repo.summary_by_account(org_id, **date_kw)
+        revenue = accounts.get("revenue", 0)
+        cogs = accounts.get("cogs", 0)
+        tax = accounts.get("tax_collected", 0)
+        shrinkage = accounts.get("shrinkage", 0)
+        profit = round(revenue - cogs - shrinkage, 2)
+        return {
+            "group_by": "overall",
+            "summary": {
+                "revenue": round(revenue, 2),
+                "cogs": round(cogs, 2),
+                "tax_collected": round(tax, 2),
+                "shrinkage": round(shrinkage, 2),
+                "gross_profit": profit,
+                "margin_pct": round(profit / revenue * 100, 1) if revenue > 0 else 0,
+            },
+            "rows": [],
+        }
+
+    if group_by == "job":
+        rows = await ledger_repo.summary_by_job(org_id, **date_kw, limit=limit)
+        label_key = "job_id"
+    elif group_by == "contractor":
+        rows = await ledger_repo.summary_by_contractor(org_id, **date_kw)
+        label_key = "contractor_id"
+    elif group_by == "department":
+        rows = await ledger_repo.summary_by_department(org_id, **date_kw)
+        label_key = "department"
+    elif group_by == "entity":
+        rows = await ledger_repo.summary_by_billing_entity(org_id, **date_kw)
+        label_key = "billing_entity"
+    elif group_by == "product":
+        rows = await ledger_repo.product_margins(org_id, **date_kw, limit=limit)
+        label_key = "product_id"
+    else:
+        rows = []
+        label_key = "name"
+
+    total_revenue = sum(r.get("revenue", 0) for r in rows)
+    total_cost = sum(r.get("cost", 0) for r in rows)
+    total_profit = round(total_revenue - total_cost, 2)
+
+    return {
+        "group_by": group_by,
+        "summary": {
+            "revenue": round(total_revenue, 2),
+            "cogs": round(total_cost, 2),
+            "gross_profit": total_profit,
+            "margin_pct": round(total_profit / total_revenue * 100, 1) if total_revenue > 0 else 0,
+        },
+        "rows": rows,
+        "label_key": label_key,
+    }
+
+
+@router.get("/ar-aging")
+async def get_ar_aging(
+    current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
+):
+    """Accounts receivable aging buckets by billing entity."""
+    return await ledger_repo.ar_aging(current_user.organization_id)
+
+
 @router.get("/kpis")
 async def get_kpis(
     start_date: Optional[str] = None,

@@ -9,6 +9,8 @@ export const reportKeys = {
   jobPl: (params) => ["reports", "jobPl", params],
   kpis: (params) => ["reports", "kpis", params],
   productPerformance: (params) => ["reports", "productPerformance", params],
+  pl: (params) => ["reports", "pl", params],
+  arAging: () => ["reports", "arAging"],
 };
 
 export function useReportSales(params) {
@@ -63,5 +65,20 @@ export function useReportProductPerformance(params) {
     queryKey: reportKeys.productPerformance(params),
     queryFn: () => api.reports.productPerformance(params),
     enabled: !!params,
+  });
+}
+
+export function useReportPL(params) {
+  return useQuery({
+    queryKey: reportKeys.pl(params),
+    queryFn: () => api.reports.pl(params),
+    enabled: !!params,
+  });
+}
+
+export function useReportArAging() {
+  return useQuery({
+    queryKey: reportKeys.arAging(),
+    queryFn: api.reports.arAging,
   });
 }

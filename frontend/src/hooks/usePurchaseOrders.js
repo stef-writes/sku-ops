@@ -3,14 +3,14 @@ import api from "@/lib/api-client";
 
 export const poKeys = {
   all: ["purchaseOrders"],
-  list: () => ["purchaseOrders", "list"],
+  list: (params) => ["purchaseOrders", "list", params],
   detail: (id) => ["purchaseOrders", "detail", id],
 };
 
-export function usePurchaseOrders() {
+export function usePurchaseOrders(params) {
   return useQuery({
-    queryKey: poKeys.list(),
-    queryFn: api.purchaseOrders.list,
+    queryKey: poKeys.list(params),
+    queryFn: () => api.purchaseOrders.list(params),
   });
 }
 

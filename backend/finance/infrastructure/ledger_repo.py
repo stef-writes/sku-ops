@@ -134,6 +134,7 @@ async def summary_by_job(
 
     cursor = await conn.execute(
         f"""SELECT job_id,
+                   billing_entity,
                    ROUND(SUM(CASE WHEN account = 'revenue' THEN amount ELSE 0 END), 2) AS revenue,
                    ROUND(SUM(CASE WHEN account = 'cogs' THEN amount ELSE 0 END), 2) AS cost,
                    COUNT(DISTINCT reference_id) AS transaction_count
@@ -142,7 +143,7 @@ async def summary_by_job(
               AND account IN ('revenue', 'cogs')
               AND job_id IS NOT NULL
               {date_filter}
-            GROUP BY job_id
+            GROUP BY job_id, billing_entity
             ORDER BY revenue DESC
             LIMIT ?""",
         params + [limit],
@@ -156,11 +157,12 @@ async def summary_by_job(
         profit = round(revenue - cost, 2)
         result.append({
             "job_id": row["job_id"],
+            "billing_entity": row["billing_entity"],
             "revenue": revenue,
             "cost": cost,
             "profit": profit,
             "margin_pct": round(profit / revenue * 100, 1) if revenue > 0 else 0,
-            "transaction_count": row["transaction_count"],
+            "withdrawal_count": row["transaction_count"],
         })
     return result
 

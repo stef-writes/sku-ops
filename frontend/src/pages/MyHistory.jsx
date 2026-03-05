@@ -1,29 +1,52 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
-import { Package, MapPin, ChevronDown, Send, Clock, CheckCircle, FileText } from "lucide-react";
+import { Package, MapPin, ChevronDown, Send, Clock, CheckCircle, FileText, X } from "lucide-react";
 import { format } from "date-fns";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { StatusBadge } from "@/components/StatusBadge";
+import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { useWithdrawals } from "@/hooks/useWithdrawals";
 import { useMaterialRequests } from "@/hooks/useMaterialRequests";
+import { dateToISO, endOfDayISO } from "@/lib/utils";
+
+const PAYMENT_OPTIONS = [
+  { value: "", label: "All statuses" },
+  { value: "unpaid", label: "Unpaid" },
+  { value: "invoiced", label: "Invoiced" },
+  { value: "paid", label: "Paid" },
+];
 
 const MyHistory = () => {
   const { user } = useAuth();
-  const { data: withdrawals = [], isLoading: wdLoading } = useWithdrawals();
-  const { data: allRequests = [], isLoading: reqLoading } = useMaterialRequests();
+  const [dateRange, setDateRange] = useState({ from: null, to: null });
+  const [paymentStatus, setPaymentStatus] = useState("");
   const [expandedId, setExpandedId] = useState(null);
+
+  const params = useMemo(() => ({
+    start_date: dateToISO(dateRange.from),
+    end_date: endOfDayISO(dateRange.to),
+    payment_status: paymentStatus || undefined,
+  }), [dateRange, paymentStatus]);
+
+  const { data: withdrawals = [], isLoading: wdLoading } = useWithdrawals(params);
+  const { data: allRequests = [], isLoading: reqLoading } = useMaterialRequests();
 
   const requests = allRequests.filter?.((r) => r.status === "pending") || [];
   const totalSpent = withdrawals.reduce((sum, w) => sum + (w.total || 0), 0);
   const totalUnpaid = withdrawals.filter((w) => w.payment_status === "unpaid").reduce((sum, w) => sum + (w.total || 0), 0);
 
+  const hasFilters = dateRange.from || dateRange.to || paymentStatus;
+
   if (wdLoading || reqLoading) return <PageSkeleton />;
 
   return (
     <div className="p-8" data-testid="my-history-page">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">My History</h1>
-        <p className="text-slate-500 mt-1 text-sm">{user?.name} · {user?.company || "Independent"}</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">My History</h1>
+          <p className="text-slate-500 mt-1 text-sm">{user?.name} · {user?.company || "Independent"}</p>
+        </div>
+        <DateRangeFilter value={dateRange} onChange={setDateRange} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -56,12 +79,33 @@ const MyHistory = () => {
       )}
 
       <div data-testid="withdrawals-list">
-        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 mb-3">Withdrawals</p>
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Withdrawals</p>
+          <select
+            value={paymentStatus}
+            onChange={(e) => setPaymentStatus(e.target.value)}
+            className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
+          >
+            {PAYMENT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={() => { setDateRange({ from: null, to: null }); setPaymentStatus(""); }}
+              className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-3 h-3" /> Clear all
+            </button>
+          )}
+        </div>
+
         {withdrawals.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-xl p-16 text-center shadow-sm">
             <Package className="w-10 h-10 mx-auto text-slate-300 mb-2" />
-            <p className="text-sm text-slate-500">No withdrawals yet</p>
-            <p className="text-xs text-slate-400 mt-1">Submit a material request and staff will process it at pickup</p>
+            <p className="text-sm text-slate-500">{hasFilters ? "No withdrawals match these filters" : "No withdrawals yet"}</p>
+            {!hasFilters && <p className="text-xs text-slate-400 mt-1">Submit a material request and staff will process it at pickup</p>}
           </div>
         ) : (
           <div className="space-y-2">

@@ -2,18 +2,18 @@ import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { Button } from "../components/ui/button";
-import { Calendar } from "../components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { DollarSign, CheckCircle, Download, Calendar as CalendarIcon, FileText, HardHat, Building2, ArrowRight } from "lucide-react";
+import { DollarSign, CheckCircle, Download, FileText, HardHat, Building2, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { StatusBadge } from "@/components/StatusBadge";
+import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { CreateInvoiceModal } from "../components/CreateInvoiceModal";
 import { useFinancialSummary } from "@/hooks/useFinancials";
 import { useWithdrawals, useMarkPaid, useBulkMarkPaid } from "@/hooks/useWithdrawals";
 import api from "@/lib/api-client";
 import { valueFormatter } from "@/lib/chartConfig";
+import { dateToISO, endOfDayISO } from "@/lib/utils";
 
 const Financials = () => {
   const [statusFilter, setStatusFilter] = useState("");
@@ -25,8 +25,8 @@ const Financials = () => {
   const params = useMemo(() => ({
     payment_status: statusFilter || undefined,
     billing_entity: entityFilter || undefined,
-    start_date: dateRange.from?.toISOString(),
-    end_date: dateRange.to?.toISOString(),
+    start_date: dateToISO(dateRange.from),
+    end_date: endOfDayISO(dateRange.to),
   }), [statusFilter, entityFilter, dateRange]);
 
   const { data: summary, isLoading: summaryLoading } = useFinancialSummary(params);
@@ -85,15 +85,18 @@ const Financials = () => {
 
   return (
     <div className="p-8" data-testid="financials-page">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Financials</h1>
-          <p className="text-slate-500 mt-1 text-sm">Payments, invoicing, and exports</p>
+      <div className="flex flex-col gap-4 mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Financials</h1>
+            <p className="text-slate-500 mt-1 text-sm">Payments, invoicing, and exports</p>
+          </div>
+          <div className="flex gap-2">
+            <Link to="/invoices"><Button variant="outline" size="sm" className="gap-2"><FileText className="w-4 h-4" />Invoices</Button></Link>
+            <Button variant="outline" size="sm" onClick={handleExport} className="gap-2" data-testid="export-btn"><Download className="w-4 h-4" />Export CSV</Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Link to="/invoices"><Button variant="outline" size="sm" className="gap-2"><FileText className="w-4 h-4" />Invoices</Button></Link>
-          <Button variant="outline" size="sm" onClick={handleExport} className="gap-2" data-testid="export-btn"><Download className="w-4 h-4" />Export CSV</Button>
-        </div>
+        <DateRangeFilter value={dateRange} onChange={setDateRange} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6" data-testid="summary-cards">
@@ -180,14 +183,8 @@ const Financials = () => {
               {billingEntities.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2"><CalendarIcon className="w-4 h-4" />{dateRange.from ? (dateRange.to ? `${format(dateRange.from, "MMM d")} – ${format(dateRange.to, "MMM d")}` : format(dateRange.from, "MMM d, yyyy")) : "Date range"}</Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start"><Calendar mode="range" selected={dateRange} onSelect={(r) => setDateRange(r || { from: null, to: null })} numberOfMonths={2} /></PopoverContent>
-          </Popover>
-          {(statusFilter || entityFilter || dateRange.from) && (
-            <button onClick={() => { setStatusFilter(""); setEntityFilter(""); setDateRange({ from: null, to: null }); }} className="text-xs text-slate-400 hover:text-slate-600">Clear</button>
+          {(statusFilter || entityFilter) && (
+            <button onClick={() => { setStatusFilter(""); setEntityFilter(""); }} className="text-xs text-slate-400 hover:text-slate-600">Clear</button>
           )}
         </div>
       </div>

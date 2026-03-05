@@ -19,20 +19,7 @@ import { RecentTransactions } from "@/components/RecentTransactions";
 import { StatusBadge } from "@/components/StatusBadge";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { useDashboardStats } from "@/hooks/useDashboard";
-
-function dateToISO(d) {
-  if (!d) return undefined;
-  const dt = new Date(d);
-  dt.setHours(0, 0, 0, 0);
-  return dt.toISOString();
-}
-
-function endOfDayISO(d) {
-  if (!d) return undefined;
-  const dt = new Date(d);
-  dt.setHours(23, 59, 59, 999);
-  return dt.toISOString();
-}
+import { dateToISO, endOfDayISO } from "@/lib/utils";
 
 const Dashboard = () => {
   const { user } = useAuth();

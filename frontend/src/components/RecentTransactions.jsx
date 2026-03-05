@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import api from "@/lib/api-client";
 import { dashboardKeys } from "@/hooks/useDashboard";
+import { dateToISO, endOfDayISO } from "@/lib/utils";
 
 const PAYMENT_STATUSES = [
   { value: "", label: "All statuses" },
@@ -13,20 +14,6 @@ const PAYMENT_STATUSES = [
   { value: "invoiced", label: "Invoiced" },
   { value: "paid", label: "Paid" },
 ];
-
-function dateToISO(d) {
-  if (!d) return undefined;
-  const dt = new Date(d);
-  dt.setHours(0, 0, 0, 0);
-  return dt.toISOString();
-}
-
-function endOfDayISO(d) {
-  if (!d) return undefined;
-  const dt = new Date(d);
-  dt.setHours(23, 59, 59, 999);
-  return dt.toISOString();
-}
 
 export function RecentTransactions({ dateRange, onProductStockHistory }) {
   const [contractorId, setContractorId] = useState("");
