@@ -90,7 +90,7 @@ class PgPORepo(PORepoPort):
         item_id: str,
         status: POItemStatus,
         product_id: Optional[str] = None,
-        delivered_qty: Optional[int] = None,
+        delivered_qty: Optional[float] = None,
     ) -> None:
         conn = get_connection()
         await conn.execute(

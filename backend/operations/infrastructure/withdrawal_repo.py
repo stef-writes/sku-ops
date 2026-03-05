@@ -1,7 +1,8 @@
 """Withdrawal repository."""
 import json
-from typing import Optional
+from typing import Optional, Union
 
+from operations.domain.withdrawal import MaterialWithdrawal
 from shared.infrastructure.database import get_connection
 
 
@@ -14,7 +15,8 @@ def _row_to_dict(row) -> Optional[dict]:
     return d
 
 
-async def insert(withdrawal_dict: dict, conn=None) -> None:
+async def insert(withdrawal: Union[MaterialWithdrawal, dict], conn=None) -> None:
+    withdrawal_dict = withdrawal if isinstance(withdrawal, dict) else withdrawal.model_dump()
     in_transaction = conn is not None
     conn = conn or get_connection()
     org_id = withdrawal_dict.get("organization_id") or "default"

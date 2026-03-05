@@ -1,12 +1,11 @@
 """Material request routes - contractor pick list, staff processes into withdrawal."""
 from datetime import datetime, timezone
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from kernel.types import CurrentUser
 from identity.application.auth_service import get_current_user, require_role
-from operations.domain.material_request import MaterialRequestCreate, MaterialRequestProcess
+from operations.domain.material_request import MaterialRequest, MaterialRequestCreate, MaterialRequestProcess
 from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
 from operations.infrastructure.material_request_repo import material_request_repo
 from identity.application.user_service import get_user_by_id
@@ -40,22 +39,18 @@ async def create_material_request(data: MaterialRequestCreate, current_user: Cur
         raise HTTPException(status_code=400, detail="At least one item is required")
 
     org_id = current_user.organization_id
-    request_id = str(uuid4())
-    request_dict = {
-        "id": request_id,
-        "contractor_id": current_user.id,
-        "contractor_name": current_user.name,
-        "items": [i.model_dump() if hasattr(i, "model_dump") else i for i in data.items],
-        "status": "pending",
-        "job_id": data.job_id,
-        "service_address": data.service_address,
-        "notes": data.notes,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "organization_id": org_id,
-    }
-    await material_request_repo.insert(request_dict)
-    req = await material_request_repo.get_by_id(request_id, org_id)
-    return req or request_dict
+    mat_request = MaterialRequest(
+        contractor_id=current_user.id,
+        contractor_name=current_user.name,
+        items=data.items,
+        job_id=data.job_id,
+        service_address=data.service_address,
+        notes=data.notes,
+        organization_id=org_id,
+    )
+    await material_request_repo.insert(mat_request)
+    req = await material_request_repo.get_by_id(mat_request.id, org_id)
+    return req or mat_request.model_dump()
 
 
 @router.get("")

@@ -1,11 +1,13 @@
 """Invoice repository port — testable contract for invoice persistence."""
-from typing import Optional, Protocol, runtime_checkable
+from typing import List, Optional, Protocol, runtime_checkable
+
+from finance.domain.invoice import Invoice, InvoiceLineItem
 
 
 @runtime_checkable
 class InvoiceRepoPort(Protocol):
 
-    async def insert(self, invoice_dict: dict) -> dict: ...
+    async def insert(self, invoice: Invoice) -> dict: ...
 
     async def get_by_id(
         self, invoice_id: str, organization_id: Optional[str] = None,
@@ -19,7 +21,7 @@ class InvoiceRepoPort(Protocol):
         end_date: Optional[str] = None,
         limit: int = 1000,
         organization_id: Optional[str] = None,
-    ) -> list: ...
+    ) -> List[dict]: ...
 
     async def update(
         self,
@@ -30,16 +32,16 @@ class InvoiceRepoPort(Protocol):
         status: Optional[str] = None,
         notes: Optional[str] = None,
         tax: Optional[float] = None,
-        line_items: Optional[list] = None,
+        line_items: Optional[List[InvoiceLineItem]] = None,
     ) -> Optional[dict]: ...
 
     async def add_withdrawals(
-        self, invoice_id: str, withdrawal_ids: list,
+        self, invoice_id: str, withdrawal_ids: List[str],
         organization_id: Optional[str] = None,
     ) -> Optional[dict]: ...
 
     async def create_from_withdrawals(
-        self, withdrawal_ids: list,
+        self, withdrawal_ids: List[str],
         organization_id: Optional[str] = None, conn=None,
     ) -> dict: ...
 

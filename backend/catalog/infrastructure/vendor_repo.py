@@ -1,6 +1,7 @@
 """Vendor repository."""
-from typing import Optional
+from typing import Optional, Union
 
+from catalog.domain.vendor import Vendor
 from shared.infrastructure.database import get_connection
 
 
@@ -55,7 +56,8 @@ async def find_by_name(name: str, organization_id: Optional[str] = None) -> Opti
     return _row_to_dict(row)
 
 
-async def insert(vendor_dict: dict) -> None:
+async def insert(vendor: Union[Vendor, dict]) -> None:
+    vendor_dict = vendor if isinstance(vendor, dict) else vendor.model_dump()
     conn = get_connection()
     org_id = vendor_dict.get("organization_id") or "default"
     await conn.execute(

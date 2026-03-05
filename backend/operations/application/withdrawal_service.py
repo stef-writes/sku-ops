@@ -56,7 +56,10 @@ async def create_withdrawal(
 
     async def _do_create(tx_conn):
         decrements = [
-            StockDecrement(product_id=i.product_id, sku=i.sku, name=i.name, quantity=i.quantity)
+            StockDecrement(
+                product_id=i.product_id, sku=i.sku, name=i.name,
+                quantity=i.quantity, unit=i.unit or "each",
+            )
             for i in data.items
         ]
         await process_stock_changes(
@@ -68,9 +71,8 @@ async def create_withdrawal(
             conn=tx_conn,
         )
 
-        w_dict = withdrawal.model_dump()
-        w_dict["organization_id"] = org_id
-        await withdrawal_repo.insert(w_dict, conn=tx_conn)
+        withdrawal.organization_id = org_id
+        await withdrawal_repo.insert(withdrawal, conn=tx_conn)
 
         if create_invoice:
             try:

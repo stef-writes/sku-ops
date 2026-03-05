@@ -19,7 +19,7 @@ class ProductCreate(BaseModel):
     description: Optional[str] = ""
     price: float
     cost: float = 0.0
-    quantity: int = 0
+    quantity: float = 0
     min_stock: int = 5
     department_id: str
     vendor_id: Optional[str] = None
@@ -48,7 +48,7 @@ class ProductUpdate(BaseModel):
     description: Optional[str] = None
     price: Optional[float] = None
     cost: Optional[float] = None
-    quantity: Optional[int] = None
+    quantity: Optional[float] = None
     min_stock: Optional[int] = None
     department_id: Optional[str] = None
     vendor_id: Optional[str] = None
@@ -79,7 +79,7 @@ class Product(AuditedEntity):
     description: str = ""
     price: float
     cost: float = 0.0
-    quantity: int = 0
+    quantity: float = 0
     min_stock: int = 5
     department_id: str
     department_name: str = ""

@@ -1,7 +1,7 @@
-"""Product CRUD and CSV import routes."""
+"""Product CRUD routes."""
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException
 
 from identity.application.auth_service import get_current_user, require_role
 from kernel.errors import ResourceNotFoundError
@@ -12,7 +12,6 @@ from catalog.infrastructure.department_repo import department_repo
 from catalog.infrastructure.product_repo import product_repo
 from catalog.infrastructure.vendor_repo import vendor_repo
 from catalog.application.product_lifecycle import create_product as lifecycle_create, delete_product as lifecycle_delete, update_product as lifecycle_update
-from catalog.application.csv_import_service import import_csv
 from inventory.application.uom_classifier import classify_uom
 from inventory.application.inventory_service import process_import_stock_changes
 from shared.infrastructure.config import LLM_AVAILABLE
@@ -172,30 +171,3 @@ async def delete_product(product_id: str, current_user: CurrentUser = Depends(re
         raise HTTPException(status_code=404, detail=str(e))
     return {"message": "Product deleted"}
 
-
-@router.post("/import-csv")
-async def import_products_csv(
-    file: UploadFile = File(...),
-    department_id: str = Form(...),
-    vendor_id: Optional[str] = Form(None),
-    current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
-):
-    """Bulk import products from a Supply Yard-style CSV."""
-    org_id = current_user.organization_id
-
-    if not file.filename or not file.filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="File must be a CSV")
-
-    content = await file.read()
-    try:
-        return await import_csv(
-            content=content,
-            department_id=department_id,
-            vendor_id=vendor_id,
-            user_id=current_user.id,
-            user_name=current_user.name,
-            organization_id=org_id,
-            on_stock_import=process_import_stock_changes,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))

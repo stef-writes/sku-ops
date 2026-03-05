@@ -16,7 +16,7 @@ router = APIRouter(prefix="/stock", tags=["stock"])
 
 
 class AdjustStockRequest(BaseModel):
-    quantity_delta: int
+    quantity_delta: float
     reason: str = "correction"
 
 

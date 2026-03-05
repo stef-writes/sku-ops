@@ -27,7 +27,7 @@ async def create_product(
     description: str = "",
     price: float = 0,
     cost: float = 0,
-    quantity: int = 0,
+    quantity: float = 0,
     min_stock: int = 5,
     vendor_id: Optional[str] = None,
     vendor_name: str = "",
@@ -87,10 +87,9 @@ async def create_product(
         pack_qty=pack_qty,
     )
 
-    prod_dict = product.model_dump()
-    prod_dict["organization_id"] = org_id
+    product.organization_id = org_id
     async with transaction() as conn:
-        await product_repo.insert(prod_dict, conn=conn)
+        await product_repo.insert(product, conn=conn)
         await department_repo.increment_product_count(department_id, 1, conn=conn)
         if vendor_id:
             await vendor_repo.increment_product_count(vendor_id, 1, conn=conn)

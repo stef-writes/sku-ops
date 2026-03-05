@@ -1,6 +1,7 @@
 """Department repository."""
-from typing import Optional
+from typing import Optional, Union
 
+from catalog.domain.department import Department
 from shared.infrastructure.database import get_connection
 
 
@@ -51,9 +52,11 @@ async def get_by_code(code: str, organization_id: Optional[str] = None) -> Optio
     return _row_to_dict(row)
 
 
-async def insert(dept_dict: dict) -> None:
+async def insert(department: Union[Department, dict]) -> None:
+    dept_dict = department if isinstance(department, dict) else department.model_dump()
+    dept_dict["organization_id"] = dept_dict.get("organization_id") or "default"
     conn = get_connection()
-    org_id = dept_dict.get("organization_id") or "default"
+    org_id = dept_dict["organization_id"]
     await conn.execute(
         """INSERT INTO departments (id, name, code, description, product_count, organization_id, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)""",

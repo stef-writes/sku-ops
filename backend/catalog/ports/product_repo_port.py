@@ -1,5 +1,7 @@
 """Product repository port — testable contract for product persistence."""
-from typing import Optional, Protocol, runtime_checkable
+from typing import List, Optional, Protocol, runtime_checkable
+
+from catalog.domain.product import Product
 
 
 @runtime_checkable
@@ -13,7 +15,7 @@ class ProductRepoPort(Protocol):
         limit: Optional[int] = None,
         offset: int = 0,
         organization_id: Optional[str] = None,
-    ) -> list: ...
+    ) -> List[dict]: ...
 
     async def count_products(
         self,
@@ -43,28 +45,28 @@ class ProductRepoPort(Protocol):
         organization_id: Optional[str] = None,
     ) -> Optional[dict]: ...
 
-    async def list_by_vendor(self, vendor_id: str, limit: int = 200) -> list: ...
+    async def list_by_vendor(self, vendor_id: str, limit: int = 200) -> List[dict]: ...
 
-    async def insert(self, product_dict: dict, conn=None) -> None: ...
+    async def insert(self, product: Product, conn=None) -> None: ...
 
     async def update(self, product_id: str, updates: dict, conn=None) -> Optional[dict]: ...
 
     async def delete(self, product_id: str, conn=None) -> int: ...
 
     async def atomic_decrement(
-        self, product_id: str, quantity: int, updated_at: str, conn=None,
+        self, product_id: str, quantity: float, updated_at: str, conn=None,
     ) -> Optional[dict]: ...
 
     async def increment_quantity(
-        self, product_id: str, quantity: int, updated_at: str, conn=None,
+        self, product_id: str, quantity: float, updated_at: str, conn=None,
     ) -> None: ...
 
     async def add_quantity(
-        self, product_id: str, quantity: int, updated_at: str,
+        self, product_id: str, quantity: float, updated_at: str, conn=None,
     ) -> Optional[dict]: ...
 
     async def atomic_adjust(
-        self, product_id: str, quantity_delta: int, updated_at: str,
+        self, product_id: str, quantity_delta: float, updated_at: str,
     ) -> Optional[dict]: ...
 
     async def count_all(self, organization_id: Optional[str] = None) -> int: ...
@@ -73,4 +75,4 @@ class ProductRepoPort(Protocol):
 
     async def list_low_stock(
         self, limit: int = 10, organization_id: Optional[str] = None,
-    ) -> list: ...
+    ) -> List[dict]: ...

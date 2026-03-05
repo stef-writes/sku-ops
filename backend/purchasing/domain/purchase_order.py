@@ -56,8 +56,8 @@ class PurchaseOrderItem(Entity):
     po_id: str
     name: str
     original_sku: Optional[str] = None
-    ordered_qty: int = 1
-    delivered_qty: int = 0
+    ordered_qty: float = 1
+    delivered_qty: float = 0
     unit_price: float = 0.0
     cost: float = 0.0
     base_unit: str = "each"
@@ -84,9 +84,9 @@ class POItemCreate(BaseModel):
     """Typed input for a single PO line item (from document parse or manual entry)."""
     name: str
     original_sku: Optional[str] = None
-    quantity: int = 1
-    ordered_qty: Optional[int] = None
-    delivered_qty: Optional[int] = None
+    quantity: float = 1
+    ordered_qty: Optional[float] = None
+    delivered_qty: Optional[float] = None
     price: float = 0.0
     cost: Optional[float] = None
     base_unit: str = "each"
@@ -109,7 +109,7 @@ class CreatePORequest(BaseModel):
 
 class ReceiveItemUpdate(BaseModel):
     id: str
-    delivered_qty: Optional[int] = None
+    delivered_qty: Optional[float] = None
 
 
 class ReceiveItemsRequest(BaseModel):

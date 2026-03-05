@@ -1,6 +1,7 @@
 """Stock transaction repository."""
-from typing import Optional
+from typing import Optional, Union
 
+from inventory.domain.stock import StockTransaction
 from shared.infrastructure.database import get_connection
 
 
@@ -10,14 +11,15 @@ def _row_to_dict(row) -> Optional[dict]:
     return dict(row) if hasattr(row, "keys") else {}
 
 
-async def insert_transaction(tx_dict: dict, conn=None) -> None:
+async def insert_transaction(transaction: Union[StockTransaction, dict], conn=None) -> None:
+    tx_dict = transaction if isinstance(transaction, dict) else transaction.model_dump()
     in_transaction = conn is not None
     conn = conn or get_connection()
     org_id = tx_dict.get("organization_id") or "default"
     await conn.execute(
         """INSERT INTO stock_transactions (id, product_id, sku, product_name, quantity_delta, quantity_before,
-           quantity_after, transaction_type, reference_id, reference_type, reason, user_id, user_name, organization_id, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           quantity_after, unit, transaction_type, reference_id, reference_type, reason, user_id, user_name, organization_id, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             tx_dict["id"],
             tx_dict["product_id"],
@@ -26,6 +28,7 @@ async def insert_transaction(tx_dict: dict, conn=None) -> None:
             tx_dict["quantity_delta"],
             tx_dict["quantity_before"],
             tx_dict["quantity_after"],
+            tx_dict.get("unit", "each"),
             tx_dict["transaction_type"].value if hasattr(tx_dict["transaction_type"], "value") else tx_dict["transaction_type"],
             tx_dict.get("reference_id"),
             tx_dict.get("reference_type"),

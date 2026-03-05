@@ -169,7 +169,7 @@ async def create_purchase_order(
             po_id=po.id,
             name=item.get("name", "Unknown"),
             original_sku=item.get("original_sku"),
-            ordered_qty=int(item.get("ordered_qty") or item.get("quantity") or 1),
+            ordered_qty=float(item.get("ordered_qty") or item.get("quantity") or 1),
             delivered_qty=item.get("delivered_qty") or 0,
             unit_price=float(item.get("price") or 0),
             cost=round(cost_val, 2),
@@ -272,7 +272,7 @@ async def receive_po_items(
         delivered = update.get("delivered_qty")
         if delivered is None:
             delivered = item.get("delivered_qty") or item.get("ordered_qty") or 1
-        delivered = max(0, int(delivered))
+        delivered = max(0.0, float(delivered))
 
         try:
             existing = await _match_product(item, vendor_id, org_id, deps)

@@ -1,7 +1,8 @@
 """Material request repository."""
 import json
-from typing import Optional
+from typing import Optional, Union
 
+from operations.domain.material_request import MaterialRequest
 from shared.infrastructure.database import get_connection
 
 
@@ -14,7 +15,8 @@ def _row_to_dict(row) -> Optional[dict]:
     return d
 
 
-async def insert(request_dict: dict, conn=None) -> None:
+async def insert(request: Union[MaterialRequest, dict], conn=None) -> None:
+    request_dict = request if isinstance(request, dict) else request.model_dump()
     in_transaction = conn is not None
     conn = conn or get_connection()
     org_id = request_dict.get("organization_id") or "default"

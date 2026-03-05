@@ -99,7 +99,7 @@ async def _sqlite_001_initial_schema(conn) -> None:
             description TEXT NOT NULL DEFAULT '',
             price REAL NOT NULL,
             cost REAL NOT NULL DEFAULT 0,
-            quantity INTEGER NOT NULL DEFAULT 0,
+            quantity REAL NOT NULL DEFAULT 0,
             min_stock INTEGER NOT NULL DEFAULT 5,
             department_id TEXT NOT NULL,
             department_name TEXT NOT NULL DEFAULT '',
@@ -157,9 +157,10 @@ async def _sqlite_001_initial_schema(conn) -> None:
             product_id TEXT NOT NULL,
             sku TEXT NOT NULL,
             product_name TEXT NOT NULL DEFAULT '',
-            quantity_delta INTEGER NOT NULL,
-            quantity_before INTEGER NOT NULL,
-            quantity_after INTEGER NOT NULL,
+            quantity_delta REAL NOT NULL,
+            quantity_before REAL NOT NULL,
+            quantity_after REAL NOT NULL,
+            unit TEXT NOT NULL DEFAULT 'each',
             transaction_type TEXT NOT NULL,
             reference_id TEXT,
             reference_type TEXT,
@@ -269,8 +270,8 @@ async def _sqlite_001_initial_schema(conn) -> None:
             po_id TEXT NOT NULL,
             name TEXT NOT NULL,
             original_sku TEXT,
-            ordered_qty INTEGER NOT NULL DEFAULT 1,
-            delivered_qty INTEGER,
+            ordered_qty REAL NOT NULL DEFAULT 1,
+            delivered_qty REAL,
             price REAL NOT NULL DEFAULT 0,
             cost REAL NOT NULL DEFAULT 0,
             base_unit TEXT NOT NULL DEFAULT 'each',
@@ -580,8 +581,31 @@ _SQLITE_MIGRATIONS: list[tuple[str, object]] = [
     ("013_agent_runs", _sqlite_013_agent_runs),
 ]
 
+async def _015_decimal_quantities_and_stock_unit(conn, *, dialect: str = "sqlite") -> None:
+    """Widen quantity columns to REAL and add unit column to stock_transactions.
+
+    SQLite is dynamically typed so the ALTER TYPE is a no-op there — existing int
+    values are already valid reals.  PostgreSQL needs explicit ALTER COLUMN.
+    """
+    if dialect == "postgresql":
+        for col in ("quantity",):
+            await conn.execute(f"ALTER TABLE products ALTER COLUMN {col} TYPE DOUBLE PRECISION USING {col}::DOUBLE PRECISION")
+        for col in ("quantity_delta", "quantity_before", "quantity_after"):
+            await conn.execute(f"ALTER TABLE stock_transactions ALTER COLUMN {col} TYPE DOUBLE PRECISION USING {col}::DOUBLE PRECISION")
+        for col in ("ordered_qty", "delivered_qty"):
+            await conn.execute(f"ALTER TABLE purchase_order_items ALTER COLUMN {col} TYPE DOUBLE PRECISION USING {col}::DOUBLE PRECISION")
+        await conn.commit()
+
+    if not await _column_exists(conn, "stock_transactions", "unit", dialect=dialect):
+        await conn.execute(
+            "ALTER TABLE stock_transactions ADD COLUMN unit TEXT NOT NULL DEFAULT 'each'"
+        )
+    await conn.commit()
+
+
 _COMMON_MIGRATIONS: list[tuple[str, object]] = [
     ("014_refresh_tokens_and_audit", _014_refresh_tokens_and_audit),
+    ("015_decimal_quantities_and_stock_unit", _015_decimal_quantities_and_stock_unit),
 ]
 
 

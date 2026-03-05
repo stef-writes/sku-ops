@@ -20,10 +20,8 @@ async def get_vendors(current_user: CurrentUser = Depends(require_role("admin", 
 @router.post("", response_model=Vendor)
 async def create_vendor(data: VendorCreate, current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager"))):
     org_id = current_user.organization_id
-    vendor = Vendor(**data.model_dump())
-    vendor_dict = vendor.model_dump()
-    vendor_dict["organization_id"] = org_id
-    await vendor_repo.insert(vendor_dict)
+    vendor = Vendor(**data.model_dump(), organization_id=org_id)
+    await vendor_repo.insert(vendor)
     return vendor
 
 

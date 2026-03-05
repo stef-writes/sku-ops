@@ -1,11 +1,13 @@
 """Department repository port — testable contract for department persistence."""
-from typing import Optional, Protocol, runtime_checkable
+from typing import List, Optional, Protocol, runtime_checkable
+
+from catalog.domain.department import Department
 
 
 @runtime_checkable
 class DepartmentRepoPort(Protocol):
 
-    async def list_all(self, organization_id: Optional[str] = None) -> list: ...
+    async def list_all(self, organization_id: Optional[str] = None) -> List[dict]: ...
 
     async def get_by_id(
         self, dept_id: str, organization_id: Optional[str] = None,
@@ -15,7 +17,7 @@ class DepartmentRepoPort(Protocol):
         self, code: str, organization_id: Optional[str] = None,
     ) -> Optional[dict]: ...
 
-    async def insert(self, dept_dict: dict) -> None: ...
+    async def insert(self, department: Department, conn=None) -> None: ...
 
     async def update(
         self, dept_id: str, name: str, description: str, conn=None,

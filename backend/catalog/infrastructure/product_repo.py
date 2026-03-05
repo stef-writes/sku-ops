@@ -1,6 +1,7 @@
 """Product repository."""
-from typing import Optional
+from typing import Optional, Union
 
+from catalog.domain.product import Product
 from shared.infrastructure.database import get_connection
 
 # Whitelist for get_by_id(columns=) to prevent SQL injection
@@ -16,7 +17,7 @@ def _row_to_dict(row) -> Optional[dict]:
         return None
     d = dict(row) if hasattr(row, "keys") else {}
     if d and "quantity" in d:
-        d["quantity"] = int(d["quantity"])
+        d["quantity"] = float(d["quantity"])
     if d and "min_stock" in d:
         d["min_stock"] = int(d["min_stock"])
     return d
@@ -177,7 +178,8 @@ async def find_by_name_and_vendor(
     return _row_to_dict(row)
 
 
-async def insert(product_dict: dict, conn=None) -> None:
+async def insert(product: Union[Product, dict], conn=None) -> None:
+    product_dict = product if isinstance(product, dict) else product.model_dump()
     in_transaction = conn is not None
     conn = conn or get_connection()
     org_id = product_dict.get("organization_id") or "default"
@@ -250,7 +252,7 @@ async def delete(product_id: str, conn=None) -> int:
     return cursor.rowcount
 
 
-async def atomic_decrement(product_id: str, quantity: int, updated_at: str, conn=None) -> Optional[dict]:
+async def atomic_decrement(product_id: str, quantity: float, updated_at: str, conn=None) -> Optional[dict]:
     """Decrement quantity only if >= requested. Returns updated row or None if insufficient."""
     in_transaction = conn is not None
     conn = conn or get_connection()
@@ -266,7 +268,7 @@ async def atomic_decrement(product_id: str, quantity: int, updated_at: str, conn
     return await get_by_id(product_id, conn=conn)
 
 
-async def increment_quantity(product_id: str, quantity: int, updated_at: str, conn=None) -> None:
+async def increment_quantity(product_id: str, quantity: float, updated_at: str, conn=None) -> None:
     """Rollback: add quantity back."""
     in_transaction = conn is not None
     conn = conn or get_connection()
@@ -278,7 +280,7 @@ async def increment_quantity(product_id: str, quantity: int, updated_at: str, co
         await conn.commit()
 
 
-async def add_quantity(product_id: str, quantity: int, updated_at: str, conn=None) -> Optional[dict]:
+async def add_quantity(product_id: str, quantity: float, updated_at: str, conn=None) -> Optional[dict]:
     """Add quantity (receiving) and return updated row."""
     in_transaction = conn is not None
     conn = conn or get_connection()
@@ -291,7 +293,7 @@ async def add_quantity(product_id: str, quantity: int, updated_at: str, conn=Non
     return await get_by_id(product_id)
 
 
-async def atomic_adjust(product_id: str, quantity_delta: int, updated_at: str) -> Optional[dict]:
+async def atomic_adjust(product_id: str, quantity_delta: float, updated_at: str) -> Optional[dict]:
     """
     Atomically adjust quantity by delta (+ or -).
     Returns updated row or None if adjustment would result in negative stock.

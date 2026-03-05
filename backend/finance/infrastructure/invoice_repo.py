@@ -1,7 +1,9 @@
 """Invoice repository."""
-from typing import Optional
+from typing import Optional, Union
 from uuid import uuid4
 from datetime import datetime, timezone
+
+from finance.domain.invoice import Invoice
 
 from typing import Callable, Awaitable
 
@@ -67,7 +69,8 @@ async def _next_invoice_number(organization_id: Optional[str] = None, conn=None)
     return f"INV-{str(num).zfill(5)}"
 
 
-async def insert(invoice_dict: dict) -> dict:
+async def insert(invoice: Union[Invoice, dict]) -> dict:
+    invoice_dict = invoice if isinstance(invoice, dict) else invoice.model_dump()
     conn = get_connection()
     org_id = invoice_dict.get("organization_id") or "default"
     invoice_id = invoice_dict.get("id") or str(uuid4())

@@ -31,4 +31,3 @@ class MaterialRequest(Entity):
     notes: Optional[str] = None
     processed_at: Optional[str] = None
     processed_by_id: Optional[str] = None
-    organization_id: str = "default"

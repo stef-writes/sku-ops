@@ -218,19 +218,20 @@ class TestUOMClassifier:
     """Test UOM classifier (uses LLM when available)."""
 
     async def test_classify_uom_returns_default_when_llm_unavailable(self):
-        """UOM classifier returns default when generate_text returns None."""
+        """UOM classifier returns default when generate_text is not passed."""
         from inventory.application.uom_classifier import classify_uom
 
-        with patch("inventory.application.uom_classifier.generate_text", return_value=None):
-            result = await classify_uom("Mystery product")
+        result = await classify_uom("Mystery product")
         assert result == {"base_unit": "each", "sell_uom": "each", "pack_qty": 1}
 
     async def test_classify_uom_uses_llm_when_mocked(self):
-        """UOM classifier uses LLM output when available."""
+        """UOM classifier uses LLM output when generate_text callable is provided."""
         from inventory.application.uom_classifier import classify_uom
 
-        with patch("inventory.application.uom_classifier.generate_text", return_value='{"base_unit":"gallon","sell_uom":"gallon","pack_qty":5}'):
-            result = await classify_uom("5 Gal Paint")
+        def mock_generate_text(_prompt, _system):
+            return '{"base_unit":"gallon","sell_uom":"gallon","pack_qty":5}'
+
+        result = await classify_uom("5 Gal Paint", generate_text=mock_generate_text)
         assert result["base_unit"] == "gallon"
         assert result["sell_uom"] == "gallon"
         assert result["pack_qty"] == 5

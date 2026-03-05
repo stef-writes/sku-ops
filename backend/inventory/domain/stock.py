@@ -12,7 +12,8 @@ class StockDecrement(BaseModel):
     product_id: str
     sku: str
     name: str
-    quantity: int
+    quantity: float
+    unit: str = "each"
 
 
 class StockTransactionType(str, Enum):
@@ -30,9 +31,10 @@ class StockTransaction(Entity):
     product_id: str
     sku: str
     product_name: str = ""
-    quantity_delta: int
-    quantity_before: int
-    quantity_after: int
+    quantity_delta: float
+    quantity_before: float
+    quantity_after: float
+    unit: str = "each"
     transaction_type: StockTransactionType
     reference_id: Optional[str] = None
     reference_type: Optional[str] = None

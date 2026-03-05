@@ -18,7 +18,7 @@ class LineItem(BaseModel):
     product_id: str
     sku: str
     name: str
-    quantity: int
+    quantity: float
     unit_price: float = Field(
         default=0.0,
         validation_alias=AliasChoices("unit_price", "price"),

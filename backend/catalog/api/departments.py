@@ -28,10 +28,9 @@ async def create_department(data: DepartmentCreate, current_user: CurrentUser = 
         name=data.name,
         code=data.code.upper(),
         description=data.description or "",
+        organization_id=org_id,
     )
-    dept_dict = dept.model_dump()
-    dept_dict["organization_id"] = org_id
-    await department_repo.insert(dept_dict)
+    await department_repo.insert(dept)
     return dept
 
 

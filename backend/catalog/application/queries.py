@@ -87,19 +87,19 @@ async def update_product(product_id: str, updates: dict, conn=None) -> Optional[
     return await _prod_repo.update(product_id, updates, conn=conn)
 
 
-async def atomic_decrement_product(product_id: str, quantity: int, updated_at: str, conn=None) -> Optional[dict]:
+async def atomic_decrement_product(product_id: str, quantity: float, updated_at: str, conn=None) -> Optional[dict]:
     return await _prod_repo.atomic_decrement(product_id, quantity, updated_at, conn=conn)
 
 
-async def increment_product_quantity(product_id: str, quantity: int, updated_at: str, conn=None) -> None:
+async def increment_product_quantity(product_id: str, quantity: float, updated_at: str, conn=None) -> None:
     return await _prod_repo.increment_quantity(product_id, quantity, updated_at, conn=conn)
 
 
-async def add_product_quantity(product_id: str, quantity: int, updated_at: str, conn=None) -> Optional[dict]:
+async def add_product_quantity(product_id: str, quantity: float, updated_at: str, conn=None) -> Optional[dict]:
     return await _prod_repo.add_quantity(product_id, quantity, updated_at, conn=conn)
 
 
-async def atomic_adjust_product(product_id: str, quantity_delta: int, updated_at: str) -> Optional[dict]:
+async def atomic_adjust_product(product_id: str, quantity_delta: float, updated_at: str) -> Optional[dict]:
     return await _prod_repo.atomic_adjust(product_id, quantity_delta, updated_at)
 
 

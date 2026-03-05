@@ -5,7 +5,7 @@ from kernel.errors import DomainError
 class InsufficientStockError(DomainError):
     """Raised when product has insufficient quantity for withdrawal."""
 
-    def __init__(self, sku: str, requested: int, available: int):
+    def __init__(self, sku: str, requested: float, available: float):
         self.sku = sku
         self.requested = requested
         self.available = available
@@ -15,7 +15,7 @@ class InsufficientStockError(DomainError):
 class NegativeStockError(DomainError):
     """Raised when a stock adjustment would result in negative quantity."""
 
-    def __init__(self, product_id: str, current: int, delta: int):
+    def __init__(self, product_id: str, current: float, delta: float):
         self.product_id = product_id
         self.current = current
         self.delta = delta

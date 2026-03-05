@@ -1,7 +1,8 @@
 """Invoicing gateway port — provider-agnostic abstraction for accounting integrations."""
 from dataclasses import dataclass
-from typing import Optional, Protocol
+from typing import List, Optional, Protocol
 
+from finance.domain.invoice import InvoiceWithDetails
 from identity.domain.org_settings import OrgSettings
 
 
@@ -13,7 +14,6 @@ class InvoiceSyncResult:
     error: Optional[str] = None
 
 
-# Backward-compatible alias
 XeroSyncResult = InvoiceSyncResult
 
 
@@ -23,26 +23,15 @@ class InvoicingGateway(Protocol):
     Implementations: XeroAdapter, StubXeroAdapter.
     """
 
-    async def sync_invoice(self, invoice: dict, settings: OrgSettings) -> InvoiceSyncResult:
-        """Create or update an invoice in the external accounting system."""
-        ...
+    async def sync_invoice(self, invoice: InvoiceWithDetails, settings: OrgSettings) -> InvoiceSyncResult: ...
 
-    async def sync_po_receipt(self, po: dict, cost_total: float, settings: OrgSettings) -> InvoiceSyncResult:
-        """Post a journal entry when a PO is received into stock."""
-        ...
+    async def sync_po_receipt(self, po: dict, cost_total: float, settings: OrgSettings) -> InvoiceSyncResult: ...
 
-    async def list_tracking_categories(self, settings: OrgSettings) -> list[dict]:
-        """List tracking categories available for the connected org."""
-        ...
+    async def list_tracking_categories(self, settings: OrgSettings) -> List[dict]: ...
 
-    async def refresh_token(self, settings: OrgSettings) -> OrgSettings:
-        """Refresh the OAuth access token and return updated settings."""
-        ...
+    async def refresh_token(self, settings: OrgSettings) -> OrgSettings: ...
 
-    async def get_tenants(self, access_token: str) -> list[dict]:
-        """List organisations (tenants) the token has access to."""
-        ...
+    async def get_tenants(self, access_token: str) -> List[dict]: ...
 
 
-# Backward-compatible alias
 XeroGateway = InvoicingGateway

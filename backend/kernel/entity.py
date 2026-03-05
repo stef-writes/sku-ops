@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class Entity(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid4()))
+    organization_id: str = "default"
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
