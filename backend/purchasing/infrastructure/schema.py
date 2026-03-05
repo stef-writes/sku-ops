@@ -26,7 +26,7 @@ TABLES: list[str] = [
         original_sku TEXT,
         ordered_qty REAL NOT NULL DEFAULT 1,
         delivered_qty REAL,
-        price REAL NOT NULL DEFAULT 0,
+        unit_price REAL NOT NULL DEFAULT 0,
         cost REAL NOT NULL DEFAULT 0,
         base_unit TEXT NOT NULL DEFAULT 'each',
         sell_uom TEXT NOT NULL DEFAULT 'each',

@@ -3,6 +3,7 @@ Supply Yard API - Material Management System.
 Main entry point: composes FastAPI app with routers from api package.
 """
 import logging
+import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -62,6 +63,25 @@ setup_prometheus(app)
 @app.exception_handler(DomainError)
 async def domain_error_handler(request, exc: DomainError):
     return JSONResponse(status_code=exc.status_hint, content={"detail": str(exc)})
+
+
+@app.exception_handler(ValueError)
+async def value_error_handler(request, exc: ValueError):
+    logger.warning("ValueError on %s %s: %s", request.method, request.url.path, exc)
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request, exc: Exception):
+    logger.error(
+        "Unhandled %s on %s %s:\n%s",
+        type(exc).__name__, request.method, request.url.path,
+        traceback.format_exc(),
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
 
 
 # ── Middleware (outermost first → executes first on request) ──────────────────

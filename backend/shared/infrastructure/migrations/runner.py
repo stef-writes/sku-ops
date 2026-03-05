@@ -280,7 +280,7 @@ async def _sqlite_001_initial_schema(conn) -> None:
             original_sku TEXT,
             ordered_qty REAL NOT NULL DEFAULT 1,
             delivered_qty REAL,
-            price REAL NOT NULL DEFAULT 0,
+            unit_price REAL NOT NULL DEFAULT 0,
             cost REAL NOT NULL DEFAULT 0,
             base_unit TEXT NOT NULL DEFAULT 'each',
             sell_uom TEXT NOT NULL DEFAULT 'each',
@@ -937,6 +937,18 @@ async def _020_accounting_standards(conn, *, dialect: str = "sqlite") -> None:
     await conn.commit()
 
 
+async def _021_po_item_price_rename(conn, *, dialect: str = "sqlite") -> None:
+    """Rename purchase_order_items.price → unit_price for consistency with domain model."""
+    if dialect == "sqlite":
+        if await _column_exists(conn, "purchase_order_items", "price", dialect=dialect):
+            await conn.execute("ALTER TABLE purchase_order_items RENAME COLUMN price TO unit_price")
+            await conn.commit()
+    else:
+        if await _column_exists(conn, "purchase_order_items", "price", dialect=dialect):
+            await conn.execute("ALTER TABLE purchase_order_items RENAME COLUMN price TO unit_price")
+            await conn.commit()
+
+
 _COMMON_MIGRATIONS: list[tuple[str, MigrationFn]] = [
     ("014_refresh_tokens_and_audit", _014_refresh_tokens_and_audit),
     ("015_decimal_quantities_and_stock_unit", _015_decimal_quantities_and_stock_unit),
@@ -945,6 +957,7 @@ _COMMON_MIGRATIONS: list[tuple[str, MigrationFn]] = [
     ("018_financial_ledger", _018_financial_ledger),
     ("019_audit_soft_deletes", _019_audit_soft_deletes),
     ("020_accounting_standards", _020_accounting_standards),
+    ("021_po_item_price_rename", _021_po_item_price_rename),
 ]
 
 

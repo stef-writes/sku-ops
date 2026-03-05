@@ -207,6 +207,22 @@ async def backfill_ledger(current_user=Depends(require_role("admin"))):
     }
 
 
+@router.post("/seed-full")
+async def seed_full():
+    """Full reset + seed: wipes DB, creates vendors, products, contractors,
+    withdrawals, POs, invoices, returns, credit notes, material requests,
+    stock transactions, and financial ledger entries."""
+    if not ALLOW_RESET:
+        raise HTTPException(status_code=403, detail="Seed not allowed. Set ALLOW_RESET=true or ENV=development.")
+    try:
+        from devtools.scripts.seed_full import main as run_full_seed
+        counts = await run_full_seed()
+        return {"message": "Full seed complete", "counts": counts or {}}
+    except Exception as e:
+        logger.error(f"Full seed failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/reset-inventory")
 async def reset_and_reseed_inventory(current_user=Depends(require_role("admin"))):
     """Reset products and stock, then re-run demo seed."""

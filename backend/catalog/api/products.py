@@ -1,7 +1,7 @@
 """Product CRUD routes."""
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from identity.application.auth_service import get_current_user, require_role
 from shared.infrastructure.middleware.audit import audit_log
@@ -51,8 +51,8 @@ async def get_products(
     department_id: Optional[str] = None,
     search: Optional[str] = None,
     low_stock: bool = False,
-    limit: Optional[int] = None,
-    offset: int = 0,
+    limit: Optional[int] = Query(None, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     current_user: CurrentUser = Depends(get_current_user),
 ):
     org_id = current_user.organization_id

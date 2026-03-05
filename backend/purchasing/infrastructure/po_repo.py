@@ -37,7 +37,7 @@ class PgPORepo(PORepoPort):
             d = item.model_dump()
             await conn.execute(
                 """INSERT INTO purchase_order_items
-                   (id, po_id, name, original_sku, ordered_qty, delivered_qty, price, cost,
+                   (id, po_id, name, original_sku, ordered_qty, delivered_qty, unit_price, cost,
                     base_unit, sell_uom, pack_qty, suggested_department, status, product_id, organization_id)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
@@ -91,13 +91,7 @@ class PgPORepo(PORepoPort):
             (po_id,),
         )
         rows = await cursor.fetchall()
-        items = []
-        for r in rows:
-            d = dict(r)
-            if "price" in d and "unit_price" not in d:
-                d["unit_price"] = d.pop("price")
-            items.append(d)
-        return items
+        return [dict(r) for r in rows]
 
     async def update_po_item(
         self,

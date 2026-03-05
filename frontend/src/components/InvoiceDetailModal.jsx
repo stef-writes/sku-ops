@@ -115,6 +115,18 @@ export function InvoiceDetailModal({ invoiceId, open, onOpenChange, onSaved, onD
   };
 
   const handleSave = async () => {
+    if (!form.billing_entity?.trim()) {
+      toast.error("Billing entity is required");
+      return;
+    }
+    if (form.contact_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contact_email)) {
+      toast.error("Please enter a valid contact email");
+      return;
+    }
+    if (lineItems.length === 0) {
+      toast.error("At least one line item is required");
+      return;
+    }
     setSaving(true);
     try {
       const items = lineItems.map((i) => ({

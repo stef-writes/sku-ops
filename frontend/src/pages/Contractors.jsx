@@ -63,6 +63,10 @@ const Contractors = () => {
       toast.error("Name and email are required");
       return;
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
     if (!editingContractor && !form.password) {
       toast.error("Password is required for new contractors");
       return;

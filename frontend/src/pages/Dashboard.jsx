@@ -95,7 +95,12 @@ const Dashboard = () => {
   }
 
   const revenueChartData = stats?.revenue_by_day?.length
-    ? stats.revenue_by_day.map((d) => ({ date: format(new Date(d.date), "MMM d"), Revenue: d.revenue }))
+    ? stats.revenue_by_day.map((d) => ({
+        date: format(new Date(d.date), "MMM d"),
+        Revenue: d.revenue,
+        Cost: d.cost || 0,
+        Profit: d.profit || 0,
+      }))
     : [];
 
   return (
@@ -127,10 +132,11 @@ const Dashboard = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         <StatCard label="Revenue" value={valueFormatter(stats?.range_revenue || 0)} note={`${stats?.range_transactions || 0} withdrawals`} accent="emerald" />
+        <StatCard label="COGS" value={valueFormatter(stats?.range_cogs || 0)} />
+        <StatCard label="Gross Profit" value={valueFormatter(stats?.range_gross_profit || 0)} note={`${stats?.range_margin_pct || 0}% margin`} accent="violet" />
         <StatCard label="Unpaid" value={valueFormatter(stats?.unpaid_total || 0)} accent={stats?.unpaid_total > 0 ? "orange" : "slate"} />
-        <StatCard label="Total Products" value={stats?.total_products || 0} />
         <StatCard label="Low Stock" value={stats?.low_stock_count || 0} accent={stats?.low_stock_count > 0 ? "amber" : "slate"} />
       </div>
 
@@ -142,7 +148,7 @@ const Dashboard = () => {
               Reports <BarChart3 className="w-3.5 h-3.5" />
             </Link>
           </div>
-          <AreaChart data={revenueChartData} index="date" categories={["Revenue"]} colors={["orange"]} valueFormatter={valueFormatter} showLegend={false} className="h-44" />
+          <AreaChart data={revenueChartData} index="date" categories={["Revenue", "Profit"]} colors={["orange", "violet"]} valueFormatter={valueFormatter} showLegend className="h-44" />
         </div>
       )}
 

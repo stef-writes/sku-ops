@@ -61,8 +61,10 @@ async def get_inventory_report(current_user: CurrentUser = Depends(require_role(
     products = await list_products(organization_id=org_id)
 
     total_products = len(products)
-    total_value = round_money(sum(p.get("price", 0) * p.get("quantity", 0) for p in products))
+    total_retail = round_money(sum(p.get("price", 0) * p.get("quantity", 0) for p in products))
     total_cost = round_money(sum(p.get("cost", 0) * p.get("quantity", 0) for p in products))
+    unrealized_margin = round_money(total_retail - total_cost)
+    margin_pct = round(unrealized_margin / total_retail * 100, 1) if total_retail > 0 else 0
     low_stock = [p for p in products if p.get("quantity", 0) <= p.get("min_stock", 5)]
     out_of_stock = [p for p in products if p.get("quantity", 0) == 0]
 
@@ -70,16 +72,24 @@ async def get_inventory_report(current_user: CurrentUser = Depends(require_role(
     for p in products:
         dept = p.get("department_name", "Unknown")
         if dept not in by_department:
-            by_department[dept] = {"count": 0, "value": 0, "cost": 0}
+            by_department[dept] = {"count": 0, "retail_value": 0, "cost_value": 0}
         by_department[dept]["count"] += 1
-        by_department[dept]["value"] += p.get("price", 0) * p.get("quantity", 0)
-        by_department[dept]["cost"] += p.get("cost", 0) * p.get("quantity", 0)
+        by_department[dept]["retail_value"] += p.get("price", 0) * p.get("quantity", 0)
+        by_department[dept]["cost_value"] += p.get("cost", 0) * p.get("quantity", 0)
+
+    for dept_data in by_department.values():
+        dept_data["retail_value"] = round_money(dept_data["retail_value"])
+        dept_data["cost_value"] = round_money(dept_data["cost_value"])
+        dept_data["margin"] = round_money(dept_data["retail_value"] - dept_data["cost_value"])
 
     return {
         "total_products": total_products,
-        "total_retail_value": total_value,
+        "total_retail_value": total_retail,
         "total_cost_value": total_cost,
-        "potential_profit": round_money(total_value - total_cost),
+        "unrealized_margin": unrealized_margin,
+        "margin_pct": margin_pct,
+        # Keep old key for backwards compat
+        "potential_profit": unrealized_margin,
         "low_stock_count": len(low_stock),
         "out_of_stock_count": len(out_of_stock),
         "low_stock_items": low_stock[:20],

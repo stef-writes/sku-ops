@@ -15,7 +15,7 @@ import { useReportSales, useReportInventory, useReportTrends, useReportMargins, 
 
 const Stat = StatCard;
 
-const ProductBars = ({ products }) => {
+const ProductBars = ({ products = [] }) => {
   const max = useMemo(() => Math.max(...products.map((p) => p.revenue), 1), [products]);
   return (
     <div className="space-y-0 divide-y divide-slate-50">
@@ -38,7 +38,7 @@ const ProductBars = ({ products }) => {
   );
 };
 
-const PaymentStrip = ({ data }) => {
+const PaymentStrip = ({ data = [] }) => {
   const total = data.reduce((s, d) => s + d.value, 0) || 1;
   const palette = { Paid: "#34d399", Invoiced: "#60a5fa", Unpaid: "#fb923c", Unknown: "#94a3b8" };
   return (
@@ -59,7 +59,7 @@ const PaymentStrip = ({ data }) => {
   );
 };
 
-const DeptBars = ({ data }) => {
+const DeptBars = ({ data = [] }) => {
   const max = useMemo(() => Math.max(...data.map((d) => d.value), 1), [data]);
   const sorted = [...data].sort((a, b) => b.value - a.value);
   return (
@@ -87,7 +87,7 @@ const DeptBars = ({ data }) => {
   );
 };
 
-const LowStockList = ({ items }) => (
+const LowStockList = ({ items = [] }) => (
   <div className="divide-y divide-slate-50">
     {items.map((item, i) => {
       const pct = item.min_stock > 0 ? Math.min((item.quantity / item.min_stock) * 100, 100) : 0;
@@ -262,7 +262,7 @@ const Reports = () => {
     : [];
 
   const departmentChartData = inventoryReport?.by_department
-    ? Object.entries(inventoryReport.by_department).map(([name, data]) => ({ name, count: data.count, value: parseFloat(data.value.toFixed(2)), cost: parseFloat((data.cost || 0).toFixed(2)) }))
+    ? Object.entries(inventoryReport.by_department).map(([name, data]) => ({ name, count: data.count, value: parseFloat((data.retail_value || data.value || 0).toFixed(2)), cost: parseFloat((data.cost_value || data.cost || 0).toFixed(2)) }))
     : [];
 
   const handleExportCSV = () => {
@@ -405,7 +405,7 @@ const Reports = () => {
             <Stat label="Total Products" value={inventoryReport?.total_products || 0} icon={Package} accent="blue" />
             <Stat label="Retail Value" value={valueFormatter(inventoryReport?.total_retail_value || 0)} icon={DollarSign} accent="emerald" />
             <Stat label="Cost Value" value={valueFormatter(inventoryReport?.total_cost_value || 0)} icon={Layers} accent="slate" />
-            <Stat label="Potential Profit" value={valueFormatter(inventoryReport?.potential_profit || 0)} icon={TrendingUp} accent="amber" />
+            <Stat label="Unrealized Margin" value={valueFormatter(inventoryReport?.unrealized_margin || inventoryReport?.potential_profit || 0)} note={inventoryReport?.margin_pct ? `${inventoryReport.margin_pct}%` : ""} icon={TrendingUp} accent="amber" />
           </div>
           <Panel>
             <SectionHead title="Stock Health" />

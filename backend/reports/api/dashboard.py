@@ -4,10 +4,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from identity.application.auth_service import get_current_user, require_role
-from kernel.types import CurrentUser
+from kernel.types import CurrentUser, round_money
 from catalog.application.queries import count_all_products, count_low_stock, list_low_stock, count_vendors
 from identity.application.user_service import count_contractors
 from operations.application.queries import list_withdrawals
+from finance.application import ledger_queries as ledger_repo
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -22,18 +23,25 @@ def _parse_iso(s: str) -> datetime:
     return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 
-def _build_revenue_by_day(withdrawals: list, start: datetime, end: datetime) -> list:
-    """Bucket withdrawal totals by calendar day between start and end."""
+def _build_daily_chart(withdrawals: list, start: datetime, end: datetime) -> list:
+    """Bucket withdrawal totals and costs by calendar day between start and end."""
     days = (end - start).days + 1
-    buckets: dict[str, float] = {}
+    rev_buckets: dict[str, float] = {}
+    cost_buckets: dict[str, float] = {}
     for i in range(days):
         key = (start + timedelta(days=i)).strftime("%Y-%m-%d")
-        buckets[key] = 0
+        rev_buckets[key] = 0
+        cost_buckets[key] = 0
     for w in withdrawals:
         created = w.get("created_at", "")[:10]
-        if created in buckets:
-            buckets[created] += w.get("total", 0)
-    return [{"date": k, "revenue": round(v, 2)} for k, v in sorted(buckets.items())]
+        if created in rev_buckets:
+            rev_buckets[created] += w.get("total", 0)
+            cost_buckets[created] += w.get("cost_total", 0)
+    return [
+        {"date": k, "revenue": round(rev_buckets[k], 2), "cost": round(cost_buckets[k], 2),
+         "profit": round(rev_buckets[k] - cost_buckets[k], 2)}
+        for k in sorted(rev_buckets)
+    ]
 
 
 @router.get("/stats")
@@ -64,6 +72,7 @@ async def get_dashboard_stats(
         start_date=sd, end_date=ed, limit=10000, organization_id=org_id,
     )
     range_revenue = sum(w.get("total", 0) for w in range_withdrawals)
+    range_cogs = sum(w.get("cost_total", 0) for w in range_withdrawals)
     range_transactions = len(range_withdrawals)
 
     total_products = await count_all_products(org_id)
@@ -84,25 +93,31 @@ async def get_dashboard_stats(
         else (now - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
     )
     chart_end = _parse_iso(ed) if ed else now
-    revenue_by_day_list = _build_revenue_by_day(range_withdrawals, chart_start, chart_end)
+    daily_chart = _build_daily_chart(range_withdrawals, chart_start, chart_end)
+
+    gross_profit = round_money(range_revenue - range_cogs)
+    margin_pct = round(gross_profit / range_revenue * 100, 1) if range_revenue > 0 else 0
 
     return {
-        "range_revenue": round(range_revenue, 2),
+        "range_revenue": round_money(range_revenue),
+        "range_cogs": round_money(range_cogs),
+        "range_gross_profit": gross_profit,
+        "range_margin_pct": margin_pct,
         "range_transactions": range_transactions,
-        "revenue_by_day": revenue_by_day_list,
+        "revenue_by_day": daily_chart,
         "total_products": total_products,
         "low_stock_count": low_stock_products,
         "total_vendors": total_vendors,
         "total_contractors": total_contractors,
-        "unpaid_total": round(unpaid_total, 2),
+        "unpaid_total": round_money(unpaid_total),
         "low_stock_alerts": low_stock_items,
     }
 
 
 @router.get("/transactions")
 async def get_dashboard_transactions(
-    limit: int = 20,
-    offset: int = 0,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
     contractor_id: Optional[str] = Query(None),

@@ -57,7 +57,7 @@ async def validate_and_rotate(raw_token: str) -> Optional[dict]:
     if row["revoked"]:
         return None
 
-    expires = datetime.fromisoformat(row["expires_at"])
+    expires = datetime.fromisoformat(row["expires_at"].replace("Z", "+00:00"))
     if expires < datetime.now(timezone.utc):
         return None
 

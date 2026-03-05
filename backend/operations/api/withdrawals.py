@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 
 from kernel.types import CurrentUser
 from identity.application.auth_service import get_current_user, require_role
@@ -132,6 +132,8 @@ async def mark_withdrawal_paid(withdrawal_id: str, request: Request, current_use
 
 @router.put("/bulk-mark-paid")
 async def bulk_mark_paid(request: Request, withdrawal_ids: List[str] = Body(...), current_user: CurrentUser = Depends(require_role("admin"))):
+    if len(withdrawal_ids) > 200:
+        raise HTTPException(status_code=400, detail="Cannot mark more than 200 withdrawals at once")
     org_id = current_user.organization_id
     paid_at = datetime.now(timezone.utc).isoformat()
     updated = await withdrawal_repo.bulk_mark_paid(withdrawal_ids, paid_at, organization_id=org_id)

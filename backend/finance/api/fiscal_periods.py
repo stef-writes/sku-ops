@@ -4,6 +4,7 @@ from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 
 from identity.application.auth_service import require_role
 from kernel.types import CurrentUser
@@ -11,6 +12,12 @@ from shared.infrastructure.database import get_connection
 from shared.infrastructure.middleware.audit import audit_log
 
 router = APIRouter(prefix="/fiscal-periods", tags=["fiscal-periods"])
+
+
+class FiscalPeriodCreate(BaseModel):
+    name: str = ""
+    start_date: str
+    end_date: str
 
 
 async def _get_period(period_id: str, org_id: str) -> Optional[dict]:
@@ -42,10 +49,9 @@ async def list_fiscal_periods(
 
 @router.post("")
 async def create_fiscal_period(
-    request: Request,
+    body: FiscalPeriodCreate,
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    body = await request.json()
     conn = get_connection()
     org_id = current_user.organization_id
     period_id = str(uuid4())
@@ -53,7 +59,7 @@ async def create_fiscal_period(
     await conn.execute(
         """INSERT INTO fiscal_periods (id, name, start_date, end_date, status, organization_id, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        (period_id, body.get("name", ""), body["start_date"], body["end_date"], "open", org_id, now),
+        (period_id, body.name, body.start_date, body.end_date, "open", org_id, now),
     )
     await conn.commit()
     return await _get_period(period_id, org_id)

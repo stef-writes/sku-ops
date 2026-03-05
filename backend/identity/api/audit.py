@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
 from identity.application.auth_service import require_role
@@ -83,8 +83,8 @@ async def list_audit_log(
     resource_id: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    limit: int = 200,
-    offset: int = 0,
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
     """List audit log entries with optional filters. Admin only."""
@@ -136,7 +136,7 @@ async def export_audit_log(
         resource_type=resource_type,
         start_date=start_date,
         end_date=end_date,
-        limit=50000,
+        limit=10000,
     )
 
     output = io.StringIO()

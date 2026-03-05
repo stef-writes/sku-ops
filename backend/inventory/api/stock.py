@@ -1,6 +1,6 @@
 """Stock history and adjustment routes - inventory bounded context."""
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from identity.application.auth_service import require_role
@@ -23,7 +23,7 @@ class AdjustStockRequest(BaseModel):
 @router.get("/{product_id}/history")
 async def get_product_stock_history(
     product_id: str,
-    limit: int = 50,
+    limit: int = Query(50, ge=1, le=500),
     current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
 ):
     org_id = current_user.organization_id

@@ -134,12 +134,22 @@ export function ProductFormDialog({
       toast.error("Please fill in required fields");
       return;
     }
+    const price = parseFloat(form.price);
+    const cost = parseFloat(form.cost) || 0;
+    if (isNaN(price) || price < 0) {
+      toast.error("Price must be zero or greater");
+      return;
+    }
+    if (cost < 0) {
+      toast.error("Cost must be zero or greater");
+      return;
+    }
 
     const data = {
       name: form.name,
       description: form.description,
-      price: parseFloat(form.price),
-      cost: parseFloat(form.cost) || 0,
+      price,
+      cost,
       quantity: parseFloat(form.quantity) || 0,
       min_stock: parseInt(form.min_stock) || 5,
       department_id: form.department_id,

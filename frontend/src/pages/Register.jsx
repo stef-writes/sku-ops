@@ -20,6 +20,7 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name || !email || !password) { toast.error("Please fill in all fields"); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast.error("Please enter a valid email address"); return; }
     if (password !== confirmPassword) { toast.error("Passwords do not match"); return; }
     if (password.length < 6) { toast.error("Password must be at least 6 characters"); return; }
     setLoading(true);

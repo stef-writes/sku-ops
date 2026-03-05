@@ -44,7 +44,7 @@ export function RecentTransactions({ dateRange, onProductStockHistory }) {
 
   useEffect(() => {
     if (!data) return;
-    setAllRows((prev) => (offset === 0 ? data.withdrawals : [...prev, ...data.withdrawals]));
+    setAllRows((prev) => (offset === 0 ? (data.withdrawals || []) : [...prev, ...(data.withdrawals || [])]));
   }, [data, offset]);
 
   useEffect(() => {
