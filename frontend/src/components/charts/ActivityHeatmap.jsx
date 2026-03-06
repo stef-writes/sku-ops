@@ -44,7 +44,8 @@ export function ActivityHeatmap({
           max: maxVal,
           show: false,
           inRange: {
-            color: ["#f8fafc", "#fef3c7", "#fcd34d", "#f59e0b", "#d97706"],
+            // Empty → low → medium → high → peak (green = activity, intuitive)
+            color: ["#1e293b", "#0f766e", "#14b8a6", "#2dd4bf", "#5eead4"],
           },
         },
         calendar: {
@@ -67,8 +68,9 @@ export function ActivityHeatmap({
           },
           dayLabel: {
             firstDay: 1,
-            fontSize: 10,
-            color: t.muted,
+            fontSize: 11,
+            fontWeight: 500,
+            color: t.foreground,
             nameMap: ["", "M", "", "W", "", "F", ""],
           },
           splitLine: { show: false },

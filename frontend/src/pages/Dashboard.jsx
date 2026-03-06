@@ -214,7 +214,7 @@ const Dashboard = () => {
           <ChartExplainer
             title="Activity Heatmap"
             bullets={[
-              "Each square is one day — darker = more transactions",
+              "Each square is one day — brighter = more transactions",
               "Rows are days of the week (Mon–Sun), columns are weeks",
               "Hover over any square to see the exact count and revenue",
               "Look for patterns: busy days, quiet weeks, or seasonal trends",

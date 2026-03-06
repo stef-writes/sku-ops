@@ -150,3 +150,74 @@ git log --oneline -10              # Find the commit to roll back to
 git reset --hard <commit-sha>
 ./scripts/deploy.sh
 ```
+
+---
+
+## Managed Platform Deployment (Recommended)
+
+For a managed hosting setup, the app runs as two separate services plus a managed database.
+
+### Architecture
+
+```
+Frontend (static site)  →  app.yourdomain.com
+Backend  (Docker)       →  api.yourdomain.com
+Database (managed PG)   →  provided by platform
+```
+
+### Frontend (Static Site)
+
+Deploy `frontend/` as a static site on Render, DigitalOcean App Platform, or similar.
+
+- **Build command:** `npm ci && npm run build`
+- **Output directory:** `dist`
+- **Environment variable:** `VITE_BACKEND_URL=https://api.yourdomain.com`
+- **Rewrite rule:** All routes → `index.html` (SPA fallback)
+
+### Backend (Docker Web Service)
+
+Deploy `backend/` using the Dockerfile. The platform must support Docker-based deploys
+(needed for `tesseract-ocr` and `poppler-utils` system packages).
+
+- **Dockerfile path:** `backend/Dockerfile`
+- **Health check:** `GET /api/health`
+- **Required env vars:**
+  - `ENV=production`
+  - `DATABASE_URL=postgresql://user:pass@host:5432/dbname`
+  - `JWT_SECRET=<generate with: python -c "import secrets; print(secrets.token_hex(32))">`
+  - `CORS_ORIGINS=https://app.yourdomain.com`
+  - `FRONTEND_URL=https://app.yourdomain.com`
+- **Optional env vars:** `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `OPENAI_API_KEY`,
+  `XERO_CLIENT_ID`, `XERO_CLIENT_SECRET`, `XERO_REDIRECT_URI`, `SENTRY_DSN`,
+  `WORKERS` (default 4)
+
+### Database
+
+Use a managed Postgres instance from the same provider or Neon/Supabase Postgres.
+The backend auto-creates tables on first startup.
+
+### WebSocket Support
+
+The backend exposes `GET /api/ws` for realtime updates. Ensure the platform
+supports WebSocket connections (both Render and DO App Platform do).
+
+### Domain and HTTPS
+
+- Buy a domain and create DNS records for `app` (frontend) and `api` (backend)
+- HTTPS is managed by the platform — no Nginx/Certbot needed
+
+### First Admin Bootstrap
+
+Public registration is disabled in production. Create the first admin by running
+the seed script against the managed database, or use the dev seed endpoint locally
+before deploying.
+
+### Launch Checklist
+
+1. Provision managed Postgres and note the connection string
+2. Deploy backend Docker service with env vars
+3. Deploy frontend static site with `VITE_BACKEND_URL`
+4. Attach domain, verify HTTPS
+5. Create first admin user
+6. Test admin and contractor flows on desktop and iPad Safari
+7. Invite real users

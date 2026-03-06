@@ -16,7 +16,12 @@ from identity.application.org_service import (
     upsert_org_settings,
 )
 from kernel.types import CurrentUser
-from shared.infrastructure.config import XERO_CLIENT_ID, XERO_CLIENT_SECRET, XERO_REDIRECT_URI
+from shared.infrastructure.config import (
+    FRONTEND_URL,
+    XERO_CLIENT_ID,
+    XERO_CLIENT_SECRET,
+    XERO_REDIRECT_URI,
+)
 from shared.infrastructure.database import get_connection
 
 router = APIRouter(prefix="/xero", tags=["xero"])
@@ -113,8 +118,8 @@ async def xero_callback(code: str = "", state: str = "", error: str = ""):
     })
     await upsert_org_settings(updated)
 
-    # Return to frontend settings page
-    return RedirectResponse(url="/settings?xero=connected")
+    redirect_target = f"{FRONTEND_URL}/settings?xero=connected" if FRONTEND_URL else "/settings?xero=connected"
+    return RedirectResponse(url=redirect_target)
 
 
 @router.get("/tenants")

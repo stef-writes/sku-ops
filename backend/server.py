@@ -117,6 +117,17 @@ async def lifespan(app: FastAPI):
         "enabled" if OPENAI_AVAILABLE else "disabled",
     )
 
+    # ── Startup assertions: fail fast on misconfiguration ──
+    ws_routes = [r.path for r in app.routes if hasattr(r, "path") and r.path.startswith("/api/ws")]
+    assert "/api/ws" in ws_routes, "Domain event WebSocket not mounted"
+    assert "/api/ws/chat" in ws_routes, "Chat streaming WebSocket not mounted"
+    logger.info("WebSocket endpoints verified: %s", ws_routes)
+
+    from shared.infrastructure.database import get_connection
+    conn = get_connection()
+    await conn.execute("SELECT 1")
+    logger.info("Database connectivity verified")
+
     sync_task = None
     if not is_test:
         sync_task = asyncio.create_task(_xero_sync_loop())
@@ -134,6 +145,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(api_router)
+
+from shared.api.websocket import mount_websocket  # noqa: E402
+
+mount_websocket(app)
+
+from assistant.api.ws_chat import mount_chat_websocket  # noqa: E402
+
+mount_chat_websocket(app)
 
 setup_sentry()
 setup_prometheus(app)

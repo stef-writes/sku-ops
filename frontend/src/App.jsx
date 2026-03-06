@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { queryClient } from "./lib/query-client";
 import { ROLES, ADMIN_ROLES } from "./lib/constants";
+import { useRealtimeSync } from "./hooks/useRealtimeSync";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Layout from "./components/Layout";
@@ -45,6 +46,11 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   return children;
 };
 
+function RealtimeSync() {
+  useRealtimeSync();
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -59,6 +65,7 @@ function App() {
                 path="/*"
                 element={
                   <ProtectedRoute>
+                    <RealtimeSync />
                     <Layout>
                       <ErrorBoundary>
                         <Suspense fallback={<div className="min-h-[50vh] flex items-center justify-center"><div className="text-muted-foreground font-heading text-sm uppercase tracking-wider">Loading...</div></div>}>

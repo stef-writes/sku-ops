@@ -5,10 +5,11 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from shared.infrastructure.config import (
+    _ENV,
     ANTHROPIC_AVAILABLE,
     ANTHROPIC_MODEL,
     LLM_SETUP_URL,
-    _ENV,
+    OPENROUTER_AVAILABLE,
 )
 from shared.infrastructure.database import get_connection
 
@@ -34,7 +35,7 @@ async def health():
 
 @router.get("/ready")
 async def ready():
-    """Readiness probe — returns 200 only if the DB is reachable."""
+    """Readiness probe — returns 200 only if DB and core services are reachable."""
     checks: dict = {}
     overall = "ok"
 
@@ -50,7 +51,9 @@ async def ready():
         checks["database"] = {"status": "unavailable", "error": str(exc)}
         overall = "unavailable"
 
-    checks["ai"] = {"status": "ok" if ANTHROPIC_AVAILABLE else "unconfigured"}
+    ai_ok = ANTHROPIC_AVAILABLE or OPENROUTER_AVAILABLE
+    checks["ai"] = {"status": "ok" if ai_ok else "unconfigured"}
+    checks["websocket"] = {"status": "ok", "endpoints": ["/api/ws", "/api/ws/chat"]}
 
     status_code = 200 if overall == "ok" else 503
     return JSONResponse(

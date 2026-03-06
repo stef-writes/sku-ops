@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { MessageCircle, X, Send, ChevronDown, ChevronUp, Plus, Sparkles } from "lucide-react";
+import { X, Send, ChevronDown, ChevronUp, Plus, Sparkles, Square, Wifi, WifiOff, Wrench } from "lucide-react";
 import api from "@/lib/api-client";
+import { useChatSocket } from "@/hooks/useChatSocket";
 
 const STORAGE_KEY = "sku-ops:chat:v4";
 
@@ -156,6 +157,36 @@ function AgentBubble({ msg, thinkingOpen, onToggleThinking }) {
   );
 }
 
+function StreamingBubble({ text, tools }) {
+  return (
+    <div className="flex flex-col gap-1 max-w-[94%]">
+      <div className="bg-surface border border-border/40 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-foreground shadow-sm">
+        {text ? (
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+            {text}
+          </ReactMarkdown>
+        ) : (
+          <span className="inline-flex gap-1 items-center">
+            <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+            <span className="w-1.5 h-1.5 bg-accent/70 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+            <span className="w-1.5 h-1.5 bg-accent/40 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+          </span>
+        )}
+      </div>
+      {tools.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap px-1">
+          <Wrench className="w-2.5 h-2.5 text-muted-foreground animate-spin" style={{ animationDuration: "3s" }} />
+          {tools.map((tool, i) => (
+            <span key={`${tool}-${i}`} className="text-[9px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded border border-border/40 animate-pulse">
+              {tool}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ChatAssistant() {
   const location = useLocation();
   const agentType = agentTypeFromPath(location.pathname);
@@ -170,7 +201,6 @@ export default function ChatAssistant() {
     catch { return null; }
   });
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
   const [aiAvailable, setAiAvailable] = useState(null);
   const [setupUrl, setSetupUrl] = useState(null);
   const [openThinking, setOpenThinking] = useState(new Set());
@@ -178,6 +208,44 @@ export default function ChatAssistant() {
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const prevAgentType = useRef(agentType);
+  const sessionIdRef = useRef(sessionId);
+
+  useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
+
+  const handleDone = useCallback((result) => {
+    if (result.session_id) setSessionId(result.session_id);
+    if (result.usage?.session_cost_usd != null) setSessionCost(result.usage.session_cost_usd);
+    setMessages((m) => [
+      ...m,
+      {
+        role: "model",
+        content: result.response || "No response.",
+        agent: result.agent,
+        tool_calls: result.tool_calls || [],
+        thinking: result.thinking || [],
+      },
+    ]);
+  }, []);
+
+  const handleError = useCallback((detail) => {
+    setMessages((m) => [
+      ...m,
+      { role: "model", content: detail || "Failed to get response." },
+    ]);
+  }, []);
+
+  const {
+    send: wsSend,
+    cancel: wsCancel,
+    connected,
+    streaming,
+    streamText,
+    activeTools,
+  } = useChatSocket({
+    onDone: handleDone,
+    onError: handleError,
+    enabled: open,
+  });
 
   const clearSession = (sid) => {
     if (sid) api.chat.deleteSession(sid).catch(() => {});
@@ -194,6 +262,7 @@ export default function ChatAssistant() {
   }, [agentType]);
 
   const startNewChat = () => {
+    if (streaming) wsCancel();
     clearSession(sessionId);
     setMessages([]);
     setSessionId(null);
@@ -202,7 +271,7 @@ export default function ChatAssistant() {
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages, streaming, streamText]);
 
   useEffect(() => {
     try {
@@ -219,39 +288,30 @@ export default function ChatAssistant() {
     if (open) setTimeout(() => inputRef.current?.focus(), 100);
   }, [open]);
 
-  const sendMessage = async (text) => {
+  const sendMessage = useCallback(async (text) => {
     text = (text || input).trim();
-    if (!text || loading) return;
+    if (!text || streaming) return;
     setMessages((m) => [...m, { role: "user", content: text }]);
     setInput("");
-    setLoading(true);
-    try {
-      const data = await api.chat.send({
-        message: text,
-        session_id: sessionId,
-        agent_type: agentType,
-      });
-      if (data.session_id) setSessionId(data.session_id);
-      if (data.usage?.session_cost_usd != null) setSessionCost(data.usage.session_cost_usd);
-      setMessages((m) => [
-        ...m,
-        {
-          role: "model",
-          content: data.response || "No response.",
-          agent: data.agent,
-          tool_calls: data.tool_calls || [],
-          thinking: data.thinking || [],
-        },
-      ]);
-    } catch (err) {
-      setMessages((m) => [
-        ...m,
-        { role: "model", content: err.response?.data?.detail || err.message || "Failed to get response." },
-      ]);
-    } finally {
-      setLoading(false);
+
+    const sid = sessionIdRef.current;
+
+    if (connected) {
+      wsSend(text, sid, agentType);
+    } else {
+      // HTTP fallback when WebSocket is not connected
+      try {
+        const data = await api.chat.send({
+          message: text,
+          session_id: sid,
+          agent_type: agentType,
+        });
+        handleDone(data);
+      } catch (err) {
+        handleError(err.response?.data?.detail || err.message || "Failed to get response.");
+      }
     }
-  };
+  }, [input, streaming, connected, wsSend, agentType, handleDone, handleError]);
 
   const toggleThinking = (idx) => {
     setOpenThinking((prev) => {
@@ -285,9 +345,16 @@ export default function ChatAssistant() {
                 </div>
                 <div>
                   <h2 className="font-semibold text-foreground text-sm leading-none">Assistant</h2>
-                  {sessionCost > 0 && (
-                    <p className="text-[9px] text-muted-foreground mt-0.5">${sessionCost.toFixed(4)}</p>
-                  )}
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    {connected ? (
+                      <Wifi className="w-2.5 h-2.5 text-success" />
+                    ) : (
+                      <WifiOff className="w-2.5 h-2.5 text-muted-foreground" />
+                    )}
+                    {sessionCost > 0 && (
+                      <p className="text-[9px] text-muted-foreground">${sessionCost.toFixed(4)}</p>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-1">
@@ -341,7 +408,7 @@ export default function ChatAssistant() {
                       <button
                         key={s.label}
                         onClick={() => sendMessage(s.prompt)}
-                        disabled={loading || aiAvailable === false}
+                        disabled={streaming || aiAvailable === false}
                         className="text-xs text-left px-3 py-2 rounded-lg border border-border/50 bg-surface hover:bg-accent/5 hover:border-accent/30 text-muted-foreground hover:text-foreground transition-colors leading-snug disabled:opacity-50"
                       >
                         {s.label}
@@ -363,15 +430,9 @@ export default function ChatAssistant() {
                 </div>
               ))}
 
-              {loading && (
+              {streaming && (
                 <div className="flex justify-start">
-                  <div className="bg-surface border border-border/40 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-                    <span className="inline-flex gap-1 items-center">
-                      <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <span className="w-1.5 h-1.5 bg-accent/70 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <span className="w-1.5 h-1.5 bg-accent/40 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                    </span>
-                  </div>
+                  <StreamingBubble text={streamText} tools={activeTools} />
                 </div>
               )}
 
@@ -388,15 +449,26 @@ export default function ChatAssistant() {
                   onChange={(e) => setInput(e.target.value)}
                   placeholder={aiAvailable === false ? "Configure API key to enable" : AGENT_PLACEHOLDER[agentType]}
                   className="flex-1 px-3 py-2 bg-background border border-border/60 rounded-lg text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent/50 disabled:opacity-50 transition-colors"
-                  disabled={loading || aiAvailable === false}
+                  disabled={aiAvailable === false}
                 />
-                <button
-                  type="submit"
-                  disabled={loading || !input.trim() || aiAvailable === false}
-                  className="px-3 py-2 bg-accent hover:bg-accent/90 disabled:opacity-30 disabled:cursor-not-allowed text-accent-foreground rounded-lg transition-colors"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
+                {streaming ? (
+                  <button
+                    type="button"
+                    onClick={wsCancel}
+                    className="px-3 py-2 bg-destructive/90 hover:bg-destructive text-destructive-foreground rounded-lg transition-colors"
+                    title="Stop generating"
+                  >
+                    <Square className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={!input.trim() || aiAvailable === false}
+                    className="px-3 py-2 bg-accent hover:bg-accent/90 disabled:opacity-30 disabled:cursor-not-allowed text-accent-foreground rounded-lg transition-colors"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                )}
               </form>
             </div>
           </div>

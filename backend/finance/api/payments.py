@@ -11,6 +11,7 @@ from finance.infrastructure.payment_repo import payment_repo
 from identity.application.auth_service import get_current_user, require_role
 from kernel.types import CurrentUser
 from operations.application.queries import get_withdrawal_by_id, mark_withdrawal_paid
+from shared.infrastructure import event_hub
 from shared.infrastructure.middleware.audit import audit_log
 
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -73,6 +74,7 @@ async def create_payment(
                 performed_by_user_id=current_user.id,
             )
 
+    await event_hub.emit("withdrawal.updated", org_id=org_id, ids=data.withdrawal_ids)
     return payment.model_dump()
 
 
@@ -84,7 +86,7 @@ async def list_payments(
     end_date: str | None = None,
     limit: int = 200,
     offset: int = 0,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
 ):
     return await payment_repo.list_payments(
         organization_id=current_user.organization_id,
@@ -95,7 +97,7 @@ async def list_payments(
 
 
 @router.get("/{payment_id}")
-async def get_payment(payment_id: str, current_user: CurrentUser = Depends(get_current_user)):
+async def get_payment(payment_id: str, current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager"))):
     p = await payment_repo.get_by_id(payment_id, current_user.organization_id)
     if not p:
         raise HTTPException(status_code=404, detail="Payment not found")

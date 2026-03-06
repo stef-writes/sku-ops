@@ -13,6 +13,7 @@ from identity.domain.user import AdminUserCreate, User, UserCreate, UserLogin
 from identity.infrastructure.refresh_token_repo import refresh_token_repo
 from identity.infrastructure.user_repo import user_repo
 from kernel.types import CurrentUser
+from shared.infrastructure.config import ALLOW_RESET
 from shared.infrastructure.middleware.audit import audit_log
 from shared.infrastructure.middleware.rate_limit import auth_limit
 
@@ -30,6 +31,12 @@ class LogoutRequest(BaseModel):
 @router.post("/register")
 @auth_limit
 async def register(data: UserCreate, request: Request):
+    if not ALLOW_RESET:
+        raise HTTPException(
+            status_code=403,
+            detail="Public registration is disabled. Contact your administrator.",
+        )
+
     existing = await user_repo.get_by_email(data.email)
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")

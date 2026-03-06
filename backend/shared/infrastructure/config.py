@@ -68,7 +68,7 @@ def _resolve_jwt_secret() -> str:
     if is_staging and (not raw or raw == _DEFAULT_JWT_SECRET):
         raise RuntimeError(
             "JWT_SECRET must be set in staging and must not be the default. "
-            "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+            'Generate one with: python -c "import secrets; print(secrets.token_hex(32))"'
         )
     return raw or _DEFAULT_JWT_SECRET
 
@@ -160,6 +160,10 @@ LLM_SETUP_URL = "https://console.anthropic.com/"
 LLM_AVAILABLE = ANTHROPIC_AVAILABLE  # alias used by enrichment/uom services
 # Per-session AI spend cap in USD. 0 = unlimited. Set SESSION_COST_CAP=2.00 in .env.
 SESSION_COST_CAP = float(os.environ.get("SESSION_COST_CAP", "2.00"))
+
+# Frontend URL — used for OAuth callbacks and cross-origin redirects in split deploys.
+# In same-origin setups this can be left empty (redirects stay relative).
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "").strip().rstrip("/")
 
 # Xero OAuth 2.0 — register a Xero app at developer.xero.com to get these.
 # XERO_REDIRECT_URI must match the callback URL registered in your Xero app.

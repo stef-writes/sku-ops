@@ -65,6 +65,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint
+        run: npx eslint src/
+
+      - name: Format check
+        run: npx prettier --check src/
+
       - name: Build
         run: npm run build
 

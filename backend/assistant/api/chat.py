@@ -1,4 +1,9 @@
-"""Chat assistant route."""
+"""Chat assistant route — HTTP fallback for when WebSocket is unavailable.
+
+The primary chat path is the WebSocket endpoint at /api/ws/chat which provides
+real-time token streaming. This POST endpoint is the fallback for environments
+where WebSocket connections are unreliable (e.g. some corporate proxies).
+"""
 import uuid
 
 from fastapi import APIRouter, Depends
@@ -8,7 +13,12 @@ from assistant.application import session_store
 from assistant.application.assistant import chat, recall_memory, schedule_memory_extraction
 from identity.application.auth_service import get_current_user, require_role
 from kernel.types import CurrentUser
-from shared.infrastructure.config import ANTHROPIC_AVAILABLE, LLM_SETUP_URL, OPENROUTER_AVAILABLE, SESSION_COST_CAP
+from shared.infrastructure.config import (
+    ANTHROPIC_AVAILABLE,
+    LLM_SETUP_URL,
+    OPENROUTER_AVAILABLE,
+    SESSION_COST_CAP,
+)
 
 router = APIRouter(tags=["chat"])
 
@@ -76,6 +86,7 @@ async def chat_assistant(
         "user_id": user_id,
         "user_name": current_user.name,
     }
+
     result = await chat(
         (data.message or "").strip(),
         history=history,

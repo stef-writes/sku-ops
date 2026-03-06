@@ -18,6 +18,7 @@ from operations.domain.material_request import (
 )
 from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
 from operations.infrastructure.material_request_repo import material_request_repo
+from shared.infrastructure import event_hub
 from shared.infrastructure.database import transaction
 
 
@@ -56,6 +57,7 @@ async def create_material_request(data: MaterialRequestCreate, current_user: Cur
     )
     await material_request_repo.insert(mat_request)
     req = await material_request_repo.get_by_id(mat_request.id, org_id)
+    await event_hub.emit("material_request.created", org_id=org_id, id=mat_request.id)
     return req or mat_request.model_dump()
 
 
@@ -129,4 +131,7 @@ async def process_material_request(
             processed_at=datetime.now(UTC).isoformat(),
             conn=conn,
         )
+    await event_hub.emit("material_request.processed", org_id=org_id, id=request_id, withdrawal_id=withdrawal["id"])
+    await event_hub.emit("withdrawal.created", org_id=org_id, id=withdrawal["id"])
+    await event_hub.emit("inventory.updated", org_id=org_id)
     return withdrawal

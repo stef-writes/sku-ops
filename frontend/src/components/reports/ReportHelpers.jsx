@@ -70,7 +70,7 @@ const PL_COLUMNS = {
   product: { label: "Product", key: "name" },
 };
 
-export const PLBreakdownTable = ({ plDimension, rows, onRowClick }) => {
+export const PLBreakdownTable = ({ plDimension, rows, onRowClick, selectedId }) => {
   const colCfg = PL_COLUMNS[plDimension];
   const columns = useMemo(() => {
     const cols = [
@@ -110,6 +110,7 @@ export const PLBreakdownTable = ({ plDimension, rows, onRowClick }) => {
   }, [plDimension, colCfg]);
 
   const dataWithId = useMemo(() => rows.map((r, i) => ({ ...r, id: r[colCfg?.key] || i })), [rows, colCfg]);
+  const selectedSet = useMemo(() => selectedId ? new Set([selectedId]) : new Set(), [selectedId]);
 
   return (
     <DataTable
@@ -122,6 +123,7 @@ export const PLBreakdownTable = ({ plDimension, rows, onRowClick }) => {
       exportFilename={`pl-${plDimension}.csv`}
       pageSize={20}
       onRowClick={onRowClick}
+      selectedIds={selectedSet}
     />
   );
 };

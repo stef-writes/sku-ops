@@ -12,8 +12,16 @@ case "${1:-help}" in
     uv run --directory backend ruff format .
     ;;
   lint)
-    echo "🔍 Linting code..."
+    echo "🔍 Linting backend..."
     uv run --directory backend ruff check .
+    ;;
+  lint:fe)
+    echo "🔍 Linting frontend..."
+    npm run lint --prefix frontend
+    ;;
+  fmt:fe)
+    echo "✨ Formatting frontend..."
+    npm run format --prefix frontend
     ;;
   commit)
     echo "📝 Commitizen commit..."
@@ -34,8 +42,10 @@ case "${1:-help}" in
   help|*)
     echo "sku-ops Dev Commands:"
     echo "  ./bin/dev test [args]    - Run pytest"
-    echo "  ./bin/dev fmt            - Format code with ruff"
-    echo "  ./bin/dev lint           - Lint code with ruff"
+    echo "  ./bin/dev fmt            - Format backend with ruff"
+    echo "  ./bin/dev lint           - Lint backend with ruff"
+    echo "  ./bin/dev lint:fe        - Lint frontend with ESLint"
+    echo "  ./bin/dev fmt:fe         - Format frontend with Prettier"
     echo "  ./bin/dev commit         - Commitizen commit"
     echo "  ./bin/dev server         - Start backend dev server"
     echo "  ./bin/dev ui             - Start frontend dev server"

@@ -1,218 +1,51 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "../components/ui/button";
 import { Calendar } from "../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import {
   TrendingUp, Package, DollarSign, Calendar as CalendarIcon,
-  Download, Layers, Briefcase, Receipt, ChevronDown, ChevronRight, Activity, X,
+  Download, Receipt, Activity,
 } from "lucide-react";
 import { format } from "date-fns";
-import { valueFormatter } from "@/lib/chartConfig";
-import { themeColors } from "@/lib/chartTheme";
 import { DATE_PRESETS } from "@/lib/constants";
 import { dateToISO, endOfDayISO } from "@/lib/utils";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
-import { StatCard } from "@/components/StatCard";
-import {
-  useReportSales, useReportInventory, useReportTrends, useReportMargins,
-  useReportPL, useReportArAging, useReportKpis, useReportProductPerformance,
-  useReportReorderUrgency, useReportProductActivity,
-} from "@/hooks/useReports";
 import { useFinancialSummary } from "@/hooks/useFinancials";
-import { useProducts } from "@/hooks/useProducts";
-import { HorizontalBarChart } from "@/components/charts/HorizontalBarChart";
-import { MultiLineChart } from "@/components/charts/MultiLineChart";
-import { GaugeRing } from "@/components/charts/GaugeRing";
-import { ProductBubblePlot } from "@/components/charts/ProductBubblePlot";
-import { LollipopChart } from "@/components/charts/LollipopChart";
-import { WaterfallChart } from "@/components/charts/WaterfallChart";
-import { DotColumnChart } from "@/components/charts/DotColumnChart";
-import { ActivityHeatmap } from "@/components/charts/ActivityHeatmap";
+import { useReportArAging } from "@/hooks/useReports";
 import { ProductDetailModal } from "@/components/ProductDetailModal";
-import { ChartExplainer, BubbleChartGuide } from "@/components/charts/ChartExplainer";
-import { Panel, SectionHead as SectionHeadBase } from "@/components/Panel";
-import {
-  PaymentStrip, LowStockList, PL_DIMENSIONS, PLBreakdownTable, ARAgingTable, PLStatement, FinanceTab,
-} from "@/components/reports/ReportHelpers";
-
-const Stat = StatCard;
-const SectionHead = ({ title, action }) => <SectionHeadBase title={title} action={action} variant="report" />;
-
-const PL_COLUMNS = {
-  job: { label: "Job ID", key: "job_id" },
-  department: { label: "Department", key: "department" },
-  entity: { label: "Billing Entity", key: "billing_entity" },
-  product: { label: "Product", key: "name" },
-};
-
-const DIMENSION_FILTER_KEY = {
-  job: "job_id",
-  department: "department",
-  entity: "billing_entity",
-};
+import { FinanceTab } from "@/components/reports/ReportHelpers";
+import { PLTab } from "@/components/reports/PLTab";
+import { OperationsTab } from "@/components/reports/OperationsTab";
+import { InventoryTab } from "@/components/reports/InventoryTab";
+import { TrendsTab } from "@/components/reports/TrendsTab";
 
 const Reports = () => {
-  const t = themeColors();
   const [activeTab, setActiveTab] = useState("pl");
   const [trendsGroupBy, setTrendsGroupBy] = useState("day");
   const [dateRange, setDateRange] = useState({ from: null, to: null });
-  const [plDimension, setPlDimension] = useState("overall");
   const [arAgingOpen, setArAgingOpen] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState(null);
-
-  const [selectedJobId, setSelectedJobId] = useState(null);
-  const [selectedDepartment, setSelectedDepartment] = useState(null);
-  const [selectedEntity, setSelectedEntity] = useState(null);
-
-  const activeDrillLabel = selectedJobId || selectedDepartment || selectedEntity || null;
-  const activeDrillDimension = selectedJobId ? "Job" : selectedDepartment ? "Department" : selectedEntity ? "Entity" : null;
-
-  const clearDrill = useCallback(() => {
-    setSelectedJobId(null);
-    setSelectedDepartment(null);
-    setSelectedEntity(null);
-  }, []);
-
-  const handleDimensionChange = useCallback((dim) => {
-    setPlDimension(dim);
-    clearDrill();
-  }, [clearDrill]);
 
   const dateParams = useMemo(() => ({
     start_date: dateToISO(dateRange.from),
     end_date: endOfDayISO(dateRange.to),
   }), [dateRange]);
 
-  const reportFilters = useMemo(() => ({
-    ...dateParams,
-    job_id: selectedJobId || undefined,
-    department: selectedDepartment || undefined,
-    billing_entity: selectedEntity || undefined,
-  }), [dateParams, selectedJobId, selectedDepartment, selectedEntity]);
+  const reportFilters = useMemo(() => ({ ...dateParams }), [dateParams]);
 
-  const plParams = useMemo(() => ({ ...reportFilters, group_by: plDimension }), [reportFilters, plDimension]);
-
-  const { data: plData, isLoading: plLoading } = useReportPL(plParams);
-  const { data: arAging } = useReportArAging(dateParams);
-  const { data: salesReport, isLoading: salesLoading } = useReportSales(reportFilters);
-  const { data: inventoryReport, isLoading: invLoading } = useReportInventory();
-  const { data: trendsReport, isLoading: trendsLoading } = useReportTrends({ ...reportFilters, group_by: trendsGroupBy });
-  const { data: marginsReport } = useReportMargins(reportFilters);
-  const { data: kpis } = useReportKpis(reportFilters);
-  const { data: perfData } = useReportProductPerformance(dateParams);
-  const { data: reorderData } = useReportReorderUrgency();
-
-  const jobPlParams = useMemo(() => ({ ...reportFilters, group_by: "job" }), [reportFilters]);
-  const contractorPlParams = useMemo(() => ({ ...reportFilters, group_by: "contractor" }), [reportFilters]);
-  const { data: jobPlData } = useReportPL(jobPlParams);
-  const { data: contractorPlData } = useReportPL(contractorPlParams);
   const { data: financialSummary } = useFinancialSummary(dateParams);
-
-  const productPerf = perfData?.products || [];
-  const reorderProducts = reorderData?.products || [];
-  const lollipopData = useMemo(() => reorderProducts.map((p) => ({
-    name: p.name,
-    value: p.days_until_stockout,
-    urgency: p.urgency,
-    id: p.product_id,
-    ...p,
-  })), [reorderProducts]);
-
-  const dotColumnParams = useMemo(() => ({ ...reportFilters, group_by: "day" }), [reportFilters]);
-  const { data: dailyTrends } = useReportTrends(dotColumnParams);
-  const dotColumnData = useMemo(() => {
-    if (!dailyTrends?.series) return [];
-    return dailyTrends.series.map((d) => ({ date: d.date, value: d.transaction_count || 0 }));
-  }, [dailyTrends]);
+  const { data: arAging } = useReportArAging(dateParams);
 
   const handleProductClick = (product) => {
     setSelectedProduct({ id: product.product_id || product.id, name: product.name, sku: product.sku });
   };
 
-  const handleRowDrill = useCallback((row) => {
-    if (plDimension === "job" && row.job_id) {
-      setSelectedJobId(row.job_id);
-    } else if (plDimension === "department" && row.department) {
-      setSelectedDepartment(row.department);
-    } else if (plDimension === "entity" && row.billing_entity) {
-      setSelectedEntity(row.billing_entity);
-    }
-  }, [plDimension]);
-
-  const [heatmapProductId, setHeatmapProductId] = useState(null);
-  const { data: productsList } = useProducts();
-  const activityParams = useMemo(() => ({ product_id: heatmapProductId || undefined }), [heatmapProductId]);
-  const { data: productActivityData } = useReportProductActivity(activityParams);
-  const productHeatmapData = useMemo(() => {
-    if (!productActivityData?.series) return [];
-    return productActivityData.series.map((d) => ({
-      date: d.day,
-      value: d.transaction_count || 0,
-      units: d.units_moved || 0,
-    }));
-  }, [productActivityData]);
-
-  const margins = marginsReport?.products || [];
-
-  const paymentChartData = salesReport?.by_payment_status
-    ? Object.entries(salesReport.by_payment_status).map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value: parseFloat(value.toFixed(2)) }))
-    : [];
-
-  const departmentChartData = inventoryReport?.by_department
-    ? Object.entries(inventoryReport.by_department).map(([name, data]) => ({ name, count: data.count, value: parseFloat((data.retail_value || data.value || 0).toFixed(2)), cost: parseFloat((data.cost_value || data.cost || 0).toFixed(2)) }))
-    : [];
-
   const handleExportCSV = () => {
-    const rows = [];
-    if (activeTab === "pl" && plData) {
-      rows.push(["P&L Report", `Dimension: ${plDimension}`]);
-      rows.push(["Revenue", plData.summary?.revenue]);
-      rows.push(["COGS", plData.summary?.cogs]);
-      rows.push(["Gross Profit", plData.summary?.gross_profit]);
-      rows.push(["Margin %", plData.summary?.margin_pct]);
-      if (plData.rows?.length > 0) {
-        rows.push([]);
-        const colCfg = PL_COLUMNS[plDimension];
-        rows.push([colCfg?.label || "Name", "Revenue", "COGS", "Profit", "Margin %"]);
-        plData.rows.forEach((r) => rows.push([r[colCfg?.key] || "—", r.revenue, r.cost, r.profit, r.margin_pct]));
-      }
-    } else if (activeTab === "operations" && salesReport) {
-      rows.push(["Metric", "Value"]);
-      rows.push(["Total Revenue", salesReport.total_revenue]);
-      rows.push(["Total Transactions", salesReport.total_transactions]);
-      if (salesReport.top_products?.length) { rows.push([]); rows.push(["Product", "Revenue", "Qty"]); salesReport.top_products.forEach((p) => rows.push([p.name, p.revenue, p.quantity])); }
-    } else if (activeTab === "trends" && trendsReport) {
-      rows.push(["Period", "Revenue", "Cost", "Profit"]);
-      trendsReport.series?.forEach((r) => rows.push([r.date, r.revenue, r.cost, r.profit]));
-    }
-    const csv = rows.map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `report-${activeTab}-${format(new Date(), "yyyy-MM-dd")}.csv`; a.click(); URL.revokeObjectURL(url);
+    const a = document.createElement("a");
+    a.download = `report-${activeTab}-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
   };
-
-  const inStock = (inventoryReport?.total_products || 0) - (inventoryReport?.low_stock_count || 0) - (inventoryReport?.out_of_stock_count || 0);
-  const totalP = inventoryReport?.total_products || 1;
-
-  const waterfallItems = useMemo(() => {
-    if (!plData?.summary) return [];
-    const s = plData.summary;
-    const items = [{ label: "Revenue", value: s.revenue || 0, type: "total" }];
-    if (s.cogs) items.push({ label: "COGS", value: -(s.cogs || 0), type: "decrease" });
-    if (plDimension === "overall" && !activeDrillLabel) {
-      if (s.shrinkage) items.push({ label: "Shrinkage", value: -(s.shrinkage || 0), type: "decrease" });
-      if (s.tax_collected) items.push({ label: "Tax", value: -(s.tax_collected || 0), type: "decrease" });
-    }
-    const net = (plDimension === "overall" && !activeDrillLabel)
-      ? (s.revenue || 0) - (s.cogs || 0) - (s.shrinkage || 0) - (s.tax_collected || 0)
-      : s.gross_profit || ((s.revenue || 0) - (s.cogs || 0));
-    items.push({ label: (plDimension === "overall" && !activeDrillLabel) ? "Net Profit" : "Gross Profit", value: net, type: "total" });
-    return items;
-  }, [plData, plDimension, activeDrillLabel]);
-
-  const loading = plLoading && salesLoading && invLoading && trendsLoading;
-  if (loading) return <PageSkeleton />;
 
   return (
     <div className="p-4 md:p-8" data-testid="reports-page">
@@ -256,363 +89,28 @@ const Reports = () => {
           ))}
         </TabsList>
 
-        {/* ══ P&L ════════════════════════════════════════════════════════════ */}
-        <TabsContent value="pl" className="space-y-6 mt-6" data-testid="pl-report-content">
-          {/* Dimension selector + active drill-down chip */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">View</span>
-            <div className="flex gap-0.5 bg-muted rounded-lg p-0.5">
-              {PL_DIMENSIONS.map((d) => (
-                <button key={d.value} onClick={() => handleDimensionChange(d.value)} className={`text-xs px-3 py-1.5 rounded-md font-medium transition-all ${plDimension === d.value ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`} data-testid={`pl-dim-${d.value}`}>
-                  {d.label}
-                </button>
-              ))}
-            </div>
-            {activeDrillLabel && (
-              <button
-                onClick={clearDrill}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition-colors"
-              >
-                {activeDrillDimension}: {activeDrillLabel}
-                <X className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-
-          {/* Summary stat cards */}
-          {plData?.summary && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Stat label="Revenue" value={valueFormatter(plData.summary.revenue)} icon={DollarSign} accent="blue" />
-              <Stat label="COGS" value={valueFormatter(plData.summary.cogs)} icon={DollarSign} accent="orange" />
-              <Stat label="Gross Profit" value={valueFormatter(plData.summary.gross_profit)} icon={TrendingUp} accent="emerald" note={`${plData.summary.margin_pct}% margin`} />
-              {plData.summary.tax_collected != null && plData.summary.tax_collected > 0
-                ? <Stat label="Tax Collected" value={valueFormatter(plData.summary.tax_collected)} icon={Receipt} accent="slate" />
-                : <Stat label="Margin" value={`${plData.summary.margin_pct}%`} icon={TrendingUp} accent="violet" />
-              }
-            </div>
-          )}
-
-          {/* P&L Statement + Waterfall */}
-          {plData?.summary && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <PLStatement summary={plData.summary} />
-              {waterfallItems.length > 0 && (
-                <Panel>
-                  <SectionHead title="P&L Waterfall" />
-                  <ChartExplainer
-                    title="Waterfall Chart"
-                    bullets={[
-                      "Starts with total Revenue on the left",
-                      "Each red bar shows a deduction dropping from the running total",
-                      "The final bar shows what's left after all deductions",
-                      "Taller red bars mean bigger cost drains to investigate",
-                    ]}
-                  >
-                    <WaterfallChart items={waterfallItems} height={260} />
-                  </ChartExplainer>
-                </Panel>
-              )}
-            </div>
-          )}
-
-          {/* Revenue, Cost & Profit over time */}
-          {trendsReport?.series?.length > 0 && (
-            <Panel>
-              <SectionHead title="Revenue, Cost & Profit Over Time" action={
-                <div className="flex gap-0.5 bg-muted rounded-lg p-0.5">
-                  {["day", "week", "month"].map((g) => (
-                    <button key={g} onClick={() => setTrendsGroupBy(g)} className={`text-xs px-3 py-1.5 rounded-md font-medium transition-all ${trendsGroupBy === g ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>{g.charAt(0).toUpperCase() + g.slice(1)}</button>
-                  ))}
-                </div>
-              } />
-              <MultiLineChart
-                data={trendsReport.series}
-                xKey="date"
-                series={[
-                  { key: "revenue", label: "Revenue", color: t.info },
-                  { key: "cost", label: "Cost", color: t.destructive },
-                  { key: "profit", label: "Profit", color: t.success, width: 3 },
-                ]}
-                valueFormatter={valueFormatter}
-                height={280}
-                stepped
-              />
-            </Panel>
-          )}
-
-          {/* KPI metrics — overall only */}
-          {plDimension === "overall" && !activeDrillLabel && kpis && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Stat label="Inventory Turnover" value={`${kpis.inventory_turnover}×`} icon={Layers} accent="blue" note={`${kpis.period_days} day period`} />
-              <Stat label="Days in Inventory" value={`${kpis.dio} days`} icon={Package} accent="slate" />
-              <Stat label="Avg Transaction" value={valueFormatter(kpis.total_revenue / Math.max(kpis.total_units_sold, 1))} icon={DollarSign} accent="violet" note={`${kpis.total_units_sold} units sold`} />
-            </div>
-          )}
-
-          {/* Breakdown table — non-overall dimensions (hidden when drilled into specific item) */}
-          {plDimension !== "overall" && !activeDrillLabel && plData?.rows?.length > 0 && (
-            <PLBreakdownTable
-              plDimension={plDimension}
-              rows={plData.rows}
-              onRowClick={DIMENSION_FILTER_KEY[plDimension] ? handleRowDrill : undefined}
-            />
-          )}
-
-          {plDimension !== "overall" && !activeDrillLabel && (!plData?.rows || plData.rows.length === 0) && (
-            <div className="bg-card border border-border rounded-xl p-12 text-center shadow-sm">
-              <Briefcase className="w-10 h-10 mx-auto text-border mb-3" />
-              <p className="text-sm text-muted-foreground">No P&L data for this period and dimension</p>
-            </div>
-          )}
-
-          {/* AR Aging */}
-          {arAging?.length > 0 && (
-            <div>
-              <button
-                onClick={() => setArAgingOpen(!arAgingOpen)}
-                className="flex items-center gap-2 text-sm font-semibold text-foreground hover:text-foreground mb-3"
-              >
-                {arAgingOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                Accounts Receivable Aging
-                <span className="text-xs font-normal text-muted-foreground">({arAging.length} entities)</span>
-              </button>
-              {arAgingOpen && <ARAgingTable data={arAging} />}
-            </div>
-          )}
+        <TabsContent value="pl" className="mt-6" data-testid="pl-report-content">
+          <PLTab reportFilters={reportFilters} dateParams={dateParams} />
         </TabsContent>
 
-        {/* ══ FINANCE ═════════════════════════════════════════════════════════ */}
         <TabsContent value="finance" className="mt-6" data-testid="finance-report-content">
-          <FinanceTab
-            financialSummary={financialSummary}
-            arAging={arAging}
-            arAgingOpen={arAgingOpen}
-            setArAgingOpen={setArAgingOpen}
-          />
+          <FinanceTab financialSummary={financialSummary} arAging={arAging} arAgingOpen={arAgingOpen} setArAgingOpen={setArAgingOpen} />
         </TabsContent>
 
-        {/* ══ OPERATIONS ══════════════════════════════════════════════════════ */}
-        <TabsContent value="operations" className="space-y-6 mt-6" data-testid="operations-report-content">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Stat label="Total Revenue" value={valueFormatter(salesReport?.total_revenue || 0)} icon={DollarSign} accent="blue" note={`${salesReport?.total_transactions || 0} transactions`} />
-            <Stat label="COGS" value={valueFormatter(salesReport?.total_cogs || 0)} icon={DollarSign} accent="orange" />
-            <Stat label="Gross Profit" value={valueFormatter(salesReport?.gross_profit || 0)} icon={TrendingUp} accent="emerald" note={`${salesReport?.gross_margin_pct ?? 0}% margin`} />
-            <Stat label="Avg Transaction" value={valueFormatter(salesReport?.average_transaction || 0)} accent="violet" note="per order" />
-          </div>
-
-          {paymentChartData.length > 0 && (
-            <Panel>
-              <SectionHead title="Payment Status" />
-              <PaymentStrip data={paymentChartData} />
-            </Panel>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Panel>
-              <SectionHead title="Job Throughput — Top by Revenue" />
-              {jobPlData?.rows?.length > 0 ? (
-                <HorizontalBarChart
-                  data={jobPlData.rows.slice(0, 12)}
-                  categoryKey="job_id"
-                  series={[
-                    { key: "revenue", label: "Revenue", color: t.category1 },
-                    { key: "cost", label: "COGS", color: t.mutedForeground },
-                  ]}
-                  valueFormatter={valueFormatter}
-                  showLegend
-                  height={Math.max(200, jobPlData.rows.slice(0, 12).length * 36)}
-                />
-              ) : <p className="text-sm text-muted-foreground py-8 text-center">No job data</p>}
-            </Panel>
-            <Panel>
-              <SectionHead title="Contractor Activity — Top by Revenue" />
-              {contractorPlData?.rows?.length > 0 ? (
-                <HorizontalBarChart
-                  data={contractorPlData.rows.slice(0, 12).map((r) => ({ ...r, name: r.name || r.company || r.contractor_id || "Unknown" }))}
-                  categoryKey="name"
-                  series={[{ key: "revenue", label: "Revenue", color: t.info }]}
-                  valueFormatter={valueFormatter}
-                  height={Math.max(200, contractorPlData.rows.slice(0, 12).length * 36)}
-                />
-              ) : <p className="text-sm text-muted-foreground py-8 text-center">No contractor data</p>}
-            </Panel>
-          </div>
-
-          {dotColumnData.length > 0 && (
-            <Panel>
-              <SectionHead title="Daily Operational Activity" action={
-                <span className="text-xs text-muted-foreground tabular-nums">{dotColumnData.filter((d) => d.value > 0).length} active days</span>
-              } />
-              <ChartExplainer
-                title="Activity Pattern"
-                bullets={[
-                  "Each dot is one day — columns are months",
-                  "Darker/brighter dots = more transactions that day",
-                  "Look for patterns: consistent activity, quiet periods, or spikes",
-                  "Gaps or pale columns may indicate supply issues or seasonal slowdowns",
-                ]}
-              >
-                <DotColumnChart data={dotColumnData} height={260} />
-              </ChartExplainer>
-            </Panel>
-          )}
+        <TabsContent value="operations" className="mt-6" data-testid="operations-report-content">
+          <OperationsTab reportFilters={reportFilters} />
         </TabsContent>
 
-        {/* ══ INVENTORY ═══════════════════════════════════════════════════════ */}
-        <TabsContent value="inventory" className="space-y-6 mt-6" data-testid="inventory-report-content">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Stat label="Total Products" value={inventoryReport?.total_products || 0} icon={Package} accent="blue" />
-            <Stat label="Retail Value" value={valueFormatter(inventoryReport?.total_retail_value || 0)} icon={DollarSign} accent="emerald" />
-            <Stat label="Cost Value" value={valueFormatter(inventoryReport?.total_cost_value || 0)} icon={Layers} accent="slate" />
-            <Stat label="Unrealized Margin" value={valueFormatter(inventoryReport?.unrealized_margin || inventoryReport?.potential_profit || 0)} note={inventoryReport?.margin_pct ? `${inventoryReport.margin_pct}%` : ""} icon={TrendingUp} accent="amber" />
-          </div>
-
-          {kpis && (
-            <ChartExplainer
-              title="Health Gauges"
-              position="top-left"
-              bullets={[
-                "Each gauge shows one key inventory health metric",
-                "Green zone = healthy, Amber = needs watching, Red = action needed",
-                "Turnover: how many times you sell through stock per period (higher is better)",
-                "Sell-Through: % of stock that has been sold (higher = faster moving)",
-                "Gross Margin: your profit % after cost of goods (higher = more profitable)",
-              ]}
-            >
-              <div className="flex flex-wrap items-center justify-center gap-6">
-                <div className="flex flex-col items-center">
-                  <GaugeRing value={kpis.inventory_turnover} max={Math.max(kpis.inventory_turnover * 1.5, 6)} label="Turnover" unit="×" zones={[{ max: 0.2, color: t.destructive }, { max: 0.5, color: t.warning }, { max: 1, color: t.success }]} size={150} />
-                </div>
-                <div className="flex flex-col items-center">
-                  <GaugeRing value={kpis.sell_through_pct} max={100} label="Sell-Through" unit="%" zones={[{ max: 0.3, color: t.destructive }, { max: 0.6, color: t.warning }, { max: 1, color: t.success }]} size={150} />
-                </div>
-                <div className="flex flex-col items-center">
-                  <GaugeRing value={kpis.gross_margin_pct} max={100} label="Gross Margin" unit="%" zones={[{ max: 0.3, color: t.destructive }, { max: 0.5, color: t.warning }, { max: 1, color: t.success }]} size={150} />
-                </div>
-              </div>
-            </ChartExplainer>
-          )}
-
-          {productPerf.length > 0 && (
-            <Panel>
-              <SectionHead title="Product Portfolio — Sell-Through vs Margin" action={<span className="text-xs text-muted-foreground">{productPerf.length} products · click to drill in</span>} />
-              <ChartExplainer title="Product Portfolio" wide content={<BubbleChartGuide />}>
-                <ProductBubblePlot products={productPerf} onBubbleClick={handleProductClick} height={420} />
-              </ChartExplainer>
-            </Panel>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Panel>
-              <SectionHead title="Reorder Urgency — Days to Stockout" action={
-                lollipopData.length > 0 && <span className="text-xs font-bold text-destructive bg-destructive/10 px-2 py-0.5 rounded-full border border-destructive/30">{lollipopData.filter((d) => d.urgency === "critical" || d.urgency === "high").length} urgent</span>
-              } />
-              {lollipopData.length > 0 ? (
-                <ChartExplainer title="Reorder Urgency" bullets={["Each dot is a product — fewer days = closer to running out", "Red = critical (under 3 days), Orange = high (under 7 days)", "Amber = medium (under 30 days), Green = healthy stock", "Click any product to view details and adjust stock"]}>
-                  <LollipopChart data={lollipopData.slice(0, 20)} valueLabel="days" onDotClick={handleProductClick} height={Math.max(200, Math.min(lollipopData.length, 20) * 28)} />
-                </ChartExplainer>
-              ) : <p className="text-sm text-muted-foreground py-8 text-center">All stock levels healthy</p>}
-            </Panel>
-            <Panel>
-              <SectionHead title="Value by Department" />
-              {departmentChartData.length > 0 ? (
-                <HorizontalBarChart data={departmentChartData} categoryKey="name" series={[{ key: "cost", label: "Cost", color: t.category5 }, { key: "value", label: "Retail", color: t.success }]} valueFormatter={valueFormatter} showLegend height={Math.max(200, departmentChartData.length * 40)} />
-              ) : <p className="text-sm text-muted-foreground py-8 text-center">No data</p>}
-            </Panel>
-          </div>
-
-          <Panel>
-            <SectionHead title="Product Activity" action={
-              <select value={heatmapProductId || ""} onChange={(e) => setHeatmapProductId(e.target.value || null)} className="text-xs border border-border rounded-lg px-2.5 py-1.5 text-muted-foreground bg-card focus:outline-none focus:ring-1 focus:ring-accent/30 max-w-[220px] truncate">
-                <option value="">All products</option>
-                {(productsList || []).map((p) => (<option key={p.id} value={p.id}>{p.name} ({p.sku})</option>))}
-              </select>
-            } />
-            {productHeatmapData.length > 0 ? (
-              <ChartExplainer title="Activity Heatmap" bullets={["Each square is one day — darker = more withdrawal transactions", "Use the dropdown to filter by a specific product or view all", "Hover over any square to see the exact count and units moved", "Consistent color = steady demand. Gaps = periods with no withdrawals"]}>
-                <ActivityHeatmap data={productHeatmapData} label="withdrawals" tooltipExtra={(d) => d?.units ? `Units moved: ${d.units}` : ""} />
-              </ChartExplainer>
-            ) : <p className="text-sm text-muted-foreground py-6 text-center">No withdrawal activity found</p>}
-          </Panel>
-
-          <Panel>
-            <SectionHead title="Stock Health" />
-            <div className="flex h-5 rounded-lg overflow-hidden gap-px mb-3">
-              <div className="bg-success" style={{ width: `${(inStock / totalP) * 100}%` }} />
-              <div className="bg-category-5" style={{ width: `${((inventoryReport?.low_stock_count || 0) / totalP) * 100}%` }} />
-              <div className="bg-destructive" style={{ width: `${((inventoryReport?.out_of_stock_count || 0) / totalP) * 100}%` }} />
-            </div>
-            <div className="flex gap-5 text-xs">
-              <span className="flex items-center gap-1.5 text-muted-foreground"><span className="w-2 h-2 rounded-full bg-success inline-block" />In stock <strong className="tabular-nums">{inStock}</strong></span>
-              <span className="flex items-center gap-1.5 text-muted-foreground"><span className="w-2 h-2 rounded-full bg-category-5 inline-block" />Low <strong className="tabular-nums">{inventoryReport?.low_stock_count || 0}</strong></span>
-              <span className="flex items-center gap-1.5 text-muted-foreground"><span className="w-2 h-2 rounded-full bg-destructive inline-block" />Out <strong className="tabular-nums">{inventoryReport?.out_of_stock_count || 0}</strong></span>
-            </div>
-          </Panel>
-
-          {inventoryReport?.low_stock_items?.length > 0 && (
-            <Panel>
-              <SectionHead title="Low Stock Alert" action={<span className="text-xs font-bold text-category-5 bg-category-5/10 px-2 py-0.5 rounded-full border border-category-5/30">{inventoryReport.low_stock_count} items</span>} />
-              <div className="max-h-[360px] overflow-auto -mx-6 px-6"><LowStockList items={inventoryReport.low_stock_items} /></div>
-            </Panel>
-          )}
+        <TabsContent value="inventory" className="mt-6" data-testid="inventory-report-content">
+          <InventoryTab dateParams={dateParams} onProductClick={handleProductClick} />
         </TabsContent>
 
-        {/* ══ TRENDS ═════════════════════════════════════════════════════════ */}
-        <TabsContent value="trends" className="space-y-6 mt-6" data-testid="trends-report-content">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <Stat label="Total Revenue" value={valueFormatter(trendsReport?.totals?.revenue || 0)} icon={DollarSign} accent="blue" />
-            <Stat label="Total COGS" value={valueFormatter(trendsReport?.totals?.cost || 0)} icon={DollarSign} accent="orange" />
-            <Stat label="Gross Profit" value={valueFormatter(trendsReport?.totals?.profit || 0)} icon={TrendingUp} accent="emerald" />
-          </div>
-
-          <Panel>
-            <SectionHead title="Revenue, Cost & Profit Over Time" action={
-              <div className="flex gap-0.5 bg-muted rounded-lg p-0.5">
-                {["day", "week", "month"].map((g) => (
-                  <button key={g} onClick={() => setTrendsGroupBy(g)} className={`text-xs px-3 py-1.5 rounded-md font-medium transition-all ${trendsGroupBy === g ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}>{g.charAt(0).toUpperCase() + g.slice(1)}</button>
-                ))}
-              </div>
-            } />
-            {trendsReport?.series?.length > 0 ? (
-              <MultiLineChart
-                data={trendsReport.series}
-                xKey="date"
-                series={[
-                  { key: "revenue", label: "Revenue", color: t.info },
-                  { key: "cost", label: "Cost", color: t.destructive },
-                  { key: "profit", label: "Profit", color: t.success, width: 3 },
-                ]}
-                valueFormatter={valueFormatter}
-                height={300}
-                stepped
-              />
-            ) : <div className="h-[300px] flex items-center justify-center"><p className="text-sm text-muted-foreground">No trend data</p></div>}
-          </Panel>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Panel>
-              <SectionHead title="Top Products by Revenue" />
-              {margins.length > 0 ? (
-                <HorizontalBarChart data={margins.slice(0, 10).map((p) => ({ name: p.name || p.product_id, revenue: p.revenue }))} categoryKey="name" series={[{ key: "revenue", label: "Revenue", color: t.category1 }]} valueFormatter={valueFormatter} height={Math.max(200, Math.min(margins.length, 10) * 36)} />
-              ) : <p className="text-sm text-muted-foreground py-8 text-center">No data</p>}
-            </Panel>
-            <Panel>
-              <SectionHead title="Product Performance — Revenue vs Margin" />
-              {productPerf.length > 0 ? (
-                <ChartExplainer title="Product Scatter" bullets={["Each bubble is a product — bigger = more revenue", "Right = high sell-through, Top = high margin", "Click any bubble to see full product details"]}>
-                  <ProductBubblePlot products={productPerf} onBubbleClick={handleProductClick} height={Math.max(300, 340)} />
-                </ChartExplainer>
-              ) : <p className="text-sm text-muted-foreground py-8 text-center">No data</p>}
-            </Panel>
-          </div>
+        <TabsContent value="trends" className="mt-6" data-testid="trends-report-content">
+          <TrendsTab reportFilters={reportFilters} dateParams={dateParams} trendsGroupBy={trendsGroupBy} setTrendsGroupBy={setTrendsGroupBy} onProductClick={handleProductClick} />
         </TabsContent>
       </Tabs>
 
-      <ProductDetailModal
-        product={selectedProduct}
-        open={!!selectedProduct}
-        onOpenChange={(open) => !open && setSelectedProduct(null)}
-      />
+      <ProductDetailModal product={selectedProduct} open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)} />
     </div>
   );
 };

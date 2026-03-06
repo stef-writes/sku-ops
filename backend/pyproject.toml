@@ -56,7 +56,7 @@ dev = [
     "pytest>=8.0,<9",
     "pytest-asyncio>=0.23,<0.24",
     "pytest-cov>=6.0",
-    "ruff>=0.9.0",
+    "ruff>=0.14.0",
 ]
 
 # =============================================================================
@@ -65,7 +65,7 @@ dev = [
 [tool.ruff]
 fix = true
 line-length = 100
-src = ["."]
+src = [".", "tests"]
 target-version = "py313"
 
 [tool.ruff.format]
@@ -73,63 +73,77 @@ docstring-code-format = true
 
 [tool.ruff.lint]
 select = [
-    "A",    # flake8-builtins
-    "ARG",  # flake8-unused-arguments
-    "ASYNC",# flake8-async
-    "B",    # flake8-bugbear
-    "BLE",  # flake8-blind-except
-    "C4",   # flake8-comprehensions
-    "DTZ",  # flake8-datetimez
-    "E",    # pycodestyle errors
-    "ERA",  # eradicate (commented-out code)
-    "F",    # pyflakes
-    "FLY",  # flynt
-    "FURB", # refurb
-    "G",    # flake8-logging-format
-    "I",    # isort
-    "ICN",  # flake8-import-conventions
-    "ISC",  # flake8-implicit-str-concat
-    "LOG",  # flake8-logging
-    "N",    # pep8-naming
-    "PERF", # perflint
-    "PGH",  # pygrep-hooks
-    "PIE",  # flake8-pie
-    "PLC",  # pylint conventions
-    "PLE",  # pylint errors
-    "PLW",  # pylint warnings
-    "PT",   # flake8-pytest-style
-    "RET",  # flake8-return
-    "RSE",  # flake8-raise
-    "RUF",  # ruff-specific
-    "S",    # bandit (security)
-    "SIM",  # flake8-simplify
-    "T10",  # flake8-debugger
-    "T20",  # flake8-print
-    "TC",   # flake8-type-checking
-    "TID",  # flake8-tidy-imports
-    "TRY",  # tryceratops
-    "UP",   # pyupgrade
-    "W",    # pycodestyle warnings
+    "A",      # flake8-builtins
+    "ARG",    # flake8-unused-arguments
+    "ASYNC",  # flake8-async
+    "B",      # flake8-bugbear
+    "BLE",    # flake8-blind-except
+    "C4",     # flake8-comprehensions
+    "DTZ",    # flake8-datetimez
+    "E",      # pycodestyle errors
+    "ERA",    # eradicate (commented-out code)
+    "F",      # pyflakes
+    "FLY",    # flynt
+    "FURB",   # refurb
+    "G",      # flake8-logging-format
+    "I",      # isort
+    "ICN",    # flake8-import-conventions
+    "INP",    # flake8-no-pep420
+    "INT",    # flake8-gettext
+    "ISC",    # flake8-implicit-str-concat
+    "LOG",    # flake8-logging
+    "N",      # pep8-naming
+    "PERF",   # perflint
+    "PGH",    # pygrep-hooks
+    "PIE",    # flake8-pie
+    "PLC",    # pylint conventions
+    "PLE",    # pylint errors
+    "PLW",    # pylint warnings
+    "PT",     # flake8-pytest-style
+    "PYI",    # flake8-pyi
+    "Q",      # flake8-quotes
+    "RET",    # flake8-return
+    "RSE",    # flake8-raise
+    "RUF",    # ruff-specific
+    "S",      # bandit (security)
+    "SIM",    # flake8-simplify
+    "SLF",    # flake8-self
+    "SLOT",   # flake8-slots
+    "T10",    # flake8-debugger
+    "T20",    # flake8-print
+    "TC",     # flake8-type-checking
+    "TID",    # flake8-tidy-imports
+    "TRY",    # tryceratops
+    "UP",     # pyupgrade
+    "W",      # pycodestyle warnings
+    "YTT",    # flake8-2020
 ]
 ignore = [
-    "E501",   # line-too-long (formatter handles)
-    "S101",   # assert used in tests + runtime contracts
-    "TRY003", # inline raise messages (project style)
-    "TRY300", # try-consider-else (stylistic)
-    "RET504", # assign-before-return (stylistic)
-    "ERA001", # allow commented-out code for now
-    "T201",   # allow print statements for now
+    "E501",    # line-too-long (formatter handles)
+    "S101",    # assert used in tests + runtime contracts
+    "TRY003",  # inline raise messages (project style)
+    "TRY300",  # try-consider-else (stylistic)
+    "RET504",  # assign-before-return (stylistic)
+    "B008",    # function-call-in-default-argument (FastAPI Depends() pattern)
+    "PLC0415", # import-outside-top-level (FastAPI DI + lazy imports)
+    "ARG002",  # unused-method-argument (framework callback signatures)
 ]
 unfixable = ["F401", "F841"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["N806", "PLR2004", "PLR0913", "PLR0915", "S108", "ARG001"]
+"scripts/**" = ["T201", "INP001"]
+"devtools/**" = ["T201", "INP001"]
+"server.py" = ["T201"]
 
 [tool.ruff.lint.flake8-tidy-imports]
-ban-relative-imports = "parents"
+ban-relative-imports = "all"
 
 [tool.ruff.lint.pycodestyle]
 max-doc-length = 100
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
 
 # =============================================================================
 # PYTEST
@@ -156,6 +170,16 @@ version_files = [
 path = ".cz-config.js"
 
 [tool.commitizen.customize]
+example = "feat: this feature enables customizing through pyproject.toml file"
+schema = """
+<type>(<scope>): <subject> \n
+<BLANK LINE> \n
+<body> \n
+<BLANK LINE> \n
+(BREAKING CHANGE: )<breaking> \n
+<BLANK LINE> \n
+(ISSUES: )<footer>
+"""
 schema_pattern = "(?s)(✨ feat|🐛 fix|🚑 hotfix|🔧 chore|♻️ refactor|🚧 WIP|📚 docs|⚡️ perf|💄 style|🏗️ build|👷 ci|✅ test|⏪ revert|➕ add_dep|➖ rem_dep|💥 boom)(\\(\\S+\\))?!?:( [^\\n\\r]+)((\\n\\n.*)|(\\s*))?$"
 bump_pattern = "^(✨ feat|🐛 fix|🚑 hotfix|⚡️ perf|♻️ refactor|⏪ revert|➕ dep-add|➖ dep-rm|💥 boom)"
 bump_map = {"BREAKING CHANGE" = "MAJOR", "💥 boom" = "MAJOR", "✨ feat" = "MINOR", "🐛 fix" = "PATCH", "🚑 hotfix" = "PATCH", "⚡️ perf" = "PATCH", "♻️ refactor" = "PATCH", "➕ dep-add" = "PATCH", "➖ dep-rm" = "PATCH"}

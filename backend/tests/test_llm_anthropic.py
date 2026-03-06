@@ -186,8 +186,8 @@ class TestAssistant:
         assert "ANTHROPIC_API_KEY" in result["response"] or "Anthropic" in result["response"]
         assert result["tool_calls"] == []
 
-    async def test_chat_dispatches_to_correct_agent(self, db):
-        """assistant.chat() dispatches to the correct specialist agent by agent_type."""
+    async def test_chat_dispatches_to_unified_agent(self, db):
+        """assistant.chat() routes all messages through the unified agent."""
         from unittest.mock import AsyncMock
 
         from assistant.application.assistant import chat
@@ -198,20 +198,20 @@ class TestAssistant:
             "thinking": [],
             "history": [],
             "usage": {"cost_usd": 0.0, "model": "claude-haiku-4-5"},
-            "agent": "inventory",
+            "agent": "unified",
         }
 
         with patch("assistant.application.assistant.ANTHROPIC_AVAILABLE", True), \
-             patch("assistant.agents.inventory.run", new=AsyncMock(return_value=expected)):
+             patch("assistant.application.assistant._unified_agent.run", new=AsyncMock(return_value=expected)):
             result = await chat(
                 "What's our inventory count?",
                 history=None,
-                agent_type="inventory",
+                agent_type="auto",
             )
 
         assert result["response"] == "You have 0 products in inventory."
-        assert result["agent"] == "inventory"
-        assert result["tool_calls"][0]["tool"] == "get_inventory_stats"
+        assert result["agent"] == "unified"
+        assert result["routed_to"] == ["unified"]
 
 
 @pytest.mark.asyncio
