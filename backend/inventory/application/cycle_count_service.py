@@ -10,14 +10,14 @@ Lifecycle:
 The snapshot (snapshot_qty) is frozen at open time and never changed.
 Inventory is only touched at commit — never during the counting phase.
 """
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Optional
 
-from kernel.errors import ResourceNotFoundError
+from catalog.application.queries import list_products
+from inventory.application.inventory_service import process_adjustment_stock_changes
 from inventory.domain.cycle_count import CycleCount, CycleCountItem, CycleCountStatus
 from inventory.infrastructure import cycle_count_repo
-from inventory.application.inventory_service import process_adjustment_stock_changes
-from catalog.application.queries import list_products
+from kernel.errors import ResourceNotFoundError
 from shared.infrastructure.database import transaction
 
 
@@ -25,7 +25,7 @@ async def open_cycle_count(
     organization_id: str,
     created_by_id: str,
     created_by_name: str,
-    scope: Optional[str] = None,
+    scope: str | None = None,
 ) -> dict:
     """Open a new cycle count session.
 
@@ -69,7 +69,7 @@ async def update_counted_qty(
     count_id: str,
     item_id: str,
     counted_qty: float,
-    notes: Optional[str],
+    notes: str | None,
     organization_id: str,
 ) -> dict:
     """Record the physical count for one line item.
@@ -136,7 +136,7 @@ async def commit_cycle_count(
         if i.get("counted_qty") is not None and i.get("variance") not in (None, 0, 0.0)
     ]
 
-    committed_at = datetime.now(timezone.utc).isoformat()
+    committed_at = datetime.now(UTC).isoformat()
 
     async with transaction() as conn:
         for item in items_to_adjust:
@@ -162,5 +162,5 @@ async def commit_cycle_count(
     return count
 
 
-async def list_cycle_counts(organization_id: str, status: Optional[str] = None) -> list:
+async def list_cycle_counts(organization_id: str, status: str | None = None) -> list:
     return await cycle_count_repo.list_counts(organization_id, status=status)

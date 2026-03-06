@@ -3,8 +3,8 @@ from typing import Optional
 
 from pydantic import BaseModel, field_validator
 
-from kernel.entity import AuditedEntity
 from catalog.domain.units import ALLOWED_BASE_UNITS
+from kernel.entity import AuditedEntity
 
 
 def _validate_unit(v: str) -> str:
@@ -16,16 +16,16 @@ def _validate_unit(v: str) -> str:
 
 class ProductCreate(BaseModel):
     name: str
-    description: Optional[str] = ""
+    description: str | None = ""
     price: float
     cost: float = 0.0
     quantity: float = 0
     min_stock: int = 5
     department_id: str
-    vendor_id: Optional[str] = None
-    original_sku: Optional[str] = None
-    barcode: Optional[str] = None
-    vendor_barcode: Optional[str] = None
+    vendor_id: str | None = None
+    original_sku: str | None = None
+    barcode: str | None = None
+    vendor_barcode: str | None = None
     base_unit: str = "each"
     sell_uom: str = "each"
     pack_qty: int = 1
@@ -44,30 +44,30 @@ class ProductCreate(BaseModel):
 
 
 class ProductUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    price: Optional[float] = None
-    cost: Optional[float] = None
-    quantity: Optional[float] = None
-    min_stock: Optional[int] = None
-    department_id: Optional[str] = None
-    vendor_id: Optional[str] = None
-    barcode: Optional[str] = None
-    vendor_barcode: Optional[str] = None
-    base_unit: Optional[str] = None
-    sell_uom: Optional[str] = None
-    pack_qty: Optional[int] = None
+    name: str | None = None
+    description: str | None = None
+    price: float | None = None
+    cost: float | None = None
+    quantity: float | None = None
+    min_stock: int | None = None
+    department_id: str | None = None
+    vendor_id: str | None = None
+    barcode: str | None = None
+    vendor_barcode: str | None = None
+    base_unit: str | None = None
+    sell_uom: str | None = None
+    pack_qty: int | None = None
 
     @field_validator("base_unit", "sell_uom")
     @classmethod
-    def valid_unit(cls, v: Optional[str]) -> Optional[str]:
+    def valid_unit(cls, v: str | None) -> str | None:
         if v is None:
             return v
         return _validate_unit(v)
 
     @field_validator("pack_qty")
     @classmethod
-    def valid_pack_qty(cls, v: Optional[int]) -> Optional[int]:
+    def valid_pack_qty(cls, v: int | None) -> int | None:
         if v is not None and v < 1:
             raise ValueError("pack_qty must be at least 1")
         return v
@@ -83,11 +83,11 @@ class Product(AuditedEntity):
     min_stock: int = 5
     department_id: str
     department_name: str = ""
-    vendor_id: Optional[str] = None
+    vendor_id: str | None = None
     vendor_name: str = ""
-    original_sku: Optional[str] = None
-    barcode: Optional[str] = None
-    vendor_barcode: Optional[str] = None
+    original_sku: str | None = None
+    barcode: str | None = None
+    vendor_barcode: str | None = None
     base_unit: str = "each"
     sell_uom: str = "each"
     pack_qty: int = 1
@@ -97,12 +97,12 @@ class Product(AuditedEntity):
         return self.quantity <= self.min_stock
 
     @property
-    def margin_pct(self) -> Optional[float]:
+    def margin_pct(self) -> float | None:
         if self.price <= 0:
             return None
         return round((self.price - self.cost) / self.price * 100, 2)
 
-    def reorder_urgency(self, days_of_stock: Optional[float] = None) -> str:
+    def reorder_urgency(self, days_of_stock: float | None = None) -> str:
         if not self.is_low_stock:
             return "ok"
         if days_of_stock is None:

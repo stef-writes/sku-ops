@@ -8,29 +8,44 @@ import logging
 from pydantic_ai import Agent, RunContext
 
 from assistant.agents.core.deps import AgentDeps
+from assistant.agents.core.messages import build_message_history
 from assistant.agents.core.model_registry import get_model
 from assistant.agents.core.runner import run_specialist
-from assistant.agents.core.messages import build_message_history
 from assistant.agents.core.tokens import budget_tool_result
-from shared.infrastructure.prompt_loader import load_prompt
+from assistant.agents.finance.tools import (
+    _get_invoice_summary,
+    _get_outstanding_balances,
+    _get_pl_summary,
+    _get_revenue_summary,
+)
+from assistant.agents.finance.tools import (
+    _get_top_products as _get_finance_top_products,
+)
 
 # Tool implementations from existing specialist agents
 from assistant.agents.inventory.tools import (
-    _search_products, _search_semantic, _get_product_details,
-    _get_inventory_stats, _list_low_stock, _list_departments,
-    _list_vendors, _get_usage_velocity, _get_reorder_suggestions,
-    _get_department_health, _get_slow_movers,
-    _get_top_products, _get_department_activity, _forecast_stockout,
+    _forecast_stockout,
+    _get_department_activity,
+    _get_department_health,
+    _get_inventory_stats,
+    _get_product_details,
+    _get_reorder_suggestions,
+    _get_slow_movers,
+    _get_top_products,
+    _get_usage_velocity,
+    _list_departments,
+    _list_low_stock,
+    _list_vendors,
+    _search_products,
+    _search_semantic,
 )
 from assistant.agents.ops.tools import (
-    _get_contractor_history, _get_job_materials,
-    _list_recent_withdrawals, _list_pending_material_requests,
+    _get_contractor_history,
+    _get_job_materials,
+    _list_pending_material_requests,
+    _list_recent_withdrawals,
 )
-from assistant.agents.finance.tools import (
-    _get_invoice_summary, _get_outstanding_balances,
-    _get_revenue_summary, _get_pl_summary,
-    _get_top_products as _get_finance_top_products,
-)
+from shared.infrastructure.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
 

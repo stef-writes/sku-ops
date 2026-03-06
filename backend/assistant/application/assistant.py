@@ -11,19 +11,19 @@ import logging
 
 from pydantic_ai import Agent as SynthAgent
 
-from shared.infrastructure.config import ANTHROPIC_AVAILABLE, OPENROUTER_AVAILABLE, LLM_SETUP_URL
-from shared.infrastructure.prompt_loader import load_prompt
-from assistant.infrastructure.llm.catalog import resolve_tier_model
-from assistant.infrastructure.llm import get_model
-from assistant.agents.core.deps import AgentDeps
-from assistant.agents.core.contracts import AgentResult, UsageInfo
-from assistant.agents.routing.router import is_trivial, classify_domain
-from assistant.agents.routing.lookups import try_lookup
-from assistant.agents.routing.dag import match_report, execute_plan
-from assistant.agents.tools.registry import run_tool
-from assistant.agents.memory.store import recall
-from assistant.agents.memory.extract import extract_and_save
 import assistant.agents.unified.agent as _unified_agent
+from assistant.agents.core.contracts import AgentResult, UsageInfo
+from assistant.agents.core.deps import AgentDeps
+from assistant.agents.memory.extract import extract_and_save
+from assistant.agents.memory.store import recall
+from assistant.agents.routing.dag import execute_plan, match_report
+from assistant.agents.routing.lookups import try_lookup
+from assistant.agents.routing.router import classify_domain, is_trivial
+from assistant.agents.tools.registry import run_tool
+from assistant.infrastructure.llm import get_model
+from assistant.infrastructure.llm.catalog import resolve_tier_model
+from shared.infrastructure.config import ANTHROPIC_AVAILABLE, LLM_SETUP_URL, OPENROUTER_AVAILABLE
+from shared.infrastructure.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
 

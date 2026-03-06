@@ -1,8 +1,12 @@
 """Org settings application service — safe for cross-context import."""
 from identity.infrastructure.org_settings_repo import (
-    get_org_settings as _get,
-    upsert_org_settings as _upsert,
     clear_xero_tokens as _clear,
+)
+from identity.infrastructure.org_settings_repo import (
+    get_org_settings as _get,
+)
+from identity.infrastructure.org_settings_repo import (
+    upsert_org_settings as _upsert,
 )
 
 

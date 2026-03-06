@@ -2,10 +2,10 @@
 import logging
 from typing import Any, Optional
 
+from finance.adapters.invoicing_factory import get_invoicing_gateway
 from finance.infrastructure.invoice_repo import invoice_repo as _default_invoice_repo
 from finance.ports.invoice_repo_port import InvoiceRepoPort
 from identity.application.org_service import get_org_settings
-from finance.adapters.invoicing_factory import get_invoicing_gateway
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ async def mark_paid_for_withdrawal(
 
 
 async def create_invoice_from_withdrawals(
-    withdrawal_ids: list, organization_id: Optional[str] = None, conn: Any = None,
+    withdrawal_ids: list, organization_id: str | None = None, conn: Any = None,
     invoice_repo: InvoiceRepoPort = _default_invoice_repo,
 ) -> dict:
     return await invoice_repo.create_from_withdrawals(withdrawal_ids, organization_id=organization_id, conn=conn)

@@ -1,10 +1,10 @@
 """Tests for inventory service and withdrawal stock changes."""
 import pytest
 
+from catalog.application.product_lifecycle import create_product
+from inventory.application.inventory_service import process_withdrawal_stock_changes
 from inventory.domain.errors import InsufficientStockError
 from operations.domain.withdrawal import WithdrawalItem
-from inventory.application.inventory_service import process_withdrawal_stock_changes
-from catalog.application.product_lifecycle import create_product
 
 
 @pytest.mark.asyncio

@@ -20,11 +20,11 @@ Exit codes:
 
 The script is deliberately sequential and verbose so every failure is obvious.
 """
-import asyncio
 import argparse
-import sys
-import os
+import asyncio
 import logging
+import os
+import sys
 
 # Bootstrap Django-style: must happen before any app imports
 os.environ.setdefault("ENV", "development")
@@ -135,9 +135,8 @@ class SmokeTestRunner:
                 self.created_invoice_id = result.xero_invoice_id
                 self._ok(name, f"xero_invoice_id={result.xero_invoice_id}")
                 return True
-            else:
-                self._fail(name, result.error or "No InvoiceID returned")
-                return False
+            self._fail(name, result.error or "No InvoiceID returned")
+            return False
         except Exception as e:
             self._fail(name, str(e))
             return False
@@ -213,9 +212,8 @@ class SmokeTestRunner:
                 self.created_bill_id = result.xero_invoice_id
                 self._ok(name, f"xero_bill_id={result.xero_invoice_id}")
                 return True
-            else:
-                self._fail(name, result.error or "No InvoiceID returned for bill")
-                return False
+            self._fail(name, result.error or "No InvoiceID returned for bill")
+            return False
         except Exception as e:
             self._fail(name, str(e))
             return False
@@ -303,9 +301,8 @@ class SmokeTestRunner:
                 self.created_cn_id = result.xero_invoice_id
                 self._ok(name, f"xero_credit_note_id={result.xero_invoice_id}")
                 return True
-            else:
-                self._fail(name, result.error or "No CreditNoteID returned")
-                return False
+            self._fail(name, result.error or "No CreditNoteID returned")
+            return False
         except Exception as e:
             self._fail(name, str(e))
             return False
@@ -366,19 +363,18 @@ class SmokeTestRunner:
                 PASS, self.passed
             )
             return 0
-        else:
-            logger.error(
-                "%d passed  %d FAILED — fix failures before enabling live sync.",
-                self.passed, self.failed,
-            )
-            # Emergency: if we failed to clean up, remind the operator
-            if self.created_invoice_id:
-                logger.warning("ACTION REQUIRED: Manually void invoice %s in Xero", self.created_invoice_id)
-            if self.created_bill_id:
-                logger.warning("ACTION REQUIRED: Manually void bill %s in Xero", self.created_bill_id)
-            if self.created_cn_id:
-                logger.warning("ACTION REQUIRED: Manually void credit note %s in Xero", self.created_cn_id)
-            return 1
+        logger.error(
+            "%d passed  %d FAILED — fix failures before enabling live sync.",
+            self.passed, self.failed,
+        )
+        # Emergency: if we failed to clean up, remind the operator
+        if self.created_invoice_id:
+            logger.warning("ACTION REQUIRED: Manually void invoice %s in Xero", self.created_invoice_id)
+        if self.created_bill_id:
+            logger.warning("ACTION REQUIRED: Manually void bill %s in Xero", self.created_bill_id)
+        if self.created_cn_id:
+            logger.warning("ACTION REQUIRED: Manually void credit note %s in Xero", self.created_cn_id)
+        return 1
 
 
 async def _main(org_id: str) -> int:

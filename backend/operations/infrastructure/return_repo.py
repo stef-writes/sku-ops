@@ -7,7 +7,7 @@ from operations.domain.returns import MaterialReturn
 from shared.infrastructure.database import get_connection
 
 
-def _row_to_dict(row) -> Optional[dict]:
+def _row_to_dict(row) -> dict | None:
     if row is None:
         return None
     d = dict(row) if hasattr(row, "keys") else {}
@@ -16,7 +16,7 @@ def _row_to_dict(row) -> Optional[dict]:
     return d
 
 
-async def insert(ret: Union[MaterialReturn, dict], conn=None) -> None:
+async def insert(ret: MaterialReturn | dict, conn=None) -> None:
     ret_dict = ret if isinstance(ret, dict) else ret.model_dump()
     in_transaction = conn is not None
     conn = conn or get_connection()
@@ -72,7 +72,7 @@ async def insert(ret: Union[MaterialReturn, dict], conn=None) -> None:
         await conn.commit()
 
 
-async def get_by_id(return_id: str, organization_id: Optional[str] = None) -> Optional[dict]:
+async def get_by_id(return_id: str, organization_id: str | None = None) -> dict | None:
     conn = get_connection()
     if organization_id:
         cursor = await conn.execute(
@@ -86,12 +86,12 @@ async def get_by_id(return_id: str, organization_id: Optional[str] = None) -> Op
 
 
 async def list_returns(
-    contractor_id: Optional[str] = None,
-    withdrawal_id: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    contractor_id: str | None = None,
+    withdrawal_id: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     limit: int = 500,
-    organization_id: Optional[str] = None,
+    organization_id: str | None = None,
 ) -> list:
     conn = get_connection()
     org_id = organization_id or "default"
@@ -116,11 +116,16 @@ async def list_returns(
     return [_row_to_dict(r) for r in rows]
 
 
-async def list_by_withdrawal(withdrawal_id: str) -> list:
+async def list_by_withdrawal(withdrawal_id: str, organization_id: str | None = None) -> list:
     conn = get_connection()
+    params: list = [withdrawal_id]
+    where = "WHERE withdrawal_id = ?"
+    if organization_id:
+        where += " AND (organization_id = ? OR organization_id IS NULL)"
+        params.append(organization_id)
     cursor = await conn.execute(
-        "SELECT * FROM returns WHERE withdrawal_id = ? ORDER BY created_at DESC",
-        (withdrawal_id,),
+        f"SELECT * FROM returns {where} ORDER BY created_at DESC",
+        params,
     )
     rows = await cursor.fetchall()
     return [_row_to_dict(r) for r in rows]

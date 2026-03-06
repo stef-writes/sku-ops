@@ -1,16 +1,17 @@
 """Return service: validate against original withdrawal, restock, create credit note."""
-from typing import Callable, Awaitable, Optional
+from collections.abc import Awaitable, Callable
+from typing import Optional
 
-from kernel.types import CurrentUser
-from kernel.errors import DomainError, ResourceNotFoundError
-from shared.infrastructure.database import transaction
+from finance.application.ledger_service import record_return as _record_ledger
 from inventory.domain.stock import StockTransactionType
+from kernel.errors import DomainError, ResourceNotFoundError
+from kernel.types import CurrentUser
 from operations.domain.returns import MaterialReturn, ReturnCreate, ReturnItem
 from operations.infrastructure.return_repo import return_repo as _default_return_repo
 from operations.ports.return_repo_port import ReturnRepoPort
-from finance.application.ledger_service import record_return as _record_ledger
+from shared.infrastructure.database import transaction
 
-GetWithdrawalFn = Callable[..., Awaitable[Optional[dict]]]
+GetWithdrawalFn = Callable[..., Awaitable[dict | None]]
 RestockFn = Callable[..., Awaitable[None]]
 CreateCreditNoteFn = Optional[Callable[..., Awaitable[dict]]]
 

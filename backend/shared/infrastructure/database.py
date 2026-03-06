@@ -5,4 +5,4 @@ continue to work unchanged.
 """
 from shared.infrastructure.db import close_db, get_connection, init_db, transaction
 
-__all__ = ["init_db", "get_connection", "transaction", "close_db"]
+__all__ = ["close_db", "get_connection", "init_db", "transaction"]

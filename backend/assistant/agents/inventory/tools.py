@@ -1,21 +1,28 @@
 """Inventory agent tool implementations — DB queries and search helpers."""
 import json
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 from assistant.agents.tools.registry import register as _reg
-
-from shared.infrastructure.config import OPENAI_API_KEY
-from shared.infrastructure.database import get_connection
-from operations.application.queries import list_withdrawals
 from assistant.agents.tools.search import get_index
 from catalog.application.queries import (
-    list_products as catalog_list_products,
-    list_low_stock as catalog_list_low_stock,
-    list_departments as catalog_list_departments,
-    list_vendors as catalog_list_vendors,
     get_sku_counters,
 )
+from catalog.application.queries import (
+    list_departments as catalog_list_departments,
+)
+from catalog.application.queries import (
+    list_low_stock as catalog_list_low_stock,
+)
+from catalog.application.queries import (
+    list_products as catalog_list_products,
+)
+from catalog.application.queries import (
+    list_vendors as catalog_list_vendors,
+)
+from operations.application.queries import list_withdrawals
+from shared.infrastructure.config import OPENAI_API_KEY
+from shared.infrastructure.database import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +176,7 @@ async def _list_vendors(org_id: str) -> str:
 async def _get_usage_velocity(args: dict, org_id: str) -> str:
     sku = (args.get("sku") or "").strip().upper()
     days = min(int(args.get("days") or 30), 365)
-    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     conn = get_connection()
     cur = await conn.execute(
         "SELECT id, name, quantity, sell_uom FROM products WHERE UPPER(sku) = ? AND (organization_id = ? OR organization_id IS NULL)",
@@ -206,7 +213,7 @@ async def _get_usage_velocity(args: dict, org_id: str) -> str:
 
 async def _get_reorder_suggestions(args: dict, org_id: str) -> str:
     limit = min(int(args.get("limit") or 20), 50)
-    since = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    since = (datetime.now(UTC) - timedelta(days=30)).isoformat()
     conn = get_connection()
     low_stock = await catalog_list_low_stock(limit=100, organization_id=org_id)
     if not low_stock:
@@ -280,7 +287,7 @@ async def _get_top_products(args: dict, org_id: str) -> str:
     if by not in ("volume", "revenue"):
         by = "revenue"
     limit = min(int(args.get("limit") or 10), 50)
-    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
     product_map: dict[str, dict] = {}
     for w in withdrawals:
@@ -303,7 +310,7 @@ async def _get_top_products(args: dict, org_id: str) -> str:
 async def _get_department_activity(args: dict, org_id: str) -> str:
     dept_code = (args.get("dept_code") or "").strip().upper()
     days = min(int(args.get("days") or 30), 365)
-    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     conn = get_connection()
     cur = await conn.execute(
         """SELECT p.id, p.sku, p.name, p.quantity, p.min_stock
@@ -349,7 +356,7 @@ async def _get_department_activity(args: dict, org_id: str) -> str:
 
 async def _forecast_stockout(args: dict, org_id: str) -> str:
     limit = min(int(args.get("limit") or 15), 50)
-    since = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    since = (datetime.now(UTC) - timedelta(days=30)).isoformat()
     conn = get_connection()
     cur = await conn.execute(
         """SELECT id, sku, name, quantity, min_stock, department_name
@@ -397,7 +404,7 @@ async def _forecast_stockout(args: dict, org_id: str) -> str:
 async def _get_slow_movers(args: dict, org_id: str) -> str:
     limit = min(int(args.get("limit") or 20), 100)
     days = min(int(args.get("days") or 30), 365)
-    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     conn = get_connection()
     cur = await conn.execute(
         """SELECT p.id, p.sku, p.name, p.quantity, p.sell_uom, p.min_stock,

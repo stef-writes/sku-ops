@@ -5,17 +5,17 @@ import random
 import time
 from enum import Enum
 
-from shared.infrastructure.config import ANTHROPIC_AVAILABLE, OPENROUTER_AVAILABLE
-from shared.infrastructure.logging_config import trace_id_var, agent_name_var, operation_var
-from assistant.infrastructure.agent_run_repo import log_agent_run
-from assistant.agents.core.model_registry import calc_cost, get_model_name
 from assistant.agents.core.contracts import AgentConfig, AgentResult, UsageInfo
-from assistant.agents.core.validators import validate_response
 from assistant.agents.core.messages import (
     extract_text_history,
     extract_tool_calls,
     extract_tool_calls_detailed,
 )
+from assistant.agents.core.model_registry import calc_cost, get_model_name
+from assistant.agents.core.validators import validate_response
+from assistant.infrastructure.agent_run_repo import log_agent_run
+from shared.infrastructure.config import ANTHROPIC_AVAILABLE, OPENROUTER_AVAILABLE
+from shared.infrastructure.logging_config import agent_name_var, operation_var, trace_id_var
 
 logger = logging.getLogger(__name__)
 
@@ -165,7 +165,7 @@ async def run_agent(
                 mode=mode, duration_ms=duration_ms, attempts=attempts,
             )
             return result
-        except asyncio.TimeoutError:
+        except TimeoutError:
             last_exc = RuntimeError(f"{agent_name} timed out after {timeout_seconds}s")
             kind, retriable, retry_after = _ErrorKind.TIMEOUT, True, None
         except Exception as e:

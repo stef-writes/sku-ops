@@ -1,9 +1,9 @@
 """Load versioned .md prompt files co-located with their owning modules."""
-from functools import lru_cache
+from functools import cache, lru_cache
 from pathlib import Path
 
 
-@lru_cache(maxsize=None)
+@cache
 def load_prompt(anchor: str, filename: str) -> str:
     """Return the contents of *filename* resolved relative to *anchor*.
 

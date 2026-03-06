@@ -11,7 +11,6 @@ from pydantic import BaseModel
 
 from kernel.entity import AuditedEntity, Entity
 
-
 # ── Status enums ───────────────────────────────────────────────────────────────
 
 class POStatus(str, Enum):
@@ -31,15 +30,15 @@ class POItemStatus(str, Enum):
 class PurchaseOrder(AuditedEntity):
     vendor_id: str
     vendor_name: str = ""
-    document_date: Optional[str] = None
-    total: Optional[float] = None
+    document_date: str | None = None
+    total: float | None = None
     status: POStatus = POStatus.ORDERED
-    notes: Optional[str] = None
+    notes: str | None = None
     created_by_id: str = ""
     created_by_name: str = ""
-    received_at: Optional[str] = None
-    received_by_id: Optional[str] = None
-    received_by_name: Optional[str] = None
+    received_at: str | None = None
+    received_by_id: str | None = None
+    received_by_name: str | None = None
     organization_id: str = "default"
 
     ALLOWED_TRANSITIONS: ClassVar[dict[str, set[str]]] = {
@@ -55,7 +54,7 @@ class PurchaseOrder(AuditedEntity):
 class PurchaseOrderItem(Entity):
     po_id: str
     name: str
-    original_sku: Optional[str] = None
+    original_sku: str | None = None
     ordered_qty: float = 1
     delivered_qty: float = 0
     unit_price: float = 0.0
@@ -65,7 +64,7 @@ class PurchaseOrderItem(Entity):
     pack_qty: int = 1
     suggested_department: str = "HDW"
     status: POItemStatus = POItemStatus.ORDERED
-    product_id: Optional[str] = None
+    product_id: str | None = None
     organization_id: str = "default"
 
     ALLOWED_TRANSITIONS: ClassVar[dict[str, set[str]]] = {
@@ -83,17 +82,17 @@ class PurchaseOrderItem(Entity):
 class POItemCreate(BaseModel):
     """Typed input for a single PO line item (from document parse or manual entry)."""
     name: str
-    original_sku: Optional[str] = None
+    original_sku: str | None = None
     quantity: float = 1
-    ordered_qty: Optional[float] = None
-    delivered_qty: Optional[float] = None
+    ordered_qty: float | None = None
+    delivered_qty: float | None = None
     price: float = 0.0
-    cost: Optional[float] = None
+    cost: float | None = None
     base_unit: str = "each"
     sell_uom: str = "each"
     pack_qty: int = 1
-    suggested_department: Optional[str] = None
-    product_id: Optional[str] = None
+    suggested_department: str | None = None
+    product_id: str | None = None
     selected: bool = True
     ai_parsed: bool = False
 
@@ -101,29 +100,29 @@ class POItemCreate(BaseModel):
 class CreatePORequest(BaseModel):
     vendor_name: str
     create_vendor_if_missing: bool = True
-    department_id: Optional[str] = None
-    document_date: Optional[str] = None
-    total: Optional[float] = None
-    products: List[POItemCreate]
+    department_id: str | None = None
+    document_date: str | None = None
+    total: float | None = None
+    products: list[POItemCreate]
 
 
 class ReceiveItemUpdate(BaseModel):
     id: str
-    delivered_qty: Optional[float] = None
-    product_id: Optional[str] = None
-    name: Optional[str] = None
-    cost: Optional[float] = None
-    unit_price: Optional[float] = None
-    suggested_department: Optional[str] = None
-    base_unit: Optional[str] = None
-    sell_uom: Optional[str] = None
-    pack_qty: Optional[int] = None
-    barcode: Optional[str] = None
+    delivered_qty: float | None = None
+    product_id: str | None = None
+    name: str | None = None
+    cost: float | None = None
+    unit_price: float | None = None
+    suggested_department: str | None = None
+    base_unit: str | None = None
+    sell_uom: str | None = None
+    pack_qty: int | None = None
+    barcode: str | None = None
 
 
 class ReceiveItemsRequest(BaseModel):
-    items: List[ReceiveItemUpdate]
+    items: list[ReceiveItemUpdate]
 
 
 class MarkDeliveryRequest(BaseModel):
-    item_ids: List[str]
+    item_ids: list[str]

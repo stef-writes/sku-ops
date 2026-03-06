@@ -1,20 +1,23 @@
 """Material withdrawal (POS) routes."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 
-from kernel.types import CurrentUser
+from catalog.application.queries import list_products
+from finance.application.invoice_service import (
+    create_invoice_from_withdrawals,
+    mark_paid_for_withdrawal,
+)
+from finance.application.ledger_service import record_payment as _record_payment
 from identity.application.auth_service import get_current_user, require_role
 from identity.application.org_service import get_org_settings
-from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalCreate
-from finance.application.invoice_service import mark_paid_for_withdrawal, create_invoice_from_withdrawals
-from finance.application.ledger_service import record_payment as _record_payment
 from identity.application.user_service import get_user_by_id
-from catalog.application.queries import list_products
 from inventory.application.inventory_service import process_withdrawal_stock_changes
-from operations.infrastructure.withdrawal_repo import withdrawal_repo
+from kernel.types import CurrentUser
 from operations.application.withdrawal_service import create_withdrawal as _do_create_withdrawal
+from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalCreate
+from operations.infrastructure.withdrawal_repo import withdrawal_repo
 from shared.infrastructure.middleware.audit import audit_log
 
 
@@ -71,11 +74,11 @@ async def create_withdrawal_for_contractor(
 
 @router.get("")
 async def get_withdrawals(
-    contractor_id: Optional[str] = None,
-    payment_status: Optional[str] = None,
-    billing_entity: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    contractor_id: str | None = None,
+    payment_status: str | None = None,
+    billing_entity: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     current_user: CurrentUser = Depends(get_current_user),
 ):
     org_id = current_user.organization_id
@@ -110,7 +113,7 @@ async def mark_withdrawal_paid(withdrawal_id: str, request: Request, current_use
     withdrawal = await withdrawal_repo.get_by_id(withdrawal_id, org_id)
     if not withdrawal:
         raise HTTPException(status_code=404, detail="Withdrawal not found")
-    paid_at = datetime.now(timezone.utc).isoformat()
+    paid_at = datetime.now(UTC).isoformat()
     result = await withdrawal_repo.mark_paid(withdrawal_id, paid_at)
     await mark_paid_for_withdrawal(withdrawal_id)
     await _record_payment(
@@ -131,11 +134,11 @@ async def mark_withdrawal_paid(withdrawal_id: str, request: Request, current_use
 
 
 @router.put("/bulk-mark-paid")
-async def bulk_mark_paid(request: Request, withdrawal_ids: List[str] = Body(...), current_user: CurrentUser = Depends(require_role("admin"))):
+async def bulk_mark_paid(request: Request, withdrawal_ids: list[str] = Body(...), current_user: CurrentUser = Depends(require_role("admin"))):
     if len(withdrawal_ids) > 200:
         raise HTTPException(status_code=400, detail="Cannot mark more than 200 withdrawals at once")
     org_id = current_user.organization_id
-    paid_at = datetime.now(timezone.utc).isoformat()
+    paid_at = datetime.now(UTC).isoformat()
     try:
         updated = await withdrawal_repo.bulk_mark_paid(withdrawal_ids, paid_at, organization_id=org_id)
         for wid in withdrawal_ids:

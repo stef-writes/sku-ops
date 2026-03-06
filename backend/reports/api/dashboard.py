@@ -1,23 +1,28 @@
 """Dashboard stats routes."""
 import asyncio
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from identity.application.auth_service import get_current_user, require_role
-from kernel.types import CurrentUser, round_money
 from catalog.application.queries import (
-    count_all_products, count_low_stock, list_low_stock, count_vendors, list_products,
+    count_all_products,
+    count_low_stock,
+    count_vendors,
+    list_low_stock,
+    list_products,
 )
-from identity.application.user_service import count_contractors
-from operations.application.queries import list_withdrawals
 from finance.application import ledger_queries as ledger_repo
+from identity.application.auth_service import get_current_user, require_role
+from identity.application.user_service import count_contractors
+from kernel.types import CurrentUser, round_money
+from operations.application.queries import list_withdrawals
 from shared.infrastructure.database import get_connection
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
-def _parse_date_range(start_date: Optional[str], end_date: Optional[str]):
+def _parse_date_range(start_date: str | None, end_date: str | None):
     """Return (start_iso, end_iso) falling back to sensible defaults when absent."""
     return start_date or None, end_date or None
 
@@ -50,11 +55,11 @@ def _build_daily_chart(withdrawals: list, start: datetime, end: datetime) -> lis
 
 @router.get("/stats")
 async def get_dashboard_stats(
-    start_date: Optional[str] = Query(None),
-    end_date: Optional[str] = Query(None),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     org_id = current_user.organization_id
     sd, ed = _parse_date_range(start_date, end_date)
 
@@ -162,10 +167,10 @@ async def get_dashboard_stats(
 async def get_dashboard_transactions(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    start_date: Optional[str] = Query(None),
-    end_date: Optional[str] = Query(None),
-    contractor_id: Optional[str] = Query(None),
-    payment_status: Optional[str] = Query(None),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    contractor_id: str | None = Query(None),
+    payment_status: str | None = Query(None),
     current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
 ):
     """Paginated transactions for the dashboard. Supports date range + filters."""

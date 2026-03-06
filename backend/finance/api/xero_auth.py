@@ -1,23 +1,23 @@
 """Xero OAuth 2.0 routes — connect, callback, disconnect, tenants."""
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from urllib.parse import urlencode
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 
+from finance.adapters.invoicing_factory import get_invoicing_gateway
+from finance.adapters.xero_adapter import XeroAdapter
 from identity.application.auth_service import require_role
-from kernel.types import CurrentUser
-from shared.infrastructure.config import XERO_CLIENT_ID, XERO_CLIENT_SECRET, XERO_REDIRECT_URI
-from shared.infrastructure.database import get_connection
 from identity.application.org_service import (
     clear_xero_tokens,
     get_org_settings,
     upsert_org_settings,
 )
-from finance.adapters.xero_adapter import XeroAdapter
-from finance.adapters.invoicing_factory import get_invoicing_gateway
+from kernel.types import CurrentUser
+from shared.infrastructure.config import XERO_CLIENT_ID, XERO_CLIENT_SECRET, XERO_REDIRECT_URI
+from shared.infrastructure.database import get_connection
 
 router = APIRouter(prefix="/xero", tags=["xero"])
 
@@ -28,7 +28,7 @@ XERO_SCOPES = "openid profile email accounting.transactions accounting.contacts 
 
 async def _save_oauth_state(state: str, org_id: str) -> None:
     conn = get_connection()
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     await conn.execute(
         """INSERT INTO oauth_states (state, org_id, created_at) VALUES (?, ?, ?)
            ON CONFLICT(state) DO UPDATE SET org_id = ?, created_at = ?""",
@@ -102,8 +102,8 @@ async def xero_callback(code: str = "", state: str = "", error: str = ""):
         raise HTTPException(status_code=502, detail=f"Xero token exchange failed: {resp.text}")
 
     token_data = resp.json()
-    expiry_ts = datetime.now(timezone.utc).timestamp() + token_data.get("expires_in", 1800)
-    expiry_iso = datetime.fromtimestamp(expiry_ts, tz=timezone.utc).isoformat()
+    expiry_ts = datetime.now(UTC).timestamp() + token_data.get("expires_in", 1800)
+    expiry_iso = datetime.fromtimestamp(expiry_ts, tz=UTC).isoformat()
 
     settings = await get_org_settings(org_id)
     updated = settings.model_copy(update={

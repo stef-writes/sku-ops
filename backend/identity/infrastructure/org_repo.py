@@ -4,13 +4,13 @@ from typing import Optional
 from shared.infrastructure.database import get_connection
 
 
-def _row_to_dict(row) -> Optional[dict]:
+def _row_to_dict(row) -> dict | None:
     if row is None:
         return None
     return dict(row) if hasattr(row, "keys") else {}
 
 
-async def get_by_id(org_id: str) -> Optional[dict]:
+async def get_by_id(org_id: str) -> dict | None:
     conn = get_connection()
     cursor = await conn.execute(
         "SELECT id, name, slug, created_at FROM organizations WHERE id = ?",
@@ -20,7 +20,7 @@ async def get_by_id(org_id: str) -> Optional[dict]:
     return _row_to_dict(row)
 
 
-async def get_by_slug(slug: str) -> Optional[dict]:
+async def get_by_slug(slug: str) -> dict | None:
     conn = get_connection()
     cursor = await conn.execute(
         "SELECT id, name, slug, created_at FROM organizations WHERE slug = ?",

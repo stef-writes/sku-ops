@@ -54,4 +54,5 @@ INDEXES: list[str] = [
     "CREATE INDEX IF NOT EXISTS idx_cycle_counts_status ON cycle_counts(status)",
     "CREATE INDEX IF NOT EXISTS idx_cycle_count_items_count ON cycle_count_items(cycle_count_id)",
     "CREATE INDEX IF NOT EXISTS idx_cycle_count_items_product ON cycle_count_items(product_id)",
+    "CREATE INDEX IF NOT EXISTS idx_cycle_counts_org_status_created ON cycle_counts(organization_id, status, created_at)",
 ]

@@ -1,6 +1,6 @@
 """Factory for invoicing gateway. Returns real adapter when connected, stub otherwise."""
-from identity.domain.org_settings import OrgSettings
 from finance.adapters.stub_xero import StubXeroAdapter
+from identity.domain.org_settings import OrgSettings
 
 
 def get_invoicing_gateway(settings: OrgSettings):

@@ -8,10 +8,10 @@ from kernel.entity import Entity
 
 class VendorCreate(BaseModel):
     name: str
-    contact_name: Optional[str] = ""
-    email: Optional[str] = ""
-    phone: Optional[str] = ""
-    address: Optional[str] = ""
+    contact_name: str | None = ""
+    email: str | None = ""
+    phone: str | None = ""
+    address: str | None = ""
 
 
 class Vendor(Entity):

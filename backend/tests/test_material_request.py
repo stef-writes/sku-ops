@@ -2,7 +2,14 @@
 import pytest
 from fastapi import HTTPException
 
+from catalog.application.product_lifecycle import create_product
+from inventory.application.inventory_service import process_import_stock_changes
 from kernel.types import CurrentUser
+from operations.api.material_requests import (
+    create_material_request,
+    list_material_requests,
+    process_material_request,
+)
 from operations.domain.material_request import (
     MaterialRequest,
     MaterialRequestCreate,
@@ -10,13 +17,6 @@ from operations.domain.material_request import (
 )
 from operations.domain.withdrawal import WithdrawalItem
 from operations.infrastructure.material_request_repo import material_request_repo
-from operations.api.material_requests import (
-    create_material_request,
-    list_material_requests,
-    process_material_request,
-)
-from catalog.application.product_lifecycle import create_product
-from inventory.application.inventory_service import process_import_stock_changes
 
 
 def _admin():

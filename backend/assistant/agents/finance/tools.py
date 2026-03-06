@@ -1,10 +1,9 @@
 """Finance helper functions — DB query implementations for the finance agent."""
 import json
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 from assistant.agents.tools.registry import register as _reg
-
 from finance.application.invoice_service import list_invoices
 from operations.application.queries import list_withdrawals
 
@@ -52,7 +51,7 @@ async def _get_outstanding_balances(args: dict, org_id: str) -> str:
 
 async def _get_revenue_summary(args: dict, org_id: str) -> str:
     days = min(int(args.get("days") or 30), 365)
-    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
     total_revenue = sum(w.get("total", 0) for w in withdrawals)
     total_tax = sum(w.get("tax", 0) for w in withdrawals)
@@ -73,7 +72,7 @@ async def _get_revenue_summary(args: dict, org_id: str) -> str:
 
 async def _get_pl_summary(args: dict, org_id: str) -> str:
     days = min(int(args.get("days") or 30), 365)
-    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
     total_revenue = sum(w.get("total", 0) for w in withdrawals)
     total_cost = sum(w.get("cost_total", 0) for w in withdrawals)
@@ -92,7 +91,7 @@ async def _get_pl_summary(args: dict, org_id: str) -> str:
 async def _get_top_products(args: dict, org_id: str) -> str:
     days = min(int(args.get("days") or 7), 365)
     limit = min(int(args.get("limit") or 10), 50)
-    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
     product_map: dict[str, dict] = {}
     for w in withdrawals:

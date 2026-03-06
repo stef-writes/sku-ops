@@ -3,10 +3,10 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from identity.application.auth_service import get_current_user, require_role
-from shared.infrastructure.middleware.audit import audit_log
-from kernel.errors import ResourceNotFoundError
-from kernel.types import CurrentUser
+from catalog.api.schemas import SuggestUomRequest
+from catalog.application.product_lifecycle import create_product as lifecycle_create
+from catalog.application.product_lifecycle import delete_product as lifecycle_delete
+from catalog.application.product_lifecycle import update_product as lifecycle_update
 from catalog.domain.barcode import validate_barcode
 from catalog.domain.errors import DuplicateBarcodeError, InvalidBarcodeError
 from catalog.domain.product import Product, ProductCreate, ProductUpdate
@@ -14,12 +14,13 @@ from catalog.domain.units import compute_sell_fields
 from catalog.infrastructure.department_repo import department_repo
 from catalog.infrastructure.product_repo import product_repo
 from catalog.infrastructure.vendor_repo import vendor_repo
-from catalog.application.product_lifecycle import create_product as lifecycle_create, delete_product as lifecycle_delete, update_product as lifecycle_update
-from inventory.application.uom_classifier import classify_uom
+from identity.application.auth_service import get_current_user, require_role
 from inventory.application.inventory_service import process_import_stock_changes
+from inventory.application.uom_classifier import classify_uom
+from kernel.errors import ResourceNotFoundError
+from kernel.types import CurrentUser
 from shared.infrastructure.config import LLM_AVAILABLE
-
-from catalog.api.schemas import SuggestUomRequest
+from shared.infrastructure.middleware.audit import audit_log
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -49,10 +50,10 @@ def _strip_for_contractor(product: dict) -> dict:
 
 @router.get("")
 async def get_products(
-    department_id: Optional[str] = None,
-    search: Optional[str] = None,
+    department_id: str | None = None,
+    search: str | None = None,
     low_stock: bool = False,
-    limit: Optional[int] = Query(None, ge=1, le=500),
+    limit: int | None = Query(None, ge=1, le=500),
     offset: int = Query(0, ge=0),
     current_user: CurrentUser = Depends(get_current_user),
 ):

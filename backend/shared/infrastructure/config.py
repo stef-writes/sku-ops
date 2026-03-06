@@ -12,6 +12,7 @@ When ENV is unset, defaults to development.
 import os
 from pathlib import Path
 
+
 # Project root = backend/ (walk up from this file to find it)
 def _find_backend_root() -> Path:
     """Locate the backend root by finding the directory containing server.py."""
@@ -24,18 +25,23 @@ def _find_backend_root() -> Path:
 
 PROJECT_ROOT = _find_backend_root()
 
-# Load .env from the backend root (where developers and docs expect it)
+# Resolve the runtime environment from the real process environment first.
+# Deployed environments must inject vars explicitly rather than inheriting
+# a stray local backend/.env file from the filesystem.
+_requested_env = os.environ.get("ENV", "").lower().strip()
+_ENV = _requested_env or "development"
+
+# Load backend/.env only for local-style runs. This keeps developer ergonomics
+# for dev/test while making staging/production rely strictly on injected vars.
 _env_file = PROJECT_ROOT / ".env"
-if _env_file.exists():
+if _ENV in {"development", "test"} and _env_file.exists():
     from dotenv import load_dotenv
     load_dotenv(_env_file)
-
-_ENV = os.environ.get("ENV", "development").lower().strip()
 
 
 def _is(env: str) -> bool:
     """Check if current env matches."""
-    return _ENV == env
+    return env == _ENV
 
 
 # Environment flags
@@ -53,13 +59,18 @@ DATABASE_URL = os.environ.get("DATABASE_URL") or (
 )
 
 # Auth
+_DEFAULT_JWT_SECRET = "hardware-store-secret-key"
+
 def _resolve_jwt_secret() -> str:
     raw = os.environ.get("JWT_SECRET", "").strip()
-    if is_production and (not raw or raw == "hardware-store-secret-key"):
+    if is_production and (not raw or raw == _DEFAULT_JWT_SECRET):
         raise RuntimeError("JWT_SECRET must be set in production. Do not use default.")
-    if is_staging and not raw:
-        raise RuntimeError("JWT_SECRET must be set in staging.")
-    return raw or "hardware-store-secret-key"
+    if is_staging and (not raw or raw == _DEFAULT_JWT_SECRET):
+        raise RuntimeError(
+            "JWT_SECRET must be set in staging and must not be the default. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
+    return raw or _DEFAULT_JWT_SECRET
 
 JWT_SECRET = _resolve_jwt_secret()
 JWT_ALGORITHM = "HS256"
@@ -104,11 +115,11 @@ def _demo_password() -> str:
 DEMO_USER_EMAIL = _demo_email()
 DEMO_USER_PASSWORD = _demo_password()
 
-# Seed on startup: always in dev/test; in staging/prod only if demo creds configured
-seed_on_startup = is_development or is_test or bool(DEMO_USER_EMAIL)
+# Seed on startup: dev/test only. Never in production, even if demo creds are set.
+seed_on_startup = (is_development or is_test) and bool(DEMO_USER_EMAIL)
 
-# Reset endpoint: dev/test/demo only. Set ALLOW_RESET=true to enable in staging/prod.
-ALLOW_RESET = is_development or is_test or os.environ.get("ALLOW_RESET", "").lower() == "true"
+# Reset/seed endpoints: dev/test only. Cannot be enabled in production or staging.
+ALLOW_RESET = is_development or is_test
 
 # AI - Anthropic Claude. Set ANTHROPIC_API_KEY to enable.
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()

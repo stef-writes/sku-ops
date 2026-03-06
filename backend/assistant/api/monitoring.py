@@ -1,14 +1,14 @@
 """Agent monitoring API — internal endpoints for observability."""
 from fastapi import APIRouter, Depends, Query
 
+from assistant.infrastructure.agent_run_repo import (
+    get_cost_breakdown,
+    get_session_trace,
+    get_stats,
+    list_runs,
+)
 from identity.application.auth_service import get_current_user
 from kernel.types import CurrentUser
-from assistant.infrastructure.agent_run_repo import (
-    list_runs,
-    get_stats,
-    get_session_trace,
-    get_cost_breakdown,
-)
 
 router = APIRouter(prefix="/admin/agents", tags=["agent-monitoring"])
 

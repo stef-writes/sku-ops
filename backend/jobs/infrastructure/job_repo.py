@@ -1,11 +1,12 @@
 """Job repository — persistence for job master data."""
+from datetime import UTC
 from typing import Optional, Union
 
 from jobs.domain.job import Job
 from shared.infrastructure.database import get_connection
 
 
-def _row_to_dict(row) -> Optional[dict]:
+def _row_to_dict(row) -> dict | None:
     if row is None:
         return None
     return dict(row) if hasattr(row, "keys") else {}
@@ -14,7 +15,7 @@ def _row_to_dict(row) -> Optional[dict]:
 _COLUMNS = "id, code, name, billing_entity_id, status, service_address, notes, organization_id, created_at, updated_at"
 
 
-async def insert(job: Union[Job, dict], conn=None) -> None:
+async def insert(job: Job | dict, conn=None) -> None:
     d = job if isinstance(job, dict) else job.model_dump()
     in_tx = conn is not None
     conn = conn or get_connection()
@@ -32,7 +33,7 @@ async def insert(job: Union[Job, dict], conn=None) -> None:
         await conn.commit()
 
 
-async def get_by_id(job_id: str, organization_id: str) -> Optional[dict]:
+async def get_by_id(job_id: str, organization_id: str) -> dict | None:
     conn = get_connection()
     cursor = await conn.execute(
         f"SELECT {_COLUMNS} FROM jobs WHERE id = ? AND organization_id = ?",
@@ -41,7 +42,7 @@ async def get_by_id(job_id: str, organization_id: str) -> Optional[dict]:
     return _row_to_dict(await cursor.fetchone())
 
 
-async def get_by_code(code: str, organization_id: str) -> Optional[dict]:
+async def get_by_code(code: str, organization_id: str) -> dict | None:
     conn = get_connection()
     cursor = await conn.execute(
         f"SELECT {_COLUMNS} FROM jobs WHERE code = ? AND organization_id = ?",
@@ -52,8 +53,8 @@ async def get_by_code(code: str, organization_id: str) -> Optional[dict]:
 
 async def list_jobs(
     organization_id: str,
-    status: Optional[str] = None,
-    q: Optional[str] = None,
+    status: str | None = None,
+    q: str | None = None,
     limit: int = 200,
     offset: int = 0,
 ) -> list:
@@ -73,7 +74,7 @@ async def list_jobs(
     return [_row_to_dict(r) for r in await cursor.fetchall()]
 
 
-async def update(job_id: str, updates: dict, organization_id: str) -> Optional[dict]:
+async def update(job_id: str, updates: dict, organization_id: str) -> dict | None:
     conn = get_connection()
     set_clauses = []
     params = []
@@ -85,7 +86,7 @@ async def update(job_id: str, updates: dict, organization_id: str) -> Optional[d
         return await get_by_id(job_id, organization_id)
     from datetime import datetime, timezone
     set_clauses.append("updated_at = ?")
-    params.append(datetime.now(timezone.utc).isoformat())
+    params.append(datetime.now(UTC).isoformat())
     params.extend([job_id, organization_id])
     await conn.execute(
         f"UPDATE jobs SET {', '.join(set_clauses)} WHERE id = ? AND organization_id = ?",

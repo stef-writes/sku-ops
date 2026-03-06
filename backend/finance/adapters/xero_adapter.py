@@ -1,13 +1,13 @@
 """Xero API adapter — real Xero API v2 via OAuth 2.0."""
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Optional
 
 import httpx
 
+from finance.ports.invoicing_port import InvoiceSyncResult
 from identity.application.org_service import upsert_org_settings
 from identity.domain.org_settings import OrgSettings
-from finance.ports.invoicing_port import InvoiceSyncResult
 from shared.infrastructure.config import XERO_CLIENT_ID, XERO_CLIENT_SECRET
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ class XeroAdapter:
         try:
             expiry = datetime.fromisoformat(settings.xero_token_expiry)
             # Treat as expired 60 s before actual expiry to avoid edge races
-            return datetime.now(timezone.utc).timestamp() >= expiry.timestamp() - 60
+            return datetime.now(UTC).timestamp() >= expiry.timestamp() - 60
         except Exception:
             return True
 
@@ -51,11 +51,11 @@ class XeroAdapter:
         resp.raise_for_status()
         token_data = resp.json()
 
-        expiry = datetime.now(timezone.utc).timestamp() + token_data.get("expires_in", 1800)
+        expiry = datetime.now(UTC).timestamp() + token_data.get("expires_in", 1800)
         updated = settings.model_copy(update={
             "xero_access_token": token_data["access_token"],
             "xero_refresh_token": token_data.get("refresh_token", settings.xero_refresh_token),
-            "xero_token_expiry": datetime.fromtimestamp(expiry, tz=timezone.utc).isoformat(),
+            "xero_token_expiry": datetime.fromtimestamp(expiry, tz=UTC).isoformat(),
         })
         return await upsert_org_settings(updated)
 
@@ -153,8 +153,8 @@ class XeroAdapter:
         self,
         invoice: dict,
         settings: OrgSettings,
-        xero_invoice_id: Optional[str],
-        first_job_id: Optional[str] = None,
+        xero_invoice_id: str | None,
+        first_job_id: str | None = None,
     ) -> tuple[list, float]:
         """Return (journal_lines, cost_total) for a per-line itemized COGS journal.
 
@@ -206,10 +206,10 @@ class XeroAdapter:
         return journal_lines, round(cost_total, 2)
 
     async def _post_cogs_journal(
-        self, invoice: dict, settings: OrgSettings, xero_invoice_id: Optional[str],
-        first_job_id: Optional[str] = None,
-        client: Optional[httpx.AsyncClient] = None,
-    ) -> Optional[str]:
+        self, invoice: dict, settings: OrgSettings, xero_invoice_id: str | None,
+        first_job_id: str | None = None,
+        client: httpx.AsyncClient | None = None,
+    ) -> str | None:
         journal_lines, cost_total = self._build_cogs_journal_lines(
             invoice, settings, xero_invoice_id, first_job_id
         )
@@ -246,8 +246,8 @@ class XeroAdapter:
         self,
         invoice: dict,
         settings: OrgSettings,
-        old_journal_id: Optional[str] = None,
-    ) -> Optional[str]:
+        old_journal_id: str | None = None,
+    ) -> str | None:
         """Void the previous COGS manual journal (if we have its ID) then post a fresh one.
 
         Xero manual journals cannot be edited once posted, so the correct approach is:

@@ -3,13 +3,12 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
-from typing import AsyncIterator, Sequence
 
 import asyncpg
 
 from shared.infrastructure.db.protocol import Connection, DictRow
-
 
 # ── Placeholder conversion ────────────────────────────────────────────────────
 
@@ -84,9 +83,8 @@ class PgPoolProxy:
             if converted.lstrip().upper().startswith("SELECT") or "RETURNING" in converted.upper():
                 rows = await conn.fetch(converted, *params)
                 return PgCursor(rows)
-            else:
-                status = await conn.execute(converted, *params)
-                return PgCursor([], status or "")
+            status = await conn.execute(converted, *params)
+            return PgCursor([], status or "")
 
     async def executemany(self, sql: str, params_list: Sequence[tuple | list]) -> None:
         converted = _convert_sql(sql)
@@ -121,9 +119,8 @@ class PgTransactionProxy:
         if converted.lstrip().upper().startswith("SELECT") or "RETURNING" in converted.upper():
             rows = await self._conn.fetch(converted, *params)
             return PgCursor(rows)
-        else:
-            status = await self._conn.execute(converted, *params)
-            return PgCursor([], status or "")
+        status = await self._conn.execute(converted, *params)
+        return PgCursor([], status or "")
 
     async def executemany(self, sql: str, params_list: Sequence[tuple | list]) -> None:
         converted = _convert_sql(sql)

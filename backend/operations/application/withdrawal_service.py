@@ -1,16 +1,17 @@
 """Withdrawal service: encapsulates creation of material withdrawals with transaction."""
-from typing import Callable, Awaitable, Optional
+from collections.abc import Awaitable, Callable
+from typing import Optional
 
-from kernel.types import CurrentUser
-from shared.infrastructure.database import transaction
-from inventory.domain.stock import StockDecrement
 from catalog.domain.units import are_compatible, convert_quantity, cost_per_sell_unit
+from finance.application.ledger_service import record_withdrawal as _record_ledger
+from identity.application.billing_entity_service import ensure_billing_entity
+from inventory.domain.stock import StockDecrement
+from jobs.infrastructure.job_repo import job_repo as _job_repo
+from kernel.types import CurrentUser
 from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalCreate
 from operations.infrastructure.withdrawal_repo import withdrawal_repo as _default_withdrawal_repo
 from operations.ports.withdrawal_repo_port import WithdrawalRepoPort
-from finance.application.ledger_service import record_withdrawal as _record_ledger
-from jobs.infrastructure.job_repo import job_repo as _job_repo
-from identity.application.billing_entity_service import ensure_billing_entity
+from shared.infrastructure.database import transaction
 
 CreateInvoiceFn = Optional[Callable[..., Awaitable[dict]]]
 ListProductsFn = Callable[..., Awaitable[list]]

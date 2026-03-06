@@ -9,9 +9,9 @@ from identity.domain.org_settings import OrgSettings
 @dataclass
 class InvoiceSyncResult:
     success: bool
-    xero_invoice_id: Optional[str] = None
-    xero_journal_id: Optional[str] = None
-    error: Optional[str] = None
+    xero_invoice_id: str | None = None
+    xero_journal_id: str | None = None
+    error: str | None = None
 
 
 XeroSyncResult = InvoiceSyncResult
@@ -33,11 +33,11 @@ class InvoicingGateway(Protocol):
 
     async def fetch_credit_note(self, xero_credit_note_id: str, settings: OrgSettings) -> dict: ...
 
-    async def list_tracking_categories(self, settings: OrgSettings) -> List[dict]: ...
+    async def list_tracking_categories(self, settings: OrgSettings) -> list[dict]: ...
 
     async def refresh_token(self, settings: OrgSettings) -> OrgSettings: ...
 
-    async def get_tenants(self, access_token: str) -> List[dict]: ...
+    async def get_tenants(self, access_token: str) -> list[dict]: ...
 
 
 XeroGateway = InvoicingGateway

@@ -7,7 +7,7 @@ Run: cd backend && python -m devtools.scripts.seed_realistic
 import asyncio
 import logging
 import random
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from uuid import uuid4
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -156,20 +156,19 @@ async def main():
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-    from shared.infrastructure.database import init_db, get_connection
+    from shared.infrastructure.database import get_connection, init_db
     await init_db()
 
-    from catalog.application.queries import list_departments
     from catalog.application.product_lifecycle import create_product
+    from catalog.application.queries import list_departments
     from catalog.infrastructure.vendor_repo import vendor_repo
-    from identity.infrastructure.user_repo import user_repo
-    from inventory.application.inventory_service import process_import_stock_changes
-    from operations.infrastructure.withdrawal_repo import withdrawal_repo
-    from operations.domain.withdrawal import MaterialWithdrawal, WithdrawalItem
-    from finance.infrastructure.invoice_repo import invoice_repo
 
     # Wire cross-domain DI (same as server.py startup)
-    from finance.infrastructure.invoice_repo import set_withdrawal_getter
+    from finance.infrastructure.invoice_repo import invoice_repo, set_withdrawal_getter
+    from identity.infrastructure.user_repo import user_repo
+    from inventory.application.inventory_service import process_import_stock_changes
+    from operations.domain.withdrawal import MaterialWithdrawal, WithdrawalItem
+    from operations.infrastructure.withdrawal_repo import withdrawal_repo
     set_withdrawal_getter(withdrawal_repo.get_by_id)
 
     org_id = "default"
@@ -202,7 +201,7 @@ async def main():
         vendor_ids.append(vid)
         await vendor_repo.insert({
             "id": vid, **v, "product_count": 0,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "organization_id": org_id,
         })
         logger.info(f"  Vendor: {v['name']}")
@@ -245,7 +244,7 @@ async def main():
 
     # 3. Create withdrawals (simulating contractor purchases over 2 weeks)
     logger.info("--- Creating withdrawals ---")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     withdrawal_ids = []
 
     for scenario in WITHDRAWAL_SCENARIOS:

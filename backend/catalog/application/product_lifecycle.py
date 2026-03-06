@@ -4,18 +4,19 @@ Product lifecycle service: single source of truth for create, update, delete.
 All product creation (API, CSV import, document import) flows through this service.
 Uses transactions to ensure product_count and stock ledger stay in sync.
 """
-from datetime import datetime, timezone
-from typing import Any, Callable, Awaitable, Optional
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timezone
+from typing import Any, Optional
 
-from shared.infrastructure.database import transaction
+from catalog.application.sku_service import generate_sku
 from catalog.domain.barcode import validate_barcode
-from kernel.errors import ResourceNotFoundError
 from catalog.domain.errors import DuplicateBarcodeError, InvalidBarcodeError
 from catalog.domain.product import Product
 from catalog.infrastructure.department_repo import department_repo
 from catalog.infrastructure.product_repo import product_repo
 from catalog.infrastructure.vendor_repo import vendor_repo
-from catalog.application.sku_service import generate_sku
+from kernel.errors import ResourceNotFoundError
+from shared.infrastructure.database import transaction
 
 StockChangesFn = Optional[Callable[..., Awaitable[None]]]
 
@@ -29,16 +30,16 @@ async def create_product(
     cost: float = 0,
     quantity: float = 0,
     min_stock: int = 5,
-    vendor_id: Optional[str] = None,
+    vendor_id: str | None = None,
     vendor_name: str = "",
-    original_sku: Optional[str] = None,
-    barcode: Optional[str] = None,
+    original_sku: str | None = None,
+    barcode: str | None = None,
     base_unit: str = "each",
     sell_uom: str = "each",
     pack_qty: int = 1,
-    user_id: Optional[str] = None,
+    user_id: str | None = None,
     user_name: str = "",
-    organization_id: Optional[str] = None,
+    organization_id: str | None = None,
     *,
     on_stock_import: StockChangesFn = None,
 ) -> Product:
@@ -90,9 +91,9 @@ async def create_product(
     product.organization_id = org_id
     async with transaction() as conn:
         await product_repo.insert(product, conn=conn)
-        await department_repo.increment_product_count(department_id, 1, conn=conn)
+        await department_repo.increment_product_count(department_id, 1, conn=conn, organization_id=org_id)
         if vendor_id:
-            await vendor_repo.increment_product_count(vendor_id, 1, conn=conn)
+            await vendor_repo.increment_product_count(vendor_id, 1, conn=conn, organization_id=org_id)
         if quantity > 0 and user_id and on_stock_import:
             await on_stock_import(
                 product_id=product.id,
@@ -111,7 +112,7 @@ async def create_product(
 async def update_product(
     product_id: str,
     updates: dict[str, Any],
-    current_product: Optional[dict] = None,
+    current_product: dict | None = None,
 ) -> dict:
     """
     Update a product. Resolves department/vendor name and product_count changes.
@@ -122,13 +123,13 @@ async def update_product(
         raise ResourceNotFoundError("Product", product_id)
 
     update_data = {k: v for k, v in updates.items() if v is not None}
-    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    update_data["updated_at"] = datetime.now(UTC).isoformat()
 
     # Normalize and validate barcode on update
     if "barcode" in update_data:
         barcode_raw = update_data["barcode"]
         barcode_val = (barcode_raw or "").strip() or product.get("sku", "")
-        update_data["barcode"] = barcode_val if barcode_val else product.get("sku", "")
+        update_data["barcode"] = barcode_val or product.get("sku", "")
         current_barcode = (product.get("barcode") or "").strip()
         if update_data["barcode"] != current_barcode:
             if update_data["barcode"] and update_data["barcode"].isdigit():
@@ -165,36 +166,34 @@ async def update_product(
             new_dept: str | None = update_data["department_id"]
             if old_dept != new_dept:
                 if old_dept:
-                    await department_repo.increment_product_count(old_dept, -1, conn=conn)
+                    await department_repo.increment_product_count(old_dept, -1, conn=conn, organization_id=org_id)
                 if new_dept:
-                    await department_repo.increment_product_count(new_dept, 1, conn=conn)
+                    await department_repo.increment_product_count(new_dept, 1, conn=conn, organization_id=org_id)
 
         if "vendor_id" in update_data:
             old_vendor = product.get("vendor_id") or ""
             new_vendor = update_data.get("vendor_id") or ""
             if old_vendor != new_vendor:
                 if old_vendor:
-                    await vendor_repo.increment_product_count(old_vendor, -1, conn=conn)
+                    await vendor_repo.increment_product_count(old_vendor, -1, conn=conn, organization_id=org_id)
                 if new_vendor:
-                    await vendor_repo.increment_product_count(new_vendor, 1, conn=conn)
+                    await vendor_repo.increment_product_count(new_vendor, 1, conn=conn, organization_id=org_id)
 
-        result = await product_repo.update(product_id, update_data, conn=conn)
+        result = await product_repo.update(product_id, update_data, conn=conn, organization_id=org_id)
     if not result:
         raise ResourceNotFoundError("Product", product_id)
     return result
 
 
-async def delete_product(product_id: str) -> None:
-    """
-    Delete a product and update department/vendor product_count.
-    Runs in a transaction.
-    """
-    product = await product_repo.get_by_id(product_id)
+async def delete_product(product_id: str, organization_id: str | None = None) -> None:
+    """Delete a product and update department/vendor product_count."""
+    product = await product_repo.get_by_id(product_id, organization_id=organization_id)
     if not product:
         raise ResourceNotFoundError("Product", product_id)
 
+    org_id = organization_id or product.get("organization_id")
     async with transaction() as conn:
-        await product_repo.delete(product_id, conn=conn)
-        await department_repo.increment_product_count(product["department_id"], -1, conn=conn)
+        await product_repo.delete(product_id, conn=conn, organization_id=org_id)
+        await department_repo.increment_product_count(product["department_id"], -1, conn=conn, organization_id=org_id)
         if product.get("vendor_id"):
-            await vendor_repo.increment_product_count(product["vendor_id"], -1, conn=conn)
+            await vendor_repo.increment_product_count(product["vendor_id"], -1, conn=conn, organization_id=org_id)

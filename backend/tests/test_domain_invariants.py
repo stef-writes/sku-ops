@@ -16,6 +16,7 @@ Categories:
 
 import pytest
 
+from catalog.domain.product import Product, ProductCreate, ProductUpdate
 from catalog.domain.units import (
     ALLOWED_BASE_UNITS,
     UNIT_FAMILIES,
@@ -23,12 +24,10 @@ from catalog.domain.units import (
     convert_quantity,
     family_for_unit,
 )
-from inventory.domain.stock import StockDecrement, StockTransaction, StockTransactionType
 from inventory.domain.errors import InsufficientStockError, NegativeStockError
+from inventory.domain.stock import StockDecrement, StockTransaction, StockTransactionType
 from kernel.types import LineItem
-from catalog.domain.product import Product, ProductCreate, ProductUpdate
-from operations.domain.withdrawal import WithdrawalItem, MaterialWithdrawal
-
+from operations.domain.withdrawal import MaterialWithdrawal, WithdrawalItem
 
 # ── 1. UOM conversion correctness ────────────────────────────────────────────
 

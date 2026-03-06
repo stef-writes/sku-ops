@@ -3,18 +3,18 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from kernel.types import CurrentUser
 from identity.application.auth_service import get_current_user, require_role
 from identity.domain.billing_entity import BillingEntity, BillingEntityCreate, BillingEntityUpdate
 from identity.infrastructure.billing_entity_repo import billing_entity_repo
+from kernel.types import CurrentUser
 
 router = APIRouter(prefix="/billing-entities", tags=["billing-entities"])
 
 
 @router.get("")
 async def list_billing_entities(
-    is_active: Optional[bool] = None,
-    q: Optional[str] = None,
+    is_active: bool | None = None,
+    q: str | None = None,
     limit: int = 200,
     offset: int = 0,
     current_user: CurrentUser = Depends(get_current_user),

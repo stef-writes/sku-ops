@@ -2,9 +2,9 @@
 from fastapi import APIRouter, Depends
 
 from identity.application.auth_service import require_role
-from kernel.types import CurrentUser
 from identity.domain.org_settings import OrgSettings, OrgSettingsUpdate
 from identity.infrastructure.org_settings_repo import get_org_settings, upsert_org_settings
+from kernel.types import CurrentUser
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 

@@ -4,7 +4,7 @@ These are the atoms that every domain module shares. If you're moving
 a quantity of a product through the system, you use LineItem. If you're
 identifying the authenticated caller, you use CurrentUser.
 """
-from decimal import Decimal, ROUND_HALF_EVEN
+from decimal import ROUND_HALF_EVEN, Decimal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, computed_field, field_validator
 

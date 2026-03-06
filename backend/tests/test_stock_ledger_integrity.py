@@ -13,21 +13,21 @@ Also tests organization isolation — org A's data must never leak into org B's 
 """
 import pytest
 
-from inventory.domain.stock import StockDecrement
-from catalog.infrastructure.product_repo import product_repo
 from catalog.application.product_lifecycle import create_product
+from catalog.infrastructure.product_repo import product_repo
 from inventory.application.inventory_service import (
-    process_import_stock_changes,
-    process_withdrawal_stock_changes,
-    process_receiving_stock_changes,
-    process_adjustment_stock_changes,
     get_stock_history,
+    process_adjustment_stock_changes,
+    process_import_stock_changes,
+    process_receiving_stock_changes,
+    process_withdrawal_stock_changes,
 )
+from inventory.domain.stock import StockDecrement
 
 
-async def _create_product(name, quantity, base_unit="each", org_id="default", **kw):
+async def _create_product(name, quantity, base_unit="each", org_id="default", dept_id="dept-1", **kw):
     return await create_product(
-        department_id="dept-1",
+        department_id=dept_id,
         department_name="Hardware",
         name=name,
         quantity=quantity,
@@ -204,8 +204,18 @@ class TestOrganizationIsolation:
     @pytest.mark.asyncio
     async def test_product_isolated_by_org(self, db):
         """Products from org-A must not appear in org-B queries."""
-        p1 = await _create_product("Org A Widget", 10.0, org_id="org-a")
-        await _create_product("Org B Widget", 20.0, org_id="org-b")
+        from shared.infrastructure.database import get_connection
+        conn = get_connection()
+        for org in ("org-a", "org-b"):
+            await conn.execute(
+                "INSERT OR IGNORE INTO departments (id, name, code, description, product_count, organization_id, created_at) "
+                "VALUES (?, 'Hardware', 'HDW', 'Hardware dept', 0, ?, datetime('now'))",
+                (f"dept-1-{org}", org),
+            )
+        await conn.commit()
+
+        p1 = await _create_product("Org A Widget", 10.0, org_id="org-a", dept_id="dept-1-org-a")
+        await _create_product("Org B Widget", 20.0, org_id="org-b", dept_id="dept-1-org-b")
 
         from_a = await product_repo.get_by_id(p1.id, organization_id="org-a")
         from_b = await product_repo.get_by_id(p1.id, organization_id="org-b")

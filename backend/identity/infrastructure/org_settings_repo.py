@@ -1,8 +1,8 @@
 """Per-org settings repository."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
-from shared.infrastructure.database import get_connection
 from identity.domain.org_settings import OrgSettings
+from shared.infrastructure.database import get_connection
 
 
 async def get_org_settings(org_id: str) -> OrgSettings:
@@ -21,7 +21,7 @@ async def get_org_settings(org_id: str) -> OrgSettings:
 async def upsert_org_settings(settings: OrgSettings) -> OrgSettings:
     """Insert or replace org settings."""
     conn = get_connection()
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     await conn.execute(
         """INSERT INTO org_settings (
                organization_id, default_tax_rate, xero_client_id, xero_client_secret,
@@ -78,7 +78,7 @@ async def clear_xero_tokens(org_id: str) -> None:
                xero_tenant_id = NULL, xero_token_expiry = NULL,
                updated_at = ?
            WHERE organization_id = ?""",
-        (datetime.now(timezone.utc).isoformat(), org_id),
+        (datetime.now(UTC).isoformat(), org_id),
     )
     await conn.commit()
 

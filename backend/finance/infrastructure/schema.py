@@ -159,4 +159,5 @@ INDEXES: list[str] = [
     "CREATE INDEX IF NOT EXISTS idx_invoices_due_date ON invoices(due_date)",
     "CREATE INDEX IF NOT EXISTS idx_invoices_xero_sync ON invoices(xero_sync_status, xero_invoice_id)",
     "CREATE INDEX IF NOT EXISTS idx_cn_xero_sync ON credit_notes(xero_sync_status, xero_credit_note_id)",
+    "CREATE INDEX IF NOT EXISTS idx_invoice_withdrawals_withdrawal ON invoice_withdrawals(withdrawal_id)",
 ]

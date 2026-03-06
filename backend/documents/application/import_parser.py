@@ -10,7 +10,7 @@ from typing import Optional, Tuple
 from catalog.domain.units import ALLOWED_BASE_UNITS
 
 
-def resolve_uom(item: dict) -> Tuple[str, str, int]:
+def resolve_uom(item: dict) -> tuple[str, str, int]:
     """Resolve base_unit, sell_uom, pack_qty from item, validating against allowed units."""
     bu = (item.get("base_unit") or "each").lower().strip()
     su = (item.get("sell_uom") or item.get("base_unit") or "each").lower().strip()
@@ -37,7 +37,7 @@ _DEPT_KEYWORDS = {
 }
 
 
-def suggest_department(name: str, departments_by_code: dict) -> Optional[str]:
+def suggest_department(name: str, departments_by_code: dict) -> str | None:
     """Suggest department code from product name using keyword matching."""
     if not name:
         return None
@@ -48,7 +48,7 @@ def suggest_department(name: str, departments_by_code: dict) -> Optional[str]:
     return None
 
 
-def infer_uom(name: str) -> Tuple[str, str, int]:
+def infer_uom(name: str) -> tuple[str, str, int]:
     """
     Infer base_unit, sell_uom, pack_qty from product name.
     Order: explicit patterns first (e.g. 5 gal), then keyword-based rules.
@@ -200,9 +200,7 @@ def parse_csv_products(content: bytes) -> list:
             col_map["quantity"] = idx
         elif "reorder point" in n:
             col_map["min_stock"] = idx
-        elif "unit cost" in n:
-            col_map["cost"] = idx
-        elif "cost" in n and "total" not in n and "cost" not in col_map:
+        elif "unit cost" in n or ("cost" in n and "total" not in n and "cost" not in col_map):
             col_map["cost"] = idx
         elif "retail price" in n and "ex" not in n and "inc" not in n:
             col_map["price"] = idx

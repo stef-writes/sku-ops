@@ -11,18 +11,20 @@ Tests cover:
   7. Fiscal period enforcement (closed periods reject entries)
   8. Invoice compliance fields (due_date, payment_terms, balance_due)
 """
-import pytest
 from uuid import uuid4
 
-from kernel.types import round_money
-from finance.domain.ledger import Account, FinancialEntry, ReferenceType
-from finance.domain.invoice import (
-    Invoice, InvoiceLineItem, compute_due_date,
-    PAYMENT_TERMS_DAYS,
-)
-from finance.infrastructure.ledger_repo import insert_entries, get_journal, trial_balance
-from shared.infrastructure.database import get_connection
+import pytest
 
+from finance.domain.invoice import (
+    PAYMENT_TERMS_DAYS,
+    Invoice,
+    InvoiceLineItem,
+    compute_due_date,
+)
+from finance.domain.ledger import Account, FinancialEntry, ReferenceType
+from finance.infrastructure.ledger_repo import get_journal, insert_entries, trial_balance
+from kernel.types import round_money
+from shared.infrastructure.database import get_connection
 
 # ── 1. round_money precision ─────────────────────────────────────────────────
 
@@ -157,7 +159,7 @@ class TestCompleteSaleEntries:
     @pytest.mark.asyncio
     async def test_return_reverses_withdrawal_entries(self, db):
         """A return should reduce net revenue/COGS/AR and increase inventory."""
-        from finance.application.ledger_service import record_withdrawal, record_return
+        from finance.application.ledger_service import record_return, record_withdrawal
 
         items = [{"quantity": 5, "unit_price": 10.0, "cost": 5.0, "product_id": "p1"}]
         await record_withdrawal(
@@ -350,7 +352,7 @@ class TestPaymentAR:
     @pytest.mark.asyncio
     async def test_payment_reduces_ar(self, db):
         """After withdrawal + payment, net AR should be zero."""
-        from finance.application.ledger_service import record_withdrawal, record_payment
+        from finance.application.ledger_service import record_payment, record_withdrawal
 
         wid = str(uuid4())
         items = [{"quantity": 1, "unit_price": 100.0, "cost": 50.0, "product_id": "p1"}]

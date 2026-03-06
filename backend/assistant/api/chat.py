@@ -3,12 +3,12 @@ import uuid
 
 from fastapi import APIRouter, Depends
 
+from assistant.api.schemas import ChatRequest
+from assistant.application import session_store
+from assistant.application.assistant import chat, recall_memory, schedule_memory_extraction
 from identity.application.auth_service import get_current_user, require_role
 from kernel.types import CurrentUser
 from shared.infrastructure.config import ANTHROPIC_AVAILABLE, LLM_SETUP_URL, SESSION_COST_CAP
-from assistant.api.schemas import ChatRequest
-from assistant.application.assistant import chat, recall_memory, schedule_memory_extraction
-from assistant.application import session_store
 
 router = APIRouter(tags=["chat"])
 

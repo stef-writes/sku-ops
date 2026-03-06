@@ -14,20 +14,21 @@ These would have caught:
 """
 import pytest
 
-from shared.infrastructure.database import get_connection
-from catalog.infrastructure.product_repo import product_repo
-from inventory.infrastructure.stock_repo import stock_repo
-from purchasing.infrastructure.po_repo import po_repo
-from operations.infrastructure.material_request_repo import material_request_repo
-from finance.infrastructure.invoice_repo import invoice_repo
-from finance.infrastructure.credit_note_repo import credit_note_repo
-
 from catalog.application.product_lifecycle import create_product
+from catalog.infrastructure.product_repo import product_repo
+from finance.infrastructure.credit_note_repo import credit_note_repo
+from finance.infrastructure.invoice_repo import invoice_repo
 from inventory.application.inventory_service import process_import_stock_changes
+from inventory.infrastructure.stock_repo import stock_repo
+from operations.infrastructure.material_request_repo import material_request_repo
 from purchasing.domain.purchase_order import (
-    PurchaseOrder, PurchaseOrderItem, POStatus, POItemStatus,
+    POItemStatus,
+    POStatus,
+    PurchaseOrder,
+    PurchaseOrderItem,
 )
-
+from purchasing.infrastructure.po_repo import po_repo
+from shared.infrastructure.database import get_connection
 
 # ── Product repo ─────────────────────────────────────────────────────────────
 

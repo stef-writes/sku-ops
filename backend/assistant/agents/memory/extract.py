@@ -7,9 +7,10 @@ import json
 import logging
 
 import anthropic
+
+from assistant.agents.memory.store import save
 from shared.infrastructure.config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL
 from shared.infrastructure.prompt_loader import load_prompt
-from assistant.agents.memory.store import save
 
 logger = logging.getLogger(__name__)
 

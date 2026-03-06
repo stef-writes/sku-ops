@@ -4,7 +4,7 @@ from typing import Optional
 from shared.infrastructure.database import get_connection
 
 
-def _row_to_dict(row) -> Optional[dict]:
+def _row_to_dict(row) -> dict | None:
     if row is None:
         return None
     d = dict(row) if hasattr(row, "keys") else {}
@@ -13,7 +13,7 @@ def _row_to_dict(row) -> Optional[dict]:
     return d
 
 
-async def get_by_id(user_id: str) -> Optional[dict]:
+async def get_by_id(user_id: str) -> dict | None:
     conn = get_connection()
     cursor = await conn.execute(
         "SELECT id, email, name, role, company, billing_entity, phone, is_active, organization_id, created_at FROM users WHERE id = ?",
@@ -23,7 +23,7 @@ async def get_by_id(user_id: str) -> Optional[dict]:
     return _row_to_dict(row)
 
 
-async def get_by_email(email: str) -> Optional[dict]:
+async def get_by_email(email: str) -> dict | None:
     conn = get_connection()
     cursor = await conn.execute(
         "SELECT * FROM users WHERE email = ?", (email,)
@@ -55,7 +55,7 @@ async def insert(user_dict: dict) -> None:
     await conn.commit()
 
 
-async def update(user_id: str, updates: dict) -> Optional[dict]:
+async def update(user_id: str, updates: dict, organization_id: str | None = None) -> dict | None:
     conn = get_connection()
     set_clauses = []
     values = []
@@ -77,15 +77,19 @@ async def update(user_id: str, updates: dict) -> Optional[dict]:
     if not set_clauses:
         return await get_by_id(user_id)
     values.append(user_id)
+    where = "WHERE id = ?"
+    if organization_id:
+        where += " AND organization_id = ?"
+        values.append(organization_id)
     await conn.execute(
-        f"UPDATE users SET {', '.join(set_clauses)} WHERE id = ?",
+        f"UPDATE users SET {', '.join(set_clauses)} {where}",
         values,
     )
     await conn.commit()
     return await get_by_id(user_id)
 
 
-async def list_contractors(organization_id: Optional[str] = None, search: Optional[str] = None) -> list:
+async def list_contractors(organization_id: str | None = None, search: str | None = None) -> list:
     conn = get_connection()
     org_id = organization_id or "default"
     base = """SELECT id, email, name, role, company, billing_entity, phone, is_active, organization_id, created_at
@@ -101,7 +105,7 @@ async def list_contractors(organization_id: Optional[str] = None, search: Option
     return [_row_to_dict(r) for r in rows]
 
 
-async def count_contractors(organization_id: Optional[str] = None) -> int:
+async def count_contractors(organization_id: str | None = None) -> int:
     conn = get_connection()
     org_id = organization_id or "default"
     cursor = await conn.execute(
@@ -112,12 +116,14 @@ async def count_contractors(organization_id: Optional[str] = None) -> int:
     return row[0] if row else 0
 
 
-async def delete_contractor(contractor_id: str) -> int:
+async def delete_contractor(contractor_id: str, organization_id: str | None = None) -> int:
     conn = get_connection()
-    cursor = await conn.execute(
-        "DELETE FROM users WHERE id = ? AND role = 'contractor'",
-        (contractor_id,),
-    )
+    where = "WHERE id = ? AND role = 'contractor'"
+    params: list = [contractor_id]
+    if organization_id:
+        where += " AND organization_id = ?"
+        params.append(organization_id)
+    cursor = await conn.execute(f"DELETE FROM users {where}", params)
     await conn.commit()
     return cursor.rowcount
 

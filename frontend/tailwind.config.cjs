@@ -1,7 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ["class"],
-  content: ["./index.html", "./src/**/*.{js,jsx}", "./node_modules/@tremor/react/dist/**/*.js"],
+  content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     container: {
       center: true,

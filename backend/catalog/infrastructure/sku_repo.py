@@ -4,14 +4,14 @@ from typing import Optional
 from shared.infrastructure.database import get_connection
 
 
-def _counter_key(organization_id: Optional[str], department_code: str) -> str:
+def _counter_key(organization_id: str | None, department_code: str) -> str:
     """Composite key for org-scoped SKU counters. Backward compat: use plain code if no org."""
     org = organization_id or "default"
     code = (department_code or "").strip().upper()
     return f"{org}|{code}"
 
 
-async def get_next_number(department_code: str, organization_id: Optional[str] = None) -> int:
+async def get_next_number(department_code: str, organization_id: str | None = None) -> int:
     """Return the next counter value without incrementing (for preview)."""
     conn = get_connection()
     key = _counter_key(organization_id, department_code)
@@ -23,7 +23,7 @@ async def get_next_number(department_code: str, organization_id: Optional[str] =
     return (row[0] + 1) if row else 1
 
 
-async def get_all_counters(organization_id: Optional[str] = None) -> dict:
+async def get_all_counters(organization_id: str | None = None) -> dict:
     """Return {department_code: counter} for org's departments with counters."""
     conn = get_connection()
     prefix = f"{organization_id or 'default'}|"
@@ -36,7 +36,7 @@ async def get_all_counters(organization_id: Optional[str] = None) -> dict:
     return {row[0].split("|", 1)[-1]: row[1] for row in rows} if rows else {}
 
 
-async def increment_and_get(department_code: str, organization_id: Optional[str] = None) -> int:
+async def increment_and_get(department_code: str, organization_id: str | None = None) -> int:
     code = (department_code or "").strip().upper()
     key = _counter_key(organization_id, code)
     conn = get_connection()

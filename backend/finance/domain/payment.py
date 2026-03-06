@@ -17,22 +17,22 @@ class PaymentMethod(str, Enum):
 
 class Payment(AuditedEntity):
     """A payment received against one or more withdrawals/invoices."""
-    invoice_id: Optional[str] = None
-    billing_entity_id: Optional[str] = None
+    invoice_id: str | None = None
+    billing_entity_id: str | None = None
     amount: float
     method: str = PaymentMethod.BANK_TRANSFER
     reference: str = ""
     payment_date: str
-    notes: Optional[str] = None
+    notes: str | None = None
     recorded_by_id: str
-    xero_payment_id: Optional[str] = None
+    xero_payment_id: str | None = None
 
 
 class PaymentCreate(BaseModel):
     withdrawal_ids: list[str] = []
-    invoice_id: Optional[str] = None
-    amount: Optional[float] = None
+    invoice_id: str | None = None
+    amount: float | None = None
     method: str = PaymentMethod.BANK_TRANSFER
     reference: str = ""
-    payment_date: Optional[str] = None
-    notes: Optional[str] = None
+    payment_date: str | None = None
+    notes: str | None = None

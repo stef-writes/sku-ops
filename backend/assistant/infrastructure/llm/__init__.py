@@ -26,12 +26,12 @@ def init_llm() -> None:
     global _provider
 
     from shared.infrastructure.config import (
-        OPENROUTER_AVAILABLE,
-        OPENROUTER_API_KEY,
-        OPENROUTER_BASE_URL,
-        ANTHROPIC_AVAILABLE,
-        ANTHROPIC_API_KEY,
         AGENT_PRIMARY_MODEL,
+        ANTHROPIC_API_KEY,
+        ANTHROPIC_AVAILABLE,
+        OPENROUTER_API_KEY,
+        OPENROUTER_AVAILABLE,
+        OPENROUTER_BASE_URL,
         is_test,
     )
 

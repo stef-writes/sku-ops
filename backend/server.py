@@ -15,14 +15,24 @@ from shared.infrastructure.logging_config import setup_logging
 
 setup_logging()
 
-from shared.infrastructure.config import CORS_ORIGINS, cors_warn_in_deployed, is_test, XERO_SYNC_HOUR  # noqa: E402
-from shared.infrastructure.database import init_db, close_db  # noqa: E402
-from kernel.errors import DomainError  # noqa: E402
-from shared.infrastructure.middleware.request_id import RequestIDMiddleware  # noqa: E402
-from shared.infrastructure.middleware.security_headers import SecurityHeadersMiddleware  # noqa: E402
-from shared.infrastructure.middleware.rate_limit import setup_rate_limiting  # noqa: E402
-from shared.infrastructure.metrics import setup_sentry, setup_prometheus  # noqa: E402
+from datetime import UTC
+
 from api import api_router  # noqa: E402
+from kernel.errors import DomainError  # noqa: E402
+from shared.infrastructure.config import (  # noqa: E402
+    CORS_ORIGINS,
+    XERO_SYNC_HOUR,
+    cors_warn_in_deployed,
+    is_deployed,
+    is_test,
+)
+from shared.infrastructure.database import close_db, init_db  # noqa: E402
+from shared.infrastructure.metrics import setup_prometheus, setup_sentry  # noqa: E402
+from shared.infrastructure.middleware.rate_limit import setup_rate_limiting  # noqa: E402
+from shared.infrastructure.middleware.request_id import RequestIDMiddleware  # noqa: E402
+from shared.infrastructure.middleware.security_headers import (
+    SecurityHeadersMiddleware,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +49,7 @@ async def _xero_sync_loop() -> None:
     while True:
         try:
             await asyncio.sleep(60)
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             if now.hour == XERO_SYNC_HOUR and now.date() != last_run_date:
                 last_run_date = now.date()
                 logger.info("Xero nightly sync starting for org 'default'")
@@ -91,6 +101,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Xero startup check failed: %s", e)
 
+    from shared.infrastructure.config import (
+        ANTHROPIC_AVAILABLE,
+        DATABASE_URL,
+        OPENAI_AVAILABLE,
+        SENTRY_DSN,
+    )
+    db_type = "postgres" if "postgresql" in (DATABASE_URL or "") else "sqlite"
+    logger.info(
+        "Application ready — env=%s, db=%s, sentry=%s, ai=%s, embeddings=%s",
+        "production" if is_deployed else ("test" if is_test else "development"),
+        db_type,
+        "enabled" if SENTRY_DSN else "disabled",
+        "enabled" if ANTHROPIC_AVAILABLE else "disabled",
+        "enabled" if OPENAI_AVAILABLE else "disabled",
+    )
+
     sync_task = None
     if not is_test:
         sync_task = asyncio.create_task(_xero_sync_loop())
@@ -122,7 +148,8 @@ async def domain_error_handler(request, exc: DomainError):
 @app.exception_handler(ValueError)
 async def value_error_handler(request, exc: ValueError):
     logger.warning("ValueError on %s %s: %s", request.method, request.url.path, exc)
-    return JSONResponse(status_code=400, content={"detail": str(exc)})
+    detail = str(exc) if not is_deployed else "Invalid request"
+    return JSONResponse(status_code=400, content={"detail": detail})
 
 
 @app.exception_handler(Exception)

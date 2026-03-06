@@ -114,4 +114,7 @@ INDEXES: list[str] = [
     "CREATE INDEX IF NOT EXISTS idx_withdrawal_items_product ON withdrawal_items(product_id)",
     "CREATE INDEX IF NOT EXISTS idx_return_items_rid ON return_items(return_id)",
     "CREATE INDEX IF NOT EXISTS idx_return_items_product ON return_items(product_id)",
+    "CREATE INDEX IF NOT EXISTS idx_withdrawals_invoice ON withdrawals(invoice_id)",
+    "CREATE INDEX IF NOT EXISTS idx_withdrawals_job ON withdrawals(organization_id, job_id)",
+    "CREATE INDEX IF NOT EXISTS idx_returns_credit_note ON returns(organization_id, credit_note_id)",
 ]

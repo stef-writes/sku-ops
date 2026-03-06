@@ -5,16 +5,17 @@ from pydantic_ai import Agent, RunContext
 
 from assistant.agents.core.config import load_agent_config
 from assistant.agents.core.deps import AgentDeps
+from assistant.agents.core.messages import build_message_history
 from assistant.agents.core.model_registry import get_model
 from assistant.agents.core.runner import build_model_settings, run_specialist
-from assistant.agents.core.messages import build_message_history
 from assistant.agents.core.tokens import budget_tool_result
 from shared.infrastructure.prompt_loader import load_prompt
+
 from .tools import (
     _get_invoice_summary,
     _get_outstanding_balances,
-    _get_revenue_summary,
     _get_pl_summary,
+    _get_revenue_summary,
     _get_top_products,
 )
 

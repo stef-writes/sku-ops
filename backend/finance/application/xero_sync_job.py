@@ -9,10 +9,10 @@ Call run_sync(org_id) from a scheduler or manually via the /api/xero/sync endpoi
 """
 import logging
 
-from finance.infrastructure.invoice_repo import invoice_repo
-from finance.infrastructure.credit_note_repo import credit_note_repo
 from finance.adapters.invoicing_factory import get_invoicing_gateway
-from finance.application.invoice_service import sync_invoice, repost_cogs_for_invoice
+from finance.application.invoice_service import repost_cogs_for_invoice, sync_invoice
+from finance.infrastructure.credit_note_repo import credit_note_repo
+from finance.infrastructure.invoice_repo import invoice_repo
 from identity.application.org_service import get_org_settings
 
 logger = logging.getLogger(__name__)
@@ -79,7 +79,7 @@ async def _sync_outbound_credit_notes(org_id: str, gateway, settings) -> dict:
 
 
 async def _sync_outbound_po_bills(org_id: str) -> dict:
-    from finance.application.po_sync_service import sync_po_bill, list_unsynced_po_bills
+    from finance.application.po_sync_service import list_unsynced_po_bills, sync_po_bill
     unsynced = await list_unsynced_po_bills(org_id)
     results = {"synced": 0, "failed": 0, "errors": []}
     for po in unsynced:

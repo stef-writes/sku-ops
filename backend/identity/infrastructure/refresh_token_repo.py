@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Optional
 
 from shared.infrastructure.config import REFRESH_TOKEN_EXPIRATION_DAYS
@@ -26,7 +26,7 @@ async def create(user_id: str) -> tuple[str, str]:
     """Create and persist a refresh token. Returns (raw_token, token_id)."""
     raw, hashed = generate_refresh_token()
     token_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires = now + timedelta(days=REFRESH_TOKEN_EXPIRATION_DAYS)
     conn = get_connection()
     await conn.execute(
@@ -38,7 +38,7 @@ async def create(user_id: str) -> tuple[str, str]:
     return raw, token_id
 
 
-async def validate_and_rotate(raw_token: str) -> Optional[dict]:
+async def validate_and_rotate(raw_token: str) -> dict | None:
     """Validate a refresh token, revoke it, and return user info if valid.
 
     Returns dict with ``user_id`` or None if invalid/expired/revoked.
@@ -58,7 +58,7 @@ async def validate_and_rotate(raw_token: str) -> Optional[dict]:
         return None
 
     expires = datetime.fromisoformat(row["expires_at"].replace("Z", "+00:00"))
-    if expires < datetime.now(timezone.utc):
+    if expires < datetime.now(UTC):
         return None
 
     # Revoke old token (rotation)

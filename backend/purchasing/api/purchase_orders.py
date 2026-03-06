@@ -4,33 +4,39 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
 
+from catalog.application.product_lifecycle import create_product as lifecycle_create
+from catalog.application.queries import (
+    find_product_by_name_and_vendor,
+    find_product_by_original_sku_and_vendor,
+    find_vendor_by_name,
+    get_department_by_code,
+    get_product_by_id,
+    insert_vendor,
+    list_departments,
+    list_products_by_vendor,
+    update_product,
+)
+from documents.application.enrichment_service import enrich_for_import
+from documents.application.import_parser import infer_uom, suggest_department
+from identity.application.auth_service import require_role
+from inventory.application.inventory_service import process_receiving_stock_changes
+from inventory.application.uom_classifier import classify_uom_batch as _classify_uom_batch
 from kernel.errors import ResourceNotFoundError
 from kernel.types import CurrentUser
-from identity.application.auth_service import require_role
-from shared.infrastructure.middleware.audit import audit_log
+from purchasing.application.purchase_order_service import (
+    PurchasingDeps,
+    create_purchase_order,
+    mark_delivery_received,
+    receive_po_items,
+)
 from purchasing.domain.purchase_order import (
     CreatePORequest,
     MarkDeliveryRequest,
     ReceiveItemsRequest,
 )
 from purchasing.infrastructure.po_repo import po_repo
-from purchasing.application.purchase_order_service import (
-    create_purchase_order,
-    mark_delivery_received,
-    receive_po_items,
-    PurchasingDeps,
-)
-from catalog.application.queries import (
-    list_departments, get_department_by_code, find_vendor_by_name, insert_vendor,
-    list_products_by_vendor, get_product_by_id, find_product_by_original_sku_and_vendor,
-    find_product_by_name_and_vendor, update_product,
-)
-from catalog.application.product_lifecycle import create_product as lifecycle_create
-from inventory.application.inventory_service import process_receiving_stock_changes
-from inventory.application.uom_classifier import classify_uom_batch as _classify_uom_batch
-from documents.application.import_parser import infer_uom, suggest_department
-from documents.application.enrichment_service import enrich_for_import
 from shared.infrastructure.config import LLM_AVAILABLE as _LLM_AVAILABLE
+from shared.infrastructure.middleware.audit import audit_log
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +99,7 @@ async def create_po(
 
 @router.get("")
 async def list_purchase_orders(
-    status: Optional[str] = None,
+    status: str | None = None,
     current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
 ):
     """List purchase orders, optionally filtered by status (ordered/received)."""

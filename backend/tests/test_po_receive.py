@@ -1,28 +1,28 @@
 """Tests for PO receive flow: stock, WAC, ledger, status, cost fallback."""
 import pytest
 
-from kernel.types import CurrentUser
-from catalog.infrastructure.product_repo import product_repo
 from catalog.application.product_lifecycle import create_product
 from catalog.application.queries import list_departments
+from catalog.infrastructure.product_repo import product_repo
 from inventory.application.inventory_service import (
     process_import_stock_changes,
     process_receiving_stock_changes,
 )
 from inventory.infrastructure.stock_repo import stock_repo
-from purchasing.domain.purchase_order import (
-    PurchaseOrder,
-    PurchaseOrderItem,
-    POStatus,
-    POItemStatus,
-)
-from purchasing.infrastructure.po_repo import po_repo
+from kernel.types import CurrentUser
 from purchasing.application.purchase_order_service import (
-    receive_po_items,
-    mark_delivery_received,
     PurchasingDeps,
     _resolve_po_item_cost,
+    mark_delivery_received,
+    receive_po_items,
 )
+from purchasing.domain.purchase_order import (
+    POItemStatus,
+    POStatus,
+    PurchaseOrder,
+    PurchaseOrderItem,
+)
+from purchasing.infrastructure.po_repo import po_repo
 from shared.infrastructure.database import get_connection
 
 
@@ -65,10 +65,14 @@ async def _create_po_with_item(
 def _stub_deps():
     """Build PurchasingDeps that wire through to real repos for integration tests."""
     from catalog.application.queries import (
-        get_department_by_code, find_vendor_by_name, insert_vendor,
-        list_products_by_vendor, get_product_by_id,
+        find_product_by_name_and_vendor,
         find_product_by_original_sku_and_vendor,
-        find_product_by_name_and_vendor, update_product,
+        find_vendor_by_name,
+        get_department_by_code,
+        get_product_by_id,
+        insert_vendor,
+        list_products_by_vendor,
+        update_product,
     )
     from documents.application.import_parser import infer_uom, suggest_department
     async def _noop_enrich(items, *a, **kw):

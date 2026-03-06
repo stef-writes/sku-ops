@@ -4,11 +4,12 @@ Decouples the purchasing API from the Xero integration.
 The route calls queue_po_for_sync(); the nightly job calls sync_pending_po_bills().
 """
 import logging
+from datetime import UTC
 from typing import Optional
 
-from shared.infrastructure.database import get_connection
 from finance.adapters.invoicing_factory import get_invoicing_gateway
 from identity.application.org_service import get_org_settings
+from shared.infrastructure.database import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ async def queue_po_for_sync(po_id: str) -> None:
     """Mark a PO as pending Xero sync. Called after stock is received."""
     conn = get_connection()
     from datetime import datetime, timezone
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     await conn.execute(
         "UPDATE purchase_orders SET xero_sync_status = 'pending', updated_at = ? WHERE id = ?",
         (now, po_id),
@@ -28,7 +29,7 @@ async def queue_po_for_sync(po_id: str) -> None:
 async def set_po_xero_bill_id(po_id: str, xero_bill_id: str) -> None:
     conn = get_connection()
     from datetime import datetime, timezone
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     await conn.execute(
         "UPDATE purchase_orders SET xero_bill_id = ?, xero_sync_status = 'synced', updated_at = ? WHERE id = ?",
         (xero_bill_id, now, po_id),
@@ -39,7 +40,7 @@ async def set_po_xero_bill_id(po_id: str, xero_bill_id: str) -> None:
 async def set_po_sync_status(po_id: str, status: str) -> None:
     conn = get_connection()
     from datetime import datetime, timezone
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     await conn.execute(
         "UPDATE purchase_orders SET xero_sync_status = ?, updated_at = ? WHERE id = ?",
         (status, now, po_id),
@@ -72,7 +73,7 @@ async def list_failed_po_bills(org_id: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-async def sync_po_bill(po_id: str, org_id: str, cost_total: Optional[float] = None) -> dict:
+async def sync_po_bill(po_id: str, org_id: str, cost_total: float | None = None) -> dict:
     """Sync a single PO to Xero as a Bill. Returns a result dict."""
     conn = get_connection()
     cursor = await conn.execute(

@@ -3,10 +3,10 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from kernel.types import CurrentUser
-from identity.application.auth_service import require_role
-from finance.infrastructure.credit_note_repo import credit_note_repo
 from finance.application.credit_note_service import apply_credit_note
+from finance.infrastructure.credit_note_repo import credit_note_repo
+from identity.application.auth_service import require_role
+from kernel.types import CurrentUser
 from shared.infrastructure.middleware.audit import audit_log
 
 router = APIRouter(prefix="/credit-notes", tags=["credit-notes"])
@@ -14,11 +14,11 @@ router = APIRouter(prefix="/credit-notes", tags=["credit-notes"])
 
 @router.get("")
 async def list_credit_notes(
-    invoice_id: Optional[str] = None,
-    billing_entity: Optional[str] = None,
-    status: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    invoice_id: str | None = None,
+    billing_entity: str | None = None,
+    status: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
     org_id = current_user.organization_id

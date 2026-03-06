@@ -1,12 +1,12 @@
 """Credit note repository."""
+from datetime import UTC, datetime, timezone
 from typing import Optional
 from uuid import uuid4
-from datetime import datetime, timezone
 
 from shared.infrastructure.database import get_connection
 
 
-async def _next_credit_note_number(organization_id: Optional[str] = None, conn=None) -> str:
+async def _next_credit_note_number(organization_id: str | None = None, conn=None) -> str:
     in_transaction = conn is not None
     conn = conn or get_connection()
     org_id = organization_id or "default"
@@ -36,12 +36,12 @@ def _row_to_dict(row) -> dict:
 
 async def insert_credit_note(
     return_id: str,
-    invoice_id: Optional[str],
+    invoice_id: str | None,
     items: list,
     subtotal: float,
     tax: float,
     total: float,
-    organization_id: Optional[str] = None,
+    organization_id: str | None = None,
     conn=None,
 ) -> dict:
     """Create a credit note linked to a return and its original invoice."""
@@ -49,13 +49,18 @@ async def insert_credit_note(
     conn = conn or get_connection()
     org_id = organization_id or "default"
     cn_id = str(uuid4())
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     cn_number = await _next_credit_note_number(org_id, conn)
 
     billing_entity = ""
     if invoice_id:
+        inv_params: list = [invoice_id]
+        inv_where = "WHERE id = ?"
+        if org_id != "default":
+            inv_where += " AND (organization_id = ? OR organization_id IS NULL)"
+            inv_params.append(org_id)
         cursor = await conn.execute(
-            "SELECT billing_entity FROM invoices WHERE id = ?", (invoice_id,)
+            f"SELECT billing_entity FROM invoices {inv_where}", inv_params
         )
         inv_row = await cursor.fetchone()
         if inv_row:
@@ -105,7 +110,7 @@ async def insert_credit_note(
     return result
 
 
-async def get_by_id(credit_note_id: str, organization_id: Optional[str] = None) -> Optional[dict]:
+async def get_by_id(credit_note_id: str, organization_id: str | None = None) -> dict | None:
     conn = get_connection()
     if organization_id:
         cursor = await conn.execute(
@@ -131,13 +136,13 @@ async def get_by_id(credit_note_id: str, organization_id: Optional[str] = None) 
 
 
 async def list_credit_notes(
-    invoice_id: Optional[str] = None,
-    billing_entity: Optional[str] = None,
-    status: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    invoice_id: str | None = None,
+    billing_entity: str | None = None,
+    status: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     limit: int = 500,
-    organization_id: Optional[str] = None,
+    organization_id: str | None = None,
 ) -> list:
     conn = get_connection()
     org_id = organization_id or "default"
@@ -165,7 +170,7 @@ async def list_credit_notes(
     return [_row_to_dict(r) for r in rows]
 
 
-async def apply_credit_note(credit_note_id: str, organization_id: Optional[str] = None) -> dict:
+async def apply_credit_note(credit_note_id: str, organization_id: str | None = None) -> dict:
     """Apply a draft credit note against its linked invoice.
 
     Increases invoices.amount_credited, sets credit note status to 'applied'.
@@ -191,7 +196,7 @@ async def apply_credit_note(credit_note_id: str, organization_id: Optional[str] 
     inv = dict(inv_row)
     new_credited = round(float(inv.get("amount_credited", 0)) + cn_total, 2)
     balance_due = round(float(inv["total"]) - new_credited, 2)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     await conn.execute(
         "UPDATE invoices SET amount_credited = ?, updated_at = ? WHERE id = ?",
@@ -216,23 +221,33 @@ async def apply_credit_note(credit_note_id: str, organization_id: Optional[str] 
     return (await get_by_id(credit_note_id)) or {}
 
 
-async def set_xero_credit_note_id(credit_note_id: str, xero_credit_note_id: str) -> None:
+async def set_xero_credit_note_id(credit_note_id: str, xero_credit_note_id: str, organization_id: str | None = None) -> None:
     """Store the Xero credit note ID and mark as synced after a successful sync."""
     conn = get_connection()
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
+    params: list = [xero_credit_note_id, now, credit_note_id]
+    where = "WHERE id = ?"
+    if organization_id:
+        where += " AND organization_id = ?"
+        params.append(organization_id)
     await conn.execute(
-        "UPDATE credit_notes SET xero_credit_note_id = ?, xero_sync_status = 'synced', updated_at = ? WHERE id = ?",
-        (xero_credit_note_id, now, credit_note_id),
+        f"UPDATE credit_notes SET xero_credit_note_id = ?, xero_sync_status = 'synced', updated_at = ? {where}",
+        params,
     )
     await conn.commit()
 
 
-async def set_credit_note_sync_status(credit_note_id: str, status: str) -> None:
+async def set_credit_note_sync_status(credit_note_id: str, status: str, organization_id: str | None = None) -> None:
     conn = get_connection()
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
+    params: list = [status, now, credit_note_id]
+    where = "WHERE id = ?"
+    if organization_id:
+        where += " AND organization_id = ?"
+        params.append(organization_id)
     await conn.execute(
-        "UPDATE credit_notes SET xero_sync_status = ?, updated_at = ? WHERE id = ?",
-        (status, now, credit_note_id),
+        f"UPDATE credit_notes SET xero_sync_status = ?, updated_at = ? {where}",
+        params,
     )
     await conn.commit()
 

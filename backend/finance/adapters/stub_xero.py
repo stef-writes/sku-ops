@@ -1,6 +1,6 @@
 """Stub Xero adapter — used in dev/test when no Xero credentials are configured."""
-from identity.domain.org_settings import OrgSettings
 from finance.ports.invoicing_port import InvoiceSyncResult
+from identity.domain.org_settings import OrgSettings
 
 
 class StubXeroAdapter:

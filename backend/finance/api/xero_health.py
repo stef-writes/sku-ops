@@ -3,11 +3,11 @@ import logging
 
 from fastapi import APIRouter, Depends
 
-from kernel.types import CurrentUser
-from identity.application.auth_service import require_role
-from finance.infrastructure.invoice_repo import invoice_repo
+from finance.application.po_sync_service import list_failed_po_bills, list_unsynced_po_bills
 from finance.infrastructure.credit_note_repo import credit_note_repo
-from finance.application.po_sync_service import list_unsynced_po_bills, list_failed_po_bills
+from finance.infrastructure.invoice_repo import invoice_repo
+from identity.application.auth_service import require_role
+from kernel.types import CurrentUser
 
 logger = logging.getLogger(__name__)
 

@@ -13,11 +13,12 @@ financial impact to the right contra-inventory account:
 Also verifies that positive deltas (found stock) reverse the correct account,
 and that DAMAGE and SHRINKAGE entries never bleed into each other.
 """
-import pytest
 from uuid import uuid4
 
-from finance.domain.ledger import Account
+import pytest
+
 from finance.application.ledger_service import record_adjustment
+from finance.domain.ledger import Account
 from finance.infrastructure.ledger_repo import trial_balance
 from shared.infrastructure.database import get_connection
 

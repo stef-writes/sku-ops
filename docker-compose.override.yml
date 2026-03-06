@@ -1,0 +1,18 @@
+# Development overrides — automatically loaded by `docker compose up`.
+# Exposes Postgres and backend ports for local debugging.
+# Production deployments use: docker compose -f docker-compose.yml up -d
+# (which ignores this file).
+services:
+  db:
+    ports:
+      - "5432:5432"
+
+  backend:
+    ports:
+      - "8000:8000"
+    environment:
+      ENV: development
+
+  certbot:
+    profiles:
+      - production-only

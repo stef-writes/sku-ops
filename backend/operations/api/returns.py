@@ -3,14 +3,16 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from kernel.types import CurrentUser
+from finance.application.credit_note_service import insert_credit_note
 from identity.application.auth_service import get_current_user, require_role
 from identity.application.org_service import get_org_settings
-from operations.domain.returns import ReturnCreate
-from operations.application.return_service import create_return
-from operations.application.queries import get_withdrawal_by_id, list_returns as _list_returns, get_return_by_id as _get_return_by_id
 from inventory.application.inventory_service import process_receiving_stock_changes
-from finance.application.credit_note_service import insert_credit_note
+from kernel.types import CurrentUser
+from operations.application.queries import get_return_by_id as _get_return_by_id
+from operations.application.queries import get_withdrawal_by_id
+from operations.application.queries import list_returns as _list_returns
+from operations.application.return_service import create_return
+from operations.domain.returns import ReturnCreate
 from shared.infrastructure.middleware.audit import audit_log
 
 router = APIRouter(prefix="/returns", tags=["returns"])
@@ -48,10 +50,10 @@ async def create_material_return(
 
 @router.get("")
 async def list_returns(
-    contractor_id: Optional[str] = None,
-    withdrawal_id: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    contractor_id: str | None = None,
+    withdrawal_id: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
 ):
     org_id = current_user.organization_id

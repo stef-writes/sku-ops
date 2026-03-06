@@ -5,27 +5,27 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from identity.application.auth_service import require_role
-from kernel.types import CurrentUser
-from kernel.errors import ResourceNotFoundError
 from inventory.application.cycle_count_service import (
+    commit_cycle_count,
+    get_count_detail,
+    list_cycle_counts,
     open_cycle_count,
     update_counted_qty,
-    get_count_detail,
-    commit_cycle_count,
-    list_cycle_counts,
 )
+from kernel.errors import ResourceNotFoundError
+from kernel.types import CurrentUser
 from shared.infrastructure.middleware.audit import audit_log
 
 router = APIRouter(prefix="/cycle-counts", tags=["cycle-counts"])
 
 
 class OpenCycleCountRequest(BaseModel):
-    scope: Optional[str] = None  # department name; omit for full-warehouse count
+    scope: str | None = None  # department name; omit for full-warehouse count
 
 
 class UpdateItemRequest(BaseModel):
     counted_qty: float
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 @router.post("", status_code=201)
@@ -55,7 +55,7 @@ async def open_count(
 
 @router.get("")
 async def list_counts(
-    status: Optional[str] = Query(None, description="Filter by status: open or committed"),
+    status: str | None = Query(None, description="Filter by status: open or committed"),
     current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
 ):
     return await list_cycle_counts(

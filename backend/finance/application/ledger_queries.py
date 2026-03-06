@@ -5,17 +5,16 @@ Write operations (insert_entries, entries_exist) remain in finance.infrastructur
 """
 from typing import Optional
 
-from shared.infrastructure.database import get_connection
-from shared.infrastructure.db.sql_compat import date_group_expr
-
 # Re-export write-path helpers that some callers (tests, ledger_service) need via this module.
 from finance.infrastructure.ledger_repo import get_journal, trial_balance  # noqa: F401
+from shared.infrastructure.database import get_connection
+from shared.infrastructure.db.sql_compat import date_group_expr
 
 
 async def summary_by_account(
     org_id: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> dict[str, float]:
     """P&L summary: {account_name: total_amount}."""
     conn = get_connection()
@@ -40,8 +39,8 @@ async def summary_by_account(
 
 async def summary_by_department(
     org_id: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> list[dict]:
     """Per-department revenue, cogs, shrinkage."""
     conn = get_connection()
@@ -87,8 +86,8 @@ async def summary_by_department(
 
 async def summary_by_job(
     org_id: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     limit: int = 100,
 ) -> list[dict]:
     """Per-job P&L."""
@@ -139,8 +138,8 @@ async def summary_by_job(
 
 async def summary_by_billing_entity(
     org_id: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> list[dict]:
     """Per-entity AR balances and revenue."""
     conn = get_connection()
@@ -186,8 +185,8 @@ async def summary_by_billing_entity(
 
 async def summary_by_contractor(
     org_id: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> list[dict]:
     """Per-contractor spend totals."""
     conn = get_connection()
@@ -220,8 +219,8 @@ async def summary_by_contractor(
 
 async def trend_series(
     org_id: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     group_by: str = "day",
 ) -> list[dict]:
     """Time-series of revenue, cost, profit."""
@@ -270,8 +269,8 @@ async def trend_series(
 
 async def ar_aging(
     org_id: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> list[dict]:
     """AR aging buckets by billing entity based on invoice due_date."""
     conn = get_connection()
@@ -311,8 +310,8 @@ async def ar_aging(
 
 async def product_margins(
     org_id: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     limit: int = 50,
 ) -> list[dict]:
     """Per-product revenue, COGS, profit, margin."""
@@ -359,8 +358,8 @@ async def product_margins(
 
 async def units_sold_by_product(
     org_id: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> dict[str, float]:
     """Sum of quantities sold per product_id from withdrawal_items."""
     conn = get_connection()
@@ -386,8 +385,8 @@ async def units_sold_by_product(
 
 async def payment_status_breakdown(
     org_id: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> dict[str, float]:
     """Revenue breakdown by payment status: {Paid: X, Invoiced: Y, Unpaid: Z}."""
     conn = get_connection()
@@ -418,8 +417,8 @@ async def payment_status_breakdown(
 
 async def purchase_spend(
     org_id: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> float:
     """Total inventory additions from PO receipts in the period."""
     conn = get_connection()
@@ -447,8 +446,8 @@ async def purchase_spend(
 
 async def reference_counts(
     org_id: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> dict[str, int]:
     """Count distinct references by type (withdrawal, return, etc.)."""
     conn = get_connection()

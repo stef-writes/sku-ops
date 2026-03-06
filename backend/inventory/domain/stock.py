@@ -36,8 +36,8 @@ class StockTransaction(Entity):
     quantity_after: float
     unit: str = "each"
     transaction_type: StockTransactionType
-    reference_id: Optional[str] = None
-    reference_type: Optional[str] = None
-    reason: Optional[str] = None
+    reference_id: str | None = None
+    reference_type: str | None = None
+    reason: str | None = None
     user_id: str
     user_name: str = ""

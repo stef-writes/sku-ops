@@ -17,22 +17,22 @@ class Job(AuditedEntity):
     """A job/project that withdrawals, returns, and invoices are charged against."""
     code: str
     name: str = ""
-    billing_entity_id: Optional[str] = None
+    billing_entity_id: str | None = None
     status: str = JobStatus.ACTIVE
     service_address: str = ""
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class JobCreate(BaseModel):
     code: str
     name: str = ""
     service_address: str = ""
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class JobUpdate(BaseModel):
-    name: Optional[str] = None
-    status: Optional[str] = None
-    billing_entity_id: Optional[str] = None
-    service_address: Optional[str] = None
-    notes: Optional[str] = None
+    name: str | None = None
+    status: str | None = None
+    billing_entity_id: str | None = None
+    service_address: str | None = None
+    notes: str | None = None

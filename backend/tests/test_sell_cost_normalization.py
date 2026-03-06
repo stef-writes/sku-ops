@@ -8,14 +8,14 @@ Covers:
   5. Xero adapter builds per-line itemized COGS journal (not one aggregate entry)
   6. Xero adapter uses sell_cost over cost when available
 """
-import pytest
+from datetime import UTC, datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timezone, timedelta
+
+import pytest
 
 from catalog.domain.units import cost_per_sell_unit
 from finance.adapters.xero_adapter import XeroAdapter
 from identity.domain.org_settings import OrgSettings
-
 
 # ── 1. cost_per_sell_unit ─────────────────────────────────────────────────────
 
@@ -69,9 +69,9 @@ async def test_withdrawal_sell_cost_same_unit(db):
         process_import_stock_changes,
         process_withdrawal_stock_changes,
     )
-    from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
-    from operations.application.withdrawal_service import create_withdrawal
     from kernel.types import CurrentUser
+    from operations.application.withdrawal_service import create_withdrawal
+    from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
 
     product = await create_product(
         department_id="dept-1",
@@ -119,9 +119,9 @@ async def test_withdrawal_sell_cost_unit_conversion(db):
         process_import_stock_changes,
         process_withdrawal_stock_changes,
     )
-    from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
-    from operations.application.withdrawal_service import create_withdrawal
     from kernel.types import CurrentUser
+    from operations.application.withdrawal_service import create_withdrawal
+    from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
 
     product = await create_product(
         department_id="dept-1",
@@ -172,9 +172,9 @@ async def test_ledger_cogs_entry_has_quantity_and_unit_cost(db):
         process_import_stock_changes,
         process_withdrawal_stock_changes,
     )
-    from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
-    from operations.application.withdrawal_service import create_withdrawal
     from kernel.types import CurrentUser
+    from operations.application.withdrawal_service import create_withdrawal
+    from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
     from shared.infrastructure.database import get_connection
 
     product = await create_product(
@@ -236,9 +236,9 @@ async def test_ledger_revenue_entry_has_quantity_and_unit_cost(db):
         process_import_stock_changes,
         process_withdrawal_stock_changes,
     )
-    from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
-    from operations.application.withdrawal_service import create_withdrawal
     from kernel.types import CurrentUser
+    from operations.application.withdrawal_service import create_withdrawal
+    from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
     from shared.infrastructure.database import get_connection
 
     product = await create_product(
@@ -288,17 +288,17 @@ async def test_invoice_line_items_carry_sell_cost(db):
     """Invoice line items built from withdrawals must copy unit and sell_cost."""
     from catalog.application.product_lifecycle import create_product
     from catalog.application.queries import list_products
-    from inventory.application.inventory_service import (
-        process_import_stock_changes,
-        process_withdrawal_stock_changes,
-    )
-    from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
-    from operations.application.withdrawal_service import create_withdrawal
     from finance.application.invoice_service import (
         create_invoice_from_withdrawals,
         get_invoice,
     )
+    from inventory.application.inventory_service import (
+        process_import_stock_changes,
+        process_withdrawal_stock_changes,
+    )
     from kernel.types import CurrentUser
+    from operations.application.withdrawal_service import create_withdrawal
+    from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
 
     product = await create_product(
         department_id="dept-1",
@@ -353,7 +353,7 @@ def _settings(**overrides) -> OrgSettings:
         xero_refresh_token="refresh-valid",
         xero_tenant_id="tenant-abc",
         xero_token_expiry=(
-            datetime.now(timezone.utc) + timedelta(hours=1)
+            datetime.now(UTC) + timedelta(hours=1)
         ).isoformat(),
         xero_sales_account_code="200",
         xero_cogs_account_code="500",

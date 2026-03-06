@@ -4,15 +4,15 @@ All monetary reports read from the financial_ledger table via ledger_repo.
 Inventory report remains current-state (product quantities).
 """
 import asyncio
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends
 
+from catalog.application.queries import list_low_stock, list_products
+from finance.application import ledger_queries as ledger_repo
 from identity.application.auth_service import require_role
 from kernel.types import CurrentUser, round_money
-from catalog.application.queries import list_products, list_low_stock
-from finance.application import ledger_queries as ledger_repo
 from shared.infrastructure.database import get_connection
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -20,8 +20,8 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 
 @router.get("/sales")
 async def get_sales_report(
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
 ):
     org_id = current_user.organization_id
@@ -107,8 +107,8 @@ async def get_inventory_report(current_user: CurrentUser = Depends(require_role(
 
 @router.get("/trends")
 async def get_trends_report(
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     group_by: str = "day",
     current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
 ):
@@ -128,8 +128,8 @@ async def get_trends_report(
 
 @router.get("/product-margins")
 async def get_product_margins(
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     limit: int = 20,
     current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
 ):
@@ -150,8 +150,8 @@ async def get_product_margins(
 
 @router.get("/job-pl")
 async def get_job_pl(
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     limit: int = 100,
     current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
 ):
@@ -177,8 +177,8 @@ async def get_job_pl(
 @router.get("/pl")
 async def get_pl(
     group_by: str = "overall",
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     limit: int = 100,
     current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
 ):
@@ -251,8 +251,8 @@ async def get_pl(
 
 @router.get("/ar-aging")
 async def get_ar_aging(
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
 ):
     """Accounts receivable aging buckets by billing entity."""
@@ -263,8 +263,8 @@ async def get_ar_aging(
 
 @router.get("/kpis")
 async def get_kpis(
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
 ):
     org_id = current_user.organization_id
@@ -313,8 +313,8 @@ async def get_kpis(
 
 @router.get("/product-performance")
 async def get_product_performance(
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     limit: int = 200,
     current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
 ):
@@ -365,7 +365,7 @@ async def get_reorder_urgency(
 ):
     """Products ranked by days-until-stockout using withdrawal velocity."""
     org_id = current_user.organization_id
-    since = (datetime.now(timezone.utc) - timedelta(days=min(days, 365))).isoformat()
+    since = (datetime.now(UTC) - timedelta(days=min(days, 365))).isoformat()
 
     low_stock, all_products = await asyncio.gather(
         list_low_stock(limit=200, organization_id=org_id),
@@ -422,13 +422,13 @@ async def get_reorder_urgency(
 
 @router.get("/product-activity")
 async def get_product_activity(
-    product_id: Optional[str] = None,
+    product_id: str | None = None,
     days: int = 365,
     current_user: CurrentUser = Depends(require_role("admin", "warehouse_manager")),
 ):
     """Daily withdrawal activity heatmap data. Optional product_id filter."""
     org_id = current_user.organization_id
-    since = (datetime.now(timezone.utc) - timedelta(days=min(days, 730))).isoformat()
+    since = (datetime.now(UTC) - timedelta(days=min(days, 730))).isoformat()
     conn = get_connection()
 
     params: list = [org_id, since]

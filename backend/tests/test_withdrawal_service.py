@@ -1,17 +1,20 @@
 """Tests for withdrawal service."""
 import pytest
 
-from kernel.types import CurrentUser
-from inventory.domain.errors import InsufficientStockError
-from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
-from catalog.infrastructure.product_repo import product_repo
-from inventory.infrastructure.stock_repo import stock_repo
-from operations.infrastructure.withdrawal_repo import withdrawal_repo
 from catalog.application.product_lifecycle import create_product
 from catalog.application.queries import list_products
-from inventory.application.inventory_service import process_import_stock_changes, process_withdrawal_stock_changes
+from catalog.infrastructure.product_repo import product_repo
 from finance.application.invoice_service import create_invoice_from_withdrawals
+from inventory.application.inventory_service import (
+    process_import_stock_changes,
+    process_withdrawal_stock_changes,
+)
+from inventory.domain.errors import InsufficientStockError
+from inventory.infrastructure.stock_repo import stock_repo
+from kernel.types import CurrentUser
 from operations.application.withdrawal_service import create_withdrawal as _create_withdrawal
+from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
+from operations.infrastructure.withdrawal_repo import withdrawal_repo
 
 
 def _test_user(user_id="user-1", name="Test User"):
@@ -20,7 +23,7 @@ def _test_user(user_id="user-1", name="Test User"):
 
 async def create_withdrawal(data, contractor, current_user):
     if isinstance(current_user, dict):
-        current_user = CurrentUser(**{**{"email": "test@test.com", "role": "admin"}, **current_user})
+        current_user = CurrentUser(**{"email": "test@test.com", "role": "admin", **current_user})
     return await _create_withdrawal(
         data, contractor, current_user,
         list_products=list_products,

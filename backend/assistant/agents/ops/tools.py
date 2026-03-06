@@ -1,12 +1,11 @@
 """Ops agent helper functions — DB query implementations for operations data."""
 import json
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 from assistant.agents.tools.registry import register as _reg
-
-from shared.infrastructure.database import get_connection
 from operations.application.queries import list_withdrawals
+from shared.infrastructure.database import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +84,7 @@ async def _get_job_materials(args: dict, org_id: str) -> str:
 async def _list_recent_withdrawals(args: dict, org_id: str) -> str:
     days = min(int(args.get("days") or 7), 365)
     limit = min(int(args.get("limit") or 20), 100)
-    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     withdrawals = await list_withdrawals(start_date=since, limit=limit, organization_id=org_id)
     out = [
         {

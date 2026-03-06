@@ -1,7 +1,7 @@
 """Repository for agent_runs — insert + query for monitoring."""
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 from shared.infrastructure.database import get_connection
 from shared.infrastructure.db.sql_compat import date_extract, time_ago_expr
@@ -29,7 +29,7 @@ async def log_agent_run(
     handoff_from: str | None = None,
 ) -> str:
     run_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     conn = get_connection()
     await conn.execute(
         """INSERT INTO agent_runs

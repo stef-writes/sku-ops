@@ -7,42 +7,42 @@ from finance.domain.invoice import Invoice, InvoiceLineItem
 @runtime_checkable
 class InvoiceRepoPort(Protocol):
 
-    async def insert(self, invoice: Union[Invoice, dict]) -> Optional[dict]: ...
+    async def insert(self, invoice: Invoice | dict) -> dict | None: ...
 
     async def get_by_id(
-        self, invoice_id: str, organization_id: Optional[str] = None,
-    ) -> Optional[dict]: ...
+        self, invoice_id: str, organization_id: str | None = None,
+    ) -> dict | None: ...
 
     async def list_invoices(
         self,
-        status: Optional[str] = None,
-        billing_entity: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        status: str | None = None,
+        billing_entity: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         limit: int = 1000,
-        organization_id: Optional[str] = None,
-    ) -> List[dict]: ...
+        organization_id: str | None = None,
+    ) -> list[dict]: ...
 
     async def update(
         self,
         invoice_id: str,
-        billing_entity: Optional[str] = None,
-        contact_name: Optional[str] = None,
-        contact_email: Optional[str] = None,
-        status: Optional[str] = None,
-        notes: Optional[str] = None,
-        tax: Optional[float] = None,
-        line_items: Optional[List[InvoiceLineItem]] = None,
-    ) -> Optional[dict]: ...
+        billing_entity: str | None = None,
+        contact_name: str | None = None,
+        contact_email: str | None = None,
+        status: str | None = None,
+        notes: str | None = None,
+        tax: float | None = None,
+        line_items: list[InvoiceLineItem] | None = None,
+    ) -> dict | None: ...
 
     async def add_withdrawals(
-        self, invoice_id: str, withdrawal_ids: List[str],
-        organization_id: Optional[str] = None,
-    ) -> Optional[dict]: ...
+        self, invoice_id: str, withdrawal_ids: list[str],
+        organization_id: str | None = None,
+    ) -> dict | None: ...
 
     async def create_from_withdrawals(
-        self, withdrawal_ids: List[str],
-        organization_id: Optional[str] = None, conn=None,
+        self, withdrawal_ids: list[str],
+        organization_id: str | None = None, conn=None,
     ) -> dict: ...
 
     async def mark_paid_for_withdrawal(self, withdrawal_id: str) -> None: ...

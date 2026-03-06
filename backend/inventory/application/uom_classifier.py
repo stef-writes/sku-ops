@@ -3,11 +3,12 @@ UOM classification for hardware/building-supply products.
 Uses LLM when a generate_text callable is provided; otherwise falls back to rule-based inference.
 Cross-domain dependencies (LLM, rule parser) are injected by callers.
 """
-from typing import Callable, List, Optional, Tuple
 import asyncio
 import json
-import re
 import logging
+import re
+from collections.abc import Callable
+from typing import List, Optional, Tuple
 
 from catalog.domain.units import ALLOWED_BASE_UNITS
 from shared.infrastructure.prompt_loader import load_prompt
@@ -15,10 +16,10 @@ from shared.infrastructure.prompt_loader import load_prompt
 logger = logging.getLogger(__name__)
 
 # Type aliases for injected dependencies
-GenerateTextFn = Optional[Callable[[str, Optional[str]], Optional[str]]]
-RuleInferFn = Callable[[str], Tuple[str, str, int]]
+GenerateTextFn = Optional[Callable[[str, str | None], str | None]]
+RuleInferFn = Callable[[str], tuple[str, str, int]]
 
-def _default_rule_infer(name: str) -> Tuple[str, str, int]:
+def _default_rule_infer(name: str) -> tuple[str, str, int]:
     """Fallback: everything is 'each'."""
     return "each", "each", 1
 
@@ -60,7 +61,7 @@ def _normalize_pack_qty(val) -> int:
 
 async def classify_uom(
     product_name: str,
-    description: Optional[str] = None,
+    description: str | None = None,
     *,
     generate_text: GenerateTextFn = None,
 ) -> dict:
@@ -113,11 +114,11 @@ Return ONLY valid JSON: {{"base_unit": "...", "sell_uom": "...", "pack_qty": 1}}
 
 
 async def classify_uom_batch(
-    products: List[dict],
+    products: list[dict],
     *,
     generate_text: GenerateTextFn = None,
     rule_infer: RuleInferFn = _default_rule_infer,
-) -> List[dict]:
+) -> list[dict]:
     """
     Classify UOM for products. Uses LLM when generate_text is provided;
     otherwise falls back to rule_infer.

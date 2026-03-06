@@ -1,8 +1,9 @@
 """Database protocol — interface contract for SQLite and PostgreSQL adapters."""
 from __future__ import annotations
 
+from collections.abc import Sequence
 from contextlib import AbstractAsyncContextManager
-from typing import Protocol, Sequence, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 
 class DictRow(dict):

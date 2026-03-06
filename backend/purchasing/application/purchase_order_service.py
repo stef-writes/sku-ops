@@ -4,14 +4,15 @@ Purchase order service: create pending POs and receive items into inventory.
 Items are saved as pending when a document is reviewed; inventory only updates
 on receive. All types are explicit — no dicts flowing across domain boundaries.
 """
-from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, List, Optional, Tuple
-
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime, timezone
+from typing import Any, List, Optional, Tuple
 
+from catalog.domain.units import ALLOWED_BASE_UNITS
+from finance.application.ledger_service import record_po_receipt as _record_ledger
 from kernel.errors import ResourceNotFoundError
 from kernel.types import CurrentUser
-from catalog.domain.units import ALLOWED_BASE_UNITS
 from purchasing.domain.purchase_order import (
     POItemCreate,
     POItemStatus,
@@ -21,7 +22,6 @@ from purchasing.domain.purchase_order import (
 )
 from purchasing.infrastructure.po_repo import po_repo as _default_repo
 from purchasing.ports.po_repo_port import PORepoPort
-from finance.application.ledger_service import record_po_receipt as _record_ledger
 
 
 @dataclass
@@ -39,14 +39,14 @@ class PurchasingDeps:
     create_product: Callable[..., Awaitable[Any]]
     process_receiving_stock_changes: Callable[..., Awaitable[None]]
     classify_uom_batch: Callable[..., Awaitable[list]]
-    infer_uom: Callable[[str], Tuple[str, str, int]]
+    infer_uom: Callable[[str], tuple[str, str, int]]
     suggest_department: Callable[..., Any]
     enrich_for_import: Callable[..., Awaitable[list]]
 
 
 def _resolve_vendor_dict(vendor_name: str, vendor_id: str) -> dict:
     """Build a minimal vendor insert dict."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     return {
         "id": vendor_id,
         "name": vendor_name,
@@ -61,12 +61,12 @@ def _resolve_vendor_dict(vendor_name: str, vendor_id: str) -> dict:
 
 async def create_purchase_order(
     vendor_name: str,
-    products: List[POItemCreate],
+    products: list[POItemCreate],
     deps: PurchasingDeps,
     current_user: CurrentUser,
-    document_date: Optional[str] = None,
-    total: Optional[float] = None,
-    department_id: Optional[str] = None,
+    document_date: str | None = None,
+    total: float | None = None,
+    department_id: str | None = None,
     create_vendor_if_missing: bool = True,
     repo: PORepoPort = _default_repo,
 ) -> dict:
@@ -166,7 +166,7 @@ async def create_purchase_order(
         organization_id=org_id,
     )
 
-    po_items: List[PurchaseOrderItem] = []
+    po_items: list[PurchaseOrderItem] = []
     for item in selected_dicts:
         cost_val = _resolve_po_item_cost(item)
         po_items.append(PurchaseOrderItem(
@@ -202,7 +202,7 @@ async def create_purchase_order(
 
 async def mark_delivery_received(
     po_id: str,
-    item_ids: List[str],
+    item_ids: list[str],
     current_user: CurrentUser,
     repo: PORepoPort = _default_repo,
 ) -> dict:
@@ -442,7 +442,7 @@ async def _recompute_po_status(
     all_items = await repo.get_po_items(po_id)
     arrived_count = sum(1 for i in all_items if i["status"] == POItemStatus.ARRIVED.value)
     total = len(all_items)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     if arrived_count == total and total > 0:
         new_status = POStatus.RECEIVED.value

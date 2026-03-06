@@ -5,7 +5,7 @@ from finance.domain.payment import Payment
 from shared.infrastructure.database import get_connection
 
 
-def _row_to_dict(row) -> Optional[dict]:
+def _row_to_dict(row) -> dict | None:
     if row is None:
         return None
     return dict(row) if hasattr(row, "keys") else {}
@@ -14,7 +14,7 @@ def _row_to_dict(row) -> Optional[dict]:
 _COLUMNS = "id, invoice_id, billing_entity_id, amount, method, reference, payment_date, notes, recorded_by_id, xero_payment_id, organization_id, created_at, updated_at"
 
 
-async def insert(payment: Union[Payment, dict], withdrawal_ids: list[str] | None = None, conn=None) -> None:
+async def insert(payment: Payment | dict, withdrawal_ids: list[str] | None = None, conn=None) -> None:
     d = payment if isinstance(payment, dict) else payment.model_dump()
     in_tx = conn is not None
     conn = conn or get_connection()
@@ -38,7 +38,7 @@ async def insert(payment: Union[Payment, dict], withdrawal_ids: list[str] | None
         await conn.commit()
 
 
-async def get_by_id(payment_id: str, organization_id: str) -> Optional[dict]:
+async def get_by_id(payment_id: str, organization_id: str) -> dict | None:
     conn = get_connection()
     cursor = await conn.execute(
         f"SELECT {_COLUMNS} FROM payments WHERE id = ? AND organization_id = ?",
@@ -59,10 +59,10 @@ async def get_by_id(payment_id: str, organization_id: str) -> Optional[dict]:
 
 async def list_payments(
     organization_id: str,
-    invoice_id: Optional[str] = None,
-    billing_entity_id: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    invoice_id: str | None = None,
+    billing_entity_id: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     limit: int = 200,
     offset: int = 0,
 ) -> list:

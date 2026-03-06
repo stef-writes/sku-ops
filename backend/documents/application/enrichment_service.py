@@ -5,8 +5,8 @@ base_unit, sell_uom, pack_qty, and original_sku to match existing vendor product
 """
 import asyncio
 import json
-import re
 import logging
+import re
 from typing import List
 
 from catalog.domain.units import ALLOWED_BASE_UNITS
@@ -41,10 +41,10 @@ def _normalize_enriched_unit(raw) -> str:
 
 
 async def enrich_for_import(
-    items: List[dict],
-    vendor_products: List[dict],
-    dept_codes: List[str],
-) -> List[dict]:
+    items: list[dict],
+    vendor_products: list[dict],
+    dept_codes: list[str],
+) -> list[dict]:
     """
     When LLM available: enrich items with suggested_department, UOM, and original_sku.
     vendor_products: existing products from this vendor (id, name, original_sku, sku).

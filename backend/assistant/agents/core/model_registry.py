@@ -14,9 +14,9 @@ from __future__ import annotations
 import logging
 import os
 
-from shared.infrastructure.config import AGENT_PRIMARY_MODEL
 from assistant.infrastructure.llm import get_model as _llm_get_model
 from assistant.infrastructure.llm.cost import calc_cost as _cost_calc
+from shared.infrastructure.config import AGENT_PRIMARY_MODEL
 
 logger = logging.getLogger(__name__)
 

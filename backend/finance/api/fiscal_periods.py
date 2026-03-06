@@ -1,5 +1,5 @@
 """Fiscal period management routes."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -20,7 +20,7 @@ class FiscalPeriodCreate(BaseModel):
     end_date: str
 
 
-async def _get_period(period_id: str, org_id: str) -> Optional[dict]:
+async def _get_period(period_id: str, org_id: str) -> dict | None:
     conn = get_connection()
     cursor = await conn.execute(
         "SELECT * FROM fiscal_periods WHERE id = ? AND organization_id = ?",
@@ -32,7 +32,7 @@ async def _get_period(period_id: str, org_id: str) -> Optional[dict]:
 
 @router.get("")
 async def list_fiscal_periods(
-    status: Optional[str] = None,
+    status: str | None = None,
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
     conn = get_connection()
@@ -55,7 +55,7 @@ async def create_fiscal_period(
     conn = get_connection()
     org_id = current_user.organization_id
     period_id = str(uuid4())
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     await conn.execute(
         """INSERT INTO fiscal_periods (id, name, start_date, end_date, status, organization_id, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)""",
@@ -79,7 +79,7 @@ async def close_fiscal_period(
     if period.get("status") != "open":
         raise HTTPException(status_code=400, detail="Period is already closed")
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     conn = get_connection()
     await conn.execute(
         "UPDATE fiscal_periods SET status = 'closed', closed_by_id = ?, closed_at = ? WHERE id = ?",

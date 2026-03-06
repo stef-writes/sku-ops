@@ -1,13 +1,13 @@
 """Tests for product lifecycle service."""
 import pytest
 
-from shared.infrastructure.database import get_connection
+from catalog.application.product_lifecycle import create_product, delete_product, update_product
+from catalog.domain.errors import DuplicateBarcodeError, InvalidBarcodeError
 from catalog.infrastructure.department_repo import department_repo
 from catalog.infrastructure.product_repo import product_repo
-from catalog.application.product_lifecycle import create_product, update_product, delete_product
 from inventory.application.inventory_service import process_import_stock_changes
 from kernel.errors import ResourceNotFoundError
-from catalog.domain.errors import DuplicateBarcodeError, InvalidBarcodeError
+from shared.infrastructure.database import get_connection
 
 
 @pytest.mark.asyncio

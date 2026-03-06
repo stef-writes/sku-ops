@@ -124,6 +124,7 @@ INDEXES: list[str] = [
     "CREATE INDEX IF NOT EXISTS idx_addresses_entity ON addresses(billing_entity_id)",
     "CREATE INDEX IF NOT EXISTS idx_addresses_job ON addresses(job_id)",
     "CREATE INDEX IF NOT EXISTS idx_fiscal_periods_org ON fiscal_periods(organization_id, status)",
+    "CREATE INDEX IF NOT EXISTS idx_users_org_role ON users(organization_id, role)",
 ]
 
 SEED: list[str] = [

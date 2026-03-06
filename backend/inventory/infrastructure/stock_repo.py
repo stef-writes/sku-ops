@@ -5,13 +5,13 @@ from inventory.domain.stock import StockTransaction
 from shared.infrastructure.database import get_connection
 
 
-def _row_to_dict(row) -> Optional[dict]:
+def _row_to_dict(row) -> dict | None:
     if row is None:
         return None
     return dict(row) if hasattr(row, "keys") else {}
 
 
-async def insert_transaction(transaction: Union[StockTransaction, dict], conn=None) -> None:
+async def insert_transaction(transaction: StockTransaction | dict, conn=None) -> None:
     tx_dict = transaction if isinstance(transaction, dict) else transaction.model_dump()
     in_transaction = conn is not None
     conn = conn or get_connection()
@@ -43,11 +43,17 @@ async def insert_transaction(transaction: Union[StockTransaction, dict], conn=No
         await conn.commit()
 
 
-async def list_by_product(product_id: str, limit: int = 50) -> list:
+async def list_by_product(product_id: str, limit: int = 50, organization_id: str | None = None) -> list:
     conn = get_connection()
+    params: list = [product_id]
+    where = "WHERE product_id = ?"
+    if organization_id:
+        where += " AND (organization_id = ? OR organization_id IS NULL)"
+        params.append(organization_id)
+    params.append(limit)
     cursor = await conn.execute(
-        "SELECT * FROM stock_transactions WHERE product_id = ? ORDER BY created_at DESC LIMIT ?",
-        (product_id, limit),
+        f"SELECT * FROM stock_transactions {where} ORDER BY created_at DESC LIMIT ?",
+        params,
     )
     rows = await cursor.fetchall()
     return [_row_to_dict(r) for r in rows]

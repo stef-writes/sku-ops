@@ -7,7 +7,7 @@ about recurring contractors, products, and user preferences.
 import json
 import logging
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 from shared.infrastructure.database import get_connection
@@ -22,8 +22,8 @@ async def save(org_id: str, user_id: str, session_id: str, artifacts: list[dict]
     if not artifacts:
         return
     conn = get_connection()
-    now = datetime.now(timezone.utc).isoformat()
-    expires_at = (datetime.now(timezone.utc) + timedelta(days=_DEFAULT_TTL_DAYS)).isoformat()
+    now = datetime.now(UTC).isoformat()
+    expires_at = (datetime.now(UTC) + timedelta(days=_DEFAULT_TTL_DAYS)).isoformat()
     rows: list[tuple[Any, ...]] = [
         (
             str(uuid.uuid4()),
@@ -58,7 +58,7 @@ async def recall(org_id: str, user_id: str, limit: int = 15) -> str:
     Returns empty string if no artifacts exist (avoids any overhead on first session).
     """
     conn = get_connection()
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     cur = await conn.execute(
         """SELECT type, subject, content, created_at
            FROM memory_artifacts

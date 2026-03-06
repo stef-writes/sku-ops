@@ -1,18 +1,18 @@
 """Department repository."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Optional, Union
 
 from catalog.domain.department import Department
 from shared.infrastructure.database import get_connection
 
 
-def _row_to_dict(row) -> Optional[dict]:
+def _row_to_dict(row) -> dict | None:
     if row is None:
         return None
     return dict(row) if hasattr(row, "keys") else {}
 
 
-async def list_all(organization_id: Optional[str] = None) -> list:
+async def list_all(organization_id: str | None = None) -> list:
     conn = get_connection()
     org_id = organization_id or "default"
     cursor = await conn.execute(
@@ -24,7 +24,7 @@ async def list_all(organization_id: Optional[str] = None) -> list:
     return [_row_to_dict(r) for r in rows]
 
 
-async def get_by_id(dept_id: str, organization_id: Optional[str] = None) -> Optional[dict]:
+async def get_by_id(dept_id: str, organization_id: str | None = None) -> dict | None:
     conn = get_connection()
     if organization_id:
         cursor = await conn.execute(
@@ -41,7 +41,7 @@ async def get_by_id(dept_id: str, organization_id: Optional[str] = None) -> Opti
     return _row_to_dict(row)
 
 
-async def get_by_code(code: str, organization_id: Optional[str] = None) -> Optional[dict]:
+async def get_by_code(code: str, organization_id: str | None = None) -> dict | None:
     conn = get_connection()
     org_id = organization_id or "default"
     cursor = await conn.execute(
@@ -53,7 +53,7 @@ async def get_by_code(code: str, organization_id: Optional[str] = None) -> Optio
     return _row_to_dict(row)
 
 
-async def insert(department: Union[Department, dict]) -> None:
+async def insert(department: Department | dict) -> None:
     dept_dict = department if isinstance(department, dict) else department.model_dump()
     dept_dict["organization_id"] = dept_dict.get("organization_id") or "default"
     conn = get_connection()
@@ -74,12 +74,17 @@ async def insert(department: Union[Department, dict]) -> None:
     await conn.commit()
 
 
-async def update(dept_id: str, name: str, description: str, conn=None) -> Optional[dict]:
+async def update(dept_id: str, name: str, description: str, conn=None, organization_id: str | None = None) -> dict | None:
     in_transaction = conn is not None
     conn = conn or get_connection()
+    params: list = [name, description or "", dept_id]
+    where = "WHERE id = ?"
+    if organization_id:
+        where += " AND organization_id = ?"
+        params.append(organization_id)
     await conn.execute(
-        "UPDATE departments SET name = ?, description = ? WHERE id = ?",
-        (name, description or "", dept_id),
+        f"UPDATE departments SET name = ?, description = ? {where}",
+        params,
     )
     await conn.execute(
         "UPDATE products SET department_name = ? WHERE department_id = ?",
@@ -90,33 +95,48 @@ async def update(dept_id: str, name: str, description: str, conn=None) -> Option
     return await get_by_id(dept_id)
 
 
-async def count_products_by_department(dept_id: str) -> int:
+async def count_products_by_department(dept_id: str, organization_id: str | None = None) -> int:
     conn = get_connection()
+    params: list = [dept_id]
+    where = "WHERE department_id = ? AND deleted_at IS NULL"
+    if organization_id:
+        where += " AND (organization_id = ? OR organization_id IS NULL)"
+        params.append(organization_id)
     cursor = await conn.execute(
-        "SELECT COUNT(*) FROM products WHERE department_id = ?",
-        (dept_id,),
+        f"SELECT COUNT(*) FROM products {where}",
+        params,
     )
     row = await cursor.fetchone()
     return row[0] if row else 0
 
 
-async def delete(dept_id: str) -> int:
+async def delete(dept_id: str, organization_id: str | None = None) -> int:
     conn = get_connection()
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
+    params: list = [now, dept_id]
+    where = "WHERE id = ? AND deleted_at IS NULL"
+    if organization_id:
+        where += " AND organization_id = ?"
+        params.append(organization_id)
     cursor = await conn.execute(
-        "UPDATE departments SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
-        (now, dept_id),
+        f"UPDATE departments SET deleted_at = ? {where}",
+        params,
     )
     await conn.commit()
     return cursor.rowcount
 
 
-async def increment_product_count(dept_id: str, delta: int, conn=None) -> None:
+async def increment_product_count(dept_id: str, delta: int, conn=None, organization_id: str | None = None) -> None:
     in_transaction = conn is not None
     conn = conn or get_connection()
+    params: list = [delta, dept_id]
+    where = "WHERE id = ?"
+    if organization_id:
+        where += " AND organization_id = ?"
+        params.append(organization_id)
     await conn.execute(
-        "UPDATE departments SET product_count = product_count + ? WHERE id = ?",
-        (delta, dept_id),
+        f"UPDATE departments SET product_count = product_count + ? {where}",
+        params,
     )
     if not in_transaction:
         await conn.commit()

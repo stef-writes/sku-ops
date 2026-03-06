@@ -3,11 +3,11 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from identity.application.auth_service import get_current_user
-from kernel.types import CurrentUser
+from catalog.application.sku_service import slug_from_name
 from catalog.infrastructure.department_repo import department_repo
 from catalog.infrastructure.sku_repo import sku_repo
-from catalog.application.sku_service import slug_from_name
+from identity.application.auth_service import get_current_user
+from kernel.types import CurrentUser
 
 router = APIRouter(tags=["sku"])
 
@@ -17,7 +17,7 @@ SKU_FORMAT = "DEPT-SLUG-XXXXX"
 @router.get("/sku/preview")
 async def get_sku_preview(
     department_id: str,
-    product_name: Optional[str] = None,
+    product_name: str | None = None,
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """Preview the next SKU for a department (without consuming it)."""
@@ -33,7 +33,7 @@ async def get_sku_preview(
 
 @router.get("/sku/overview")
 async def get_sku_overview(
-    product_name: Optional[str] = None,
+    product_name: str | None = None,
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """SKU system overview: format, departments with next available SKU."""

@@ -10,13 +10,13 @@ Tests validate:
   6. Token refresh — expired token triggers refresh before API call
   7. Idempotency contract — existing xero_invoice_id uses InvoiceID in payload
 """
+from datetime import UTC, datetime, timedelta, timezone
+from unittest.mock import AsyncMock, MagicMock, call, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
-from datetime import datetime, timezone, timedelta
 
-from identity.domain.org_settings import OrgSettings
 from finance.adapters.xero_adapter import XeroAdapter
-
+from identity.domain.org_settings import OrgSettings
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ def _settings(**overrides) -> OrgSettings:
         xero_refresh_token="refresh-valid",
         xero_tenant_id="tenant-abc",
         xero_token_expiry=(
-            datetime.now(timezone.utc) + timedelta(hours=1)
+            datetime.now(UTC) + timedelta(hours=1)
         ).isoformat(),
         xero_sales_account_code="200",
         xero_cogs_account_code="500",
@@ -41,7 +41,7 @@ def _settings(**overrides) -> OrgSettings:
 def _expired_settings() -> OrgSettings:
     return _settings(
         xero_token_expiry=(
-            datetime.now(timezone.utc) - timedelta(hours=1)
+            datetime.now(UTC) - timedelta(hours=1)
         ).isoformat()
     )
 

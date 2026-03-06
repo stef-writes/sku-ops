@@ -48,9 +48,22 @@ dump.rdb
 
 # Python
 __pycache__/
-*pyc*
+*.py[cod]
+*$py.class
+*.so
 venv/
 .venv/
+build/
+dist/
+*.egg-info/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+uv.lock.bak
 
 # Development tools
 chainlit.md
@@ -85,8 +98,15 @@ backend/:memory:*
 .env
 .env.*
 !.env.example
+!.env.production.example
 backend/.env
 frontend/.env
+
+# Deployment artifacts
+backups/
+nginx/nginx.rendered.conf
+nginx/ssl-temp/
+nginx/nginx.init-tls.conf
 
 # Test artifacts and temp files
 test_temp.txt

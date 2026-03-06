@@ -1,16 +1,16 @@
 """Payment routes — record and list payments."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from kernel.types import CurrentUser
-from identity.application.auth_service import require_role, get_current_user
+from finance.application.invoice_service import mark_paid_for_withdrawal
+from finance.application.ledger_service import record_payment as _record_ledger_payment
 from finance.domain.payment import Payment, PaymentCreate
 from finance.infrastructure.payment_repo import payment_repo
+from identity.application.auth_service import get_current_user, require_role
+from kernel.types import CurrentUser
 from operations.application.queries import get_withdrawal_by_id, mark_withdrawal_paid
-from finance.application.ledger_service import record_payment as _record_ledger_payment
-from finance.application.invoice_service import mark_paid_for_withdrawal
 from shared.infrastructure.middleware.audit import audit_log
 
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -23,7 +23,7 @@ async def create_payment(
 ):
     """Record a payment against withdrawals and/or an invoice."""
     org_id = current_user.organization_id
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     if not data.withdrawal_ids and not data.invoice_id:
         raise HTTPException(status_code=400, detail="Provide withdrawal_ids or invoice_id")
@@ -78,10 +78,10 @@ async def create_payment(
 
 @router.get("")
 async def list_payments(
-    invoice_id: Optional[str] = None,
-    billing_entity_id: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    invoice_id: str | None = None,
+    billing_entity_id: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     limit: int = 200,
     offset: int = 0,
     current_user: CurrentUser = Depends(get_current_user),

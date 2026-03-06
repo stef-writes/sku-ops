@@ -1,14 +1,15 @@
 """Invoice CRUD and Xero sync routes."""
 import logging
+from datetime import UTC
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from finance.application.invoice_service import sync_invoice
+from finance.domain.invoice import InvoiceCreate, InvoiceSyncXeroBulk, InvoiceUpdate
+from finance.infrastructure.invoice_repo import invoice_repo
 from identity.application.auth_service import require_role
 from kernel.types import CurrentUser
-from finance.domain.invoice import InvoiceCreate, InvoiceUpdate, InvoiceSyncXeroBulk
-from finance.infrastructure.invoice_repo import invoice_repo
-from finance.application.invoice_service import sync_invoice
 from shared.infrastructure.middleware.audit import audit_log
 
 logger = logging.getLogger(__name__)
@@ -43,10 +44,10 @@ async def sync_invoices_to_xero_bulk(
 
 @router.get("")
 async def get_invoices(
-    status: Optional[str] = None,
-    billing_entity: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    status: str | None = None,
+    billing_entity: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
     """List invoices with optional filters."""
@@ -176,7 +177,7 @@ async def approve_invoice(
         raise HTTPException(status_code=400, detail=f"Cannot approve invoice in '{inv.get('status')}' status")
 
     from datetime import datetime, timezone
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     updated = await invoice_repo.update(
         invoice_id,
         status="approved",

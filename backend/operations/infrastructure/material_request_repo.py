@@ -6,7 +6,7 @@ from operations.domain.material_request import MaterialRequest
 from shared.infrastructure.database import get_connection
 
 
-def _row_to_dict(row) -> Optional[dict]:
+def _row_to_dict(row) -> dict | None:
     if row is None:
         return None
     d = dict(row) if hasattr(row, "keys") else {}
@@ -15,7 +15,7 @@ def _row_to_dict(row) -> Optional[dict]:
     return d
 
 
-async def insert(request: Union[MaterialRequest, dict], conn=None) -> None:
+async def insert(request: MaterialRequest | dict, conn=None) -> None:
     request_dict = request if isinstance(request, dict) else request.model_dump()
     in_transaction = conn is not None
     conn = conn or get_connection()
@@ -45,7 +45,7 @@ async def insert(request: Union[MaterialRequest, dict], conn=None) -> None:
         await conn.commit()
 
 
-async def get_by_id(request_id: str, organization_id: Optional[str] = None) -> Optional[dict]:
+async def get_by_id(request_id: str, organization_id: str | None = None) -> dict | None:
     conn = get_connection()
     org_id = organization_id or "default"
     cursor = await conn.execute(
@@ -56,7 +56,7 @@ async def get_by_id(request_id: str, organization_id: Optional[str] = None) -> O
     return _row_to_dict(row)
 
 
-async def list_pending(organization_id: Optional[str] = None, limit: int = 100) -> list:
+async def list_pending(organization_id: str | None = None, limit: int = 100) -> list:
     conn = get_connection()
     org_id = organization_id or "default"
     cursor = await conn.execute(
@@ -67,7 +67,7 @@ async def list_pending(organization_id: Optional[str] = None, limit: int = 100) 
     return [_row_to_dict(r) for r in rows]
 
 
-async def list_by_contractor(contractor_id: str, organization_id: Optional[str] = None, limit: int = 100) -> list:
+async def list_by_contractor(contractor_id: str, organization_id: str | None = None, limit: int = 100) -> list:
     conn = get_connection()
     org_id = organization_id or "default"
     cursor = await conn.execute(

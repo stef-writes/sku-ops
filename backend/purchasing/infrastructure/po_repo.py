@@ -1,12 +1,12 @@
 """Purchase order repository — typed implementation of PORepoPort."""
 from typing import List, Optional
 
-from shared.infrastructure.database import get_connection
-from purchasing.domain.purchase_order import PurchaseOrder, PurchaseOrderItem, POItemStatus
+from purchasing.domain.purchase_order import POItemStatus, PurchaseOrder, PurchaseOrderItem
 from purchasing.ports.po_repo_port import PORepoPort
+from shared.infrastructure.database import get_connection
 
 
-def _row(row) -> Optional[dict]:
+def _row(row) -> dict | None:
     return dict(row) if row is not None else None
 
 
@@ -31,7 +31,7 @@ class PgPORepo(PORepoPort):
         )
         await conn.commit()
 
-    async def insert_items(self, items: List[PurchaseOrderItem]) -> None:
+    async def insert_items(self, items: list[PurchaseOrderItem]) -> None:
         conn = get_connection()
         for item in items:
             d = item.model_dump()
@@ -52,7 +52,7 @@ class PgPORepo(PORepoPort):
             )
         await conn.commit()
 
-    async def list_pos(self, org_id: str, status: Optional[str] = None) -> List[dict]:
+    async def list_pos(self, org_id: str, status: str | None = None) -> list[dict]:
         conn = get_connection()
         if status:
             cursor = await conn.execute(
@@ -67,7 +67,7 @@ class PgPORepo(PORepoPort):
         rows = await cursor.fetchall()
         return [dict(r) for r in rows]
 
-    async def get_po(self, po_id: str, org_id: str) -> Optional[dict]:
+    async def get_po(self, po_id: str, org_id: str) -> dict | None:
         conn = get_connection()
         cursor = await conn.execute(
             "SELECT * FROM purchase_orders WHERE id = ? AND organization_id = ?",
@@ -76,7 +76,7 @@ class PgPORepo(PORepoPort):
         row = await cursor.fetchone()
         return _row(row)
 
-    async def get_po_items(self, po_id: str) -> List[dict]:
+    async def get_po_items(self, po_id: str) -> list[dict]:
         conn = get_connection()
         cursor = await conn.execute(
             """SELECT poi.*,
@@ -97,8 +97,8 @@ class PgPORepo(PORepoPort):
         self,
         item_id: str,
         status: POItemStatus,
-        product_id: Optional[str] = None,
-        delivered_qty: Optional[float] = None,
+        product_id: str | None = None,
+        delivered_qty: float | None = None,
     ) -> None:
         conn = get_connection()
         await conn.execute(
@@ -114,9 +114,9 @@ class PgPORepo(PORepoPort):
         self,
         po_id: str,
         status: str,
-        received_at: Optional[str] = None,
-        received_by_id: Optional[str] = None,
-        received_by_name: Optional[str] = None,
+        received_at: str | None = None,
+        received_by_id: str | None = None,
+        received_by_name: str | None = None,
     ) -> None:
         conn = get_connection()
         await conn.execute(
@@ -130,7 +130,7 @@ class PgPORepo(PORepoPort):
         )
         await conn.commit()
 
-    async def list_unsynced_po_bills(self, org_id: str) -> List[dict]:
+    async def list_unsynced_po_bills(self, org_id: str) -> list[dict]:
         """Return received POs with pending Xero sync."""
         conn = get_connection()
         cursor = await conn.execute(
@@ -146,7 +146,7 @@ class PgPORepo(PORepoPort):
         rows = await cursor.fetchall()
         return [dict(r) for r in rows]
 
-    async def list_failed_po_bills(self, org_id: str) -> List[dict]:
+    async def list_failed_po_bills(self, org_id: str) -> list[dict]:
         conn = get_connection()
         cursor = await conn.execute(
             """SELECT id, vendor_name, total, document_date, created_at

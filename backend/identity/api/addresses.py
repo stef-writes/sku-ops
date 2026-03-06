@@ -1,14 +1,14 @@
 """Address book routes — CRUD and autocomplete for saved addresses."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from kernel.types import CurrentUser
 from identity.application.auth_service import get_current_user, require_role
 from identity.infrastructure.address_repo import address_repo
+from kernel.types import CurrentUser
 
 router = APIRouter(prefix="/addresses", tags=["addresses"])
 
@@ -21,15 +21,15 @@ class AddressCreate(BaseModel):
     state: str = ""
     postal_code: str = ""
     country: str = "US"
-    billing_entity_id: Optional[str] = None
-    job_id: Optional[str] = None
+    billing_entity_id: str | None = None
+    job_id: str | None = None
 
 
 @router.get("")
 async def list_addresses(
-    billing_entity_id: Optional[str] = None,
-    job_id: Optional[str] = None,
-    q: Optional[str] = None,
+    billing_entity_id: str | None = None,
+    job_id: str | None = None,
+    q: str | None = None,
     limit: int = 100,
     offset: int = 0,
     current_user: CurrentUser = Depends(get_current_user),
@@ -83,7 +83,7 @@ async def create_address(
         "billing_entity_id": data.billing_entity_id,
         "job_id": data.job_id,
         "organization_id": current_user.organization_id,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
     await address_repo.insert(address)
     return address

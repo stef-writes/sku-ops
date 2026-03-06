@@ -33,18 +33,18 @@ class ReferenceType(str, Enum):
 
 class FinancialEntry(Entity):
     """One line in the financial ledger — always created, never mutated."""
-    journal_id: Optional[str] = None
+    journal_id: str | None = None
     account: Account
     amount: float
-    quantity: Optional[float] = None
-    unit: Optional[str] = None
-    unit_cost: Optional[float] = None
-    department: Optional[str] = None
-    job_id: Optional[str] = None
-    billing_entity: Optional[str] = None
-    contractor_id: Optional[str] = None
-    vendor_name: Optional[str] = None
-    product_id: Optional[str] = None
-    performed_by_user_id: Optional[str] = None
+    quantity: float | None = None
+    unit: str | None = None
+    unit_cost: float | None = None
+    department: str | None = None
+    job_id: str | None = None
+    billing_entity: str | None = None
+    contractor_id: str | None = None
+    vendor_name: str | None = None
+    product_id: str | None = None
+    performed_by_user_id: str | None = None
     reference_type: ReferenceType
     reference_id: str

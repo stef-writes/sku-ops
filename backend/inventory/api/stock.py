@@ -3,13 +3,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
-from identity.application.auth_service import require_role
-from kernel.types import CurrentUser
 from catalog.application.queries import get_product_by_id
+from identity.application.auth_service import require_role
 from inventory.application.inventory_service import (
     get_stock_history,
     process_adjustment_stock_changes,
 )
+from kernel.types import CurrentUser
 from shared.infrastructure.middleware.audit import audit_log
 
 router = APIRouter(prefix="/stock", tags=["stock"])

@@ -10,7 +10,7 @@ import asyncio
 import json
 import logging
 import random
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from uuid import uuid4
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -76,38 +76,41 @@ async def main():
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-    from shared.infrastructure.database import init_db, get_connection
+    from shared.infrastructure.database import get_connection, init_db
     await init_db()
 
-    from identity.application.auth_service import hash_password
-    from identity.infrastructure.user_repo import user_repo
-    from identity.infrastructure.org_repo import organization_repo
-    from catalog.application.queries import list_departments
     from catalog.application.product_lifecycle import create_product
+    from catalog.application.queries import list_departments
     from catalog.infrastructure.vendor_repo import vendor_repo
-    from inventory.application.inventory_service import process_import_stock_changes
-    from operations.infrastructure.withdrawal_repo import withdrawal_repo
-    from operations.infrastructure.return_repo import return_repo
-    from operations.infrastructure.material_request_repo import material_request_repo
-    from operations.domain.withdrawal import MaterialWithdrawal, WithdrawalItem
-    from operations.domain.returns import MaterialReturn, ReturnItem
-    from operations.domain.material_request import MaterialRequest
-    from finance.infrastructure.invoice_repo import invoice_repo, set_withdrawal_getter
-    from finance.infrastructure.credit_note_repo import credit_note_repo
-    from purchasing.domain.purchase_order import PurchaseOrder, PurchaseOrderItem
-    from purchasing.infrastructure.po_repo import po_repo
     from finance.application.ledger_service import (
-        record_withdrawal, record_return, record_po_receipt, record_payment,
         record_adjustment,
+        record_payment,
+        record_po_receipt,
+        record_return,
+        record_withdrawal,
     )
+    from finance.infrastructure.credit_note_repo import credit_note_repo
+    from finance.infrastructure.invoice_repo import invoice_repo, set_withdrawal_getter
+    from identity.application.auth_service import hash_password
+    from identity.infrastructure.org_repo import organization_repo
+    from identity.infrastructure.user_repo import user_repo
+    from inventory.application.inventory_service import process_import_stock_changes
     from inventory.domain.stock import StockTransaction, StockTransactionType
     from inventory.infrastructure.stock_repo import stock_repo
+    from operations.domain.material_request import MaterialRequest
+    from operations.domain.returns import MaterialReturn, ReturnItem
+    from operations.domain.withdrawal import MaterialWithdrawal, WithdrawalItem
+    from operations.infrastructure.material_request_repo import material_request_repo
+    from operations.infrastructure.return_repo import return_repo
+    from operations.infrastructure.withdrawal_repo import withdrawal_repo
+    from purchasing.domain.purchase_order import PurchaseOrder, PurchaseOrderItem
+    from purchasing.infrastructure.po_repo import po_repo
 
     set_withdrawal_getter(withdrawal_repo.get_by_id)
 
     org_id = "default"
     conn = get_connection()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # ══════════════════════════════════════════════════════════════════════
     # 0. RESET — wipe everything and bootstrap org + admin + departments
@@ -126,7 +129,7 @@ async def main():
     demo_contractor = await user_repo.get_by_email("contractor@demo.local")
     if not admin or not demo_contractor:
         logger.error("Failed to create demo users")
-        return
+        return None
 
     departments = await list_departments(org_id)
     dept_by_code = {d["code"]: d for d in departments}
@@ -135,7 +138,7 @@ async def main():
     # ══════════════════════════════════════════════════════════════════════
     # 1. VENDORS (from seed_realistic)
     # ══════════════════════════════════════════════════════════════════════
-    from devtools.scripts.seed_realistic import VENDORS, PRODUCTS
+    from devtools.scripts.seed_realistic import PRODUCTS, VENDORS
     logger.info("--- Creating vendors ---")
     vendor_ids = []
     for v in VENDORS:

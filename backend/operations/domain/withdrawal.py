@@ -9,21 +9,20 @@ from kernel.types import LineItem, round_money
 
 class WithdrawalItem(LineItem):
     """A line item on a material withdrawal — extends the universal LineItem."""
-    pass
 
 
 class MaterialWithdrawalCreate(BaseModel):
-    items: List[WithdrawalItem]
+    items: list[WithdrawalItem]
     job_id: str
     service_address: str
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class MaterialWithdrawal(Entity):
-    items: List[WithdrawalItem]
+    items: list[WithdrawalItem]
     job_id: str
     service_address: str
-    notes: Optional[str] = None
+    notes: str | None = None
     subtotal: float
     tax: float
     tax_rate: float = 0.0
@@ -33,10 +32,10 @@ class MaterialWithdrawal(Entity):
     contractor_name: str = ""
     contractor_company: str = ""
     billing_entity: str = ""
-    billing_entity_id: Optional[str] = None
+    billing_entity_id: str | None = None
     payment_status: str = "unpaid"
-    invoice_id: Optional[str] = None
-    paid_at: Optional[str] = None
+    invoice_id: str | None = None
+    paid_at: str | None = None
     processed_by_id: str
     processed_by_name: str = ""
 

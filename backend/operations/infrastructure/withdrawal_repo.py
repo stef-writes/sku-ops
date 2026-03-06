@@ -7,7 +7,7 @@ from operations.domain.withdrawal import MaterialWithdrawal
 from shared.infrastructure.database import get_connection
 
 
-def _row_to_dict(row) -> Optional[dict]:
+def _row_to_dict(row) -> dict | None:
     if row is None:
         return None
     d = dict(row) if hasattr(row, "keys") else {}
@@ -16,7 +16,7 @@ def _row_to_dict(row) -> Optional[dict]:
     return d
 
 
-async def insert(withdrawal: Union[MaterialWithdrawal, dict], conn=None) -> None:
+async def insert(withdrawal: MaterialWithdrawal | dict, conn=None) -> None:
     withdrawal_dict = withdrawal if isinstance(withdrawal, dict) else withdrawal.model_dump()
     in_transaction = conn is not None
     conn = conn or get_connection()
@@ -73,14 +73,14 @@ async def insert(withdrawal: Union[MaterialWithdrawal, dict], conn=None) -> None
 
 
 async def list_withdrawals(
-    contractor_id: Optional[str] = None,
-    payment_status: Optional[str] = None,
-    billing_entity: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    contractor_id: str | None = None,
+    payment_status: str | None = None,
+    billing_entity: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     limit: int = 10000,
     offset: int = 0,
-    organization_id: Optional[str] = None,
+    organization_id: str | None = None,
 ) -> list:
     conn = get_connection()
     org_id = organization_id or "default"
@@ -108,7 +108,7 @@ async def list_withdrawals(
     return [_row_to_dict(r) for r in rows]
 
 
-async def get_by_id(withdrawal_id: str, organization_id: Optional[str] = None) -> Optional[dict]:
+async def get_by_id(withdrawal_id: str, organization_id: str | None = None) -> dict | None:
     conn = get_connection()
     if organization_id:
         cursor = await conn.execute(
@@ -124,17 +124,22 @@ async def get_by_id(withdrawal_id: str, organization_id: Optional[str] = None) -
     return _row_to_dict(row)
 
 
-async def mark_paid(withdrawal_id: str, paid_at: str) -> Optional[dict]:
+async def mark_paid(withdrawal_id: str, paid_at: str, organization_id: str | None = None) -> dict | None:
     conn = get_connection()
+    params: list = [paid_at, withdrawal_id]
+    where = "WHERE id = ?"
+    if organization_id:
+        where += " AND organization_id = ?"
+        params.append(organization_id)
     await conn.execute(
-        "UPDATE withdrawals SET payment_status = 'paid', paid_at = ? WHERE id = ?",
-        (paid_at, withdrawal_id),
+        f"UPDATE withdrawals SET payment_status = 'paid', paid_at = ? {where}",
+        params,
     )
     await conn.commit()
     return await get_by_id(withdrawal_id)
 
 
-async def bulk_mark_paid(withdrawal_ids: list, paid_at: str, organization_id: Optional[str] = None) -> int:
+async def bulk_mark_paid(withdrawal_ids: list, paid_at: str, organization_id: str | None = None) -> int:
     if not withdrawal_ids:
         return 0
     conn = get_connection()

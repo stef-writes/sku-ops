@@ -8,25 +8,31 @@ import tempfile
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-from identity.application.auth_service import require_role
-from kernel.types import CurrentUser
-from shared.infrastructure.config import ANTHROPIC_AVAILABLE, LLM_SETUP_URL
-from documents.application.import_service import import_document as do_import_document, ImportDeps
+from catalog.application.product_lifecycle import create_product as lifecycle_create
 from catalog.application.queries import (
-    list_departments, get_department_by_code, find_vendor_by_name, insert_vendor,
-    list_products_by_vendor, get_product_by_id, find_product_by_original_sku_and_vendor,
-    find_product_by_name_and_vendor, update_product,
+    find_product_by_name_and_vendor,
+    find_product_by_original_sku_and_vendor,
+    find_vendor_by_name,
+    get_department_by_code,
+    get_product_by_id,
+    insert_vendor,
+    list_departments,
+    list_products_by_vendor,
+    update_product,
 )
 from catalog.domain.barcode import validate_barcode
-from catalog.application.product_lifecycle import create_product as lifecycle_create
+from documents.application.import_parser import infer_uom as rule_infer_uom
+from documents.application.import_service import ImportDeps
+from documents.application.import_service import import_document as do_import_document
+from documents.domain.document import Document, DocumentImportRequest
+from documents.infrastructure.document_repo import document_repo
+from identity.application.auth_service import require_role
 from inventory.application.inventory_service import process_receiving_stock_changes
 from inventory.application.uom_classifier import classify_uom_batch as _classify_uom_batch
-from documents.application.import_parser import infer_uom as rule_infer_uom
+from kernel.types import CurrentUser
+from shared.infrastructure.config import ANTHROPIC_AVAILABLE, LLM_SETUP_URL
 from shared.infrastructure.config import LLM_AVAILABLE as _LLM_AVAILABLE
 from shared.infrastructure.prompt_loader import load_prompt
-
-from documents.domain.document import DocumentImportRequest, Document
-from documents.infrastructure.document_repo import document_repo
 
 logger = logging.getLogger(__name__)
 

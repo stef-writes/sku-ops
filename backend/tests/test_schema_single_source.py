@@ -10,7 +10,6 @@ import pytest
 
 from full_schema import FULL_SCHEMA
 
-
 EXPECTED_TABLES = {
     "organizations", "users", "refresh_tokens", "audit_log", "org_settings",
     "oauth_states", "fiscal_periods",

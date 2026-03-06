@@ -1,17 +1,16 @@
 """Document import service: vendor lookup/create, product match/create, inventory updates."""
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
-
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Awaitable
+from datetime import UTC, datetime, timezone
+from typing import Any, Optional
 
+from catalog.domain.units import ALLOWED_BASE_UNITS
+from documents.application.enrichment_service import enrich_for_import
+from documents.application.import_parser import infer_uom, resolve_uom, suggest_department
+from documents.domain.document import DocumentLineItem
 from kernel.errors import ResourceNotFoundError
 from kernel.types import CurrentUser
-from catalog.domain.units import ALLOWED_BASE_UNITS
-from documents.application.import_parser import infer_uom, resolve_uom, suggest_department
-from documents.application.enrichment_service import enrich_for_import
-from documents.domain.document import DocumentLineItem
 
 
 @dataclass
@@ -37,7 +36,7 @@ async def import_document(
     products: list[DocumentLineItem],
     deps: ImportDeps,
     current_user: CurrentUser,
-    department_id: Optional[str] = None,
+    department_id: str | None = None,
     create_vendor_if_missing: bool = True,
 ) -> dict:
     """Import parsed products; create or match vendor, add/receive inventory."""
@@ -52,7 +51,7 @@ async def import_document(
         if not create_vendor_if_missing:
             raise ResourceNotFoundError("Vendor", vendor_name)
         vendor_id = uuid.uuid4().hex
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         await deps.insert_vendor({
             "id": vendor_id,
             "name": vendor_name,

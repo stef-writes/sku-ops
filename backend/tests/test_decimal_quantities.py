@@ -11,17 +11,17 @@ to int, these fail.
 """
 import pytest
 
+from catalog.application.product_lifecycle import create_product
+from catalog.infrastructure.product_repo import product_repo
+from inventory.application.inventory_service import (
+    get_stock_history,
+    process_adjustment_stock_changes,
+    process_import_stock_changes,
+    process_receiving_stock_changes,
+    process_withdrawal_stock_changes,
+)
 from inventory.domain.errors import InsufficientStockError, NegativeStockError
 from inventory.domain.stock import StockDecrement
-from catalog.infrastructure.product_repo import product_repo
-from catalog.application.product_lifecycle import create_product
-from inventory.application.inventory_service import (
-    process_import_stock_changes,
-    process_withdrawal_stock_changes,
-    process_receiving_stock_changes,
-    process_adjustment_stock_changes,
-    get_stock_history,
-)
 
 
 async def _create_product(name, quantity, base_unit="each", **kw):

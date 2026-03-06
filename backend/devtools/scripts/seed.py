@@ -2,25 +2,30 @@
 Seed logic: demo users, departments, inventory.
 Lives in scripts/ to avoid cross-domain imports inside identity/.
 """
-import os
 import logging
-from datetime import datetime, timezone
+import os
+from datetime import UTC, datetime, timezone
 from uuid import uuid4
 
-from identity.application.auth_service import hash_password
-from shared.infrastructure.config import (
-    DEMO_USER_EMAIL as MOCK_USER_EMAIL,
-    DEMO_USER_PASSWORD as MOCK_USER_PASSWORD,
+from catalog.application.product_lifecycle import create_product as lifecycle_create
+from catalog.application.queries import (
+    count_all_products,
+    get_department_by_code,
+    insert_department,
+    list_departments,
 )
 from catalog.domain.department import Department
-from catalog.application.queries import (
-    list_departments, get_department_by_code, insert_department, count_all_products,
-)
+from documents.application.import_parser import infer_uom, parse_csv_products, suggest_department
+from identity.application.auth_service import hash_password
 from identity.infrastructure.org_repo import organization_repo
 from identity.infrastructure.user_repo import user_repo
-from documents.application.import_parser import infer_uom, parse_csv_products, suggest_department
-from catalog.application.product_lifecycle import create_product as lifecycle_create
 from inventory.application.inventory_service import process_import_stock_changes
+from shared.infrastructure.config import (
+    DEMO_USER_EMAIL as MOCK_USER_EMAIL,
+)
+from shared.infrastructure.config import (
+    DEMO_USER_PASSWORD as MOCK_USER_PASSWORD,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +182,7 @@ async def seed_demo_tenants() -> None:
         if not os.path.exists(DEMO_CSV_PATH):
             logger.warning(f"Demo CSV not found: {DEMO_CSV_PATH}, skipping product seed")
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         rows = parse_csv_products(open(DEMO_CSV_PATH, "rb").read()) if os.path.exists(DEMO_CSV_PATH) else []
 
         for org in DEMO_TENANTS:

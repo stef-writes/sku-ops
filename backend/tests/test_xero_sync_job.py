@@ -18,15 +18,15 @@ Tests cover the three most dangerous failure modes:
   6. Credit note sync — applied credit notes get a xero_credit_note_id.
   7. Health endpoint returns correct counts matching DB state.
 """
-import pytest
-from uuid import uuid4
 from unittest.mock import AsyncMock, patch
+from uuid import uuid4
 
-from finance.infrastructure.invoice_repo import invoice_repo
+import pytest
+
 from finance.infrastructure.credit_note_repo import credit_note_repo
+from finance.infrastructure.invoice_repo import invoice_repo
 from operations.infrastructure.withdrawal_repo import withdrawal_repo
 from shared.infrastructure.database import get_connection
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -60,8 +60,8 @@ async def _make_approved_invoice(billing_entity="On Point LLC") -> dict:
 
 async def _run_sync_with_stub(org_id="default"):
     """Run the sync job with StubXeroAdapter injected at every call site."""
-    from finance.application.xero_sync_job import run_sync
     from finance.adapters.stub_xero import StubXeroAdapter
+    from finance.application.xero_sync_job import run_sync
     from identity.domain.org_settings import OrgSettings
 
     stub_settings = OrgSettings(
@@ -108,8 +108,8 @@ class TestSyncJobIdempotency:
     async def test_running_sync_twice_does_not_call_put_twice(self, db):
         """StubXeroAdapter.sync_invoice should only be called once per invoice."""
         from finance.adapters.stub_xero import StubXeroAdapter
-        from identity.domain.org_settings import OrgSettings
         from finance.application.xero_sync_job import run_sync
+        from identity.domain.org_settings import OrgSettings
 
         inv = await _make_approved_invoice()
 
@@ -223,7 +223,8 @@ class TestAdjustmentIdempotencyFix:
     async def test_two_adjustments_on_same_product_both_record_ledger_entries(self, db):
         from catalog.application.product_lifecycle import create_product
         from inventory.application.inventory_service import (
-            process_import_stock_changes, process_adjustment_stock_changes,
+            process_adjustment_stock_changes,
+            process_import_stock_changes,
         )
 
         product = await create_product(
@@ -270,7 +271,8 @@ class TestAdjustmentIdempotencyFix:
         """Each adjustment must produce a distinct reference_id in the ledger."""
         from catalog.application.product_lifecycle import create_product
         from inventory.application.inventory_service import (
-            process_import_stock_changes, process_adjustment_stock_changes,
+            process_adjustment_stock_changes,
+            process_import_stock_changes,
         )
 
         product = await create_product(
@@ -312,8 +314,8 @@ class TestReconciliationMismatch:
     @pytest.mark.asyncio
     async def test_total_mismatch_sets_mismatch_status(self, db):
         """When Xero returns a different total, xero_sync_status must become 'mismatch'."""
-        from finance.application.xero_sync_job import run_sync
         from finance.adapters.stub_xero import StubXeroAdapter
+        from finance.application.xero_sync_job import run_sync
         from identity.domain.org_settings import OrgSettings
 
         inv = await _make_approved_invoice()
@@ -352,8 +354,8 @@ class TestReconciliationMismatch:
     @pytest.mark.asyncio
     async def test_matching_totals_keeps_synced_status(self, db):
         """When Xero total matches local total, status stays 'synced'."""
-        from finance.application.xero_sync_job import run_sync
         from finance.adapters.stub_xero import StubXeroAdapter
+        from finance.application.xero_sync_job import run_sync
         from identity.domain.org_settings import OrgSettings
 
         inv = await _make_approved_invoice()
@@ -455,9 +457,9 @@ class TestPOQueuing:
 
     @pytest.mark.asyncio
     async def test_queue_po_for_sync_sets_pending_status(self, db):
-        from purchasing.domain.purchase_order import PurchaseOrder, POStatus
-        from purchasing.infrastructure.po_repo import po_repo
         from finance.application.po_sync_service import queue_po_for_sync
+        from purchasing.domain.purchase_order import POStatus, PurchaseOrder
+        from purchasing.infrastructure.po_repo import po_repo
 
         po = PurchaseOrder(
             vendor_id="v1", vendor_name="Acme Corp",
@@ -474,11 +476,16 @@ class TestPOQueuing:
 
     @pytest.mark.asyncio
     async def test_po_bill_sync_stores_xero_bill_id(self, db):
-        from purchasing.domain.purchase_order import PurchaseOrder, PurchaseOrderItem, POStatus, POItemStatus
-        from purchasing.infrastructure.po_repo import po_repo
-        from finance.application.po_sync_service import sync_po_bill, queue_po_for_sync
         from finance.adapters.stub_xero import StubXeroAdapter
+        from finance.application.po_sync_service import queue_po_for_sync, sync_po_bill
         from identity.domain.org_settings import OrgSettings
+        from purchasing.domain.purchase_order import (
+            POItemStatus,
+            POStatus,
+            PurchaseOrder,
+            PurchaseOrderItem,
+        )
+        from purchasing.infrastructure.po_repo import po_repo
 
         po = PurchaseOrder(
             vendor_id="v1", vendor_name="Acme Corp",
@@ -515,11 +522,16 @@ class TestPOQueuing:
     @pytest.mark.asyncio
     async def test_po_bill_sync_idempotent(self, db):
         """Calling sync_po_bill twice must not change the stored xero_bill_id."""
-        from purchasing.domain.purchase_order import PurchaseOrder, PurchaseOrderItem, POStatus, POItemStatus
-        from purchasing.infrastructure.po_repo import po_repo
-        from finance.application.po_sync_service import sync_po_bill
         from finance.adapters.stub_xero import StubXeroAdapter
+        from finance.application.po_sync_service import sync_po_bill
         from identity.domain.org_settings import OrgSettings
+        from purchasing.domain.purchase_order import (
+            POItemStatus,
+            POStatus,
+            PurchaseOrder,
+            PurchaseOrderItem,
+        )
+        from purchasing.infrastructure.po_repo import po_repo
 
         po = PurchaseOrder(
             vendor_id="v1", vendor_name="Acme Corp",
@@ -565,10 +577,10 @@ class TestSyncSummaryCounts:
     @pytest.mark.asyncio
     async def test_failed_sync_increments_failed_count(self, db):
         """A gateway that raises must increment failed count and set 'failed' status."""
-        from finance.application.xero_sync_job import run_sync
         from finance.adapters.stub_xero import StubXeroAdapter
-        from identity.domain.org_settings import OrgSettings
+        from finance.application.xero_sync_job import run_sync
         from finance.ports.invoicing_port import InvoiceSyncResult
+        from identity.domain.org_settings import OrgSettings
 
         inv = await _make_approved_invoice()
 
@@ -654,8 +666,8 @@ class TestCogsRepost:
     async def test_sync_job_repost_stale_cogs_updates_status_to_synced(self, db):
         """The sync job must re-post the COGS journal and mark status back to 'synced'."""
         from finance.adapters.stub_xero import StubXeroAdapter
-        from identity.domain.org_settings import OrgSettings
         from finance.application.xero_sync_job import run_sync
+        from identity.domain.org_settings import OrgSettings
 
         inv = await _make_approved_invoice()
         inv_id = inv["id"]
@@ -716,8 +728,8 @@ class TestCogsRepost:
     async def test_cogs_repost_failure_increments_failed_count(self, db):
         """When repost_cogs_journal raises, the job must increment cogs_repost_failed."""
         from finance.adapters.stub_xero import StubXeroAdapter
-        from identity.domain.org_settings import OrgSettings
         from finance.application.xero_sync_job import run_sync
+        from identity.domain.org_settings import OrgSettings
 
         inv = await _make_approved_invoice()
         await _run_sync_with_stub()

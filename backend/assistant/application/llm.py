@@ -8,10 +8,10 @@ import logging
 from typing import Optional
 
 from shared.infrastructure.config import (
-    ANTHROPIC_AVAILABLE,
     ANTHROPIC_API_KEY,
-    ANTHROPIC_MODEL,
+    ANTHROPIC_AVAILABLE,
     ANTHROPIC_FAST_MODEL,
+    ANTHROPIC_MODEL,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ def _detect_media_type(image_bytes: bytes) -> str:
     return "image/jpeg"
 
 
-def generate_text(prompt: str, system_instruction: Optional[str] = None) -> Optional[str]:
+def generate_text(prompt: str, system_instruction: str | None = None) -> str | None:
     """Generate text. Returns None if Anthropic is not configured."""
     client = _get_client()
     if not client:
@@ -74,7 +74,7 @@ def generate_text(prompt: str, system_instruction: Optional[str] = None) -> Opti
 def generate_with_image(
     prompt: str,
     image_bytes: bytes,
-    system_instruction: Optional[str] = None,
+    system_instruction: str | None = None,
 ) -> str:
     """Generate from image. Raises ValueError on failure or if not configured."""
     client = _get_client()
@@ -119,7 +119,7 @@ def generate_with_image(
 def generate_with_pdf(
     prompt: str,
     pdf_path: str,
-    system_instruction: Optional[str] = None,
+    system_instruction: str | None = None,
 ) -> str:
     """Generate from PDF via Anthropic native PDF support. Raises ValueError on failure."""
     client = _get_client()

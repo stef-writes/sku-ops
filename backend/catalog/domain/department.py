@@ -9,7 +9,7 @@ from kernel.entity import Entity
 class DepartmentCreate(BaseModel):
     name: str
     code: str
-    description: Optional[str] = ""
+    description: str | None = ""
 
 
 class Department(Entity):

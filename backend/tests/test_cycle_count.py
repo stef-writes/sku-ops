@@ -11,8 +11,9 @@ Coverage:
   6. Atomicity — partial failure rolls back the entire commit
   7. Ledger balance invariant — post-commit ledger still sums to product qty
 """
-import pytest
 from uuid import uuid4
+
+import pytest
 
 from catalog.application.product_lifecycle import create_product
 from catalog.infrastructure.product_repo import product_repo
@@ -35,7 +36,6 @@ from inventory.domain.errors import NegativeStockError
 from inventory.domain.stock import StockDecrement
 from kernel.errors import ResourceNotFoundError
 from shared.infrastructure.database import get_connection
-
 
 # ── Fixtures / helpers ────────────────────────────────────────────────────────
 

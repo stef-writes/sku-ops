@@ -6,8 +6,8 @@ Consumers resolve tools by canonical name or (domain, lookup_key) pair.
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +82,6 @@ def init_tools() -> None:
     """Import agent tool modules so they self-register. Call once at startup."""
     if _TOOLS:
         return
-    import assistant.agents.inventory.tools  # noqa: F401
-    import assistant.agents.ops.tools        # noqa: F401
-    import assistant.agents.finance.tools    # noqa: F401
+    import assistant.agents.finance.tools
+    import assistant.agents.inventory.tools
+    import assistant.agents.ops.tools  # noqa: F401

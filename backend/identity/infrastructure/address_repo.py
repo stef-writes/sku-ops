@@ -1,10 +1,11 @@
 """Address repository — persistence for the address book."""
+from datetime import UTC
 from typing import Optional, Union
 
 from shared.infrastructure.database import get_connection
 
 
-def _row_to_dict(row) -> Optional[dict]:
+def _row_to_dict(row) -> dict | None:
     if row is None:
         return None
     return dict(row) if hasattr(row, "keys") else {}
@@ -32,7 +33,7 @@ async def insert(address: dict, conn=None) -> None:
         await conn.commit()
 
 
-async def get_by_id(address_id: str, organization_id: str) -> Optional[dict]:
+async def get_by_id(address_id: str, organization_id: str) -> dict | None:
     conn = get_connection()
     cursor = await conn.execute(
         f"SELECT {_COLUMNS} FROM addresses WHERE id = ? AND organization_id = ?",
@@ -43,9 +44,9 @@ async def get_by_id(address_id: str, organization_id: str) -> Optional[dict]:
 
 async def list_addresses(
     organization_id: str,
-    billing_entity_id: Optional[str] = None,
-    job_id: Optional[str] = None,
-    q: Optional[str] = None,
+    billing_entity_id: str | None = None,
+    job_id: str | None = None,
+    q: str | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list:
@@ -90,14 +91,14 @@ async def ensure_address(display_text: str, organization_id: str, conn=None) -> 
     existing = await search(text, organization_id, limit=1)
     if existing and existing[0].get("line1", "").lower() == text.lower():
         return existing[0]
-    from uuid import uuid4
     from datetime import datetime, timezone
+    from uuid import uuid4
     address = {
         "id": str(uuid4()),
         "label": text[:80],
         "line1": text,
         "organization_id": organization_id,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
     await insert(address, conn=conn)
     return address

@@ -5,7 +5,7 @@ from inventory.domain.cycle_count import CycleCount, CycleCountItem
 from shared.infrastructure.database import get_connection
 
 
-def _row(row) -> Optional[dict]:
+def _row(row) -> dict | None:
     if row is None:
         return None
     return dict(row) if hasattr(row, "keys") else {}
@@ -54,9 +54,9 @@ async def update_item_counted(
     item_id: str,
     counted_qty: float,
     variance: float,
-    notes: Optional[str],
+    notes: str | None,
     conn=None,
-) -> Optional[dict]:
+) -> dict | None:
     in_tx = conn is not None
     conn = conn or get_connection()
     cursor = await conn.execute(
@@ -90,7 +90,7 @@ async def commit_count(
         await conn.commit()
 
 
-async def get_count(count_id: str, organization_id: str, conn=None) -> Optional[dict]:
+async def get_count(count_id: str, organization_id: str, conn=None) -> dict | None:
     conn = conn or get_connection()
     cursor = await conn.execute(
         "SELECT * FROM cycle_counts WHERE id = ? AND organization_id = ?",
@@ -99,7 +99,7 @@ async def get_count(count_id: str, organization_id: str, conn=None) -> Optional[
     return _row(await cursor.fetchone())
 
 
-async def list_counts(organization_id: str, status: Optional[str] = None) -> list:
+async def list_counts(organization_id: str, status: str | None = None) -> list:
     conn = get_connection()
     if status:
         cursor = await conn.execute(
@@ -125,7 +125,7 @@ async def list_items(cycle_count_id: str) -> list:
     return [_row(r) for r in rows]
 
 
-async def get_item(item_id: str, cycle_count_id: str, conn=None) -> Optional[dict]:
+async def get_item(item_id: str, cycle_count_id: str, conn=None) -> dict | None:
     conn = conn or get_connection()
     cursor = await conn.execute(
         "SELECT * FROM cycle_count_items WHERE id = ? AND cycle_count_id = ?",

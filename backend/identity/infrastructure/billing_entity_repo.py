@@ -1,12 +1,12 @@
 """Billing entity repository — persistence for billing entity master data."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Optional, Union
 
 from identity.domain.billing_entity import BillingEntity
 from shared.infrastructure.database import get_connection
 
 
-def _row_to_dict(row) -> Optional[dict]:
+def _row_to_dict(row) -> dict | None:
     if row is None:
         return None
     d = dict(row) if hasattr(row, "keys") else {}
@@ -18,7 +18,7 @@ def _row_to_dict(row) -> Optional[dict]:
 _COLUMNS = "id, name, contact_name, contact_email, billing_address, payment_terms, xero_contact_id, is_active, organization_id, created_at, updated_at"
 
 
-async def insert(entity: Union[BillingEntity, dict], conn=None) -> None:
+async def insert(entity: BillingEntity | dict, conn=None) -> None:
     d = entity if isinstance(entity, dict) else entity.model_dump()
     in_tx = conn is not None
     conn = conn or get_connection()
@@ -37,7 +37,7 @@ async def insert(entity: Union[BillingEntity, dict], conn=None) -> None:
         await conn.commit()
 
 
-async def get_by_id(entity_id: str, organization_id: str) -> Optional[dict]:
+async def get_by_id(entity_id: str, organization_id: str) -> dict | None:
     conn = get_connection()
     cursor = await conn.execute(
         f"SELECT {_COLUMNS} FROM billing_entities WHERE id = ? AND organization_id = ?",
@@ -46,7 +46,7 @@ async def get_by_id(entity_id: str, organization_id: str) -> Optional[dict]:
     return _row_to_dict(await cursor.fetchone())
 
 
-async def get_by_name(name: str, organization_id: str) -> Optional[dict]:
+async def get_by_name(name: str, organization_id: str) -> dict | None:
     conn = get_connection()
     cursor = await conn.execute(
         f"SELECT {_COLUMNS} FROM billing_entities WHERE LOWER(TRIM(name)) = ? AND organization_id = ?",
@@ -57,8 +57,8 @@ async def get_by_name(name: str, organization_id: str) -> Optional[dict]:
 
 async def list_billing_entities(
     organization_id: str,
-    is_active: Optional[bool] = None,
-    q: Optional[str] = None,
+    is_active: bool | None = None,
+    q: str | None = None,
     limit: int = 200,
     offset: int = 0,
 ) -> list:
@@ -78,7 +78,7 @@ async def list_billing_entities(
     return [_row_to_dict(r) for r in await cursor.fetchall()]
 
 
-async def update(entity_id: str, updates: dict, organization_id: str) -> Optional[dict]:
+async def update(entity_id: str, updates: dict, organization_id: str) -> dict | None:
     conn = get_connection()
     set_clauses = []
     params = []
@@ -92,7 +92,7 @@ async def update(entity_id: str, updates: dict, organization_id: str) -> Optiona
     if not set_clauses:
         return await get_by_id(entity_id, organization_id)
     set_clauses.append("updated_at = ?")
-    params.append(datetime.now(timezone.utc).isoformat())
+    params.append(datetime.now(UTC).isoformat())
     params.extend([entity_id, organization_id])
     await conn.execute(
         f"UPDATE billing_entities SET {', '.join(set_clauses)} WHERE id = ? AND organization_id = ?",

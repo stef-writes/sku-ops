@@ -13,7 +13,7 @@ class BillingEntity(AuditedEntity):
     contact_email: str = ""
     billing_address: str = ""
     payment_terms: str = "net_30"
-    xero_contact_id: Optional[str] = None
+    xero_contact_id: str | None = None
     is_active: bool = True
 
 
@@ -26,10 +26,10 @@ class BillingEntityCreate(BaseModel):
 
 
 class BillingEntityUpdate(BaseModel):
-    name: Optional[str] = None
-    contact_name: Optional[str] = None
-    contact_email: Optional[str] = None
-    billing_address: Optional[str] = None
-    payment_terms: Optional[str] = None
-    xero_contact_id: Optional[str] = None
-    is_active: Optional[bool] = None
+    name: str | None = None
+    contact_name: str | None = None
+    contact_email: str | None = None
+    billing_address: str | None = None
+    payment_terms: str | None = None
+    xero_contact_id: str | None = None
+    is_active: bool | None = None

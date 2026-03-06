@@ -24,7 +24,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import Optional
 
 from starlette.requests import Request
@@ -38,11 +38,11 @@ async def audit_log(
     *,
     user_id: str,
     action: str,
-    resource_type: Optional[str] = None,
-    resource_id: Optional[str] = None,
-    details: Optional[dict | str] = None,
-    request: Optional[Request] = None,
-    org_id: Optional[str] = None,
+    resource_type: str | None = None,
+    resource_id: str | None = None,
+    details: dict | str | None = None,
+    request: Request | None = None,
+    org_id: str | None = None,
 ) -> None:
     """Write an audit log entry to the database."""
     ip = ""
@@ -52,7 +52,7 @@ async def audit_log(
             ip = request.client.host
 
     details_str = json.dumps(details) if isinstance(details, dict) else (details or "")
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     try:
         conn = get_connection()

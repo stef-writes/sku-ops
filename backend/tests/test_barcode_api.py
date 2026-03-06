@@ -2,8 +2,8 @@
 import pytest
 import pytest_asyncio
 
-from identity.application.auth_service import create_token
 from catalog.application.product_lifecycle import create_product
+from identity.application.auth_service import create_token
 from inventory.application.inventory_service import process_import_stock_changes
 
 

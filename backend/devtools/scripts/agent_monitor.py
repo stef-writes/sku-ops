@@ -19,12 +19,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from rich.console import Console
+from rich.layout import Layout
 from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-from rich.layout import Layout
-
 
 console = Console()
 
@@ -56,7 +55,7 @@ def _agent_color(name: str) -> str:
         "OpsAgent": "yellow",
         "FinanceAgent": "magenta",
     }
-    base = name.split(":")[0]
+    base = name.split(":", maxsplit=1)[0]
     return colors.get(base, "white")
 
 
@@ -178,14 +177,14 @@ def _build_display(stats: dict, runs: list[dict]) -> Layout:
 
 
 async def _fetch_data(minutes: int, limit: int) -> tuple[dict, list[dict]]:
-    from assistant.infrastructure.agent_run_repo import list_runs, get_stats
+    from assistant.infrastructure.agent_run_repo import get_stats, list_runs
     stats = await get_stats(hours=max(1, minutes // 60) or 1)
     runs = await list_runs(minutes=minutes, limit=limit)
     return stats, runs
 
 
 async def _run(interval: int, minutes: int, limit: int, once: bool):
-    from shared.infrastructure.database import init_db, close_db
+    from shared.infrastructure.database import close_db, init_db
     await init_db()
 
     try:

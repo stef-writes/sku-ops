@@ -5,21 +5,24 @@ Every quantity change creates an immutable StockTransaction record.
 Withdrawals use atomic UPDATE with quantity guard to prevent overselling.
 Unit conversion happens here — stock is always stored in the product's base_unit.
 """
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import List, Optional, Tuple
 from uuid import uuid4
 
-from kernel.errors import ResourceNotFoundError
+from catalog.application.queries import (
+    add_product_quantity,
+    atomic_adjust_product,
+    atomic_decrement_product,
+    get_product_by_id,
+    increment_product_quantity,
+)
+from catalog.domain.units import are_compatible, convert_quantity
+from finance.application.ledger_service import record_adjustment as _record_ledger_adjustment
 from inventory.domain.errors import InsufficientStockError, NegativeStockError
 from inventory.domain.stock import StockDecrement, StockTransaction, StockTransactionType
-from catalog.application.queries import (
-    get_product_by_id, atomic_decrement_product,
-    increment_product_quantity, add_product_quantity, atomic_adjust_product,
-)
-from catalog.domain.units import convert_quantity, are_compatible
 from inventory.infrastructure.stock_repo import stock_repo as _default_stock_repo
 from inventory.ports.stock_repo_port import StockRepoPort
-from finance.application.ledger_service import record_adjustment as _record_ledger_adjustment
+from kernel.errors import ResourceNotFoundError
 
 
 async def _record_stock_transaction(
@@ -31,10 +34,10 @@ async def _record_stock_transaction(
     transaction_type: StockTransactionType,
     user_id: str,
     user_name: str,
-    reference_id: Optional[str] = None,
-    reason: Optional[str] = None,
+    reference_id: str | None = None,
+    reason: str | None = None,
     unit: str = "each",
-    organization_id: Optional[str] = None,
+    organization_id: str | None = None,
     conn=None,
     repo: StockRepoPort = _default_stock_repo,
 ) -> None:
@@ -60,11 +63,11 @@ async def _record_stock_transaction(
 
 
 async def process_withdrawal_stock_changes(
-    items: List[StockDecrement],
+    items: list[StockDecrement],
     withdrawal_id: str,
     user_id: str,
     user_name: str,
-    organization_id: Optional[str] = None,
+    organization_id: str | None = None,
     conn=None,
 ) -> None:
     """
@@ -74,8 +77,8 @@ async def process_withdrawal_stock_changes(
     Rolls back all completed decrements on any failure (InsufficientStockError or other).
     When conn is provided, runs inside that transaction (no commit).
     """
-    now = datetime.now(timezone.utc).isoformat()
-    completed: List[Tuple[str, float]] = []
+    now = datetime.now(UTC).isoformat()
+    completed: list[tuple[str, float]] = []
 
     try:
         for item in items:
@@ -128,9 +131,9 @@ async def process_receiving_stock_changes(
     quantity: float,
     user_id: str,
     user_name: str,
-    reference_id: Optional[str] = None,
+    reference_id: str | None = None,
     unit: str = "each",
-    organization_id: Optional[str] = None,
+    organization_id: str | None = None,
     conn=None,
     transaction_type: StockTransactionType = StockTransactionType.RECEIVING,
 ) -> None:
@@ -147,7 +150,7 @@ async def process_receiving_stock_changes(
     else:
         canonical_qty = quantity
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     result = await add_product_quantity(product_id, canonical_qty, now, conn=conn)
     if not result:
         raise ResourceNotFoundError("Product", product_id)
@@ -177,7 +180,7 @@ async def process_import_stock_changes(
     user_id: str,
     user_name: str,
     unit: str = "each",
-    organization_id: Optional[str] = None,
+    organization_id: str | None = None,
     conn=None,
 ) -> None:
     """Record stock added via bulk import (new product creation - no delta from existing)."""
@@ -199,7 +202,7 @@ async def process_import_stock_changes(
 async def get_stock_history(
     product_id: str,
     limit: int = 50,
-) -> List[dict]:
+) -> list[dict]:
     """Get stock transaction history for a product."""
     return await _default_stock_repo.list_by_product(product_id, limit)
 
@@ -219,7 +222,7 @@ async def process_adjustment_stock_changes(
     """
     if quantity_delta == 0:
         raise ValueError("quantity_delta must not be zero")
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     product = await get_product_by_id(product_id, conn=conn)
     if not product:
         raise ResourceNotFoundError("Product", product_id)

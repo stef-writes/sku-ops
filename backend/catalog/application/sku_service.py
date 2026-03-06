@@ -21,8 +21,8 @@ def slug_from_name(name: str, max_len: int = 6) -> str:
 
 async def generate_sku(
     department_code: str,
-    product_name: Optional[str] = None,
-    organization_id: Optional[str] = None,
+    product_name: str | None = None,
+    organization_id: str | None = None,
 ) -> str:
     """Generate SKU: DEPT-SLUG-000001. Slug derived from product name for readability."""
     number = await sku_repo.increment_and_get(department_code, organization_id)

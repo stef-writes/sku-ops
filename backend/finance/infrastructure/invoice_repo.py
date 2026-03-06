@@ -1,25 +1,23 @@
 """Invoice repository."""
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timezone
 from typing import Optional, Union
 from uuid import uuid4
-from datetime import datetime, timezone
 
 from finance.domain.invoice import Invoice, compute_due_date
-
-from typing import Callable, Awaitable
-
 from shared.infrastructure.database import get_connection
 
 # Injected at module level by the API layer to avoid circular import with operations
-_withdrawal_getter: Optional[Callable[..., Awaitable[Optional[dict]]]] = None
+_withdrawal_getter: Callable[..., Awaitable[dict | None]] | None = None
 
 
-def set_withdrawal_getter(fn: Callable[..., Awaitable[Optional[dict]]]) -> None:
+def set_withdrawal_getter(fn: Callable[..., Awaitable[dict | None]]) -> None:
     """Wire the withdrawal query function (called once at startup)."""
     global _withdrawal_getter
     _withdrawal_getter = fn
 
 
-async def _get_withdrawal(wid: str, org_id: str) -> Optional[dict]:
+async def _get_withdrawal(wid: str, org_id: str) -> dict | None:
     """Fetch a withdrawal via the injected operations query."""
     if _withdrawal_getter is None:
         raise RuntimeError("withdrawal_getter not wired — call set_withdrawal_getter at startup")
@@ -38,7 +36,7 @@ def _line_item_row_to_dict(row) -> dict:
     return d
 
 
-async def _next_invoice_number(organization_id: Optional[str] = None, conn=None) -> str:
+async def _next_invoice_number(organization_id: str | None = None, conn=None) -> str:
     """Generate next invoice number: INV-00001, INV-00002, etc. Org-scoped counter."""
     in_transaction = conn is not None
     conn = conn or get_connection()
@@ -60,13 +58,13 @@ async def _next_invoice_number(organization_id: Optional[str] = None, conn=None)
     return f"INV-{str(num).zfill(5)}"
 
 
-async def insert(invoice: Union[Invoice, dict]) -> Optional[dict]:
+async def insert(invoice: Invoice | dict) -> dict | None:
     invoice_dict = invoice if isinstance(invoice, dict) else invoice.model_dump()
     conn = get_connection()
     org_id = invoice_dict.get("organization_id") or "default"
     invoice_id = invoice_dict.get("id") or str(uuid4())
     invoice_number = invoice_dict.get("invoice_number") or await _next_invoice_number(org_id)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     inv_date = invoice_dict.get("invoice_date") or now
     payment_terms = invoice_dict.get("payment_terms") or "net_30"
     due_date = invoice_dict.get("due_date") or compute_due_date(inv_date, payment_terms)
@@ -108,7 +106,7 @@ async def insert(invoice: Union[Invoice, dict]) -> Optional[dict]:
     return await get_by_id(invoice_id)
 
 
-async def get_by_id(invoice_id: str, organization_id: Optional[str] = None) -> Optional[dict]:
+async def get_by_id(invoice_id: str, organization_id: str | None = None) -> dict | None:
     conn = get_connection()
     if organization_id:
         cursor = await conn.execute(
@@ -145,12 +143,12 @@ async def get_by_id(invoice_id: str, organization_id: Optional[str] = None) -> O
 
 
 async def list_invoices(
-    status: Optional[str] = None,
-    billing_entity: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    status: str | None = None,
+    billing_entity: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     limit: int = 1000,
-    organization_id: Optional[str] = None,
+    organization_id: str | None = None,
 ) -> list:
     conn = get_connection()
     org_id = organization_id or "default"
@@ -173,42 +171,52 @@ async def list_invoices(
     cursor = await conn.execute(query, params)
     rows = await cursor.fetchall()
 
+    invoice_ids = []
     result = []
     for row in rows:
         inv = _invoice_row_to_dict(row)
-        # Count withdrawals for list view
-        cursor2 = await conn.execute(
-            "SELECT COUNT(*) FROM invoice_withdrawals WHERE invoice_id = ?",
-            (inv["id"],),
-        )
-        count_row = await cursor2.fetchone()
-        inv["withdrawal_count"] = count_row[0] if count_row else 0
+        invoice_ids.append(inv["id"])
         result.append(inv)
+
+    if invoice_ids:
+        placeholders = ",".join("?" for _ in invoice_ids)
+        count_cursor = await conn.execute(
+            f"SELECT invoice_id, COUNT(*) FROM invoice_withdrawals WHERE invoice_id IN ({placeholders}) GROUP BY invoice_id",
+            invoice_ids,
+        )
+        counts = {r[0]: r[1] for r in await count_cursor.fetchall()}
+        for inv in result:
+            inv["withdrawal_count"] = counts.get(inv["id"], 0)
+    else:
+        for inv in result:
+            inv["withdrawal_count"] = 0
+
     return result
 
 
 async def update(
     invoice_id: str,
-    billing_entity: Optional[str] = None,
-    contact_name: Optional[str] = None,
-    contact_email: Optional[str] = None,
-    status: Optional[str] = None,
-    notes: Optional[str] = None,
-    tax: Optional[float] = None,
-    tax_rate: Optional[float] = None,
-    invoice_date: Optional[str] = None,
-    due_date: Optional[str] = None,
-    payment_terms: Optional[str] = None,
-    billing_address: Optional[str] = None,
-    po_reference: Optional[str] = None,
-    line_items: Optional[list] = None,
-) -> Optional[dict]:
+    billing_entity: str | None = None,
+    contact_name: str | None = None,
+    contact_email: str | None = None,
+    status: str | None = None,
+    notes: str | None = None,
+    tax: float | None = None,
+    tax_rate: float | None = None,
+    invoice_date: str | None = None,
+    due_date: str | None = None,
+    payment_terms: str | None = None,
+    billing_address: str | None = None,
+    po_reference: str | None = None,
+    line_items: list | None = None,
+    organization_id: str | None = None,
+) -> dict | None:
     conn = get_connection()
-    inv = await get_by_id(invoice_id)
+    inv = await get_by_id(invoice_id, organization_id=organization_id)
     if not inv:
         return None
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     if line_items is not None:
         await conn.execute("DELETE FROM invoice_line_items WHERE invoice_id = ?", (invoice_id,))
@@ -313,7 +321,7 @@ async def update(
     return await get_by_id(invoice_id)
 
 
-async def add_withdrawals(invoice_id: str, withdrawal_ids: list, organization_id: Optional[str] = None) -> Optional[dict]:
+async def add_withdrawals(invoice_id: str, withdrawal_ids: list, organization_id: str | None = None) -> dict | None:
     """Link withdrawals to invoice. Validates: unpaid, same billing_entity, not already on another invoice."""
     if not withdrawal_ids:
         return await get_by_id(invoice_id)
@@ -351,7 +359,7 @@ async def add_withdrawals(invoice_id: str, withdrawal_ids: list, organization_id
     if not inv.get("billing_entity") and billing_entity:
         await conn.execute(
             "UPDATE invoices SET billing_entity = ?, contact_name = ?, updated_at = ? WHERE id = ?",
-            (billing_entity, contact_name or inv.get("contact_name", ""), datetime.now(timezone.utc).isoformat(), invoice_id),
+            (billing_entity, contact_name or inv.get("contact_name", ""), datetime.now(UTC).isoformat(), invoice_id),
         )
 
     # Copy line items from withdrawals
@@ -387,7 +395,7 @@ async def add_withdrawals(invoice_id: str, withdrawal_ids: list, organization_id
     total = round(total_subtotal + total_tax, 2)
     await conn.execute(
         "UPDATE invoices SET subtotal = ?, tax = ?, total = ?, updated_at = ? WHERE id = ?",
-        (total_subtotal, total_tax, total, datetime.now(timezone.utc).isoformat(), invoice_id),
+        (total_subtotal, total_tax, total, datetime.now(UTC).isoformat(), invoice_id),
     )
 
     for wid in withdrawal_ids:
@@ -404,7 +412,7 @@ async def add_withdrawals(invoice_id: str, withdrawal_ids: list, organization_id
     return await get_by_id(invoice_id)
 
 
-async def create_from_withdrawals(withdrawal_ids: list, organization_id: Optional[str] = None, conn=None) -> dict:
+async def create_from_withdrawals(withdrawal_ids: list, organization_id: str | None = None, conn=None) -> dict:
     """Create new invoice from unpaid withdrawals. All must share same billing_entity."""
     if not withdrawal_ids:
         raise ValueError("At least one withdrawal required")
@@ -434,7 +442,7 @@ async def create_from_withdrawals(withdrawal_ids: list, organization_id: Optiona
     total_tax = 0.0
     in_transaction = conn is not None
     conn = conn or get_connection()
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     invoice_number = await _next_invoice_number(org_id, conn)
     payment_terms = "net_30"
     due_date = compute_due_date(now, payment_terms)
@@ -502,16 +510,21 @@ async def create_from_withdrawals(withdrawal_ids: list, organization_id: Optiona
     return (await get_by_id(inv_id)) or {}
 
 
-async def mark_paid_for_withdrawal(withdrawal_id: str) -> None:
+async def mark_paid_for_withdrawal(withdrawal_id: str, organization_id: str | None = None) -> None:
     """When a withdrawal is marked paid, update its linked invoice to status 'paid'."""
     conn = get_connection()
+    params: list = [withdrawal_id]
+    where = "WHERE id = ? AND invoice_id IS NOT NULL"
+    if organization_id:
+        where += " AND (organization_id = ? OR organization_id IS NULL)"
+        params.append(organization_id)
     cursor = await conn.execute(
-        "SELECT invoice_id FROM withdrawals WHERE id = ? AND invoice_id IS NOT NULL",
-        (withdrawal_id,),
+        f"SELECT invoice_id FROM withdrawals {where}",
+        params,
     )
     row = await cursor.fetchone()
     if row and row[0]:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         await conn.execute(
             "UPDATE invoices SET status = 'paid', updated_at = ? WHERE id = ?",
             (now, row[0]),
@@ -522,25 +535,34 @@ async def mark_paid_for_withdrawal(withdrawal_id: str) -> None:
 async def set_xero_invoice_id(
     invoice_id: str,
     xero_invoice_id: str,
-    xero_cogs_journal_id: Optional[str] = None,
+    xero_cogs_journal_id: str | None = None,
+    organization_id: str | None = None,
 ) -> None:
     """Store the Xero invoice ID (and optional COGS journal ID) and mark as synced."""
     conn = get_connection()
+    params: list = [xero_invoice_id, xero_cogs_journal_id, datetime.now(UTC).isoformat(), invoice_id]
+    where = "WHERE id = ?"
+    if organization_id:
+        where += " AND organization_id = ?"
+        params.append(organization_id)
     await conn.execute(
-        """UPDATE invoices
-           SET xero_invoice_id = ?, xero_cogs_journal_id = ?, xero_sync_status = 'synced', updated_at = ?
-           WHERE id = ?""",
-        (xero_invoice_id, xero_cogs_journal_id, datetime.now(timezone.utc).isoformat(), invoice_id),
+        f"UPDATE invoices SET xero_invoice_id = ?, xero_cogs_journal_id = ?, xero_sync_status = 'synced', updated_at = ? {where}",
+        params,
     )
     await conn.commit()
 
 
-async def set_xero_sync_status(invoice_id: str, status: str) -> None:
+async def set_xero_sync_status(invoice_id: str, status: str, organization_id: str | None = None) -> None:
     """Update the Xero sync status for an invoice."""
     conn = get_connection()
+    params: list = [status, datetime.now(UTC).isoformat(), invoice_id]
+    where = "WHERE id = ?"
+    if organization_id:
+        where += " AND organization_id = ?"
+        params.append(organization_id)
     await conn.execute(
-        "UPDATE invoices SET xero_sync_status = ?, updated_at = ? WHERE id = ?",
-        (status, datetime.now(timezone.utc).isoformat(), invoice_id),
+        f"UPDATE invoices SET xero_sync_status = ?, updated_at = ? {where}",
+        params,
     )
     await conn.commit()
 
@@ -634,16 +656,16 @@ async def list_stale_cogs_invoices(organization_id: str) -> list:
     return [dict(r) for r in rows]
 
 
-async def delete_draft(invoice_id: str) -> bool:
+async def delete_draft(invoice_id: str, organization_id: str | None = None) -> bool:
     """Soft-delete draft invoice and unlink withdrawals."""
     conn = get_connection()
-    inv = await get_by_id(invoice_id)
+    inv = await get_by_id(invoice_id, organization_id=organization_id)
     if not inv:
         return False
     if inv.get("status") != "draft":
         raise ValueError("Can only delete draft invoices")
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     for wid in inv.get("withdrawal_ids", []):
         await conn.execute(
             "UPDATE withdrawals SET invoice_id = NULL, payment_status = 'unpaid' WHERE id = ?",

@@ -7,16 +7,27 @@ from __future__ import annotations
 
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
 _AUTH_LIMIT = os.environ.get("RATE_LIMIT_AUTH", "10/minute")
 _CHAT_LIMIT = os.environ.get("RATE_LIMIT_CHAT", "30/minute")
 _API_LIMIT = os.environ.get("RATE_LIMIT_API", "120/minute")
 
-limiter = Limiter(key_func=get_remote_address, default_limits=[_API_LIMIT])
+
+def _get_client_ip(request: Request) -> str:
+    """Extract the real client IP, respecting X-Forwarded-For behind a reverse proxy."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    return request.client.host if request.client else "127.0.0.1"
+
+
+limiter = Limiter(key_func=_get_client_ip, default_limits=[_API_LIMIT])
 
 
 def setup_rate_limiting(app: FastAPI) -> None:

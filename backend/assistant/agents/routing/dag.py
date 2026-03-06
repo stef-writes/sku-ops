@@ -11,8 +11,9 @@ import asyncio
 import json
 import logging
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Awaitable
+from typing import Any
 
 from assistant.agents.core.tokens import budget_tool_result, count_tokens
 
@@ -185,43 +186,43 @@ def _search_then_detail() -> ExecutionPlan:
 
 _TEMPLATE_PATTERNS: list[tuple[re.Pattern, Callable[[], ExecutionPlan]]] = [
     # Inventory overview
-    (re.compile(r"(full|complete|deep)\s+(inventory|stock)\s+(analysis|report|overview|health)", re.I), _inventory_overview),
-    (re.compile(r"inventory\s+(overview|analysis|health|report)", re.I), _inventory_overview),
-    (re.compile(r"(stock|inventory)\s+health", re.I), _inventory_overview),
+    (re.compile(r"(full|complete|deep)\s+(inventory|stock)\s+(analysis|report|overview|health)", re.IGNORECASE), _inventory_overview),
+    (re.compile(r"inventory\s+(overview|analysis|health|report)", re.IGNORECASE), _inventory_overview),
+    (re.compile(r"(stock|inventory)\s+health", re.IGNORECASE), _inventory_overview),
 
     # Weekly / periodic reports
-    (re.compile(r"(weekly|week|7.day|periodic)\s+(sales|report|summary)", re.I), _weekly_report),
-    (re.compile(r"(write|give|create)\s+.{0,20}(weekly|week)\s+(report|summary)", re.I), _weekly_report),
+    (re.compile(r"(weekly|week|7.day|periodic)\s+(sales|report|summary)", re.IGNORECASE), _weekly_report),
+    (re.compile(r"(write|give|create)\s+.{0,20}(weekly|week)\s+(report|summary)", re.IGNORECASE), _weekly_report),
 
     # Dashboard / business overview
-    (re.compile(r"(dashboard|business|store|shop)\s+(overview|summary|status)", re.I), _dashboard_overview),
-    (re.compile(r"how.s the (business|store|shop) doing", re.I), _dashboard_overview),
-    (re.compile(r"(full|complete)\s+(store|business)\s+overview", re.I), _dashboard_overview),
-    (re.compile(r"give me .{0,20}(overview|summary)", re.I), _dashboard_overview),
+    (re.compile(r"(dashboard|business|store|shop)\s+(overview|summary|status)", re.IGNORECASE), _dashboard_overview),
+    (re.compile(r"how.s the (business|store|shop) doing", re.IGNORECASE), _dashboard_overview),
+    (re.compile(r"(full|complete)\s+(store|business)\s+overview", re.IGNORECASE), _dashboard_overview),
+    (re.compile(r"give me .{0,20}(overview|summary)", re.IGNORECASE), _dashboard_overview),
 
     # Stockout / running out
-    (re.compile(r"(stockout|running out|going to run out).*(forecast|report|risk|prediction)", re.I), _stockout_report),
-    (re.compile(r"(what|which).*(running out|run out|stockout)", re.I), _stockout_report),
-    (re.compile(r"at risk of (stocking out|running out)", re.I), _stockout_report),
+    (re.compile(r"(stockout|running out|going to run out).*(forecast|report|risk|prediction)", re.IGNORECASE), _stockout_report),
+    (re.compile(r"(what|which).*(running out|run out|stockout)", re.IGNORECASE), _stockout_report),
+    (re.compile(r"at risk of (stocking out|running out)", re.IGNORECASE), _stockout_report),
 
     # What needs attention
-    (re.compile(r"what needs?.{0,15}(attention|focus|my attention)", re.I), _attention_report),
-    (re.compile(r"what should I (focus|look at|prioriti[sz]e)", re.I), _attention_report),
-    (re.compile(r"(critical|urgent).*(stock|request|invoice|alert)", re.I), _attention_report),
+    (re.compile(r"what needs?.{0,15}(attention|focus|my attention)", re.IGNORECASE), _attention_report),
+    (re.compile(r"what should I (focus|look at|prioriti[sz]e)", re.IGNORECASE), _attention_report),
+    (re.compile(r"(critical|urgent).*(stock|request|invoice|alert)", re.IGNORECASE), _attention_report),
 
     # Finance overview
-    (re.compile(r"financ\w*\s+(overview|summary|report|health)", re.I), _financial_report),
-    (re.compile(r"(P&?L|profit.{0,5}loss)\s+(summary|report|overview)", re.I), _financial_report),
-    (re.compile(r"how.{0,10}(money|financ|revenue)", re.I), _financial_report),
+    (re.compile(r"financ\w*\s+(overview|summary|report|health)", re.IGNORECASE), _financial_report),
+    (re.compile(r"(P&?L|profit.{0,5}loss)\s+(summary|report|overview)", re.IGNORECASE), _financial_report),
+    (re.compile(r"how.{0,10}(money|financ|revenue)", re.IGNORECASE), _financial_report),
 
     # Reorder / what to buy
-    (re.compile(r"(what should we|what do we need to)\s+reorder", re.I), _reorder_report),
-    (re.compile(r"reorder\s+(priority|list|suggestions?|report)", re.I), _reorder_report),
-    (re.compile(r"(what|which).*(need|should).*(restock|reorder|buy|order)", re.I), _reorder_report),
+    (re.compile(r"(what should we|what do we need to)\s+reorder", re.IGNORECASE), _reorder_report),
+    (re.compile(r"reorder\s+(priority|list|suggestions?|report)", re.IGNORECASE), _reorder_report),
+    (re.compile(r"(what|which).*(need|should).*(restock|reorder|buy|order)", re.IGNORECASE), _reorder_report),
 
     # Low stock deep dive
-    (re.compile(r"(low stock|below reorder).*(report|analysis|detail|alert)", re.I), _low_stock_report),
-    (re.compile(r"(all|every|list).*(low stock|running low|below)", re.I), _low_stock_report),
+    (re.compile(r"(low stock|below reorder).*(report|analysis|detail|alert)", re.IGNORECASE), _low_stock_report),
+    (re.compile(r"(all|every|list).*(low stock|running low|below)", re.IGNORECASE), _low_stock_report),
 ]
 
 

@@ -7,18 +7,19 @@ you write a correcting entry (never delete).
 Every event produces a set of entries grouped under a single journal_id
 so the transaction can be verified as balanced.
 """
+from datetime import UTC
 from typing import List, Optional
 from uuid import uuid4
 
-from kernel.types import round_money
 from finance.domain.ledger import Account, FinancialEntry, ReferenceType
 from finance.infrastructure.ledger_repo import entries_exist, insert_entries
+from kernel.types import round_money
 
 
 async def _check_fiscal_period(organization_id: str) -> None:
     """Check that the current date is not in a closed fiscal period."""
     from datetime import datetime, timezone
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     try:
         from finance.api.fiscal_periods import check_period_open
         await check_period_open(now, organization_id)
@@ -60,9 +61,9 @@ async def _record_sale_event(
     billing_entity: str,
     contractor_id: str,
     organization_id: str,
-    performed_by_user_id: Optional[str] = None,
+    performed_by_user_id: str | None = None,
     conn=None,
-    created_at: Optional[str] = None,
+    created_at: str | None = None,
 ) -> None:
     """Shared logic for withdrawals (+1) and returns (-1).
 
@@ -80,7 +81,7 @@ async def _record_sale_event(
         performed_by_user_id=performed_by_user_id,
         reference_type=reference_type, reference_id=reference_id, organization_id=organization_id,
     )
-    entries: List[FinancialEntry] = []
+    entries: list[FinancialEntry] = []
 
     for item in items:
         qty, unit, unit_price, cost, sell_cost, sell_uom, dept, pid = _extract_item(item)
@@ -128,9 +129,9 @@ async def record_withdrawal(
     billing_entity: str,
     contractor_id: str,
     organization_id: str,
-    performed_by_user_id: Optional[str] = None,
+    performed_by_user_id: str | None = None,
     conn=None,
-    created_at: Optional[str] = None,
+    created_at: str | None = None,
 ) -> None:
     """Write ledger entries for a new material withdrawal."""
     await _record_sale_event(
@@ -155,9 +156,9 @@ async def record_return(
     billing_entity: str,
     contractor_id: str,
     organization_id: str,
-    performed_by_user_id: Optional[str] = None,
+    performed_by_user_id: str | None = None,
     conn=None,
-    created_at: Optional[str] = None,
+    created_at: str | None = None,
 ) -> None:
     """Write reversing entries for a material return."""
     await _record_sale_event(
@@ -178,16 +179,16 @@ async def record_po_receipt(
     items: list,
     vendor_name: str,
     organization_id: str,
-    performed_by_user_id: Optional[str] = None,
+    performed_by_user_id: str | None = None,
     conn=None,
-    created_at: Optional[str] = None,
+    created_at: str | None = None,
 ) -> None:
     """Write inventory + AP entries for each received PO line item."""
     if await entries_exist(ReferenceType.PO_RECEIPT.value, po_id, conn=conn):
         return
     await _check_fiscal_period(organization_id)
     journal_id = str(uuid4())
-    entries: List[FinancialEntry] = []
+    entries: list[FinancialEntry] = []
 
     for item in items:
         cost = float(item.get("cost", 0) or 0)
@@ -227,7 +228,7 @@ _DAMAGE_REASONS = {"damage"}
 _THEFT_REASONS = {"theft"}
 
 
-def _offset_account_for_reason(reason: Optional[str]) -> Account:
+def _offset_account_for_reason(reason: str | None) -> Account:
     """Route negative adjustments to the correct contra-inventory account."""
     if reason in _DAMAGE_REASONS:
         return Account.DAMAGE
@@ -239,12 +240,12 @@ async def record_adjustment(
     product_id: str,
     product_cost: float,
     quantity_delta: float,
-    department: Optional[str],
+    department: str | None,
     organization_id: str,
-    reason: Optional[str] = None,
-    performed_by_user_id: Optional[str] = None,
+    reason: str | None = None,
+    performed_by_user_id: str | None = None,
     conn=None,
-    created_at: Optional[str] = None,
+    created_at: str | None = None,
 ) -> None:
     """Write inventory + contra entries for a stock adjustment.
 
@@ -290,9 +291,9 @@ async def record_payment(
     billing_entity: str,
     contractor_id: str,
     organization_id: str,
-    performed_by_user_id: Optional[str] = None,
+    performed_by_user_id: str | None = None,
     conn=None,
-    created_at: Optional[str] = None,
+    created_at: str | None = None,
 ) -> None:
     """Write AR reduction when a withdrawal is marked paid."""
     if await entries_exist(ReferenceType.PAYMENT.value, withdrawal_id, conn=conn):
@@ -320,7 +321,7 @@ async def record_credit_note_application(
     billing_entity: str,
     contractor_id: str,
     organization_id: str,
-    performed_by_user_id: Optional[str] = None,
+    performed_by_user_id: str | None = None,
     conn=None,
 ) -> None:
     """Write AR reduction when a credit note is applied to an invoice."""

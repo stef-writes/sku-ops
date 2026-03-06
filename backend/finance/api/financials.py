@@ -12,18 +12,18 @@ from typing import Optional
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
+from finance.application import ledger_queries as ledger_repo
 from identity.application.auth_service import require_role
 from kernel.types import CurrentUser, round_money
 from operations.application.queries import list_withdrawals
-from finance.application import ledger_queries as ledger_repo
 
 router = APIRouter(prefix="/financials", tags=["financials"])
 
 
 @router.get("/summary")
 async def get_financial_summary(
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
     """P&L summary sourced from the financial ledger."""
@@ -91,10 +91,10 @@ async def get_financial_summary(
 @router.get("/export")
 async def export_financials(
     format: str = "csv",
-    payment_status: Optional[str] = None,
-    billing_entity: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    payment_status: str | None = None,
+    billing_entity: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
     """Export financial data as CSV (line-level, from operational tables)."""

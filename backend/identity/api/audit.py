@@ -18,12 +18,12 @@ router = APIRouter(prefix="/audit-log", tags=["audit-log"])
 async def _query_audit_log(
     org_id: str,
     *,
-    user_id: Optional[str] = None,
-    action: Optional[str] = None,
-    resource_type: Optional[str] = None,
-    resource_id: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    user_id: str | None = None,
+    action: str | None = None,
+    resource_type: str | None = None,
+    resource_id: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     limit: int = 200,
     offset: int = 0,
 ) -> tuple[list[dict], int]:
@@ -77,12 +77,12 @@ async def _query_audit_log(
 
 @router.get("")
 async def list_audit_log(
-    user_id: Optional[str] = None,
-    action: Optional[str] = None,
-    resource_type: Optional[str] = None,
-    resource_id: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    user_id: str | None = None,
+    action: str | None = None,
+    resource_type: str | None = None,
+    resource_id: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     limit: int = Query(200, ge=1, le=500),
     offset: int = Query(0, ge=0),
     current_user: CurrentUser = Depends(require_role("admin")),
@@ -120,11 +120,11 @@ async def list_audit_actions(
 
 @router.get("/export")
 async def export_audit_log(
-    user_id: Optional[str] = None,
-    action: Optional[str] = None,
-    resource_type: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    user_id: str | None = None,
+    action: str | None = None,
+    resource_type: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
     """Export audit log as CSV. Admin only."""

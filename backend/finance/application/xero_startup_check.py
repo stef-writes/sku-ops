@@ -5,7 +5,7 @@ config is non-fatal (StubXeroAdapter handles it). The goal is to surface
 misconfiguration immediately at boot, not at the moment the first sync fires.
 """
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 from identity.application.org_service import get_org_settings
 
@@ -22,7 +22,7 @@ _REQUIRED_ACCOUNT_CODES = [
 def _is_token_expired(token_expiry: str) -> bool:
     try:
         expiry = datetime.fromisoformat(token_expiry)
-        return datetime.now(timezone.utc).timestamp() >= expiry.timestamp() - 60
+        return datetime.now(UTC).timestamp() >= expiry.timestamp() - 60
     except Exception:
         return True
 

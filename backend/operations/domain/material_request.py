@@ -4,31 +4,32 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from kernel.entity import Entity
+
 from .withdrawal import WithdrawalItem
 
 
 class MaterialRequestCreate(BaseModel):
-    items: List[WithdrawalItem]
-    job_id: Optional[str] = None
-    service_address: Optional[str] = None
-    notes: Optional[str] = None
+    items: list[WithdrawalItem]
+    job_id: str | None = None
+    service_address: str | None = None
+    notes: str | None = None
 
 
 class MaterialRequestProcess(BaseModel):
-    job_id: Optional[str] = None
-    service_address: Optional[str] = None
-    notes: Optional[str] = None
+    job_id: str | None = None
+    service_address: str | None = None
+    notes: str | None = None
 
 
 class MaterialRequest(Entity):
     contractor_id: str
     contractor_name: str = ""
-    items: List[WithdrawalItem]
+    items: list[WithdrawalItem]
     status: str = "pending"
-    withdrawal_id: Optional[str] = None
-    job_id: Optional[str] = None
-    service_address: Optional[str] = None
-    notes: Optional[str] = None
-    processed_at: Optional[str] = None
-    processed_by_id: Optional[str] = None
+    withdrawal_id: str | None = None
+    job_id: str | None = None
+    service_address: str | None = None
+    notes: str | None = None
+    processed_at: str | None = None
+    processed_by_id: str | None = None
     organization_id: str = "default"

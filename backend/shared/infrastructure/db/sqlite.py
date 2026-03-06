@@ -1,14 +1,13 @@
 """SQLite backend using aiosqlite — wraps the existing single-connection pattern."""
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncIterator, Sequence
 
 import aiosqlite
 
 from shared.infrastructure.db.protocol import Connection, DictRow
-
 
 # ── Cursor wrapper ────────────────────────────────────────────────────────────
 

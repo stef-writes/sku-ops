@@ -1,12 +1,13 @@
 """Document repository — persistence for uploaded/parsed documents."""
 import json
+from datetime import UTC
 from typing import Optional, Union
 
 from documents.domain.document import Document
 from shared.infrastructure.database import get_connection
 
 
-def _row_to_dict(row) -> Optional[dict]:
+def _row_to_dict(row) -> dict | None:
     if row is None:
         return None
     d = dict(row) if hasattr(row, "keys") else {}
@@ -21,7 +22,7 @@ def _row_to_dict(row) -> Optional[dict]:
 _COLUMNS = "id, filename, document_type, vendor_name, file_hash, file_size, mime_type, parsed_data, po_id, status, uploaded_by_id, organization_id, created_at, updated_at"
 
 
-async def insert(doc: Union[Document, dict], conn=None) -> None:
+async def insert(doc: Document | dict, conn=None) -> None:
     d = doc if isinstance(doc, dict) else doc.model_dump()
     in_tx = conn is not None
     conn = conn or get_connection()
@@ -44,7 +45,7 @@ async def insert(doc: Union[Document, dict], conn=None) -> None:
         await conn.commit()
 
 
-async def get_by_id(doc_id: str, organization_id: str) -> Optional[dict]:
+async def get_by_id(doc_id: str, organization_id: str) -> dict | None:
     conn = get_connection()
     cursor = await conn.execute(
         f"SELECT {_COLUMNS} FROM documents WHERE id = ? AND organization_id = ?",
@@ -55,9 +56,9 @@ async def get_by_id(doc_id: str, organization_id: str) -> Optional[dict]:
 
 async def list_documents(
     organization_id: str,
-    status: Optional[str] = None,
-    vendor_name: Optional[str] = None,
-    po_id: Optional[str] = None,
+    status: str | None = None,
+    vendor_name: str | None = None,
+    po_id: str | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list:
@@ -79,19 +80,19 @@ async def list_documents(
     return [_row_to_dict(r) for r in await cursor.fetchall()]
 
 
-async def update_status(doc_id: str, status: str, po_id: Optional[str] = None, conn=None) -> None:
+async def update_status(doc_id: str, status: str, po_id: str | None = None, conn=None) -> None:
     from datetime import datetime, timezone
     in_tx = conn is not None
     conn = conn or get_connection()
     if po_id:
         await conn.execute(
             "UPDATE documents SET status = ?, po_id = ?, updated_at = ? WHERE id = ?",
-            (status, po_id, datetime.now(timezone.utc).isoformat(), doc_id),
+            (status, po_id, datetime.now(UTC).isoformat(), doc_id),
         )
     else:
         await conn.execute(
             "UPDATE documents SET status = ?, updated_at = ? WHERE id = ?",
-            (status, datetime.now(timezone.utc).isoformat(), doc_id),
+            (status, datetime.now(UTC).isoformat(), doc_id),
         )
     if not in_tx:
         await conn.commit()

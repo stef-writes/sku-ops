@@ -5,22 +5,27 @@ which is the cross-context entry point for analytics consumers.
 """
 from typing import List
 
+from finance.domain.ledger import FinancialEntry
 from kernel.types import round_money
 from shared.infrastructure.database import get_connection
-from finance.domain.ledger import FinancialEntry
 
 
-async def entries_exist(reference_type: str, reference_id: str, conn=None) -> bool:
+async def entries_exist(reference_type: str, reference_id: str, conn=None, organization_id: str | None = None) -> bool:
     """Return True if any ledger rows already exist for this reference."""
     c = conn or get_connection()
+    params: list = [reference_type, reference_id]
+    where = "WHERE reference_type = ? AND reference_id = ?"
+    if organization_id:
+        where += " AND organization_id = ?"
+        params.append(organization_id)
     cursor = await c.execute(
-        "SELECT 1 FROM financial_ledger WHERE reference_type = ? AND reference_id = ? LIMIT 1",
-        (reference_type, reference_id),
+        f"SELECT 1 FROM financial_ledger {where} LIMIT 1",
+        params,
     )
     return (await cursor.fetchone()) is not None
 
 
-async def insert_entries(entries: List[FinancialEntry], conn=None) -> None:
+async def insert_entries(entries: list[FinancialEntry], conn=None) -> None:
     """Batch-insert ledger entries. Uses caller's conn if inside a transaction."""
     c = conn or get_connection()
     for e in entries:
@@ -45,12 +50,17 @@ async def insert_entries(entries: List[FinancialEntry], conn=None) -> None:
         await c.commit()
 
 
-async def get_journal(journal_id: str) -> list[dict]:
+async def get_journal(journal_id: str, organization_id: str | None = None) -> list[dict]:
     """Return all entries for a single journal transaction."""
     conn = get_connection()
+    params: list = [journal_id]
+    where = "WHERE journal_id = ?"
+    if organization_id:
+        where += " AND organization_id = ?"
+        params.append(organization_id)
     cursor = await conn.execute(
-        "SELECT * FROM financial_ledger WHERE journal_id = ? ORDER BY id",
-        (journal_id,),
+        f"SELECT * FROM financial_ledger {where} ORDER BY id",
+        params,
     )
     return [dict(r) for r in await cursor.fetchall()]
 

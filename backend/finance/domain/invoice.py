@@ -41,15 +41,15 @@ class InvoiceLineItem(BaseModel):
     unit_price: float = 0.0
     amount: float = 0.0
     cost: float = 0.0
-    product_id: Optional[str] = None
-    job_id: Optional[str] = None
+    product_id: str | None = None
+    job_id: str | None = None
 
     @property
     def margin(self) -> float:
         return round_money(self.amount - (self.cost * self.quantity))
 
     @property
-    def margin_pct(self) -> Optional[float]:
+    def margin_pct(self) -> float | None:
         if self.amount <= 0:
             return None
         return round(self.margin / self.amount * 100, 2)
@@ -59,7 +59,7 @@ class InvoiceLineItem(BaseModel):
         cls,
         item: LineItem,
         invoice_id: str = "",
-        job_id: Optional[str] = None,
+        job_id: str | None = None,
     ) -> "InvoiceLineItem":
         """Convert a universal LineItem to an InvoiceLineItem."""
         return cls(
@@ -76,29 +76,29 @@ class InvoiceLineItem(BaseModel):
 
 class InvoiceCreate(BaseModel):
     """Payload for creating invoice from withdrawal IDs."""
-    withdrawal_ids: List[str]
+    withdrawal_ids: list[str]
 
 
 class InvoiceSyncXeroBulk(BaseModel):
     """Payload for bulk sync to Xero."""
-    invoice_ids: List[str]
+    invoice_ids: list[str]
 
 
 class InvoiceUpdate(BaseModel):
     """Payload for updating invoice."""
-    billing_entity: Optional[str] = None
-    contact_name: Optional[str] = None
-    contact_email: Optional[str] = None
-    status: Optional[str] = None
-    notes: Optional[str] = None
-    tax: Optional[float] = None
-    tax_rate: Optional[float] = None
-    invoice_date: Optional[str] = None
-    due_date: Optional[str] = None
-    payment_terms: Optional[str] = None
-    billing_address: Optional[str] = None
-    po_reference: Optional[str] = None
-    line_items: Optional[List[InvoiceLineItem]] = None
+    billing_entity: str | None = None
+    contact_name: str | None = None
+    contact_email: str | None = None
+    status: str | None = None
+    notes: str | None = None
+    tax: float | None = None
+    tax_rate: float | None = None
+    invoice_date: str | None = None
+    due_date: str | None = None
+    payment_terms: str | None = None
+    billing_address: str | None = None
+    po_reference: str | None = None
+    line_items: list[InvoiceLineItem] | None = None
 
 
 class Invoice(AuditedEntity):
@@ -112,16 +112,16 @@ class Invoice(AuditedEntity):
     tax_rate: float = 0.0
     total: float = 0.0
     amount_credited: float = 0.0
-    notes: Optional[str] = None
-    invoice_date: Optional[str] = None
-    due_date: Optional[str] = None
+    notes: str | None = None
+    invoice_date: str | None = None
+    due_date: str | None = None
     payment_terms: str = "net_30"
     billing_address: str = ""
     po_reference: str = ""
     currency: str = "USD"
-    approved_by_id: Optional[str] = None
-    approved_at: Optional[str] = None
-    xero_invoice_id: Optional[str] = None
+    approved_by_id: str | None = None
+    approved_at: str | None = None
+    xero_invoice_id: str | None = None
 
     ALLOWED_TRANSITIONS: ClassVar[dict[str, set[str]]] = {
         "draft": {"approved", "sent", "paid"},
@@ -140,5 +140,5 @@ class Invoice(AuditedEntity):
 
 class InvoiceWithDetails(Invoice):
     """Invoice with line items and linked withdrawals."""
-    line_items: List[InvoiceLineItem] = []
-    withdrawal_ids: List[str] = []
+    line_items: list[InvoiceLineItem] = []
+    withdrawal_ids: list[str] = []

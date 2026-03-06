@@ -11,25 +11,25 @@ class WithdrawalRepoPort(Protocol):
 
     async def list_withdrawals(
         self,
-        contractor_id: Optional[str] = None,
-        payment_status: Optional[str] = None,
-        billing_entity: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        contractor_id: str | None = None,
+        payment_status: str | None = None,
+        billing_entity: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         limit: int = 10000,
         offset: int = 0,
-        organization_id: Optional[str] = None,
-    ) -> List[dict]: ...
+        organization_id: str | None = None,
+    ) -> list[dict]: ...
 
     async def get_by_id(
-        self, withdrawal_id: str, organization_id: Optional[str] = None,
-    ) -> Optional[dict]: ...
+        self, withdrawal_id: str, organization_id: str | None = None,
+    ) -> dict | None: ...
 
     async def mark_paid(
         self, withdrawal_id: str, paid_at: str,
-    ) -> Optional[dict]: ...
+    ) -> dict | None: ...
 
     async def bulk_mark_paid(
-        self, withdrawal_ids: List[str], paid_at: str,
-        organization_id: Optional[str] = None,
+        self, withdrawal_ids: list[str], paid_at: str,
+        organization_id: str | None = None,
     ) -> int: ...

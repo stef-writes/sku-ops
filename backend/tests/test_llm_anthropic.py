@@ -6,8 +6,8 @@ import pytest
 
 # Import after conftest sets ENV
 from shared.infrastructure.config import (
-    ANTHROPIC_AVAILABLE,
     ANTHROPIC_API_KEY,
+    ANTHROPIC_AVAILABLE,
     ANTHROPIC_FAST_MODEL,
     ANTHROPIC_MODEL,
     LLM_SETUP_URL,
@@ -189,6 +189,7 @@ class TestAssistant:
     async def test_chat_dispatches_to_correct_agent(self, db):
         """assistant.chat() dispatches to the correct specialist agent by agent_type."""
         from unittest.mock import AsyncMock
+
         from assistant.application.assistant import chat
 
         expected = {

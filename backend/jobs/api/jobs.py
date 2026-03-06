@@ -3,18 +3,18 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from kernel.types import CurrentUser
 from identity.application.auth_service import get_current_user, require_role
-from jobs.domain.job import JobCreate, JobUpdate, JobStatus
+from jobs.domain.job import JobCreate, JobStatus, JobUpdate
 from jobs.infrastructure.job_repo import job_repo
+from kernel.types import CurrentUser
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 @router.get("")
 async def list_jobs(
-    status: Optional[str] = None,
-    q: Optional[str] = None,
+    status: str | None = None,
+    q: str | None = None,
     limit: int = 200,
     offset: int = 0,
     current_user: CurrentUser = Depends(get_current_user),

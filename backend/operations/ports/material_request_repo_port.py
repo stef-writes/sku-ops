@@ -10,17 +10,17 @@ class MaterialRequestRepoPort(Protocol):
     async def insert(self, request: MaterialRequest, conn=None) -> None: ...
 
     async def get_by_id(
-        self, request_id: str, organization_id: Optional[str] = None,
-    ) -> Optional[dict]: ...
+        self, request_id: str, organization_id: str | None = None,
+    ) -> dict | None: ...
 
     async def list_pending(
-        self, organization_id: Optional[str] = None, limit: int = 100,
-    ) -> List[dict]: ...
+        self, organization_id: str | None = None, limit: int = 100,
+    ) -> list[dict]: ...
 
     async def list_by_contractor(
-        self, contractor_id: str, organization_id: Optional[str] = None,
+        self, contractor_id: str, organization_id: str | None = None,
         limit: int = 100,
-    ) -> List[dict]: ...
+    ) -> list[dict]: ...
 
     async def mark_processed(
         self, request_id: str, withdrawal_id: str, processed_by_id: str,

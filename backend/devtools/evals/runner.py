@@ -12,18 +12,18 @@ import json
 import logging
 import sys
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import yaml
 
-from shared.infrastructure.database import init_db
-from assistant.agents.tools.registry import init_tools
-from assistant.agents.routing.router import is_trivial, classify_domain
-from assistant.agents.routing.lookups import try_lookup
 from assistant.agents.routing.dag import match_report
+from assistant.agents.routing.lookups import try_lookup
+from assistant.agents.routing.router import classify_domain, is_trivial
+from assistant.agents.tools.registry import init_tools
 from assistant.application.assistant import chat
 from devtools.evals.scorer import score_case
+from shared.infrastructure.database import init_db
 
 logger = logging.getLogger(__name__)
 

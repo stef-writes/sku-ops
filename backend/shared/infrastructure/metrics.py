@@ -11,6 +11,7 @@ Sentry:
 from __future__ import annotations
 
 import logging
+import os
 import re
 import time
 
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 # ── Prometheus ────────────────────────────────────────────────────────────────
 
 try:
-    from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+    from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
     http_requests_total = Counter(
         "http_requests_total",
@@ -81,8 +82,15 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
         return response
 
 
+_METRICS_TOKEN = os.environ.get("METRICS_TOKEN", "").strip()
+
+
 def setup_prometheus(app: FastAPI) -> None:
-    """Add /metrics endpoint and request metrics middleware."""
+    """Add /metrics endpoint and request metrics middleware.
+
+    When METRICS_TOKEN is set, the /metrics endpoint requires
+    ``Authorization: Bearer <token>`` to prevent leaking operational data.
+    """
     if not _PROMETHEUS_AVAILABLE:
         logger.info("prometheus_client not installed — metrics disabled")
         return
@@ -90,21 +98,50 @@ def setup_prometheus(app: FastAPI) -> None:
     app.add_middleware(PrometheusMiddleware)
 
     @app.get("/metrics", include_in_schema=False)
-    async def metrics():
+    async def metrics(request: Request):
+        if _METRICS_TOKEN:
+            auth = request.headers.get("authorization", "")
+            if auth != f"Bearer {_METRICS_TOKEN}":
+                return Response(status_code=403, content="Forbidden")
         from starlette.responses import Response as StarletteResponse
         return StarletteResponse(
             content=generate_latest(),
             media_type=CONTENT_TYPE_LATEST,
         )
 
-    logger.info("Prometheus metrics enabled at /metrics")
+    logger.info("Prometheus metrics enabled at /metrics%s", " (token-protected)" if _METRICS_TOKEN else "")
 
 
 # ── Sentry ────────────────────────────────────────────────────────────────────
 
+
+def _sentry_before_send(event: dict, hint: dict) -> dict:
+    """Enrich every Sentry event with request correlation context."""
+    from shared.infrastructure.logging_config import (
+        org_id_var,
+        request_id_var,
+        user_id_var,
+    )
+
+    rid = request_id_var.get("")
+    uid = user_id_var.get("")
+    oid = org_id_var.get("")
+
+    tags = event.setdefault("tags", {})
+    if rid:
+        tags["request_id"] = rid
+    if oid:
+        tags["org_id"] = oid
+
+    if uid:
+        event.setdefault("user", {})["id"] = uid
+
+    return event
+
+
 def setup_sentry() -> None:
     """Initialize Sentry if SENTRY_DSN is configured."""
-    from shared.infrastructure.config import SENTRY_DSN, _ENV
+    from shared.infrastructure.config import _ENV, SENTRY_DSN
 
     if not SENTRY_DSN:
         return
@@ -124,6 +161,7 @@ def setup_sentry() -> None:
                 FastApiIntegration(transaction_style="endpoint"),
             ],
             send_default_pii=False,
+            before_send=_sentry_before_send,
         )
         logger.info("Sentry initialized (env=%s)", _ENV)
     except ImportError:

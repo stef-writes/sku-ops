@@ -8,7 +8,7 @@ try_lookup() returns a formatted markdown response string or None.
 import json
 import logging
 import re
-from typing import Callable
+from collections.abc import Callable
 
 from assistant.agents.tools.registry import get_by_lookup_key
 
@@ -168,36 +168,36 @@ def _format_job_materials(data: dict) -> str:
 
 _LOOKUP_PATTERNS: list[tuple[re.Pattern, str, str, Callable, Callable]] = [
     # Inventory lookups
-    (re.compile(r"(?:do we have|search for|find|look up|lookup)\s+(?P<query>.+)", re.I),
+    (re.compile(r"(?:do we have|search for|find|look up|lookup)\s+(?P<query>.+)", re.IGNORECASE),
      "inventory", "search_products", _extract_query, _format_product_search),
 
-    (re.compile(r"(?:details?|info|tell me about)\s+(?:for\s+)?(?:sku\s+)?(?P<sku>[A-Z]{2,4}-\w+-\w+)", re.I),
+    (re.compile(r"(?:details?|info|tell me about)\s+(?:for\s+)?(?:sku\s+)?(?P<sku>[A-Z]{2,4}-\w+-\w+)", re.IGNORECASE),
      "inventory", "product_details", _extract_sku, _format_product_details),
 
-    (re.compile(r"(?:low stock|below reorder|needs? reorder)", re.I),
+    (re.compile(r"(?:low stock|below reorder|needs? reorder)", re.IGNORECASE),
      "inventory", "low_stock", _no_args, _format_low_stock),
 
-    (re.compile(r"(?:inventory stats?|how many products?|catalogue size|catalog size|how many skus?)", re.I),
+    (re.compile(r"(?:inventory stats?|how many products?|catalogue size|catalog size|how many skus?)", re.IGNORECASE),
      "inventory", "stats", _no_args, _format_stats),
 
-    (re.compile(r"(?:list|show|what)\s+departments?", re.I),
+    (re.compile(r"(?:list|show|what)\s+departments?", re.IGNORECASE),
      "inventory", "departments", _no_args, _format_departments),
 
-    (re.compile(r"(?:list|show|what)\s+vendors?|(?:who are|list)\s+(?:our\s+)?suppliers?", re.I),
+    (re.compile(r"(?:list|show|what)\s+vendors?|(?:who are|list)\s+(?:our\s+)?suppliers?", re.IGNORECASE),
      "inventory", "vendors", _no_args, _format_vendors),
 
     # Ops lookups
-    (re.compile(r"pending\s+(?:material\s+)?requests?|requests?\s+awaiting", re.I),
+    (re.compile(r"pending\s+(?:material\s+)?requests?|requests?\s+awaiting", re.IGNORECASE),
      "ops", "pending_requests", _no_args, _format_pending_requests),
 
-    (re.compile(r"(?:history|withdrawals?)\s+(?:for|by)\s+(?P<name>[\w\s]+?)(?:\s*$|\s+(?:last|this|in))", re.I),
+    (re.compile(r"(?:history|withdrawals?)\s+(?:for|by)\s+(?P<name>[\w\s]+?)(?:\s*$|\s+(?:last|this|in))", re.IGNORECASE),
      "ops", "contractor_history", _extract_name, _format_contractor),
 
-    (re.compile(r"(?:what\s+(?:was\s+)?(?:pulled|used)|materials?)\s+(?:for|on)\s+(?:job\s+)?(?P<job>[\w-]+)", re.I),
+    (re.compile(r"(?:what\s+(?:was\s+)?(?:pulled|used)|materials?)\s+(?:for|on)\s+(?:job\s+)?(?P<job>[\w-]+)", re.IGNORECASE),
      "ops", "job_materials", _extract_job, _format_job_materials),
 
     # Finance lookups
-    (re.compile(r"(?:who owes|outstanding\s+balance|unpaid\s+accounts?|unpaid\s+balance)", re.I),
+    (re.compile(r"(?:who owes|outstanding\s+balance|unpaid\s+accounts?|unpaid\s+balance)", re.IGNORECASE),
      "finance", "outstanding", _no_args, _format_outstanding),
 ]
 

@@ -42,9 +42,9 @@ class ReturnItem(BaseModel):
 class ReturnCreate(BaseModel):
     """API payload to create a return."""
     withdrawal_id: str
-    items: List[ReturnItem]
+    items: list[ReturnItem]
     reason: ReturnReason = ReturnReason.OTHER
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class MaterialReturn(AuditedEntity):
@@ -54,14 +54,14 @@ class MaterialReturn(AuditedEntity):
     contractor_name: str = ""
     billing_entity: str = ""
     job_id: str = ""
-    items: List[ReturnItem]
+    items: list[ReturnItem]
     subtotal: float = 0.0
     tax: float = 0.0
     total: float = 0.0
     cost_total: float = 0.0
     reason: ReturnReason = ReturnReason.OTHER
-    notes: Optional[str] = None
-    credit_note_id: Optional[str] = None
+    notes: str | None = None
+    credit_note_id: str | None = None
     processed_by_id: str = ""
     processed_by_name: str = ""
 

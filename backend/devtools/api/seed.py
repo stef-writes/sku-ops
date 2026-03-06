@@ -1,22 +1,20 @@
 """Seed API routes. Business logic lives in scripts/seed.py to avoid cross-domain imports."""
-from datetime import datetime, timezone
+import logging
+from datetime import UTC, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from identity.application.auth_service import require_role
-from shared.infrastructure.config import ALLOW_RESET
-from shared.infrastructure.database import get_connection
 from catalog.application.queries import count_all_products
-from identity.infrastructure.org_repo import organization_repo
-
 from devtools.scripts.seed import (
-    seed_mock_user,
-    seed_standard_departments,
     seed_demo_inventory,
     seed_demo_tenants,
+    seed_mock_user,
+    seed_standard_departments,
 )
-
-import logging
+from identity.application.auth_service import require_role
+from identity.infrastructure.org_repo import organization_repo
+from shared.infrastructure.config import ALLOW_RESET
+from shared.infrastructure.database import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +80,7 @@ async def reset_empty():
     except Exception as e:
         logger.error(f"Reset failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     await organization_repo.insert({"id": "default", "name": "Default", "slug": "default", "created_at": now})
     await seed_mock_user()
     await seed_standard_departments("default")
@@ -92,11 +90,15 @@ async def reset_empty():
 @router.post("/backfill-ledger")
 async def backfill_ledger(current_user=Depends(require_role("admin"))):
     """Replay all historical events into the financial_ledger for existing data."""
-    from finance.application.ledger_service import (
-        record_withdrawal, record_return, record_po_receipt, record_adjustment, record_payment,
-    )
-    from operations.application.queries import list_withdrawals, list_returns
     from catalog.application.queries import list_products
+    from finance.application.ledger_service import (
+        record_adjustment,
+        record_payment,
+        record_po_receipt,
+        record_return,
+        record_withdrawal,
+    )
+    from operations.application.queries import list_returns, list_withdrawals
 
     org_id = getattr(current_user, "organization_id", None) or "default"
     conn = get_connection()

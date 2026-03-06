@@ -15,11 +15,11 @@ class CycleCount(Entity):
     organization_id: str
     status: CycleCountStatus = CycleCountStatus.OPEN
     # None = full warehouse count; a department name scopes to that dept only.
-    scope: Optional[str] = None
+    scope: str | None = None
     created_by_id: str
     created_by_name: str = ""
-    committed_by_id: Optional[str] = None
-    committed_at: Optional[str] = None
+    committed_by_id: str | None = None
+    committed_at: str | None = None
 
 
 class CycleCountItem(Entity):
@@ -31,8 +31,8 @@ class CycleCountItem(Entity):
     # Frozen at the moment the count was opened — never changes after that.
     snapshot_qty: float
     # Null until the counter physically enters a value.
-    counted_qty: Optional[float] = None
+    counted_qty: float | None = None
     # Computed at entry time: counted_qty - snapshot_qty.
-    variance: Optional[float] = None
+    variance: float | None = None
     unit: str = "each"
-    notes: Optional[str] = None
+    notes: str | None = None

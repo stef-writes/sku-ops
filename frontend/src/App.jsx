@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
@@ -7,19 +8,28 @@ import { queryClient } from "./lib/query-client";
 import { ROLES, ADMIN_ROLES } from "./lib/constants";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import Inventory from "./pages/inventory";
-import CycleCountsPage from "./pages/inventory/CycleCountsPage";
-import CycleCountDetailPage from "./pages/inventory/CycleCountDetailPage";
-import Reports from "./pages/Reports";
 import Layout from "./components/Layout";
 
-import {
-  POS, PendingRequests, RequestMaterials, ScanModePage, Contractors, Departments,
-  Vendors, PurchaseOrders, MyHistory, ReceiptImport, Jobs,
-} from "./pages/operations";
-import { Invoices, Payments, XeroHealthPage } from "./pages/finance";
-import { BillingEntities } from "./pages/identity";
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Inventory = lazy(() => import("./pages/inventory"));
+const CycleCountsPage = lazy(() => import("./pages/inventory/CycleCountsPage"));
+const CycleCountDetailPage = lazy(() => import("./pages/inventory/CycleCountDetailPage"));
+const Reports = lazy(() => import("./pages/Reports"));
+const POS = lazy(() => import("./pages/operations/POS"));
+const PendingRequests = lazy(() => import("./pages/operations/PendingRequests"));
+const RequestMaterials = lazy(() => import("./pages/operations/RequestMaterials"));
+const ScanModePage = lazy(() => import("./pages/operations/ScanModePage"));
+const Contractors = lazy(() => import("./pages/operations/Contractors"));
+const Departments = lazy(() => import("./pages/operations/Departments"));
+const Vendors = lazy(() => import("./pages/operations/Vendors"));
+const PurchaseOrders = lazy(() => import("./pages/operations/PurchaseOrders"));
+const MyHistory = lazy(() => import("./pages/operations/MyHistory"));
+const ReceiptImport = lazy(() => import("./pages/operations/ReceiptImport"));
+const Jobs = lazy(() => import("./pages/operations/Jobs"));
+const Invoices = lazy(() => import("./pages/finance/Invoices"));
+const Payments = lazy(() => import("./pages/finance/Payments"));
+const XeroHealthPage = lazy(() => import("./pages/finance/XeroHealthPage"));
+const BillingEntities = lazy(() => import("./pages/identity/BillingEntities"));
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -51,6 +61,7 @@ function App() {
                   <ProtectedRoute>
                     <Layout>
                       <ErrorBoundary>
+                        <Suspense fallback={<div className="min-h-[50vh] flex items-center justify-center"><div className="text-slate-400 font-heading text-sm uppercase tracking-wider">Loading...</div></div>}>
                         <Routes>
                           <Route path="/" element={<Dashboard />} />
                           <Route path="/pos" element={<ProtectedRoute allowedRoles={ADMIN_ROLES}><POS /></ProtectedRoute>} />
@@ -74,6 +85,7 @@ function App() {
                           <Route path="/xero-health" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><XeroHealthPage /></ProtectedRoute>} />
                           <Route path="/my-history" element={<ProtectedRoute allowedRoles={[ROLES.CONTRACTOR]}><MyHistory /></ProtectedRoute>} />
                         </Routes>
+                        </Suspense>
                       </ErrorBoundary>
                     </Layout>
                   </ProtectedRoute>

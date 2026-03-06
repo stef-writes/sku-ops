@@ -17,7 +17,7 @@ class TestMemoryStore:
 
     async def test_save_and_recall_basic(self, db):
         """save() persists artifacts; recall() returns formatted string."""
-        from assistant.agents.memory.store import save, recall
+        from assistant.agents.memory.store import recall, save
 
         artifacts = [
             {"type": "entity_fact", "subject": "contractor:john", "content": "John has $300 unpaid", "tags": ["contractor"]},
@@ -34,7 +34,7 @@ class TestMemoryStore:
 
     async def test_recall_respects_org_and_user_isolation(self, db):
         """Artifacts saved for one user/org are not visible to another."""
-        from assistant.agents.memory.store import save, recall
+        from assistant.agents.memory.store import recall, save
 
         await save("org-A", "user-A", "sess-A", [
             {"type": "entity_fact", "subject": "product:X", "content": "Product X is discontinued", "tags": []}
@@ -54,7 +54,7 @@ class TestMemoryStore:
 
     async def test_save_skips_artifacts_without_content(self, db):
         """Artifacts missing 'content' are silently dropped."""
-        from assistant.agents.memory.store import save, recall
+        from assistant.agents.memory.store import recall, save
 
         artifacts = [
             {"type": "entity_fact", "subject": "test", "content": ""},  # empty content → skip
@@ -70,7 +70,7 @@ class TestMemoryStore:
 
     async def test_recall_limit(self, db):
         """recall() respects the limit parameter."""
-        from assistant.agents.memory.store import save, recall
+        from assistant.agents.memory.store import recall, save
 
         # Save 10 artifacts
         artifacts = [
@@ -86,7 +86,7 @@ class TestMemoryStore:
 
     async def test_save_empty_list_is_noop(self, db):
         """save([]) should not crash and recall still returns ''."""
-        from assistant.agents.memory.store import save, recall
+        from assistant.agents.memory.store import recall, save
         await save("default", "user-1", "sess-noop", [])
         result = await recall("default", "user-1")
         assert result == ""

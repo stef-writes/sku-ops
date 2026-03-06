@@ -38,8 +38,7 @@ def time_ago_expr(column: str, *, minutes: int = 0, hours: int = 0, days: int = 
 
     if d == "sqlite":
         return f"{column} >= datetime('now', ?)", [interval_str]
-    else:
-        return f"{column} >= NOW() - INTERVAL '{label}'", []
+    return f"{column} >= NOW() - INTERVAL '{label}'", []
 
 
 # ── Date formatting / grouping ────────────────────────────────────────────────
@@ -55,13 +54,11 @@ def date_group_expr(column: str, grain: str) -> str:
             "week": f"strftime('%Y-W%W', {column})",
             "month": f"strftime('%Y-%m', {column})",
         }.get(grain, f"strftime('%Y-%m-%d', {column})")
-    else:
-        if grain == "week":
-            return f"to_char({column}::date, 'IYYY-\"W\"IW')"
-        elif grain == "month":
-            return f"to_char({column}::date, 'YYYY-MM')"
-        else:
-            return f"to_char({column}::date, 'YYYY-MM-DD')"
+    if grain == "week":
+        return f"to_char({column}::date, 'IYYY-\"W\"IW')"
+    if grain == "month":
+        return f"to_char({column}::date, 'YYYY-MM')"
+    return f"to_char({column}::date, 'YYYY-MM-DD')"
 
 
 def date_extract(column: str) -> str:

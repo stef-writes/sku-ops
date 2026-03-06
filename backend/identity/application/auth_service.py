@@ -1,11 +1,12 @@
 """Authentication helpers and dependencies."""
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 import bcrypt
 import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from identity.infrastructure.user_repo import user_repo
 from kernel.types import CurrentUser
 from shared.infrastructure.config import (
     JWT_ACCESS_EXPIRATION_MINUTES,
@@ -13,7 +14,6 @@ from shared.infrastructure.config import (
     JWT_SECRET,
 )
 from shared.infrastructure.logging_config import org_id_var, user_id_var
-from identity.infrastructure.user_repo import user_repo
 
 security = HTTPBearer()
 
@@ -32,7 +32,7 @@ def create_token(user_id: str, email: str, role: str, organization_id: str = "de
         "email": email,
         "role": role,
         "organization_id": organization_id or "default",
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=JWT_ACCESS_EXPIRATION_MINUTES),
+        "exp": datetime.now(UTC) + timedelta(minutes=JWT_ACCESS_EXPIRATION_MINUTES),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
