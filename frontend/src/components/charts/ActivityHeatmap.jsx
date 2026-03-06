@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
-import "../../lib/chartTheme";
+import { themeColors } from "../../lib/chartTheme";
 
 /**
  * Calendar heatmap showing daily activity intensity over trailing months.
@@ -17,6 +17,7 @@ export function ActivityHeatmap({
   height = 164,
 }) {
   const { calendarRange, option } = useMemo(() => {
+    const t = themeColors();
     if (!data.length) return { calendarRange: null, option: {} };
 
     const dates = data.map((d) => d.date).sort();
@@ -55,19 +56,19 @@ export function ActivityHeatmap({
           range: [rangeStart, rangeEnd],
           itemStyle: {
             borderWidth: 2,
-            borderColor: "#fff",
+            borderColor: t.card,
             borderRadius: 2,
           },
           yearLabel: { show: false },
           monthLabel: {
             fontSize: 11,
-            color: "#94a3b8",
+            color: t.mutedForeground,
             nameMap: "en",
           },
           dayLabel: {
             firstDay: 1,
             fontSize: 10,
-            color: "#cbd5e1",
+            color: t.muted,
             nameMap: ["", "M", "", "W", "", "F", ""],
           },
           splitLine: { show: false },
@@ -79,7 +80,7 @@ export function ActivityHeatmap({
             data: heatmapData,
             emphasis: {
               itemStyle: {
-                borderColor: "#475569",
+                borderColor: t.foreground,
                 borderWidth: 1,
               },
             },

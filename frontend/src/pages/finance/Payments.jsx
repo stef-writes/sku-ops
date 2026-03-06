@@ -20,7 +20,7 @@ const COLUMNS = [
     label: "Date",
     type: "date",
     render: (row) => (
-      <span className="font-mono text-xs text-slate-500">
+      <span className="font-mono text-xs text-muted-foreground">
         {row.payment_date ? format(new Date(row.payment_date), "MMM d, yyyy") : "—"}
       </span>
     ),
@@ -31,7 +31,7 @@ const COLUMNS = [
     type: "number",
     align: "right",
     render: (row) => (
-      <span className="font-bold font-mono text-slate-900 tabular-nums">
+      <span className="font-bold font-mono text-foreground tabular-nums">
         ${(row.amount ?? 0).toFixed(2)}
       </span>
     ),
@@ -43,8 +43,8 @@ const COLUMNS = [
     filterValues: PAYMENT_METHODS.map((m) => m.value),
     render: (row) => (
       <div className="flex items-center gap-2">
-        <CreditCard className="w-3.5 h-3.5 text-slate-400" />
-        <span className="text-sm text-slate-700">{methodMap[row.method] || row.method}</span>
+        <CreditCard className="w-3.5 h-3.5 text-muted-foreground" />
+        <span className="text-sm text-foreground">{methodMap[row.method] || row.method}</span>
       </div>
     ),
   },
@@ -53,7 +53,7 @@ const COLUMNS = [
     label: "Reference",
     type: "text",
     render: (row) => (
-      <span className="font-mono text-xs text-slate-500">{row.reference || "—"}</span>
+      <span className="font-mono text-xs text-muted-foreground">{row.reference || "—"}</span>
     ),
   },
   {
@@ -61,7 +61,7 @@ const COLUMNS = [
     label: "Invoice",
     type: "text",
     render: (row) => (
-      <span className="font-mono text-xs text-slate-500">
+      <span className="font-mono text-xs text-muted-foreground">
         {row.invoice_id ? row.invoice_id.slice(0, 8) + "…" : "—"}
       </span>
     ),

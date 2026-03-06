@@ -1,0 +1,44 @@
+#!/bin/bash
+set -e
+cd "$(dirname "$0")/.."
+
+case "${1:-help}" in
+  test)
+    echo "🧪 Running tests..."
+    uv run --directory backend pytest "${@:2}"
+    ;;
+  fmt)
+    echo "✨ Formatting code..."
+    uv run --directory backend ruff format .
+    ;;
+  lint)
+    echo "🔍 Linting code..."
+    uv run --directory backend ruff check .
+    ;;
+  commit)
+    echo "📝 Commitizen commit..."
+    uv run --directory backend cz commit
+    ;;
+  container)
+    echo "🐳 Starting devcontainer..."
+    cd .devcontainer && docker-compose up -d
+    ;;
+  server)
+    echo "🚀 Starting backend dev server..."
+    uv run --directory backend uvicorn server:app --reload --host 0.0.0.0 --port 8000
+    ;;
+  ui)
+    echo "🎨 Starting frontend dev server..."
+    npm run dev --prefix frontend
+    ;;
+  help|*)
+    echo "sku-ops Dev Commands:"
+    echo "  ./bin/dev test [args]    - Run pytest"
+    echo "  ./bin/dev fmt            - Format code with ruff"
+    echo "  ./bin/dev lint           - Lint code with ruff"
+    echo "  ./bin/dev commit         - Commitizen commit"
+    echo "  ./bin/dev server         - Start backend dev server"
+    echo "  ./bin/dev ui             - Start frontend dev server"
+    echo "  ./bin/dev container      - Start devcontainer"
+    ;;
+esac

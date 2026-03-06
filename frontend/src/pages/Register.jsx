@@ -37,22 +37,22 @@ const Register = () => {
 
   return (
     <AuthLayout testId="register-page">
-      <h2 className="text-lg font-semibold text-slate-900 mb-6">Create your account</h2>
+      <h2 className="text-lg font-semibold text-foreground mb-6">Create your account</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <Label htmlFor="name" className="text-slate-600 font-medium text-sm">Full name</Label>
+          <Label htmlFor="name" className="text-muted-foreground font-medium text-sm">Full name</Label>
           <Input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="John Doe" className="input-field mt-2" data-testid="register-name-input" />
         </div>
         <div>
-          <Label htmlFor="email" className="text-slate-600 font-medium text-sm">Email</Label>
+          <Label htmlFor="email" className="text-muted-foreground font-medium text-sm">Email</Label>
           <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" className="input-field mt-2" data-testid="register-email-input" />
         </div>
         <div>
-          <Label htmlFor="password" className="text-slate-600 font-medium text-sm">Password</Label>
+          <Label htmlFor="password" className="text-muted-foreground font-medium text-sm">Password</Label>
           <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="input-field mt-2" data-testid="register-password-input" />
         </div>
         <div>
-          <Label htmlFor="confirmPassword" className="text-slate-600 font-medium text-sm">Confirm password</Label>
+          <Label htmlFor="confirmPassword" className="text-muted-foreground font-medium text-sm">Confirm password</Label>
           <Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" className="input-field mt-2" data-testid="register-confirm-password-input" />
         </div>
         <Button type="submit" disabled={loading} className="w-full btn-primary h-11 text-sm" data-testid="register-submit-btn">
@@ -60,9 +60,9 @@ const Register = () => {
           {loading ? "Creating account…" : "Create account"}
         </Button>
       </form>
-      <p className="text-center mt-6 text-slate-500 text-sm">
+      <p className="text-center mt-6 text-muted-foreground text-sm">
         Already have an account?{" "}
-        <Link to="/login" className="text-amber-600 font-medium hover:text-amber-700 transition-colors" data-testid="login-link">Sign in</Link>
+        <Link to="/login" className="text-accent font-medium hover:text-accent transition-colors" data-testid="login-link">Sign in</Link>
       </p>
     </AuthLayout>
   );

@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { themeColors } from "@/lib/chartTheme";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { FileText, HardHat, Building2, DollarSign as DollarSignIcon, Briefcase } from "lucide-react";
@@ -29,7 +30,7 @@ const buildColumns = (onViewJob) => [
     label: "Date",
     type: "date",
     render: (row) => (
-      <span className="font-mono text-xs text-slate-500">
+      <span className="font-mono text-xs text-muted-foreground">
         {new Date(row.created_at).toLocaleDateString()}
       </span>
     ),
@@ -41,10 +42,10 @@ const buildColumns = (onViewJob) => [
     type: "text",
     render: (row) => (
       <div className="flex items-center gap-2">
-        <HardHat className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+        <HardHat className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         <div>
-          <p className="font-medium text-slate-800">{row.contractor_name}</p>
-          <p className="text-[10px] text-slate-400">{row.contractor_company}</p>
+          <p className="font-medium text-foreground">{row.contractor_name}</p>
+          <p className="text-[10px] text-muted-foreground">{row.contractor_company}</p>
         </div>
       </div>
     ),
@@ -59,11 +60,11 @@ const buildColumns = (onViewJob) => [
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onViewJob(row.job_id); }}
-        className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline"
+        className="font-mono text-xs text-info hover:text-info hover:underline"
       >
         {row.job_id}
       </button>
-    ) : <span className="text-xs text-slate-400">—</span>,
+    ) : <span className="text-xs text-muted-foreground">—</span>,
   },
   {
     key: "billing_entity",
@@ -88,7 +89,7 @@ const buildColumns = (onViewJob) => [
     type: "number",
     align: "right",
     render: (row) => (
-      <span className="text-slate-500 tabular-nums">
+      <span className="text-muted-foreground tabular-nums">
         ${(row.cost_total || 0).toFixed(2)}
       </span>
     ),
@@ -102,7 +103,7 @@ const buildColumns = (onViewJob) => [
     filterable: false,
     searchable: false,
     render: (row) => (
-      <span className="text-emerald-600 tabular-nums">
+      <span className="text-success tabular-nums">
         ${((row.total || 0) - (row.cost_total || 0)).toFixed(2)}
       </span>
     ),
@@ -218,10 +219,10 @@ const Financials = () => {
       <div className="flex flex-col gap-4 mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
+            <h1 className="text-2xl font-semibold text-foreground tracking-tight">
               Financials
             </h1>
-            <p className="text-slate-500 mt-1 text-sm">
+            <p className="text-muted-foreground mt-1 text-sm">
               Invoicing, margins, and exports
             </p>
           </div>
@@ -284,7 +285,7 @@ const Financials = () => {
                   revenue: c.revenue ?? c.total ?? 0,
                 }))}
               categoryKey="name"
-              series={[{ key: "revenue", label: "Revenue", color: "#f59e0b" }]}
+              series={[{ key: "revenue", label: "Revenue", color: themeColors().category1 }]}
               valueFormatter={valueFormatter}
               height={Math.max(200, Math.min(summary.by_contractor.length, 10) * 36)}
             />
@@ -303,13 +304,13 @@ const Financials = () => {
                 "90d+": r.overdue_90_plus || 0,
               }))}
               categoryKey="name"
-              series={[
-                { key: "current", label: "Current", color: "#34d399" },
-                { key: "1-30d", label: "1–30d", color: "#fbbf24" },
-                { key: "31-60d", label: "31–60d", color: "#fb923c" },
-                { key: "61-90d", label: "61–90d", color: "#f87171" },
-                { key: "90d+", label: "90d+", color: "#dc2626" },
-              ]}
+              series={(() => { const t = themeColors(); return [
+                { key: "current", label: "Current", color: t.success },
+                { key: "1-30d", label: "1–30d", color: t.warning },
+                { key: "31-60d", label: "31–60d", color: t.category5 },
+                { key: "61-90d", label: "61–90d", color: t.destructive },
+                { key: "90d+", label: "90d+", color: t.destructive },
+              ]; })()}
               valueFormatter={valueFormatter}
               height={Math.max(200, arAging.length * 40)}
             />
@@ -319,8 +320,8 @@ const Financials = () => {
 
       {summary?.by_billing_entity &&
         Object.keys(summary.by_billing_entity).length > 0 && (
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm mb-6">
-            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 mb-3">
+          <div className="bg-card border border-border rounded-xl p-5 shadow-sm mb-6">
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground mb-3">
               By Billing Entity
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -330,16 +331,16 @@ const Financials = () => {
                   const hasOverdue90 = aging && ((aging.overdue_61_90 || 0) > 0 || (aging.overdue_90_plus || 0) > 0);
                   const hasOverdue30 = aging && ((aging.overdue_31_60 || 0) > 0);
                   const hasOverdue = aging && ((aging.overdue_1_30 || 0) > 0);
-                  const badgeColor = hasOverdue90 ? "bg-red-100 text-red-700 border-red-200" : hasOverdue30 ? "bg-orange-100 text-orange-700 border-orange-200" : hasOverdue ? "bg-amber-100 text-amber-700 border-amber-200" : null;
+                  const badgeColor = hasOverdue90 ? "bg-destructive/15 text-destructive border-destructive/30" : hasOverdue30 ? "bg-warning/15 text-category-5 border-warning/30" : hasOverdue ? "bg-warning/15 text-accent border-warning/30" : null;
                   const badgeLabel = hasOverdue90 ? "60d+ overdue" : hasOverdue30 ? "31–60d overdue" : hasOverdue ? "1–30d overdue" : null;
                   return (
                     <div
                       key={entity}
-                      className="p-3 bg-slate-50 rounded-lg border border-slate-100"
+                      className="p-3 bg-muted rounded-lg border border-border/50"
                     >
                       <div className="flex items-center gap-2 mb-2">
-                        <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="text-sm font-semibold text-slate-800 flex-1 truncate">
+                        <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-sm font-semibold text-foreground flex-1 truncate">
                           {entity}
                         </span>
                         {badgeColor && (
@@ -350,19 +351,19 @@ const Financials = () => {
                       </div>
                       <div className="space-y-0.5 text-xs">
                         <div className="flex justify-between">
-                          <span className="text-slate-500">Revenue</span>
+                          <span className="text-muted-foreground">Revenue</span>
                           <span className="font-mono tabular-nums">
                             ${(data.total ?? 0).toFixed(2)}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-500">AR Balance</span>
-                          <span className="font-mono tabular-nums text-amber-600">
+                          <span className="text-muted-foreground">AR Balance</span>
+                          <span className="font-mono tabular-nums text-accent">
                             ${(data.ar_balance ?? 0).toFixed(2)}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-400">Txns</span>
+                          <span className="text-muted-foreground">Txns</span>
                           <span className="font-mono tabular-nums">
                             {data.count}
                           </span>
@@ -385,7 +386,7 @@ const Financials = () => {
         actions={
           <button
             onClick={selectAllUninvoiced}
-            className="text-xs text-amber-500 hover:text-amber-600 font-medium"
+            className="text-xs text-accent hover:text-accent font-medium"
           >
             Select All Uninvoiced
           </button>
@@ -393,8 +394,8 @@ const Financials = () => {
       />
 
       {selectedIds.size > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 flex items-center justify-between">
-          <span className="text-sm font-semibold text-amber-700">
+        <div className="bg-warning/10 border border-warning/30 rounded-xl p-4 mb-4 flex items-center justify-between">
+          <span className="text-sm font-semibold text-accent">
             {selectedIds.size} selected
           </span>
           <div className="flex gap-2">

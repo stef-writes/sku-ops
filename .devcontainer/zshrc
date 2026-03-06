@@ -1,0 +1,36 @@
+export ZSH="/home/vscode/.oh-my-zsh"
+ZSH_THEME=""
+plugins=(git zsh-autosuggestions zsh-syntax-highlighting)
+source $ZSH/oh-my-zsh.sh
+
+if command -v oh-my-posh >/dev/null 2>&1; then
+  eval "$(oh-my-posh init zsh --config /home/vscode/.poshthemes/kushal.omp.json)"
+fi
+
+export EDITOR="code -w"
+setopt AUTO_CD
+setopt HIST_IGNORE_DUPS
+setopt SHARE_HISTORY
+
+alias ll='ls -alF'
+alias la='ls -A'
+
+if [ -d "/workspace/backend/.venv" ] && [ -f "/workspace/backend/.venv/bin/activate" ]; then
+  . "/workspace/backend/.venv/bin/activate"
+fi
+
+ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+export ZSH_AUTOSUGGEST_STRATEGY
+export ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=8'
+
+if [ -f "/workspace/.env" ]; then
+  set -a
+  source "/workspace/.env"
+  set +a
+fi
+
+if [ -f "/workspace/backend/.env" ]; then
+  set -a
+  source "/workspace/backend/.env"
+  set +a
+fi

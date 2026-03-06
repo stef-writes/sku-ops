@@ -158,29 +158,29 @@ export function InvoiceDetailModal({ invoiceId, open, onOpenChange, onSaved, onD
       <DialogContent className="sm:max-w-2xl rounded-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
-            <FileText className="w-5 h-5 text-slate-500" />
+            <FileText className="w-5 h-5 text-muted-foreground" />
             <span>{invoice?.invoice_number || "Invoice"}</span>
             {invoice && <StatusBadge status={invoice.status} />}
           </DialogTitle>
         </DialogHeader>
 
         {isLoading ? (
-          <div className="py-8 text-center text-slate-500">Loading…</div>
+          <div className="py-8 text-center text-muted-foreground">Loading…</div>
         ) : (
           <div className="flex-1 overflow-auto space-y-6">
             <div>
-              <Label className="text-xs uppercase text-slate-500">Invoice Details</Label>
+              <Label className="text-xs uppercase text-muted-foreground">Invoice Details</Label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
                 <div>
-                  <label className="text-xs text-slate-500">Invoice Date</label>
+                  <label className="text-xs text-muted-foreground">Invoice Date</label>
                   <Input type="date" value={form.invoice_date} onChange={(e) => setForm((f) => ({ ...f, invoice_date: e.target.value }))} disabled={!canEdit} className="mt-0.5" />
                 </div>
                 <div>
-                  <label className="text-xs text-slate-500">Due Date</label>
+                  <label className="text-xs text-muted-foreground">Due Date</label>
                   <Input type="date" value={form.due_date} onChange={(e) => setForm((f) => ({ ...f, due_date: e.target.value }))} disabled={!canEdit} className="mt-0.5" />
                 </div>
                 <div>
-                  <label className="text-xs text-slate-500">Payment Terms</label>
+                  <label className="text-xs text-muted-foreground">Payment Terms</label>
                   <Select value={form.payment_terms} onValueChange={(v) => setForm((f) => ({ ...f, payment_terms: v }))} disabled={!canEdit}>
                     <SelectTrigger className="mt-0.5"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -189,14 +189,14 @@ export function InvoiceDetailModal({ invoiceId, open, onOpenChange, onSaved, onD
                   </Select>
                 </div>
                 <div>
-                  <label className="text-xs text-slate-500">PO Reference</label>
+                  <label className="text-xs text-muted-foreground">PO Reference</label>
                   <Input value={form.po_reference} onChange={(e) => setForm((f) => ({ ...f, po_reference: e.target.value }))} disabled={!canEdit} className="mt-0.5" placeholder="Contractor PO #" />
                 </div>
               </div>
             </div>
 
             <div>
-              <Label className="text-xs uppercase text-slate-500">Bill To</Label>
+              <Label className="text-xs uppercase text-muted-foreground">Bill To</Label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
                 {[
                   { key: "billing_entity", label: "Billing Entity" },
@@ -205,7 +205,7 @@ export function InvoiceDetailModal({ invoiceId, open, onOpenChange, onSaved, onD
                   { key: "billing_address", label: "Billing Address", placeholder: "Street, City, State ZIP" },
                 ].map((f) => (
                   <div key={f.key}>
-                    <label className="text-xs text-slate-500">{f.label}</label>
+                    <label className="text-xs text-muted-foreground">{f.label}</label>
                     <Input
                       type={f.type || "text"}
                       value={form[f.key]}
@@ -221,17 +221,17 @@ export function InvoiceDetailModal({ invoiceId, open, onOpenChange, onSaved, onD
 
             <div>
               <div className="flex justify-between items-center mb-2">
-                <Label className="text-xs uppercase text-slate-500">Line Items</Label>
+                <Label className="text-xs uppercase text-muted-foreground">Line Items</Label>
                 {canEdit && (
                   <Button variant="ghost" size="sm" onClick={() => setLineItems([...lineItems, { id: crypto.randomUUID(), description: "", quantity: 1, unit_price: 0, amount: 0 }])}>
                     <Plus className="w-4 h-4 mr-1" /> Add row
                   </Button>
                 )}
               </div>
-              <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <div className="border border-border rounded-lg overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200">
+                    <tr className="bg-muted border-b border-border">
                       <th className="px-3 py-2 text-left">Description</th>
                       <th className="px-3 py-2 text-right w-20">Qty</th>
                       <th className="px-3 py-2 text-right w-24">Unit $</th>
@@ -241,7 +241,7 @@ export function InvoiceDetailModal({ invoiceId, open, onOpenChange, onSaved, onD
                   </thead>
                   <tbody>
                     {lineItems.map((item, idx) => (
-                      <tr key={item.id || idx} className="border-b border-slate-100">
+                      <tr key={item.id || idx} className="border-b border-border/50">
                         <td className="px-3 py-2">
                           {canEdit ? <Input value={item.description || ""} onChange={(e) => updateLineItem(idx, "description", e.target.value)} className="h-8 text-sm" /> : (item.description || "—")}
                         </td>
@@ -253,7 +253,7 @@ export function InvoiceDetailModal({ invoiceId, open, onOpenChange, onSaved, onD
                         </td>
                         <td className="px-3 py-2 text-right font-mono">${(item.amount ?? (item.quantity ?? 0) * (item.unit_price ?? 0)).toFixed(2)}</td>
                         {canEdit && (
-                          <td><Button variant="ghost" size="sm" className="text-red-600 h-8 w-8 p-0" onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))}><Trash2 className="w-4 h-4" /></Button></td>
+                          <td><Button variant="ghost" size="sm" className="text-destructive h-8 w-8 p-0" onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))}><Trash2 className="w-4 h-4" /></Button></td>
                         )}
                       </tr>
                     ))}
@@ -265,22 +265,22 @@ export function InvoiceDetailModal({ invoiceId, open, onOpenChange, onSaved, onD
             <div className="flex justify-end">
               <div className="w-72 space-y-1">
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Subtotal</span>
+                  <span className="text-muted-foreground">Subtotal</span>
                   <span className="font-mono">${subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm items-center gap-2">
-                  <span className="text-slate-500">Tax Rate</span>
+                  <span className="text-muted-foreground">Tax Rate</span>
                   {canEdit ? (
                     <div className="flex items-center gap-1">
                       <Input type="number" min={0} max={100} step={0.1} value={((parseFloat(form.tax_rate) || 0) * 100).toFixed(1)} onChange={(e) => { const rate = (parseFloat(e.target.value) || 0) / 100; setForm((f) => ({ ...f, tax_rate: rate })); }} className="w-20 h-8 text-right" />
-                      <span className="text-xs text-slate-400">%</span>
+                      <span className="text-xs text-muted-foreground">%</span>
                     </div>
                   ) : (
                     <span className="font-mono">{((parseFloat(form.tax_rate) || 0) * 100).toFixed(1)}%</span>
                   )}
                 </div>
                 <div className="flex justify-between text-sm items-center">
-                  <span className="text-slate-500">Tax</span>
+                  <span className="text-muted-foreground">Tax</span>
                   <span className="font-mono">${taxAmount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between font-bold pt-2 border-t">
@@ -289,7 +289,7 @@ export function InvoiceDetailModal({ invoiceId, open, onOpenChange, onSaved, onD
                 </div>
                 {(invoice?.amount_credited ?? 0) > 0 && (
                   <>
-                    <div className="flex justify-between text-sm text-green-600">
+                    <div className="flex justify-between text-sm text-success">
                       <span>Credits Applied</span>
                       <span className="font-mono">-${(invoice.amount_credited ?? 0).toFixed(2)}</span>
                     </div>
@@ -303,20 +303,20 @@ export function InvoiceDetailModal({ invoiceId, open, onOpenChange, onSaved, onD
             </div>
 
             <div>
-              <Label className="text-xs uppercase text-slate-500">Notes</Label>
+              <Label className="text-xs uppercase text-muted-foreground">Notes</Label>
               {canEdit ? (
                 <Textarea value={form.notes || ""} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} className="mt-1 min-h-[60px]" placeholder="Optional notes" />
               ) : (
-                <p className="mt-1 text-sm text-slate-600">{invoice?.notes || "—"}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{invoice?.notes || "—"}</p>
               )}
             </div>
 
             {invoice?.withdrawal_ids?.length > 0 && (
               <div>
-                <Label className="text-xs uppercase text-slate-500">Linked Withdrawals</Label>
+                <Label className="text-xs uppercase text-muted-foreground">Linked Withdrawals</Label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {invoice.withdrawal_ids.map((wid) => (
-                    <Link key={wid} to="/" className="px-2 py-1 bg-slate-100 rounded font-mono text-xs hover:bg-slate-200 hover:underline" title={wid}>
+                    <Link key={wid} to="/" className="px-2 py-1 bg-muted rounded font-mono text-xs hover:bg-muted hover:underline" title={wid}>
                       {wid.slice(0, 8)}…
                     </Link>
                   ))}
@@ -326,7 +326,7 @@ export function InvoiceDetailModal({ invoiceId, open, onOpenChange, onSaved, onD
 
             {canEdit && (
               <div>
-                <Label className="text-xs uppercase text-slate-500">Status</Label>
+                <Label className="text-xs uppercase text-muted-foreground">Status</Label>
                 <Select value={form.status} onValueChange={(v) => setForm((f) => ({ ...f, status: v }))}>
                   <SelectTrigger className="mt-1 w-40"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -341,7 +341,7 @@ export function InvoiceDetailModal({ invoiceId, open, onOpenChange, onSaved, onD
         <div className="flex justify-between pt-4 border-t">
           <div>
             {canEdit && (
-              <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => setDeleteConfirmOpen(true)}>
+              <Button variant="outline" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setDeleteConfirmOpen(true)}>
                 <Trash2 className="w-4 h-4 mr-2" /> Delete
               </Button>
             )}

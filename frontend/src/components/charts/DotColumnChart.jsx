@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
-import "../../lib/chartTheme";
+import { themeColors } from "../../lib/chartTheme";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -13,6 +13,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
  */
 export function DotColumnChart({ data = [], height = 260 }) {
   const option = useMemo(() => {
+    const t = themeColors();
     if (!data.length) return {};
 
     const monthSet = new Set();
@@ -53,7 +54,7 @@ export function DotColumnChart({ data = [], height = 260 }) {
         max: maxVal || 1,
         show: false,
         inRange: {
-          color: ["#e2e8f0", "#fcd34d", "#f59e0b", "#d97706"],
+          color: [t.border, "#fcd34d", "#f59e0b", "#d97706"],
         },
       },
       grid: { left: 32, right: 12, top: 8, bottom: 28, containLabel: false },
@@ -62,7 +63,7 @@ export function DotColumnChart({ data = [], height = 260 }) {
         data: monthLabels,
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { fontSize: 11, color: "#94a3b8" },
+        axisLabel: { fontSize: 11, color: t.mutedForeground },
       },
       yAxis: {
         type: "value",
@@ -81,7 +82,7 @@ export function DotColumnChart({ data = [], height = 260 }) {
           symbolSize: 8,
           itemStyle: { borderRadius: 2 },
           emphasis: {
-            itemStyle: { borderColor: "#475569", borderWidth: 1 },
+            itemStyle: { borderColor: t.foreground, borderWidth: 1 },
           },
         },
       ],

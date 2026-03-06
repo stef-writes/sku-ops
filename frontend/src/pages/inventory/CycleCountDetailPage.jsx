@@ -33,13 +33,13 @@ function formatDate(iso) {
 }
 
 function VarianceCell({ variance }) {
-  if (variance == null) return <span className="text-slate-300">—</span>;
-  if (variance === 0) return <span className="text-slate-400 tabular-nums">0</span>;
+  if (variance == null) return <span className="text-muted-foreground/60">—</span>;
+  if (variance === 0) return <span className="text-muted-foreground tabular-nums">0</span>;
   const positive = variance > 0;
   return (
     <span className={cn(
       "tabular-nums font-semibold",
-      positive ? "text-emerald-600" : "text-red-600"
+      positive ? "text-success" : "text-destructive"
     )}>
       {positive ? "+" : ""}{variance}
     </span>
@@ -72,8 +72,8 @@ function CountInput({ item, countId, disabled }) {
 
   if (disabled) {
     return (
-      <span className="text-sm tabular-nums text-slate-700">
-        {item.counted_qty != null ? item.counted_qty : <span className="text-slate-300">—</span>}
+      <span className="text-sm tabular-nums text-foreground">
+        {item.counted_qty != null ? item.counted_qty : <span className="text-muted-foreground/60">—</span>}
       </span>
     );
   }
@@ -91,7 +91,7 @@ function CountInput({ item, countId, disabled }) {
         className="h-8 text-sm tabular-nums pr-7"
       />
       {saving && (
-        <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 animate-spin" />
+        <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground animate-spin" />
       )}
     </div>
   );
@@ -118,12 +118,12 @@ function VarianceSummary({ items }) {
         { label: "Total lines",   value: stats.total },
         { label: "Counted",       value: stats.counted },
         { label: "Variances",     value: stats.withVariance },
-        { label: "Shortages",     value: stats.shortages,  color: stats.shortages > 0 ? "text-red-600" : undefined },
-        { label: "Overages",      value: stats.overages,   color: stats.overages > 0  ? "text-emerald-600" : undefined },
+        { label: "Shortages",     value: stats.shortages,  color: stats.shortages > 0 ? "text-destructive" : undefined },
+        { label: "Overages",      value: stats.overages,   color: stats.overages > 0  ? "text-success" : undefined },
       ].map(({ label, value, color }) => (
-        <div key={label} className="bg-slate-50 rounded-lg px-4 py-3">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">{label}</p>
-          <p className={cn("text-2xl font-semibold tabular-nums text-slate-800", color)}>{value}</p>
+        <div key={label} className="bg-muted rounded-lg px-4 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
+          <p className={cn("text-2xl font-semibold tabular-nums text-foreground", color)}>{value}</p>
         </div>
       ))}
     </div>
@@ -162,7 +162,7 @@ export default function CycleCountDetailPage() {
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -170,7 +170,7 @@ export default function CycleCountDetailPage() {
   if (error || !count) {
     return (
       <div className="flex-1 p-6">
-        <p className="text-slate-500">Count not found.</p>
+        <p className="text-muted-foreground">Count not found.</p>
       </div>
     );
   }
@@ -182,18 +182,18 @@ export default function CycleCountDetailPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate("/cycle-counts")}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div>
             <div className="flex items-center gap-2.5">
-              <h1 className="text-xl font-semibold text-slate-900">
+              <h1 className="text-xl font-semibold text-foreground">
                 Cycle Count
               </h1>
               <StatusBadge status={count.status} />
             </div>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <p className="text-sm text-muted-foreground mt-0.5">
               {count.scope
                 ? <><span className="font-medium">{count.scope}</span> department</>
                 : "Full warehouse"
@@ -226,31 +226,31 @@ export default function CycleCountDetailPage() {
       <VarianceSummary items={items} />
 
       {isOpen && (
-        <div className="flex items-center gap-2 text-xs text-slate-500 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5">
-          <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-warning/10 border border-warning/30 rounded-lg px-4 py-2.5">
+          <AlertTriangle className="w-3.5 h-3.5 text-accent shrink-0" />
           Enter the physical count for each line. Changes save automatically on blur.
           Committing will apply all non-zero variances as stock adjustments.
         </div>
       )}
 
       {/* Count sheet table */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
-                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-4 py-2.5">SKU</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-4 py-2.5">Product</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-4 py-2.5 text-right">On Hand (snapshot)</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-4 py-2.5 text-right">Counted</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-4 py-2.5 text-right">Variance</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-4 py-2.5">Unit</TableHead>
+              <TableRow className="bg-muted/80 hover:bg-muted/80">
+                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5">SKU</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5">Product</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5 text-right">On Hand (snapshot)</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5 text-right">Counted</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5 text-right">Variance</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5">Unit</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12 text-slate-400 text-sm">
+                  <TableCell colSpan={6} className="text-center py-12 text-muted-foreground text-sm">
                     No items in this count
                   </TableCell>
                 </TableRow>
@@ -259,17 +259,17 @@ export default function CycleCountDetailPage() {
                   <TableRow
                     key={item.id}
                     className={cn(
-                      "hover:bg-slate-50/60 transition-colors",
-                      item.variance != null && item.variance !== 0 && "bg-amber-50/30"
+                      "hover:bg-muted/60 transition-colors",
+                      item.variance != null && item.variance !== 0 && "bg-warning/10"
                     )}
                   >
                     <TableCell className="px-4 py-2.5">
-                      <span className="font-mono text-xs text-slate-600">{item.sku}</span>
+                      <span className="font-mono text-xs text-muted-foreground">{item.sku}</span>
                     </TableCell>
-                    <TableCell className="px-4 py-2.5 text-sm text-slate-700 max-w-xs truncate">
+                    <TableCell className="px-4 py-2.5 text-sm text-foreground max-w-xs truncate">
                       {item.product_name}
                     </TableCell>
-                    <TableCell className="px-4 py-2.5 text-right tabular-nums text-sm text-slate-600">
+                    <TableCell className="px-4 py-2.5 text-right tabular-nums text-sm text-muted-foreground">
                       {item.snapshot_qty}
                     </TableCell>
                     <TableCell className="px-4 py-2.5 text-right">
@@ -280,7 +280,7 @@ export default function CycleCountDetailPage() {
                     <TableCell className="px-4 py-2.5 text-right">
                       <VarianceCell variance={item.variance} />
                     </TableCell>
-                    <TableCell className="px-4 py-2.5 text-sm text-slate-400">
+                    <TableCell className="px-4 py-2.5 text-sm text-muted-foreground">
                       {item.unit}
                     </TableCell>
                   </TableRow>

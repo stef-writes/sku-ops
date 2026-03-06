@@ -41,6 +41,8 @@ module.exports = {
         accent: {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
+          "gradient-from": "hsl(var(--accent-gradient-from))",
+          "gradient-to": "hsl(var(--accent-gradient-to))",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",
@@ -62,6 +64,26 @@ module.exports = {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
         },
+        sidebar: {
+          DEFAULT: "hsl(var(--sidebar))",
+          foreground: "hsl(var(--sidebar-foreground))",
+          muted: "hsl(var(--sidebar-muted))",
+          border: "hsl(var(--sidebar-border))",
+          accent: "hsl(var(--sidebar-accent))",
+        },
+        surface: {
+          DEFAULT: "hsl(var(--surface))",
+          muted: "hsl(var(--surface-muted))",
+          subtle: "hsl(var(--surface-subtle))",
+        },
+        "category-1": "hsl(var(--category-1))",
+        "category-2": "hsl(var(--category-2))",
+        "category-3": "hsl(var(--category-3))",
+        "category-4": "hsl(var(--category-4))",
+        "category-5": "hsl(var(--category-5))",
+        "category-6": "hsl(var(--category-6))",
+        "category-7": "hsl(var(--category-7))",
+        "category-8": "hsl(var(--category-8))",
       },
       borderRadius: {
         lg: "var(--radius-lg)",
@@ -69,9 +91,9 @@ module.exports = {
         sm: "calc(var(--radius) - 2px)",
       },
       boxShadow: {
-        'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
-        'soft-lg': '0 10px 40px -10px rgba(0, 0, 0, 0.1)',
-        'glow': '0 0 20px -5px rgba(251, 191, 36, 0.3)',
+        'soft': 'var(--shadow)',
+        'soft-lg': 'var(--shadow-lg)',
+        'glow': '0 0 20px -5px hsl(var(--accent) / 0.3)',
       },
       keyframes: {
         "accordion-down": {

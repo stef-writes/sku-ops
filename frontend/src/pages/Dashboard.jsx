@@ -30,9 +30,9 @@ import api from "@/lib/api-client";
 
 const POSummaryStrip = ({ summary = {} }) => {
   const statuses = [
-    { key: "ordered", label: "Ordered", color: "bg-slate-300" },
-    { key: "partial", label: "Partial", color: "bg-slate-400" },
-    { key: "received", label: "Received", color: "bg-slate-500" },
+    { key: "ordered", label: "Ordered", color: "bg-muted-foreground/40" },
+    { key: "partial", label: "Partial", color: "bg-muted-foreground/60" },
+    { key: "received", label: "Received", color: "bg-muted-foreground/80" },
   ];
   const total = Object.values(summary).reduce((s, v) => s + (v?.total || 0), 0) || 1;
   return (
@@ -51,9 +51,9 @@ const POSummaryStrip = ({ summary = {} }) => {
           return (
             <div key={s.key} className="flex items-center gap-1.5">
               <div className={`w-2 h-2 rounded-full ${s.color}`} />
-              <span className="text-xs text-slate-500">{s.label}</span>
-              <span className="text-xs font-bold text-slate-700 tabular-nums">{v.count}</span>
-              <span className="text-[10px] text-slate-400 tabular-nums">({valueFormatter(v.total)})</span>
+              <span className="text-xs text-muted-foreground">{s.label}</span>
+              <span className="text-xs font-bold text-foreground tabular-nums">{v.count}</span>
+              <span className="text-[10px] text-muted-foreground tabular-nums">({valueFormatter(v.total)})</span>
             </div>
           );
         })}
@@ -115,8 +115,8 @@ const Dashboard = () => {
       <div className="p-8" data-testid="dashboard-page">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Dashboard</h1>
-            <p className="text-slate-500 mt-1 text-sm">Welcome back, {user?.name} · {user?.company || "Independent"}</p>
+            <h1 className="text-2xl font-semibold text-foreground tracking-tight">Dashboard</h1>
+            <p className="text-muted-foreground mt-1 text-sm">Welcome back, {user?.name} · {user?.company || "Independent"}</p>
           </div>
           <DateRangeFilter value={dateRange} onChange={setDateRange} />
         </div>
@@ -128,24 +128,24 @@ const Dashboard = () => {
         </div>
 
         <Panel>
-          <h2 className="text-base font-semibold text-slate-900 mb-4">Recent Withdrawals</h2>
+          <h2 className="text-base font-semibold text-foreground mb-4">Recent Withdrawals</h2>
           {stats?.recent_withdrawals?.length > 0 ? (
             <div className="space-y-2">
               {stats.recent_withdrawals.map((w, i) => (
-                <div key={w.id || i} className="p-4 bg-slate-50/80 rounded-lg border border-slate-100">
+                <div key={w.id || i} className="p-4 bg-muted/80 rounded-lg border border-border/50">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="font-mono text-xs text-slate-400">Job: {w.job_id}</p>
+                    <p className="font-mono text-xs text-muted-foreground">Job: {w.job_id}</p>
                     <div className="flex items-center gap-3">
-                      <span className="font-semibold text-slate-900 tabular-nums">${w.total?.toFixed(2)}</span>
+                      <span className="font-semibold text-foreground tabular-nums">${w.total?.toFixed(2)}</span>
                       <StatusBadge status={w.invoice_id ? "invoiced" : "uninvoiced"} />
                     </div>
                   </div>
                   {w.items?.length > 0 && (
-                    <div className="space-y-1 mt-2 border-t border-slate-100 pt-2">
+                    <div className="space-y-1 mt-2 border-t border-border/50 pt-2">
                       {w.items.map((item, j) => (
-                        <div key={j} className="flex items-center justify-between text-xs text-slate-600">
+                        <div key={j} className="flex items-center justify-between text-xs text-muted-foreground">
                           <span className="truncate max-w-[200px]">{item.name || item.product_name || "Item"}</span>
-                          <span className="tabular-nums text-slate-500">{item.quantity} × ${(item.unit_price ?? 0).toFixed(2)}</span>
+                          <span className="tabular-nums text-muted-foreground">{item.quantity} × ${(item.unit_price ?? 0).toFixed(2)}</span>
                         </div>
                       ))}
                     </div>
@@ -154,7 +154,7 @@ const Dashboard = () => {
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 text-slate-400">
+            <div className="text-center py-12 text-muted-foreground">
               <ShoppingCart className="w-10 h-10 mx-auto mb-2 opacity-40" />
               <p className="text-sm">No withdrawals in this range</p>
             </div>
@@ -171,8 +171,8 @@ const Dashboard = () => {
     <div className="p-8" data-testid="dashboard-page">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Dashboard</h1>
-          <p className="text-slate-500 mt-1 text-sm">{rangeLabel}</p>
+          <h1 className="text-2xl font-semibold text-foreground tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground mt-1 text-sm">{rangeLabel}</p>
         </div>
         <DateRangeFilter value={dateRange} onChange={setDateRange} />
       </div>
@@ -181,17 +181,17 @@ const Dashboard = () => {
       {(stats?.low_stock_count > 0 || (pendingRequests ?? 0) > 0) && (
         <div className="flex flex-wrap gap-2 mb-6">
           {(pendingRequests ?? 0) > 0 && (
-            <Link to="/pending-requests" className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 text-sm">
+            <Link to="/pending-requests" className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-info/10 border border-info/30 text-info hover:bg-info/15 text-sm">
               <ClipboardList className="w-4 h-4" />
               <span>{pendingRequests} pending requests</span>
-              <ArrowRight className="w-3.5 h-3.5 text-blue-400" />
+              <ArrowRight className="w-3.5 h-3.5 text-info" />
             </Link>
           )}
           {stats?.low_stock_count > 0 && (
-            <Link to="/inventory?low_stock=1" className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 text-sm">
-              <AlertTriangle className="w-4 h-4 text-amber-600" />
+            <Link to="/inventory?low_stock=1" className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border text-foreground hover:bg-muted text-sm">
+              <AlertTriangle className="w-4 h-4 text-accent" />
               <span>{stats.low_stock_count} items low on stock</span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+              <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
             </Link>
           )}
         </div>
@@ -209,7 +209,7 @@ const Dashboard = () => {
       {heatmapData.length > 0 && (
         <Panel className="mb-6">
           <SectionHead title="Transaction Activity" action={
-            <span className="text-xs text-slate-400 tabular-nums">{heatmapData.reduce((s, d) => s + d.value, 0).toLocaleString()} total</span>
+            <span className="text-xs text-muted-foreground tabular-nums">{heatmapData.reduce((s, d) => s + d.value, 0).toLocaleString()} total</span>
           } />
           <ChartExplainer
             title="Activity Heatmap"
@@ -234,13 +234,13 @@ const Dashboard = () => {
         {hasPOs && (
           <Panel>
             <SectionHead title="Purchase orders" action={
-              <Link to="/purchase-orders" className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1">
+              <Link to="/purchase-orders" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
                 All POs <Truck className="w-3 h-3" />
               </Link>
             } />
             <div className="mb-4">
-              <span className="text-lg font-bold text-slate-900 tabular-nums">{openPOCount} open</span>
-              <span className="text-xs text-slate-400 ml-2">purchase orders</span>
+              <span className="text-lg font-bold text-foreground tabular-nums">{openPOCount} open</span>
+              <span className="text-xs text-muted-foreground ml-2">purchase orders</span>
             </div>
             <POSummaryStrip summary={stats.po_summary} />
           </Panel>
@@ -249,20 +249,20 @@ const Dashboard = () => {
         {stats?.low_stock_alerts?.length > 0 && (
           <Panel>
             <SectionHead title="Low stock items" action={
-              <Link to="/inventory?low_stock=1" className="text-xs text-slate-500 hover:text-slate-700">
+              <Link to="/inventory?low_stock=1" className="text-xs text-muted-foreground hover:text-foreground">
                 {stats.low_stock_count} items →
               </Link>
             } />
             <div className="space-y-2 max-h-[260px] overflow-auto -mx-6 px-6">
               {stats.low_stock_alerts.map((product, i) => (
-                <Link key={product.id || i} to="/inventory" className="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:bg-slate-50">
+                <Link key={product.id || i} to="/inventory" className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-muted">
                   <div>
-                    <p className="font-mono text-xs text-slate-500">{product.sku}</p>
-                    <p className="text-sm text-slate-700 truncate max-w-[200px]">{product.name}</p>
+                    <p className="font-mono text-xs text-muted-foreground">{product.sku}</p>
+                    <p className="text-sm text-foreground truncate max-w-[200px]">{product.name}</p>
                   </div>
-                  <div className="flex items-center gap-3 text-right shrink-0 text-xs text-slate-600">
+                  <div className="flex items-center gap-3 text-right shrink-0 text-xs text-muted-foreground">
                     <span>{product.quantity} left</span>
-                    <span className="text-slate-400">min {product.min_stock}</span>
+                    <span className="text-muted-foreground">min {product.min_stock}</span>
                   </div>
                 </Link>
               ))}

@@ -251,8 +251,8 @@ const ReceiptImport = () => {
   return (
     <div className="p-8" data-testid="receipt-import-page">
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Receive / Import</h1>
-        <p className="text-slate-500 mt-1 text-sm">Upload a delivery receipt or vendor invoice to add products, or bulk import from CSV</p>
+        <h1 className="text-2xl font-semibold text-foreground tracking-tight">Receive / Import</h1>
+        <p className="text-muted-foreground mt-1 text-sm">Upload a delivery receipt or vendor invoice to add products, or bulk import from CSV</p>
       </div>
 
       <Tabs defaultValue="receipt" className="mt-4">
@@ -265,11 +265,11 @@ const ReceiptImport = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Upload Section */}
         <div
-          className="card-elevated p-6 border-violet-100"
+          className="card-elevated p-6 border-primary/20"
           data-testid="upload-section"
         >
-          <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <span className="w-7 h-7 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center text-sm font-bold">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+            <span className="w-7 h-7 rounded-lg bg-primary/15 text-primary flex items-center justify-center text-sm font-bold">
               1
             </span>
             Upload document
@@ -279,17 +279,17 @@ const ReceiptImport = () => {
             <div
               onDrop={handleDrop}
               onDragOver={handleDragOver}
-              className="border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center hover:border-violet-300 hover:bg-violet-50/30 transition-all cursor-pointer group"
+              className="border-2 border-dashed border-border rounded-2xl p-12 text-center hover:border-primary/30 hover:bg-primary/5 transition-all cursor-pointer group"
               onClick={() => document.getElementById("receipt-input").click()}
               data-testid="upload-dropzone"
             >
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-100 to-amber-50 flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition-transform">
-                <Upload className="w-7 h-7 text-violet-500" />
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/15 to-warning/10 flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition-transform">
+                <Upload className="w-7 h-7 text-primary" />
               </div>
-              <p className="text-slate-600 font-medium">
+              <p className="text-muted-foreground font-medium">
                 Drop document here or click to browse
               </p>
-              <p className="text-slate-400 text-sm mt-2">
+              <p className="text-muted-foreground text-sm mt-2">
                 Supports JPG, PNG, WEBP, PDF
               </p>
               <input
@@ -303,31 +303,31 @@ const ReceiptImport = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="relative rounded-xl overflow-hidden border border-slate-200 shadow-sm">
+              <div className="relative rounded-xl overflow-hidden border border-border shadow-sm">
                 {preview ? (
                   <img
                     src={preview}
                     alt="Document preview"
-                    className="w-full max-h-[400px] object-contain bg-slate-50"
+                    className="w-full max-h-[400px] object-contain bg-muted"
                     data-testid="receipt-preview"
                   />
                 ) : (
-                  <div className="w-full h-48 bg-slate-50 flex flex-col items-center justify-center gap-2">
-                    <FileText className="w-12 h-12 text-slate-400" />
-                    <span className="text-slate-600 font-medium">{file.name}</span>
-                    <span className="text-slate-400 text-sm">PDF document</span>
+                  <div className="w-full h-48 bg-muted flex flex-col items-center justify-center gap-2">
+                    <FileText className="w-12 h-12 text-muted-foreground" />
+                    <span className="text-muted-foreground font-medium">{file.name}</span>
+                    <span className="text-muted-foreground text-sm">PDF document</span>
                   </div>
                 )}
                 <button
                   onClick={clearAll}
-                  className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur-sm text-slate-600 rounded-xl hover:bg-red-50 hover:text-red-600 border border-slate-200 shadow-sm transition-colors"
+                  className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur-sm text-muted-foreground rounded-xl hover:bg-destructive/10 hover:text-destructive border border-border shadow-sm transition-colors"
                   data-testid="clear-receipt-btn"
                 >
                   <XCircle className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="flex items-center gap-2 text-sm text-slate-500">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 {preview ? <FileImage className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
                 <span>{file?.name}</span>
               </div>
@@ -349,7 +349,7 @@ const ReceiptImport = () => {
                   onClick={() => extractReceipt(false)}
                   disabled={extracting}
                   variant="outline"
-                  className="h-11 text-slate-600"
+                  className="h-11 text-muted-foreground"
                 >
                   {extracting ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -365,24 +365,24 @@ const ReceiptImport = () => {
 
         {/* Extracted Products Section */}
         <div className="card-elevated p-6" data-testid="extracted-section">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <span className="w-7 h-7 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-sm font-bold">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+            <span className="w-7 h-7 rounded-lg bg-warning/15 text-accent flex items-center justify-center text-sm font-bold">
               2
             </span>
             Review & import
           </h2>
 
           {!extractedData ? (
-            <div className="text-center py-16 text-slate-400">
-              <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
-                <Package className="w-7 h-7 text-slate-400" />
+            <div className="text-center py-16 text-muted-foreground">
+              <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                <Package className="w-7 h-7 text-muted-foreground" />
               </div>
               <p className="font-medium">Upload and extract a document to see products</p>
             </div>
           ) : (
             <div className="space-y-4">
               <div>
-                <Label className="text-slate-600 font-medium text-sm">Vendor *</Label>
+                <Label className="text-muted-foreground font-medium text-sm">Vendor *</Label>
                 <Input
                   value={vendorName}
                   onChange={(e) => setVendorName(e.target.value)}
@@ -398,13 +398,13 @@ const ReceiptImport = () => {
                   checked={createVendorIfMissing}
                   onCheckedChange={(c) => setCreateVendorIfMissing(c === true)}
                 />
-                <Label htmlFor="create-vendor" className="text-sm text-slate-600 cursor-pointer">
+                <Label htmlFor="create-vendor" className="text-sm text-muted-foreground cursor-pointer">
                   Create vendor if missing
                 </Label>
               </div>
 
               <div>
-                <Label className="text-slate-600 font-medium text-sm">Department override (optional)</Label>
+                <Label className="text-muted-foreground font-medium text-sm">Department override (optional)</Label>
                 <Select value={selectedDept || "none"} onValueChange={(v) => setSelectedDept(v === "none" ? "" : v)}>
                   <SelectTrigger
                     className="input-field mt-2"
@@ -436,8 +436,8 @@ const ReceiptImport = () => {
                       key={product.id}
                       className={`p-4 rounded-xl border transition-all ${
                         product.selected
-                          ? "border-amber-200 bg-amber-50/50"
-                          : "border-slate-200 bg-slate-50/50 opacity-60"
+                          ? "border-warning/30 bg-warning/10"
+                          : "border-border bg-muted/50 opacity-60"
                       }`}
                       data-testid={`extracted-product-${product.id}`}
                     >
@@ -446,8 +446,8 @@ const ReceiptImport = () => {
                           onClick={() => toggleProduct(product.id)}
                           className={`mt-1 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
                             product.selected
-                              ? "bg-amber-500 border-amber-500 text-white"
-                              : "border-slate-300"
+                              ? "bg-accent border-accent text-white"
+                              : "border-border"
                           }`}
                           data-testid={`toggle-product-${product.id}`}
                         >
@@ -470,7 +470,7 @@ const ReceiptImport = () => {
                             <div className="space-y-2">
                               <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                  <Label className="text-xs text-slate-500">Delivered qty</Label>
+                                  <Label className="text-xs text-muted-foreground">Delivered qty</Label>
                                   <Input
                                     type="number"
                                     step="any"
@@ -480,7 +480,7 @@ const ReceiptImport = () => {
                                   />
                                 </div>
                                 <div>
-                                  <Label className="text-xs text-slate-500">Cost</Label>
+                                  <Label className="text-xs text-muted-foreground">Cost</Label>
                                   <Input
                                     type="number"
                                     step="0.01"
@@ -491,7 +491,7 @@ const ReceiptImport = () => {
                                 </div>
                               </div>
                               {product.original_sku && (
-                                <p className="text-xs text-slate-400 font-mono">Original: {product.original_sku}</p>
+                                <p className="text-xs text-muted-foreground font-mono">Original: {product.original_sku}</p>
                               )}
                             </div>
                           ) : (
@@ -520,7 +520,7 @@ const ReceiptImport = () => {
 
                         <button
                           onClick={() => removeProduct(product.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                          className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors shrink-0"
                           data-testid={`remove-product-${product.id}`}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -531,8 +531,8 @@ const ReceiptImport = () => {
                 })}
               </div>
 
-              <div className="p-4 bg-slate-50/80 rounded-xl border border-slate-200">
-                <p className="text-sm text-slate-600">
+              <div className="p-4 bg-muted/80 rounded-xl border border-border">
+                <p className="text-sm text-muted-foreground">
                   <strong>{editedProducts.filter((p) => p.selected).length}</strong> of{" "}
                   {editedProducts.length} products selected for import
                 </p>
@@ -563,18 +563,18 @@ const ReceiptImport = () => {
         </TabsContent>
 
         <TabsContent value="csv">
-          <div className="card-elevated p-6 max-w-2xl border-slate-200">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+          <div className="card-elevated p-6 max-w-2xl border-border">
+            <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5 text-success" />
               Bulk import from CSV
             </h2>
-            <p className="text-slate-600 text-sm mb-4">
+            <p className="text-muted-foreground text-sm mb-4">
               Supply Yard format: Product, SKU, Barcode, On hand, Reorder point, Unit cost, Retail price, Department
             </p>
 
             <div className="space-y-4">
               <div>
-                <Label className="text-slate-600 font-medium text-sm">Department *</Label>
+                <Label className="text-muted-foreground font-medium text-sm">Department *</Label>
                 <Select value={selectedDept} onValueChange={setSelectedDept}>
                   <SelectTrigger className="input-field mt-2">
                     <SelectValue placeholder="Select department" />
@@ -590,7 +590,7 @@ const ReceiptImport = () => {
               </div>
 
               <div>
-                <Label className="text-slate-600 font-medium text-sm">Vendor (optional)</Label>
+                <Label className="text-muted-foreground font-medium text-sm">Vendor (optional)</Label>
                 <Select value={selectedVendor} onValueChange={setSelectedVendor}>
                   <SelectTrigger className="input-field mt-2">
                     <SelectValue placeholder="None" />
@@ -616,7 +616,7 @@ const ReceiptImport = () => {
                   }
                 }}
                 onDragOver={(e) => e.preventDefault()}
-                className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-emerald-300 cursor-pointer"
+                className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-success/30 cursor-pointer"
                 onClick={() => document.getElementById("csv-input").click()}
               >
                 <input
@@ -626,23 +626,23 @@ const ReceiptImport = () => {
                   onChange={handleCsvFileChange}
                   className="hidden"
                 />
-                <FileSpreadsheet className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-                <p className="text-slate-600 font-medium">
+                <FileSpreadsheet className="w-12 h-12 text-success mx-auto mb-3" />
+                <p className="text-muted-foreground font-medium">
                   {csvFile ? csvFile.name : "Drop CSV or click to browse"}
                 </p>
               </div>
 
               {csvResult && (
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm">
-                  <p className="font-medium text-slate-900">
+                <div className="p-4 bg-muted rounded-xl border border-border text-sm">
+                  <p className="font-medium text-foreground">
                     Imported {csvResult.imported} products
                     {csvResult.errors > 0 && ` · ${csvResult.errors} errors`}
                     {csvResult.warnings?.length > 0 && ` · ${csvResult.warnings.length} barcode warnings`}
                   </p>
                   {csvResult.error_details?.length > 0 && (
                     <details className="mt-2">
-                      <summary className="cursor-pointer text-slate-500">View errors</summary>
-                      <ul className="mt-2 space-y-1 text-slate-600 text-xs max-h-32 overflow-auto">
+                      <summary className="cursor-pointer text-muted-foreground">View errors</summary>
+                      <ul className="mt-2 space-y-1 text-muted-foreground text-xs max-h-32 overflow-auto">
                         {csvResult.error_details.map((e, i) => (
                           <li key={i}>{e.product}: {e.error}</li>
                         ))}
@@ -651,8 +651,8 @@ const ReceiptImport = () => {
                   )}
                   {csvResult.warnings?.length > 0 && (
                     <details className="mt-2">
-                      <summary className="cursor-pointer text-amber-600">View barcode warnings</summary>
-                      <ul className="mt-2 space-y-1 text-slate-600 text-xs max-h-32 overflow-auto">
+                      <summary className="cursor-pointer text-accent">View barcode warnings</summary>
+                      <ul className="mt-2 space-y-1 text-muted-foreground text-xs max-h-32 overflow-auto">
                         {csvResult.warnings.map((w, i) => (
                           <li key={i}>{w.product}: {w.warning}</li>
                         ))}
@@ -685,14 +685,14 @@ const ReceiptImport = () => {
       </Tabs>
 
       {/* How It Works - AI focus */}
-      <div className="card-elevated p-6 mt-8 bg-gradient-to-br from-slate-50 to-violet-50/30 border-violet-100/50">
-        <h3 className="text-base font-semibold text-slate-900 mb-4 flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-violet-500" />
+      <div className="card-elevated p-6 mt-8 bg-gradient-to-br from-muted to-primary/5 border-primary/10">
+        <h3 className="text-base font-semibold text-foreground mb-4 flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-primary" />
           How it works
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-slate-600">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-muted-foreground">
           <div className="flex items-start gap-4">
-            <span className="w-9 h-9 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center font-semibold shrink-0">
+            <span className="w-9 h-9 bg-primary/15 text-primary rounded-xl flex items-center justify-center font-semibold shrink-0">
               1
             </span>
             <p>
@@ -701,16 +701,16 @@ const ReceiptImport = () => {
             </p>
           </div>
           <div className="flex items-start gap-4">
-            <span className="w-9 h-9 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center font-semibold shrink-0">
+            <span className="w-9 h-9 bg-warning/15 text-accent rounded-xl flex items-center justify-center font-semibold shrink-0">
               2
             </span>
             <p>
-              <strong className="text-slate-700">AI extracts</strong> vendor,
+              <strong className="text-foreground">AI extracts</strong> vendor,
               items, UOM, costs, and quantities
             </p>
           </div>
           <div className="flex items-start gap-4">
-            <span className="w-9 h-9 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center font-semibold shrink-0">
+            <span className="w-9 h-9 bg-success/15 text-success rounded-xl flex items-center justify-center font-semibold shrink-0">
               3
             </span>
             <p>

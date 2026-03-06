@@ -54,7 +54,7 @@ export function AdjustStockDialog({ product, open, onOpenChange }) {
         <DialogHeader>
           <DialogTitle>Adjust Stock</DialogTitle>
           {product && (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-muted-foreground">
               {product.sku} — {product.name}
             </p>
           )}

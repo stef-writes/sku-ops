@@ -53,13 +53,13 @@ export function RecordPaymentModal({ open, onOpenChange, withdrawalIds = [], def
       <DialogContent className="sm:max-w-md">
         <DialogHeader><DialogTitle>Record Payment</DialogTitle></DialogHeader>
         <div className="space-y-4 pt-2">
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted-foreground">
             Recording payment for <strong>{withdrawalIds.length}</strong> withdrawal{withdrawalIds.length !== 1 ? "s" : ""}
           </p>
           <div>
             <Label className="text-sm">Amount</Label>
             <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={defaultAmount ? defaultAmount.toFixed(2) : "Total"} className="mt-1.5" />
-            <p className="text-xs text-slate-400 mt-1">Leave blank to use withdrawal total</p>
+            <p className="text-xs text-muted-foreground mt-1">Leave blank to use withdrawal total</p>
           </div>
           <div>
             <Label className="text-sm">Method</Label>

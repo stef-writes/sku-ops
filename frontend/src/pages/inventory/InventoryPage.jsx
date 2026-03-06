@@ -55,7 +55,7 @@ const InventoryPage = () => {
           <div>
             <p className="font-semibold">{row.name}</p>
             {row.original_sku && (
-              <p className="text-xs text-slate-400">Orig: {row.original_sku}</p>
+              <p className="text-xs text-muted-foreground">Orig: {row.original_sku}</p>
             )}
           </div>
         ),
@@ -78,16 +78,16 @@ const InventoryPage = () => {
         sortable: false,
         filterable: false,
         render: (row) => (
-          <span className="text-sm text-slate-600">
+          <span className="text-sm text-muted-foreground">
             {row.base_unit || "each"}
             {row.sell_uom && row.sell_uom !== row.base_unit && (
-              <span className="block text-xs text-slate-400">
+              <span className="block text-xs text-muted-foreground">
                 sell: {row.sell_uom}
                 {(row.pack_qty || 1) > 1 ? ` ×${row.pack_qty}` : ""}
               </span>
             )}
             {row.sell_uom === row.base_unit && (row.pack_qty || 1) > 1 && (
-              <span className="block text-xs text-slate-400">×{row.pack_qty}</span>
+              <span className="block text-xs text-muted-foreground">×{row.pack_qty}</span>
             )}
           </span>
         ),
@@ -106,7 +106,7 @@ const InventoryPage = () => {
         type: "number",
         align: "right",
         render: (row) => (
-          <span className="font-mono text-slate-500">${(row.cost || 0).toFixed(2)}</span>
+          <span className="font-mono text-muted-foreground">${(row.cost || 0).toFixed(2)}</span>
         ),
         exportValue: (row) => (row.cost || 0).toFixed(2),
       },
@@ -231,7 +231,7 @@ const InventoryPage = () => {
                 e.stopPropagation();
                 setDetailProduct(product);
               }}
-              className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-sm transition-colors"
+              className="p-2 text-muted-foreground hover:text-info hover:bg-info/10 rounded-sm transition-colors"
               title="View details"
               data-testid={`product-detail-${product.sku}`}
             >

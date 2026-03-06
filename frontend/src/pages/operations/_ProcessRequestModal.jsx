@@ -24,8 +24,8 @@ export function ProcessRequestModal({
         <DialogHeader><DialogTitle>Process request</DialogTitle></DialogHeader>
         {request && (
           <div className="space-y-4 pt-2">
-            <p className="text-sm text-slate-500">
-              Processing request from <strong className="text-slate-700">{request.contractor_name}</strong>
+            <p className="text-sm text-muted-foreground">
+              Processing request from <strong className="text-foreground">{request.contractor_name}</strong>
             </p>
             <div>
               <Label className="text-sm">Job ID *</Label>

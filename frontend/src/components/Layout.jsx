@@ -88,9 +88,9 @@ const Layout = ({ children }) => {
 
   const getRoleBadge = () => {
     const role = user?.role;
-    if (role === ROLES.ADMIN) return "bg-rose-500";
-    if (role === ROLES.WAREHOUSE_MANAGER) return "bg-blue-500";
-    return "bg-emerald-500";
+    if (role === ROLES.ADMIN) return "bg-destructive";
+    if (role === ROLES.WAREHOUSE_MANAGER) return "bg-info";
+    return "bg-success";
   };
 
   const getRoleLabel = () => {
@@ -101,16 +101,16 @@ const Layout = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/80 flex" data-testid="app-layout">
-      <aside className="w-60 bg-slate-900 text-white flex flex-col border-r border-slate-800" data-testid="sidebar">
-        <div className="p-5 border-b border-slate-800">
+    <div className="min-h-screen bg-background text-foreground flex" data-testid="app-layout">
+      <aside className="w-64 bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border/80 shadow-soft" data-testid="sidebar">
+        <div className="p-5 border-b border-sidebar-border">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-sm">
-              <Wrench className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 bg-gradient-to-br from-accent-gradient-from to-accent-gradient-to rounded-xl flex items-center justify-center shadow-sm ring-1 ring-accent/40">
+              <Wrench className="w-5 h-5 text-accent-foreground" />
             </div>
             <div>
-              <h1 className="font-semibold text-slate-50 tracking-tight">Supply Yard</h1>
-              <p className="text-xs text-slate-400">Material management</p>
+              <h1 className="font-semibold text-sidebar-foreground tracking-tight">Supply Yard</h1>
+              <p className="text-xs text-sidebar-muted">Material management</p>
             </div>
           </div>
         </div>
@@ -119,7 +119,7 @@ const Layout = ({ children }) => {
           {navGroups.map((group, gi) => (
             <div key={gi} className={gi > 0 ? "mt-4" : ""}>
               {group.section && (
-                <p className="px-3 mb-1 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <p className="px-3 mb-1 text-[10px] font-semibold text-sidebar-muted uppercase tracking-[0.14em]">
                   {group.section}
                 </p>
               )}
@@ -141,19 +141,19 @@ const Layout = ({ children }) => {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-slate-800">
+        <div className="p-4 border-t border-sidebar-border">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="font-medium text-sm text-slate-100 truncate">{user?.name}</p>
+              <p className="font-medium text-sm text-sidebar-foreground truncate">{user?.name}</p>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className={`w-2 h-2 rounded-full shrink-0 ${getRoleBadge()}`} />
-                <p className="text-xs text-slate-400 truncate">{getRoleLabel()}</p>
+                <p className="text-xs text-sidebar-muted truncate">{getRoleLabel()}</p>
               </div>
-              {user?.company && <p className="text-xs text-slate-500 truncate mt-0.5">{user.company}</p>}
+              {user?.company && <p className="text-xs text-sidebar-muted/70 truncate mt-0.5">{user.company}</p>}
             </div>
             <button
               onClick={handleLogout}
-              className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors shrink-0"
+              className="p-2 text-sidebar-muted hover:text-sidebar-foreground hover:bg-white/5 rounded-lg transition-colors shrink-0"
               data-testid="logout-btn"
             >
               <LogOut className="w-5 h-5" />
@@ -162,7 +162,7 @@ const Layout = ({ children }) => {
         </div>
       </aside>
 
-      <main className="flex-1 min-h-0 overflow-auto bg-slate-50/50 flex flex-col" data-testid="main-content">
+      <main className="flex-1 min-h-0 overflow-auto bg-surface-muted/35 flex flex-col" data-testid="main-content">
         {children}
       </main>
 

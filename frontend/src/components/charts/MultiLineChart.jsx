@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
-import "../../lib/chartTheme";
+import { themeColors } from "../../lib/chartTheme";
 
 /**
  * Multi-line / area chart for time-series data.
@@ -27,6 +27,7 @@ export function MultiLineChart({
   onPointClick,
 }) {
   const option = useMemo(() => {
+    const t = themeColors();
     const categories = data.map((d) => d[xKey]);
 
     const echartSeries = seriesDefs.map((def) => ({
@@ -46,14 +47,14 @@ export function MultiLineChart({
       areaStyle: area ? { opacity: 0.08 } : undefined,
       emphasis: {
         focus: "series",
-        itemStyle: { borderWidth: 2, borderColor: "#fff" },
+        itemStyle: { borderWidth: 2, borderColor: t.card },
       },
     }));
 
     return {
       tooltip: {
         trigger: "axis",
-        axisPointer: { type: "cross", crossStyle: { color: "#94a3b8" } },
+        axisPointer: { type: "cross", crossStyle: { color: t.mutedForeground } },
         formatter: (params) => {
           const title = params[0]?.axisValue || "";
           const lines = params.map(
@@ -65,7 +66,7 @@ export function MultiLineChart({
       },
       legend: {
         bottom: 0,
-        textStyle: { fontSize: 11, color: "#94a3b8" },
+        textStyle: { fontSize: 11, color: t.mutedForeground },
       },
       grid: { left: 12, right: 12, top: 12, bottom: 36, containLabel: true },
       xAxis: {
@@ -74,16 +75,16 @@ export function MultiLineChart({
         boundaryGap: false,
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { fontSize: 11, color: "#94a3b8" },
+        axisLabel: { fontSize: 11, color: t.mutedForeground },
       },
       yAxis: {
         type: "value",
-        splitLine: { lineStyle: { color: "#f1f5f9" } },
+        splitLine: { lineStyle: { color: t.border } },
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {
           fontSize: 11,
-          color: "#94a3b8",
+          color: t.mutedForeground,
           formatter: (v) => valueFormatter(v),
         },
       },

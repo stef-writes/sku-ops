@@ -74,7 +74,7 @@ function OpenCountDialog({ open, onOpenChange }) {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-slate-400 mt-1.5">
+            <p className="text-xs text-muted-foreground mt-1.5">
               Current on-hand quantities will be snapshotted at open time.
             </p>
           </div>
@@ -101,7 +101,7 @@ const COLUMNS = [
   {
     key: "scope",
     label: "Scope",
-    render: (row) => row.scope || <span className="text-slate-400">Full warehouse</span>,
+    render: (row) => row.scope || <span className="text-muted-foreground">Full warehouse</span>,
   },
   {
     key: "status",
@@ -129,8 +129,8 @@ export default function CycleCountsPage() {
     <div className="flex-1 p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Cycle Counts</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <h1 className="text-xl font-semibold text-foreground">Cycle Counts</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Physical inventory counts — snapshot, count, reconcile.
           </p>
         </div>

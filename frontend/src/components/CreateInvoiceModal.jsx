@@ -71,7 +71,7 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated, preselectedI
         <DialogHeader>
           <DialogTitle>Create Invoice</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-muted-foreground">
           Select uninvoiced withdrawals. All must share the same billing entity.
         </p>
 
@@ -89,17 +89,17 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated, preselectedI
           </Button>
         </div>
 
-        <div className="flex-1 overflow-auto border border-slate-200 rounded-lg min-h-[200px]">
+        <div className="flex-1 overflow-auto border border-border rounded-lg min-h-[200px]">
           {isLoading ? (
-            <div className="p-6 text-center text-slate-500">Loading…</div>
+            <div className="p-6 text-center text-muted-foreground">Loading…</div>
           ) : eligible.length === 0 ? (
-            <div className="p-6 text-center text-slate-500">
+            <div className="p-6 text-center text-muted-foreground">
               No uninvoiced withdrawals{entityFilter ? ` for ${entityFilter}` : ""}
             </div>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
+                <tr className="border-b border-border bg-muted">
                   <th className="w-10 px-3 py-2"></th>
                   <th className="px-3 py-2 text-left">Date</th>
                   <th className="px-3 py-2 text-left">Job ID</th>
@@ -109,9 +109,9 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated, preselectedI
               </thead>
               <tbody>
                 {eligible.map((w) => (
-                  <tr key={w.id} className="border-b border-slate-100 hover:bg-slate-50">
+                  <tr key={w.id} className="border-b border-border/50 hover:bg-muted">
                     <td className="px-3 py-2">
-                      <input type="checkbox" checked={selectedIds.has(w.id)} onChange={() => toggleSelect(w.id)} className="w-4 h-4 rounded border-slate-300" />
+                      <input type="checkbox" checked={selectedIds.has(w.id)} onChange={() => toggleSelect(w.id)} className="w-4 h-4 rounded border-border" />
                     </td>
                     <td className="px-3 py-2 font-mono text-xs">{new Date(w.created_at).toLocaleDateString()}</td>
                     <td className="px-3 py-2 font-mono">{w.job_id}</td>
@@ -125,7 +125,7 @@ export function CreateInvoiceModal({ open, onOpenChange, onCreated, preselectedI
         </div>
 
         <div className="flex justify-between items-center pt-4 border-t">
-          <span className="text-sm text-slate-600">{selectedIds.size} withdrawal(s) selected</span>
+          <span className="text-sm text-muted-foreground">{selectedIds.size} withdrawal(s) selected</span>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button onClick={handleCreate} disabled={selectedIds.size === 0 || createInvoice.isPending}>

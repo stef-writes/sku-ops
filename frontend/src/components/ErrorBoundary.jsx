@@ -28,9 +28,9 @@ export class ErrorBoundary extends Component {
 
       return (
         <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 text-center">
-          <AlertTriangle className="w-12 h-12 text-amber-500 mb-4" />
-          <h2 className="text-lg font-semibold text-slate-900 mb-2">Something went wrong</h2>
-          <p className="text-sm text-slate-500 max-w-md mb-6">
+          <AlertTriangle className="w-12 h-12 text-warning mb-4" />
+          <h2 className="text-lg font-semibold text-foreground mb-2">Something went wrong</h2>
+          <p className="text-sm text-muted-foreground max-w-md mb-6">
             {this.state.error?.message || "An unexpected error occurred. Please try again."}
           </p>
           <Button onClick={this.handleReset} variant="outline" className="gap-2">

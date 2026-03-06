@@ -8,12 +8,12 @@ import api from "@/lib/api-client";
 const STORAGE_KEY = "sku-ops:chat:v3";
 
 const AGENT_META = {
-  inventory: { label: "Inventory",  cls: "bg-blue-50 text-blue-700 border border-blue-200" },
-  ops:       { label: "Operations", cls: "bg-orange-50 text-orange-700 border border-orange-200" },
-  finance:   { label: "Finance",    cls: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
-  system:    { label: "Assistant",  cls: "bg-amber-50 text-amber-700 border border-amber-200" },
-  lookup:    { label: "Quick Look", cls: "bg-slate-50 text-slate-700 border border-slate-200" },
-  dag:       { label: "Report",     cls: "bg-purple-50 text-purple-700 border border-purple-200" },
+  inventory: { label: "Inventory",  cls: "bg-info/10 text-info border border-info/30" },
+  ops:       { label: "Operations", cls: "bg-warning/10 text-category-5 border border-warning/30" },
+  finance:   { label: "Finance",    cls: "bg-success/10 text-success border border-success/30" },
+  system:    { label: "Assistant",  cls: "bg-warning/10 text-accent border border-warning/30" },
+  lookup:    { label: "Quick Look", cls: "bg-muted text-foreground border border-border" },
+  dag:       { label: "Report",     cls: "bg-category-4/10 text-category-4 border border-category-4/30" },
 };
 
 function agentTypeFromPath(pathname) {
@@ -59,28 +59,28 @@ const AGENT_PLACEHOLDER = {
 
 const mdComponents = {
   table: ({ children }) => (
-    <div className="overflow-x-auto my-2 rounded-lg border border-slate-200 shadow-sm">
+    <div className="overflow-x-auto my-2 rounded-lg border border-border shadow-sm">
       <table className="min-w-full text-xs">{children}</table>
     </div>
   ),
-  thead: ({ children }) => <thead className="bg-slate-100 border-b border-slate-200">{children}</thead>,
-  tbody: ({ children }) => <tbody className="divide-y divide-slate-100">{children}</tbody>,
+  thead: ({ children }) => <thead className="bg-muted border-b border-border">{children}</thead>,
+  tbody: ({ children }) => <tbody className="divide-y divide-border/50">{children}</tbody>,
   th: ({ children }) => (
-    <th className="px-3 py-2 text-left font-medium text-slate-500 text-[10px] uppercase tracking-wider whitespace-nowrap">
+    <th className="px-3 py-2 text-left font-medium text-muted-foreground text-[10px] uppercase tracking-wider whitespace-nowrap">
       {children}
     </th>
   ),
-  td: ({ children }) => <td className="px-3 py-1.5 text-slate-700 whitespace-nowrap">{children}</td>,
+  td: ({ children }) => <td className="px-3 py-1.5 text-foreground whitespace-nowrap">{children}</td>,
   p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
-  strong: ({ children }) => <strong className="font-semibold text-slate-900">{children}</strong>,
+  strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
   ul: ({ children }) => <ul className="mb-2 space-y-0.5 pl-4 list-disc">{children}</ul>,
   ol: ({ children }) => <ol className="mb-2 space-y-0.5 pl-4 list-decimal">{children}</ol>,
-  li: ({ children }) => <li className="text-slate-700 leading-relaxed">{children}</li>,
-  h1: ({ children }) => <h1 className="font-bold text-slate-900 text-sm mb-1.5 mt-3 first:mt-0">{children}</h1>,
-  h2: ({ children }) => <h2 className="font-semibold text-slate-900 text-sm mb-1 mt-3 first:mt-0">{children}</h2>,
-  h3: ({ children }) => <h3 className="font-medium text-slate-800 text-xs mb-1 mt-2 first:mt-0">{children}</h3>,
+  li: ({ children }) => <li className="text-foreground leading-relaxed">{children}</li>,
+  h1: ({ children }) => <h1 className="font-bold text-foreground text-sm mb-1.5 mt-3 first:mt-0">{children}</h1>,
+  h2: ({ children }) => <h2 className="font-semibold text-foreground text-sm mb-1 mt-3 first:mt-0">{children}</h2>,
+  h3: ({ children }) => <h3 className="font-medium text-foreground text-xs mb-1 mt-2 first:mt-0">{children}</h3>,
   pre: ({ children }) => (
-    <pre className="my-2 p-3 bg-slate-800 rounded-lg overflow-x-auto text-xs text-slate-100 font-mono leading-relaxed">
+    <pre className="my-2 p-3 bg-sidebar rounded-lg overflow-x-auto text-xs text-muted font-mono leading-relaxed">
       {children}
     </pre>
   ),
@@ -88,11 +88,11 @@ const mdComponents = {
     className ? (
       <code className={className}>{children}</code>
     ) : (
-      <code className="px-1 py-0.5 bg-slate-200 rounded text-[11px] font-mono text-slate-700">{children}</code>
+      <code className="px-1 py-0.5 bg-border rounded text-[11px] font-mono text-foreground">{children}</code>
     ),
-  hr: () => <hr className="my-3 border-slate-200" />,
+  hr: () => <hr className="my-3 border-border" />,
   blockquote: ({ children }) => (
-    <blockquote className="border-l-2 border-amber-400 pl-3 my-2 text-slate-500 italic text-xs">{children}</blockquote>
+    <blockquote className="border-l-2 border-accent pl-3 my-2 text-muted-foreground italic text-xs">{children}</blockquote>
   ),
 };
 
@@ -111,13 +111,13 @@ function AgentBubble({ msg, thinkingOpen, onToggleThinking }) {
             </span>
           )}
           {toolCalls.map((t, i) => (
-            <span key={t.tool || i} className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+            <span key={t.tool || i} className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full border border-border">
               {t.tool}
             </span>
           ))}
         </div>
       )}
-      <div className="bg-slate-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-slate-800">
+      <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-foreground">
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
           {msg.content}
         </ReactMarkdown>
@@ -126,13 +126,13 @@ function AgentBubble({ msg, thinkingOpen, onToggleThinking }) {
         <div>
           <button
             onClick={onToggleThinking}
-            className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-slate-600 transition-colors"
+            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
           >
             {thinkingOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             {thinkingOpen ? "Hide" : "View"} reasoning
           </button>
           {thinkingOpen && (
-            <div className="mt-1.5 p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-500 font-mono leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap">
+            <div className="mt-1.5 p-3 bg-muted border border-border rounded-xl text-[11px] text-muted-foreground font-mono leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap">
               {thinking.join("\n\n---\n\n")}
             </div>
           )}
@@ -145,7 +145,7 @@ function AgentBubble({ msg, thinkingOpen, onToggleThinking }) {
 export default function ChatAssistant() {
   const location = useLocation();
   const agentType = agentTypeFromPath(location.pathname);
-  const agentMeta = AGENT_META[agentType] || { label: "Assistant", cls: "bg-amber-50 text-amber-700 border border-amber-200" };
+  const agentMeta = AGENT_META[agentType] || { label: "Assistant", cls: "bg-warning/10 text-accent border border-warning/30" };
 
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState(() => {
@@ -257,7 +257,7 @@ export default function ChatAssistant() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow-lg flex items-center justify-center transition-colors z-40"
+        className="fixed bottom-6 right-6 w-14 h-14 bg-accent hover:bg-accent/90 text-accent-foreground rounded-full shadow-lg flex items-center justify-center transition-colors z-40"
         aria-label="Open AI assistant"
       >
         <MessageCircle className="w-6 h-6" />
@@ -266,23 +266,23 @@ export default function ChatAssistant() {
       {open && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
-          <div className="relative w-full max-w-md bg-white shadow-xl flex flex-col h-full animate-slide-in-right">
+          <div className="relative w-full max-w-md bg-card shadow-xl flex flex-col h-full animate-slide-in-right">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center shrink-0">
                   <MessageCircle className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <h2 className="font-semibold text-slate-900 text-sm leading-tight">
+                  <h2 className="font-semibold text-foreground text-sm leading-tight">
                     {agentMeta.label} Assistant
                   </h2>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
                     <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-medium ${agentMeta.cls}`}>
                       {agentMeta.label}
                     </span>
                     {sessionCost > 0 && (
-                      <span className="ml-2 text-slate-300">· ${sessionCost.toFixed(4)} session</span>
+                      <span className="ml-2 text-muted-foreground/60">· ${sessionCost.toFixed(4)} session</span>
                     )}
                   </p>
                 </div>
@@ -293,19 +293,19 @@ export default function ChatAssistant() {
                     type="button"
                     onClick={startNewChat}
                     title="New chat"
-                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"
+                    className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-border rounded-lg transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
                 )}
-                <div className="flex rounded-lg border border-slate-200 bg-white p-0.5" role="group">
+                <div className="flex rounded-lg border border-border bg-card p-0.5" role="group">
                   <button
                     type="button"
                     onClick={() => setMode("fast")}
                     className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
                       mode === "fast"
-                        ? "bg-amber-100 text-amber-800 border border-amber-200"
-                        : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                        ? "bg-warning/15 text-accent border border-warning/30"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
                     }`}
                     title="Fast: quick answers, lower cost"
                   >
@@ -317,8 +317,8 @@ export default function ChatAssistant() {
                     onClick={() => setMode("deep")}
                     className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
                       mode === "deep"
-                        ? "bg-slate-800 text-white border border-slate-700"
-                        : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                        ? "bg-sidebar text-white border border-sidebar-border"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
                     }`}
                     title="Deep: more reasoning, higher cost"
                   >
@@ -328,7 +328,7 @@ export default function ChatAssistant() {
                 </div>
                 <button
                   onClick={() => setOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"
+                  className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-border rounded-lg transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -338,14 +338,14 @@ export default function ChatAssistant() {
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {aiAvailable === false && (
-                <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
-                  <p className="font-medium text-sm text-amber-900 mb-1">AI assistant not configured</p>
-                  <p className="text-xs text-amber-700 mb-3">
-                    Add <code className="px-1 bg-amber-100 rounded font-mono">ANTHROPIC_API_KEY</code> to{" "}
-                    <code className="px-1 bg-amber-100 rounded font-mono">backend/.env</code> to enable.
+                <div className="rounded-xl bg-warning/10 border border-warning/30 p-4">
+                  <p className="font-medium text-sm text-foreground mb-1">AI assistant not configured</p>
+                  <p className="text-xs text-accent mb-3">
+                    Add <code className="px-1 bg-warning/15 rounded font-mono">ANTHROPIC_API_KEY</code> to{" "}
+                    <code className="px-1 bg-warning/15 rounded font-mono">backend/.env</code> to enable.
                   </p>
                   {setupUrl && (
-                    <a href={setupUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-amber-600 underline hover:text-amber-900">
+                    <a href={setupUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-accent underline hover:text-foreground">
                       Get an API key →
                     </a>
                   )}
@@ -354,14 +354,14 @@ export default function ChatAssistant() {
 
               {messages.length === 0 && aiAvailable !== false && (
                 <div className="flex flex-col items-center py-6 gap-4">
-                  <p className="text-xs text-slate-400 text-center">{AGENT_PLACEHOLDER[agentType]}</p>
+                  <p className="text-xs text-muted-foreground text-center">{AGENT_PLACEHOLDER[agentType]}</p>
                   <div className="grid grid-cols-2 gap-2 w-full">
                     {suggestions.map((s) => (
                       <button
                         key={s.label}
                         onClick={() => sendMessage(s.prompt)}
                         disabled={loading || aiAvailable === false}
-                        className="text-xs text-left px-3 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-amber-50 hover:border-amber-300 text-slate-600 transition-colors leading-snug disabled:opacity-50"
+                        className="text-xs text-left px-3 py-2.5 rounded-xl border border-border bg-card hover:bg-warning/10 hover:border-warning/30 text-muted-foreground transition-colors leading-snug disabled:opacity-50"
                       >
                         {s.label}
                       </button>
@@ -373,7 +373,7 @@ export default function ChatAssistant() {
               {messages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                   {m.role === "user" ? (
-                    <div className="max-w-[85%] bg-amber-500 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed">
+                    <div className="max-w-[85%] bg-accent text-accent-foreground rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed">
                       {m.content}
                     </div>
                   ) : (
@@ -384,11 +384,11 @@ export default function ChatAssistant() {
 
               {loading && (
                 <div className="flex justify-start">
-                  <div className="bg-slate-100 rounded-2xl rounded-tl-sm px-4 py-3">
+                  <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3">
                     <span className="inline-flex gap-1 items-center">
-                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                      <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                     </span>
                   </div>
                 </div>
@@ -398,7 +398,7 @@ export default function ChatAssistant() {
             </div>
 
             {/* Input */}
-            <div className="p-4 border-t border-slate-200 bg-white">
+            <div className="p-4 border-t border-border bg-card">
               <form onSubmit={(e) => { e.preventDefault(); sendMessage(input); }} className="flex gap-2">
                 <input
                   ref={inputRef}
@@ -406,13 +406,13 @@ export default function ChatAssistant() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder={aiAvailable === false ? "Configure ANTHROPIC_API_KEY to enable" : AGENT_PLACEHOLDER[agentType]}
-                  className="flex-1 px-4 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-400 disabled:bg-slate-50 disabled:text-slate-400"
+                  className="flex-1 px-4 py-2.5 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent disabled:bg-muted disabled:text-muted-foreground"
                   disabled={loading || aiAvailable === false}
                 />
                 <button
                   type="submit"
                   disabled={loading || !input.trim() || aiAvailable === false}
-                  className="p-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors"
+                  className="p-2.5 bg-accent hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed text-accent-foreground rounded-xl transition-colors"
                 >
                   <Send className="w-5 h-5" />
                 </button>

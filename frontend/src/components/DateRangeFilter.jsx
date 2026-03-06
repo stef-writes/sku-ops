@@ -29,7 +29,7 @@ export function DateRangeFilter({ value, onChange }) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+      <div className="flex gap-1 bg-muted rounded-lg p-1">
         {DATE_PRESETS.map((preset) => {
           const isActive = activePreset === preset.label;
           return (
@@ -38,8 +38,8 @@ export function DateRangeFilter({ value, onChange }) {
               onClick={() => onChange(preset.getValue())}
               className={`text-xs px-3 py-1.5 rounded-md transition-all font-medium ${
                 isActive
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:bg-white/60 hover:text-slate-700"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-card/60 hover:text-foreground"
               }`}
               type="button"
             >
@@ -67,7 +67,7 @@ export function DateRangeFilter({ value, onChange }) {
       {(value.from || value.to) && (
         <button
           onClick={() => onChange({ from: null, to: null })}
-          className="text-xs text-slate-400 hover:text-slate-600"
+          className="text-xs text-muted-foreground hover:text-foreground"
           type="button"
         >
           Clear

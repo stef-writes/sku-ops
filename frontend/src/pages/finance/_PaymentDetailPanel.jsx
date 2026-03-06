@@ -22,16 +22,16 @@ export function PaymentDetailPanel({ paymentId, open, onOpenChange, onViewInvoic
       <DetailSection label="Payment Details">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-xs text-slate-500">Amount</p>
-            <p className="text-2xl font-bold font-mono text-slate-900 mt-0.5">
+            <p className="text-xs text-muted-foreground">Amount</p>
+            <p className="text-2xl font-bold font-mono text-foreground mt-0.5">
               ${(payment?.amount ?? 0).toFixed(2)}
             </p>
           </div>
           <div>
-            <p className="text-xs text-slate-500">Method</p>
+            <p className="text-xs text-muted-foreground">Method</p>
             <div className="flex items-center gap-2 mt-1">
-              <CreditCard className="w-4 h-4 text-slate-400" />
-              <span className="text-sm font-medium text-slate-900">{methodLabel}</span>
+              <CreditCard className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-foreground">{methodLabel}</span>
             </div>
           </div>
           <DetailField
@@ -47,7 +47,7 @@ export function PaymentDetailPanel({ paymentId, open, onOpenChange, onViewInvoic
           <button
             type="button"
             onClick={() => onViewInvoice?.(payment.invoice_id)}
-            className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 hover:underline"
+            className="flex items-center gap-2 text-sm text-info hover:text-info hover:underline"
           >
             <FileText className="w-4 h-4" />
             View Invoice
@@ -57,7 +57,7 @@ export function PaymentDetailPanel({ paymentId, open, onOpenChange, onViewInvoic
 
       {payment?.notes && (
         <DetailSection label="Notes">
-          <p className="text-sm text-slate-600 whitespace-pre-wrap">{payment.notes}</p>
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap">{payment.notes}</p>
         </DetailSection>
       )}
 

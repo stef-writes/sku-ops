@@ -1,13 +1,13 @@
 import { cn } from "@/lib/utils";
 
 const ACCENTS = {
-  amber:   { bar: "bg-amber-400",   icon: "bg-amber-50 text-amber-600" },
-  emerald: { bar: "bg-emerald-400", icon: "bg-emerald-50 text-emerald-600" },
-  blue:    { bar: "bg-blue-400",    icon: "bg-blue-50 text-blue-600" },
-  orange:  { bar: "bg-orange-400",  icon: "bg-orange-50 text-orange-600" },
-  violet:  { bar: "bg-violet-400",  icon: "bg-violet-50 text-violet-600" },
-  rose:    { bar: "bg-rose-400",    icon: "bg-rose-50 text-rose-600" },
-  slate:   { bar: "bg-slate-200",   icon: "bg-slate-50 text-slate-500" },
+  amber:   { bar: "bg-category-1",   icon: "bg-category-1/10 text-category-1" },
+  emerald: { bar: "bg-category-2",   icon: "bg-category-2/10 text-category-2" },
+  blue:    { bar: "bg-category-3",   icon: "bg-category-3/10 text-category-3" },
+  orange:  { bar: "bg-category-5",   icon: "bg-category-5/10 text-category-5" },
+  violet:  { bar: "bg-category-4",   icon: "bg-category-4/10 text-category-4" },
+  rose:    { bar: "bg-destructive",  icon: "bg-destructive/10 text-destructive" },
+  slate:   { bar: "bg-muted",        icon: "bg-muted text-muted-foreground" },
 };
 
 /**
@@ -23,18 +23,18 @@ const ACCENTS = {
 export function StatCard({ label, value, note, icon: Icon, accent = "slate", className }) {
   const cfg = ACCENTS[accent] || ACCENTS.slate;
   return (
-    <div className={cn("bg-white rounded-xl border border-slate-200 p-5 relative overflow-hidden shadow-sm", className)}>
+    <div className={cn("bg-surface rounded-xl border border-border/80 p-5 relative overflow-hidden shadow-soft", className)}>
       <div className={cn("absolute top-0 left-0 right-0 h-[2px]", cfg.bar)} />
       <div className="flex items-start justify-between mb-3">
-        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{label}</p>
+        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
         {Icon && (
-          <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", cfg.icon)}>
+          <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center ring-1 ring-border/60", cfg.icon)}>
             <Icon className="w-4 h-4" />
           </div>
         )}
       </div>
-      <p className="text-2xl font-bold text-slate-900 tabular-nums leading-none">{value}</p>
-      {note && <p className="text-xs text-slate-400 mt-2">{note}</p>}
+      <p className="text-2xl font-bold text-foreground tabular-nums leading-none">{value}</p>
+      {note && <p className="text-xs text-muted-foreground mt-2">{note}</p>}
     </div>
   );
 }

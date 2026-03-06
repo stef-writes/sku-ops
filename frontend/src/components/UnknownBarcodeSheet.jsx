@@ -52,22 +52,22 @@ export function UnknownBarcodeSheet({ open, onOpenChange, barcode, products = []
       <SheetContent side="bottom" className="max-h-[75vh] flex flex-col rounded-t-2xl">
         <SheetHeader className="pb-2">
           <SheetTitle className="flex items-center gap-2">
-            <PackageSearch className="w-5 h-5 text-amber-500" />
+            <PackageSearch className="w-5 h-5 text-warning" />
             Barcode not recognised
           </SheetTitle>
           {barcode && (
             <SheetDescription className="font-mono text-xs">
-              Scanned: <span className="text-slate-700">{barcode}</span>
+              Scanned: <span className="text-foreground">{barcode}</span>
             </SheetDescription>
           )}
         </SheetHeader>
 
-        <p className="text-sm text-slate-500 mb-3">
+        <p className="text-sm text-muted-foreground mb-3">
           Search by product name or SKU to add it manually.
         </p>
 
         <div className="relative mb-3">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <Input
             autoFocus
             value={search}
@@ -79,19 +79,19 @@ export function UnknownBarcodeSheet({ open, onOpenChange, barcode, products = []
 
         <div className="flex-1 overflow-auto">
           {search.trim().length > 1 && results.length === 0 && (
-            <p className="text-center text-sm text-slate-400 py-8">No products match.</p>
+            <p className="text-center text-sm text-muted-foreground py-8">No products match.</p>
           )}
           {results.map((p) => (
             <button
               key={p.id}
               onClick={() => handleAdd(p)}
-              className="w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-slate-50 border-b border-slate-100 last:border-b-0 text-left"
+              className="w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-muted border-b border-border/50 last:border-b-0 text-left"
             >
               <div className="min-w-0">
-                <p className="font-mono text-[10px] text-slate-400">{p.sku}</p>
-                <p className="text-sm font-medium text-slate-900 truncate">{p.name}</p>
+                <p className="font-mono text-[10px] text-muted-foreground">{p.sku}</p>
+                <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
               </div>
-              <span className="text-xs text-slate-400 shrink-0 ml-4">
+              <span className="text-xs text-muted-foreground shrink-0 ml-4">
                 {Math.floor(p.sell_quantity ?? p.quantity)} avail
               </span>
             </button>

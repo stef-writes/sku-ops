@@ -113,27 +113,27 @@ const Vendors = () => {
           {vendors.map((vendor) => (
             <div key={vendor.id} className="card-workshop p-6" data-testid={`vendor-card-${vendor.id}`}>
               <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-slate-100 rounded-sm flex items-center justify-center">
-                  <Users className="w-6 h-6 text-slate-600" />
+                <div className="w-12 h-12 bg-muted rounded-sm flex items-center justify-center">
+                  <Users className="w-6 h-6 text-muted-foreground" />
                 </div>
                 <div className="flex gap-1">
-                  <button onClick={() => openDialog(vendor)} className="p-2 text-slate-600 hover:text-orange-500 hover:bg-orange-50 rounded-sm transition-colors" data-testid={`edit-vendor-${vendor.id}`}>
+                  <button onClick={() => openDialog(vendor)} className="p-2 text-muted-foreground hover:text-accent hover:bg-warning/10 rounded-sm transition-colors" data-testid={`edit-vendor-${vendor.id}`}>
                     <Edit2 className="w-4 h-4" />
                   </button>
-                  <button onClick={() => setDeleteConfirm({ open: true, vendor })} className="p-2 text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-sm transition-colors" data-testid={`delete-vendor-${vendor.id}`}>
+                  <button onClick={() => setDeleteConfirm({ open: true, vendor })} className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-sm transition-colors" data-testid={`delete-vendor-${vendor.id}`}>
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
-              <h3 className="font-heading font-bold text-xl text-slate-900 uppercase tracking-wide mb-2">{vendor.name}</h3>
-              {vendor.contact_name && <p className="text-slate-600 mb-3">{vendor.contact_name}</p>}
-              <div className="space-y-2 text-sm text-slate-500">
+              <h3 className="font-heading font-bold text-xl text-foreground uppercase tracking-wide mb-2">{vendor.name}</h3>
+              {vendor.contact_name && <p className="text-muted-foreground mb-3">{vendor.contact_name}</p>}
+              <div className="space-y-2 text-sm text-muted-foreground">
                 {vendor.email && <div className="flex items-center gap-2"><Mail className="w-4 h-4" /><span>{vendor.email}</span></div>}
                 {vendor.phone && <div className="flex items-center gap-2"><Phone className="w-4 h-4" /><span>{vendor.phone}</span></div>}
                 {vendor.address && <div className="flex items-center gap-2"><MapPin className="w-4 h-4" /><span className="truncate">{vendor.address}</span></div>}
               </div>
-              <div className="mt-4 pt-4 border-t border-slate-200">
-                <span className="text-xs text-slate-400 uppercase tracking-wide">{vendor.product_count || 0} products</span>
+              <div className="mt-4 pt-4 border-t border-border">
+                <span className="text-xs text-muted-foreground uppercase tracking-wide">{vendor.product_count || 0} products</span>
               </div>
             </div>
           ))}

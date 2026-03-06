@@ -63,19 +63,19 @@ export function BillingEntityDetailPanel({ entityId, open, onOpenChange }) {
         <DetailSection label="Details">
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-slate-500">Contact Name</label>
+              <label className="text-xs text-muted-foreground">Contact Name</label>
               <Input value={form.contact_name} onChange={(e) => setForm((f) => ({ ...f, contact_name: e.target.value }))} className="mt-1" />
             </div>
             <div>
-              <label className="text-xs text-slate-500">Contact Email</label>
+              <label className="text-xs text-muted-foreground">Contact Email</label>
               <Input type="email" value={form.contact_email} onChange={(e) => setForm((f) => ({ ...f, contact_email: e.target.value }))} className="mt-1" />
             </div>
             <div>
-              <label className="text-xs text-slate-500">Billing Address</label>
+              <label className="text-xs text-muted-foreground">Billing Address</label>
               <Input value={form.billing_address} onChange={(e) => setForm((f) => ({ ...f, billing_address: e.target.value }))} className="mt-1" />
             </div>
             <div>
-              <label className="text-xs text-slate-500">Payment Terms</label>
+              <label className="text-xs text-muted-foreground">Payment Terms</label>
               <Select value={form.payment_terms || "none"} onValueChange={(v) => setForm((f) => ({ ...f, payment_terms: v === "none" ? "" : v }))}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -90,7 +90,7 @@ export function BillingEntityDetailPanel({ entityId, open, onOpenChange }) {
               </Select>
             </div>
             <div>
-              <label className="text-xs text-slate-500">Xero Contact ID</label>
+              <label className="text-xs text-muted-foreground">Xero Contact ID</label>
               <Input value={form.xero_contact_id} onChange={(e) => setForm((f) => ({ ...f, xero_contact_id: e.target.value }))} className="mt-1" placeholder="Optional" />
             </div>
           </div>
@@ -100,20 +100,20 @@ export function BillingEntityDetailPanel({ entityId, open, onOpenChange }) {
           <DetailSection label="Contact">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-slate-500">Contact Name</p>
+                <p className="text-xs text-muted-foreground">Contact Name</p>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <User className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="text-sm text-slate-900">{entity?.contact_name || "—"}</span>
+                  <User className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-sm text-foreground">{entity?.contact_name || "—"}</span>
                 </div>
               </div>
               <div>
-                <p className="text-xs text-slate-500">Contact Email</p>
+                <p className="text-xs text-muted-foreground">Contact Email</p>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <Mail className="w-3.5 h-3.5 text-slate-400" />
+                  <Mail className="w-3.5 h-3.5 text-muted-foreground" />
                   {entity?.contact_email ? (
-                    <a href={`mailto:${entity.contact_email}`} className="text-sm text-blue-600 hover:underline">{entity.contact_email}</a>
+                    <a href={`mailto:${entity.contact_email}`} className="text-sm text-info hover:underline">{entity.contact_email}</a>
                   ) : (
-                    <span className="text-sm text-slate-900">—</span>
+                    <span className="text-sm text-foreground">—</span>
                   )}
                 </div>
               </div>
@@ -124,10 +124,10 @@ export function BillingEntityDetailPanel({ entityId, open, onOpenChange }) {
             <div className="grid grid-cols-2 gap-4">
               <DetailField label="Billing Address" value={entity?.billing_address} />
               <div>
-                <p className="text-xs text-slate-500">Payment Terms</p>
+                <p className="text-xs text-muted-foreground">Payment Terms</p>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <CreditCard className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="text-sm text-slate-900">{entity?.payment_terms?.replace(/_/g, " ") || "—"}</span>
+                  <CreditCard className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-sm text-foreground">{entity?.payment_terms?.replace(/_/g, " ") || "—"}</span>
                 </div>
               </div>
             </div>

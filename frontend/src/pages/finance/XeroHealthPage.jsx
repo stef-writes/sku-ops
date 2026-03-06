@@ -18,17 +18,17 @@ function formatMoney(val) {
 
 function SectionHeader({ icon: Icon, label, count, variant = "neutral" }) {
   const colors = {
-    neutral: "text-slate-500",
-    warn: "text-amber-600",
-    danger: "text-red-600",
-    ok: "text-emerald-600",
+    neutral: "text-muted-foreground",
+    warn: "text-accent",
+    danger: "text-destructive",
+    ok: "text-success",
   };
   return (
     <div className="flex items-center gap-2 mb-2">
       <Icon className={`w-4 h-4 ${colors[variant]}`} />
-      <h2 className="font-semibold text-slate-700 text-sm">{label}</h2>
+      <h2 className="font-semibold text-foreground text-sm">{label}</h2>
       <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
-        count === 0 ? "bg-slate-100 text-slate-400" : "bg-amber-100 text-amber-700"
+        count === 0 ? "bg-muted text-muted-foreground" : "bg-warning/15 text-accent"
       }`}>
         {count}
       </span>
@@ -39,7 +39,7 @@ function SectionHeader({ icon: Icon, label, count, variant = "neutral" }) {
 function EmptyRow() {
   return (
     <tr>
-      <td colSpan={99} className="px-4 py-3 text-xs text-slate-400 italic">
+      <td colSpan={99} className="px-4 py-3 text-xs text-muted-foreground italic">
         None — all clear
       </td>
     </tr>
@@ -48,25 +48,25 @@ function EmptyRow() {
 
 function DocTable({ rows, columns }) {
   return (
-    <div className="rounded-lg border border-slate-200 overflow-hidden mb-6">
+    <div className="rounded-lg border border-border overflow-hidden mb-6">
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-slate-50 border-b border-slate-200">
+          <tr className="bg-muted border-b border-border">
             {columns.map((col) => (
-              <th key={col.key} className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              <th key={col.key} className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 {col.label}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-border/50">
           {rows.length === 0 ? (
             <EmptyRow />
           ) : (
             rows.map((row, i) => (
-              <tr key={row.id ?? i} className="hover:bg-slate-50/60 transition-colors">
+              <tr key={row.id ?? i} className="hover:bg-muted/60 transition-colors">
                 {columns.map((col) => (
-                  <td key={col.key} className="px-4 py-2.5 text-slate-700">
+                  <td key={col.key} className="px-4 py-2.5 text-foreground">
                     {col.render ? col.render(row) : row[col.key] ?? "—"}
                   </td>
                 ))}
@@ -106,7 +106,7 @@ const MISMATCH_INVOICE_COLS = [
   { key: "invoice_number", label: "Invoice #" },
   { key: "billing_entity", label: "Billed to" },
   { key: "total", label: "Local Total", render: (r) => formatMoney(r.total) },
-  { key: "xero_invoice_id", label: "Xero ID", render: (r) => <span className="font-mono text-xs text-slate-500">{r.xero_invoice_id}</span> },
+  { key: "xero_invoice_id", label: "Xero ID", render: (r) => <span className="font-mono text-xs text-muted-foreground">{r.xero_invoice_id}</span> },
   { key: "created_at", label: "Created", render: (r) => formatDate(r.created_at) },
 ];
 
@@ -132,7 +132,7 @@ export default function XeroHealthPage() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 p-6 flex items-center justify-center text-slate-500 text-sm">
+      <div className="flex-1 p-6 flex items-center justify-center text-muted-foreground text-sm">
         Loading sync health…
       </div>
     );
@@ -140,7 +140,7 @@ export default function XeroHealthPage() {
 
   if (error) {
     return (
-      <div className="flex-1 p-6 flex items-center justify-center text-red-500 text-sm">
+      <div className="flex-1 p-6 flex items-center justify-center text-destructive text-sm">
         Failed to load sync health
       </div>
     );
@@ -153,8 +153,8 @@ export default function XeroHealthPage() {
     <div className="flex-1 p-6 space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Xero Sync Health</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <h1 className="text-xl font-semibold text-foreground">Xero Sync Health</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Unsynced documents, reconciliation mismatches, and failed syncs.
           </p>
         </div>
@@ -170,7 +170,7 @@ export default function XeroHealthPage() {
       </div>
 
       {allClear && (
-        <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-sm font-medium">
+        <div className="flex items-center gap-2 text-success bg-success/10 border border-success/30 rounded-lg px-4 py-3 text-sm font-medium">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           All documents are synced and reconciled — no exceptions.
         </div>
@@ -178,12 +178,12 @@ export default function XeroHealthPage() {
 
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Unsynced", value: totals.unsynced, color: totals.unsynced > 0 ? "text-amber-600" : "text-slate-400" },
-          { label: "Mismatches", value: totals.mismatch, color: totals.mismatch > 0 ? "text-red-600" : "text-slate-400" },
-          { label: "Failed", value: totals.failed, color: totals.failed > 0 ? "text-red-600" : "text-slate-400" },
+          { label: "Unsynced", value: totals.unsynced, color: totals.unsynced > 0 ? "text-accent" : "text-muted-foreground" },
+          { label: "Mismatches", value: totals.mismatch, color: totals.mismatch > 0 ? "text-destructive" : "text-muted-foreground" },
+          { label: "Failed", value: totals.failed, color: totals.failed > 0 ? "text-destructive" : "text-muted-foreground" },
         ].map((stat) => (
-          <div key={stat.label} className="bg-white border border-slate-200 rounded-lg p-4">
-            <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">{stat.label}</p>
+          <div key={stat.label} className="bg-card border border-border rounded-lg p-4">
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{stat.label}</p>
             <p className={`text-3xl font-bold mt-1 ${stat.color}`}>{stat.value ?? 0}</p>
           </div>
         ))}

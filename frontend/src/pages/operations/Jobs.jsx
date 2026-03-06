@@ -27,7 +27,7 @@ const COLUMNS = [
     label: "Code",
     type: "text",
     render: (row) => (
-      <span className="font-mono text-sm font-semibold text-slate-900">{row.code}</span>
+      <span className="font-mono text-sm font-semibold text-foreground">{row.code}</span>
     ),
   },
   {
@@ -35,7 +35,7 @@ const COLUMNS = [
     label: "Name",
     type: "text",
     render: (row) => (
-      <span className="text-slate-700">{row.name || "—"}</span>
+      <span className="text-foreground">{row.name || "—"}</span>
     ),
   },
   {
@@ -50,7 +50,7 @@ const COLUMNS = [
     label: "Address",
     type: "text",
     render: (row) => (
-      <span className="text-sm text-slate-500 truncate max-w-[200px] inline-block">
+      <span className="text-sm text-muted-foreground truncate max-w-[200px] inline-block">
         {row.service_address || "—"}
       </span>
     ),
@@ -60,7 +60,7 @@ const COLUMNS = [
     label: "Created",
     type: "date",
     render: (row) => (
-      <span className="font-mono text-xs text-slate-500">
+      <span className="font-mono text-xs text-muted-foreground">
         {row.created_at ? format(new Date(row.created_at), "MMM d, yyyy") : "—"}
       </span>
     ),
@@ -125,7 +125,7 @@ const Jobs = () => {
         {Object.entries(statusCounts).map(([status, count]) => (
           <div
             key={status}
-            className="px-3 py-1.5 rounded-lg border text-xs bg-slate-50 border-slate-200 text-slate-700"
+            className="px-3 py-1.5 rounded-lg border text-xs bg-muted border-border text-foreground"
           >
             <span className="font-semibold capitalize">{count} {status}</span>
           </div>
@@ -160,13 +160,13 @@ const Jobs = () => {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-slate-500" />
+              <Briefcase className="w-5 h-5 text-muted-foreground" />
               New Job
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4 pt-2">
             <div>
-              <Label className="text-xs text-slate-500">Job Code *</Label>
+              <Label className="text-xs text-muted-foreground">Job Code *</Label>
               <Input
                 value={createForm.code}
                 onChange={(e) => setCreateForm((f) => ({ ...f, code: e.target.value }))}
@@ -176,7 +176,7 @@ const Jobs = () => {
               />
             </div>
             <div>
-              <Label className="text-xs text-slate-500">Name</Label>
+              <Label className="text-xs text-muted-foreground">Name</Label>
               <Input
                 value={createForm.name}
                 onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}

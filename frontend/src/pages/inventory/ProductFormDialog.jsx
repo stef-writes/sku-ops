@@ -183,22 +183,22 @@ export function ProductFormDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-          <div className={`rounded-lg px-4 py-3 ${editingProduct ? "bg-amber-50/50 border border-amber-200/60" : "bg-slate-50 border border-slate-200"}`}>
+          <div className={`rounded-lg px-4 py-3 ${editingProduct ? "bg-warning/10 border border-warning/30" : "bg-muted border border-border"}`}>
             <div className="flex items-center justify-between mb-1">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">SKU</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">SKU</p>
               {editingProduct && (
-                <span className="text-[10px] font-medium text-amber-700 uppercase tracking-wider">Cannot be changed</span>
+                <span className="text-[10px] font-medium text-accent uppercase tracking-wider">Cannot be changed</span>
               )}
             </div>
             {editingProduct ? (
-              <p className="font-mono text-lg font-semibold text-slate-900">{editingProduct.sku}</p>
+              <p className="font-mono text-lg font-semibold text-foreground">{editingProduct.sku}</p>
             ) : skuPreview ? (
-              <p className="font-mono text-lg font-semibold text-slate-700">
+              <p className="font-mono text-lg font-semibold text-foreground">
                 {skuPreview}
-                <span className="text-xs font-normal text-slate-400 ml-2">(assigned on save)</span>
+                <span className="text-xs font-normal text-muted-foreground ml-2">(assigned on save)</span>
               </p>
             ) : (
-              <p className="text-sm text-slate-400">Select a department to see SKU</p>
+              <p className="text-sm text-muted-foreground">Select a department to see SKU</p>
             )}
           </div>
 
@@ -216,13 +216,13 @@ export function ProductFormDialog({
                 variant="outline"
                 onClick={suggestUnit}
                 disabled={suggestMutation.isPending || !form.name?.trim()}
-                className="h-11 px-3 border-slate-200 mt-2"
+                className="h-11 px-3 border-border mt-2"
                 title="Use AI to suggest unit from product name"
               >
                 {suggestMutation.isPending ? (
-                  <span className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin block" />
+                  <span className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin block" />
                 ) : (
-                  <Sparkles className="w-5 h-5 text-amber-500" />
+                  <Sparkles className="w-5 h-5 text-accent" />
                 )}
                 <span className="ml-2 text-sm">Suggest unit</span>
               </Button>

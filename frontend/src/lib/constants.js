@@ -86,16 +86,16 @@ export const PAGE_SIZES = {
 };
 
 export const DEPT_COLORS = {
-  LUM: "bg-amber-100 text-amber-700",
-  PLU: "bg-blue-100 text-blue-700",
-  ELE: "bg-yellow-100 text-yellow-700",
-  PNT: "bg-purple-100 text-purple-700",
-  TOL: "bg-red-100 text-red-700",
-  HDW: "bg-slate-100 text-slate-700",
-  GDN: "bg-green-100 text-green-700",
-  APP: "bg-cyan-100 text-cyan-700",
+  LUM: "bg-category-1/15 text-category-1",
+  PLU: "bg-category-3/15 text-category-3",
+  ELE: "bg-category-7/15 text-category-7",
+  PNT: "bg-category-4/15 text-category-4",
+  TOL: "bg-destructive/15 text-destructive",
+  HDW: "bg-muted text-muted-foreground",
+  GDN: "bg-category-2/15 text-category-2",
+  APP: "bg-category-6/15 text-category-6",
 };
 
 export function getDeptColor(code) {
-  return DEPT_COLORS[code] || "bg-orange-100 text-orange-700";
+  return DEPT_COLORS[code] || "bg-category-5/15 text-category-5";
 }

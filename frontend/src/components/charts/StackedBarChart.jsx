@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
-import "../../lib/chartTheme";
+import { themeColors } from "../../lib/chartTheme";
 
 /**
  * Stacked horizontal bar chart, e.g. AR aging buckets per entity.
@@ -19,6 +19,7 @@ export function StackedBarChart({
   height = 300,
 }) {
   const option = useMemo(() => {
+    const t = themeColors();
     const categories = data.map((d) => d[categoryKey] || "—");
 
     const echartSeries = seriesDefs.map((def, i) => ({
@@ -59,7 +60,7 @@ export function StackedBarChart({
       },
       legend: {
         bottom: 0,
-        textStyle: { fontSize: 11, color: "#94a3b8" },
+        textStyle: { fontSize: 11, color: t.mutedForeground },
       },
       grid: { left: 8, right: 24, top: 8, bottom: 36, containLabel: true },
       xAxis: { type: "value", show: false },
@@ -70,7 +71,7 @@ export function StackedBarChart({
         axisTick: { show: false },
         axisLabel: {
           fontSize: 12,
-          color: "#475569",
+          color: t.foreground,
           width: 160,
           overflow: "truncate",
         },

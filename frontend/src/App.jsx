@@ -35,8 +35,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-slate-600 font-heading text-xl uppercase tracking-wider">Loading...</div>
+      <div className="min-h-screen bg-muted flex items-center justify-center">
+        <div className="text-muted-foreground font-heading text-xl uppercase tracking-wider">Loading...</div>
       </div>
     );
   }
@@ -61,7 +61,7 @@ function App() {
                   <ProtectedRoute>
                     <Layout>
                       <ErrorBoundary>
-                        <Suspense fallback={<div className="min-h-[50vh] flex items-center justify-center"><div className="text-slate-400 font-heading text-sm uppercase tracking-wider">Loading...</div></div>}>
+                        <Suspense fallback={<div className="min-h-[50vh] flex items-center justify-center"><div className="text-muted-foreground font-heading text-sm uppercase tracking-wider">Loading...</div></div>}>
                         <Routes>
                           <Route path="/" element={<Dashboard />} />
                           <Route path="/pos" element={<ProtectedRoute allowedRoles={ADMIN_ROLES}><POS /></ProtectedRoute>} />

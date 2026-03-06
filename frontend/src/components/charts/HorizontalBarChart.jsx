@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from "react";
 import ReactECharts from "echarts-for-react";
-import "../../lib/chartTheme";
+import { themeColors } from "../../lib/chartTheme";
 
 /**
  * Reusable horizontal bar chart for ranked lists.
@@ -23,6 +23,7 @@ export function HorizontalBarChart({
   onBarClick,
 }) {
   const option = useMemo(() => {
+    const t = themeColors();
     const sliced = [...data].reverse();
     const categories = sliced.map((d) => {
       const raw = d[categoryKey] || "—";
@@ -39,7 +40,7 @@ export function HorizontalBarChart({
         show: true,
         position: "right",
         fontSize: 11,
-        color: "#475569",
+        color: t.foreground,
         formatter: (params) => valueFormatter(params.value),
       },
       emphasis: {
@@ -62,7 +63,7 @@ export function HorizontalBarChart({
         },
       },
       legend: showLegend
-        ? { bottom: 0, textStyle: { fontSize: 11, color: "#94a3b8" } }
+        ? { bottom: 0, textStyle: { fontSize: 11, color: t.mutedForeground } }
         : undefined,
       grid: {
         left: 8,
@@ -77,7 +78,7 @@ export function HorizontalBarChart({
         data: categories,
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { fontSize: 12, color: "#475569", width: 140, overflow: "truncate" },
+        axisLabel: { fontSize: 12, color: t.foreground, width: 140, overflow: "truncate" },
       },
       series: echartSeries,
     };

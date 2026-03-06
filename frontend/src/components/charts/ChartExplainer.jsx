@@ -36,8 +36,8 @@ export function ChartExplainer({
         onClick={() => setOpen((v) => !v)}
         className={`absolute top-1 z-10 flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium transition-all ${posClass} ${
           open
-            ? "bg-slate-100 text-slate-600"
-            : "text-slate-300 hover:text-slate-500 hover:bg-slate-50"
+            ? "bg-muted text-muted-foreground"
+            : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted"
         }`}
         aria-label={`How to read: ${title}`}
       >
@@ -47,27 +47,27 @@ export function ChartExplainer({
 
       {open && (
         <div
-          className={`absolute top-8 z-20 bg-white border border-slate-200 rounded-xl shadow-lg p-4 ${posClass} ${wide ? "w-[420px]" : "w-72"}`}
+          className={`absolute top-8 z-20 bg-card border border-border rounded-xl shadow-lg p-4 ${posClass} ${wide ? "w-[420px]" : "w-72"}`}
         >
           <div className="flex items-start justify-between mb-2">
-            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+            <h4 className="text-xs font-bold text-foreground uppercase tracking-wide">
               {title}
             </h4>
             <button
               onClick={() => setOpen(false)}
-              className="text-slate-300 hover:text-slate-500 -mt-0.5"
+              className="text-muted-foreground/60 hover:text-muted-foreground -mt-0.5"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {content ? (
-            <div className="text-xs text-slate-500 leading-relaxed">{content}</div>
+            <div className="text-xs text-muted-foreground leading-relaxed">{content}</div>
           ) : (
             <ul className="space-y-1.5">
               {bullets.map((b, i) => (
-                <li key={i} className="flex gap-2 text-xs text-slate-500 leading-relaxed">
-                  <span className="text-amber-400 mt-0.5 shrink-0">•</span>
+                <li key={i} className="flex gap-2 text-xs text-muted-foreground leading-relaxed">
+                  <span className="text-accent mt-0.5 shrink-0">&bull;</span>
                   <span>{b}</span>
                 </li>
               ))}
@@ -128,27 +128,27 @@ export function BubbleChartGuide() {
         <text x="58" y="138" fontSize="7" fill="#94a3b8">needs attention</text>
       </svg>
 
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 pt-1 border-t border-slate-100">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 pt-1 border-t border-border/50">
         <div className="flex items-start gap-2">
-          <span className="text-amber-400 mt-0.5 shrink-0">•</span>
-          <span><b className="text-slate-600">Position</b> — right = selling fast, top = high margin</span>
+          <span className="text-accent mt-0.5 shrink-0">&bull;</span>
+          <span><b className="text-muted-foreground">Position</b> — right = selling fast, top = high margin</span>
         </div>
         <div className="flex items-start gap-2">
-          <span className="text-amber-400 mt-0.5 shrink-0">•</span>
-          <span><b className="text-slate-600">Size</b> — bigger bubble = more revenue generated</span>
+          <span className="text-accent mt-0.5 shrink-0">&bull;</span>
+          <span><b className="text-muted-foreground">Size</b> — bigger bubble = more revenue generated</span>
         </div>
         <div className="flex items-start gap-2">
-          <span className="text-amber-400 mt-0.5 shrink-0">•</span>
-          <span><b className="text-slate-600">Color</b> — each color is a department</span>
+          <span className="text-accent mt-0.5 shrink-0">&bull;</span>
+          <span><b className="text-muted-foreground">Color</b> — each color is a department</span>
         </div>
         <div className="flex items-start gap-2">
-          <span className="text-amber-400 mt-0.5 shrink-0">•</span>
-          <span><b className="text-slate-600">Click</b> — tap any bubble to see full product details</span>
+          <span className="text-accent mt-0.5 shrink-0">&bull;</span>
+          <span><b className="text-muted-foreground">Click</b> — tap any bubble to see full product details</span>
         </div>
       </div>
 
-      <p className="text-[10px] text-slate-400 pt-1">
-        Top-right products are your <b className="text-emerald-500">stars</b>. Bottom-left products need <b className="text-red-400">review</b> — low sales and low margin.
+      <p className="text-[10px] text-muted-foreground pt-1">
+        Top-right products are your <b className="text-success">stars</b>. Bottom-left products need <b className="text-destructive">review</b> — low sales and low margin.
       </p>
     </div>
   );

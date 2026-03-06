@@ -66,11 +66,11 @@ export function JobDetailPanel({ jobId, open, onOpenChange }) {
           <DetailSection label="Details">
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-slate-500">Name</label>
+                <label className="text-xs text-muted-foreground">Name</label>
                 <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className="mt-1" />
               </div>
               <div>
-                <label className="text-xs text-slate-500">Status</label>
+                <label className="text-xs text-muted-foreground">Status</label>
                 <Select value={form.status} onValueChange={(v) => setForm((f) => ({ ...f, status: v }))}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -81,7 +81,7 @@ export function JobDetailPanel({ jobId, open, onOpenChange }) {
                 </Select>
               </div>
               <div>
-                <label className="text-xs text-slate-500">Notes</label>
+                <label className="text-xs text-muted-foreground">Notes</label>
                 <Textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} className="mt-1 min-h-[80px]" />
               </div>
             </div>
@@ -104,13 +104,13 @@ export function JobDetailPanel({ jobId, open, onOpenChange }) {
 
           {job?.service_address && (
             <DetailSection label="Service Address">
-              <p className="text-sm text-slate-700">{job.service_address}</p>
+              <p className="text-sm text-foreground">{job.service_address}</p>
             </DetailSection>
           )}
 
           {job?.notes && (
             <DetailSection label="Notes">
-              <p className="text-sm text-slate-600 whitespace-pre-wrap">{job.notes}</p>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{job.notes}</p>
             </DetailSection>
           )}
 

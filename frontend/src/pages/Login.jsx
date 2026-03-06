@@ -32,14 +32,14 @@ const Login = () => {
 
   return (
     <AuthLayout testId="login-page">
-      <h2 className="text-lg font-semibold text-slate-900 mb-6">Sign in to your account</h2>
+      <h2 className="text-lg font-semibold text-foreground mb-6">Sign in to your account</h2>
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <Label htmlFor="email" className="text-slate-600 font-medium text-sm">Email</Label>
+          <Label htmlFor="email" className="text-muted-foreground font-medium text-sm">Email</Label>
           <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" className="input-field mt-2" data-testid="login-email-input" />
         </div>
         <div>
-          <Label htmlFor="password" className="text-slate-600 font-medium text-sm">Password</Label>
+          <Label htmlFor="password" className="text-muted-foreground font-medium text-sm">Password</Label>
           <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="input-field mt-2" data-testid="login-password-input" />
         </div>
         <Button type="submit" disabled={loading} className="w-full btn-primary h-11 text-sm" data-testid="login-submit-btn">
@@ -47,10 +47,10 @@ const Login = () => {
           {loading ? "Signing in…" : "Sign in"}
         </Button>
       </form>
-      <p className="text-center mt-4 text-slate-400 text-xs">Demo: admin@demo.local / demo123</p>
-      <p className="text-center mt-6 text-slate-500 text-sm">
+      <p className="text-center mt-4 text-muted-foreground text-xs">Demo: admin@demo.local / demo123</p>
+      <p className="text-center mt-6 text-muted-foreground text-sm">
         Don't have an account?{" "}
-        <Link to="/register" className="text-amber-600 font-medium hover:text-amber-700 transition-colors" data-testid="register-link">Create one</Link>
+        <Link to="/register" className="text-accent font-medium hover:text-accent transition-colors" data-testid="register-link">Create one</Link>
       </p>
     </AuthLayout>
   );

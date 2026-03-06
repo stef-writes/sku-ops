@@ -1,18 +1,6 @@
 import { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
-import "../../lib/chartTheme";
-
-const DEPT_COLORS = {
-  Lumber: "#f59e0b",
-  Plumbing: "#3b82f6",
-  Electrical: "#8b5cf6",
-  Paint: "#ec4899",
-  Hardware: "#94a3b8",
-  Tools: "#06b6d4",
-  Garden: "#10b981",
-  Appliances: "#fb923c",
-};
-const FALLBACK_COLOR = "#94a3b8";
+import { themeColors } from "../../lib/chartTheme";
 
 /**
  * Bubble scatter plot: sell-through vs margin, sized by revenue, colored by department.
@@ -28,7 +16,20 @@ export function ProductBubblePlot({
   height = 420,
 }) {
   const option = useMemo(() => {
+    const t = themeColors();
     if (!products.length) return {};
+
+    const DEPT_COLORS = {
+      Lumber: t.category1,
+      Plumbing: t.category3,
+      Electrical: t.category4,
+      Paint: "#ec4899",
+      Hardware: t.mutedForeground,
+      Tools: t.category6,
+      Garden: t.category2,
+      Appliances: t.category5,
+    };
+    const FALLBACK_COLOR = t.mutedForeground;
 
     const departments = [...new Set(products.map((p) => p.department || "Other"))];
     const maxRevenue = Math.max(...products.map((p) => p.revenue || 0), 1);
@@ -55,7 +56,7 @@ export function ProductBubblePlot({
       emphasis: {
         itemStyle: {
           opacity: 1,
-          borderColor: "#1e293b",
+          borderColor: t.foreground,
           borderWidth: 2,
           shadowBlur: 8,
           shadowColor: "rgba(0,0,0,.15)",
@@ -82,7 +83,7 @@ export function ProductBubblePlot({
           const [sellThrough, margin, revenue, name, sku, units, stock] =
             params.value;
           return `<div style="font-size:12px">
-            <b>${name}</b> <span style="color:#94a3b8">${sku}</span><br/>
+            <b>${name}</b> <span style="color:${t.mutedForeground}">${sku}</span><br/>
             Margin: <b>${margin.toFixed(1)}%</b><br/>
             Sell-through: <b>${sellThrough.toFixed(1)}%</b><br/>
             Revenue: <b>$${revenue.toLocaleString("en-US", { minimumFractionDigits: 2 })}</b><br/>
@@ -92,38 +93,38 @@ export function ProductBubblePlot({
       },
       legend: {
         bottom: 0,
-        textStyle: { fontSize: 11, color: "#94a3b8" },
+        textStyle: { fontSize: 11, color: t.mutedForeground },
       },
       grid: { left: 48, right: 24, top: 32, bottom: 52, containLabel: false },
       xAxis: {
         name: "Sell-through %",
         nameLocation: "center",
         nameGap: 28,
-        nameTextStyle: { fontSize: 11, color: "#94a3b8" },
+        nameTextStyle: { fontSize: 11, color: t.mutedForeground },
         type: "value",
         min: 0,
-        splitLine: { lineStyle: { color: "#f1f5f9" } },
+        splitLine: { lineStyle: { color: t.border } },
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { fontSize: 11, color: "#94a3b8", formatter: "{value}%" },
+        axisLabel: { fontSize: 11, color: t.mutedForeground, formatter: "{value}%" },
       },
       yAxis: {
         name: "Margin %",
         nameLocation: "center",
         nameGap: 36,
-        nameTextStyle: { fontSize: 11, color: "#94a3b8" },
+        nameTextStyle: { fontSize: 11, color: t.mutedForeground },
         type: "value",
-        splitLine: { lineStyle: { color: "#f1f5f9" } },
+        splitLine: { lineStyle: { color: t.border } },
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { fontSize: 11, color: "#94a3b8", formatter: "{value}%" },
+        axisLabel: { fontSize: 11, color: t.mutedForeground, formatter: "{value}%" },
       },
       graphic: [
         {
           type: "text",
           left: 60,
           top: 36,
-          style: { text: "Slow Movers", fontSize: 10, fill: "#cbd5e1" },
+          style: { text: "Slow Movers", fontSize: 10, fill: t.muted },
         },
         {
           type: "text",
@@ -141,7 +142,7 @@ export function ProductBubblePlot({
           type: "text",
           right: 36,
           bottom: 56,
-          style: { text: "Volume Drivers", fontSize: 10, fill: "#cbd5e1" },
+          style: { text: "Volume Drivers", fontSize: 10, fill: t.muted },
         },
       ],
       series: seriesList,

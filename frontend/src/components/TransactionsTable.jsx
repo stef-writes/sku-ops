@@ -20,7 +20,7 @@ const buildColumns = (onViewJob) => [
     label: "Date",
     type: "date",
     render: (row) => (
-      <span className="font-mono text-xs text-slate-500">
+      <span className="font-mono text-xs text-muted-foreground">
         {new Date(row.created_at).toLocaleDateString()}
       </span>
     ),
@@ -32,10 +32,10 @@ const buildColumns = (onViewJob) => [
     type: "text",
     render: (row) => (
       <div className="flex items-center gap-2">
-        <HardHat className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+        <HardHat className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         <div>
-          <p className="font-medium text-slate-800">{row.contractor_name}</p>
-          <p className="text-[10px] text-slate-400">{row.contractor_company}</p>
+          <p className="font-medium text-foreground">{row.contractor_name}</p>
+          <p className="text-[10px] text-muted-foreground">{row.contractor_company}</p>
         </div>
       </div>
     ),
@@ -50,12 +50,12 @@ const buildColumns = (onViewJob) => [
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onViewJob(row.job_id); }}
-          className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline"
+          className="font-mono text-xs text-info hover:text-info hover:underline"
         >
           {row.job_id}
         </button>
       ) : (
-        <span className="text-xs text-slate-400">—</span>
+        <span className="text-xs text-muted-foreground">—</span>
       ),
   },
   { key: "billing_entity", label: "Entity", type: "enum" },
@@ -72,7 +72,7 @@ const buildColumns = (onViewJob) => [
     label: "Cost",
     type: "number",
     align: "right",
-    render: (row) => <span className="text-slate-500 tabular-nums">${(row.cost_total || 0).toFixed(2)}</span>,
+    render: (row) => <span className="text-muted-foreground tabular-nums">${(row.cost_total || 0).toFixed(2)}</span>,
     exportValue: (row) => (row.cost_total || 0).toFixed(2),
   },
   {
@@ -82,7 +82,7 @@ const buildColumns = (onViewJob) => [
     sortable: false,
     filterable: false,
     searchable: false,
-    render: (row) => <span className="text-emerald-600 tabular-nums">${((row.total || 0) - (row.cost_total || 0)).toFixed(2)}</span>,
+    render: (row) => <span className="text-success tabular-nums">${((row.total || 0) - (row.cost_total || 0)).toFixed(2)}</span>,
     exportValue: (row) => ((row.total || 0) - (row.cost_total || 0)).toFixed(2),
   },
   {
@@ -150,21 +150,21 @@ export function TransactionsTable({ dateParams }) {
         resultCount={processed.length}
         className="mb-3"
         actions={
-          <button onClick={selectAllUninvoiced} className="text-xs text-amber-500 hover:text-amber-600 font-medium">
+          <button onClick={selectAllUninvoiced} className="text-xs text-accent hover:text-accent font-medium">
             Select All Uninvoiced
           </button>
         }
       />
 
       {selectedIds.size > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 flex items-center justify-between">
-          <span className="text-sm font-semibold text-amber-700">{selectedIds.size} selected</span>
+        <div className="bg-warning/10 border border-warning/30 rounded-xl p-4 mb-4 flex items-center justify-between">
+          <span className="text-sm font-semibold text-accent">{selectedIds.size} selected</span>
           <div className="flex gap-2">
-            <button onClick={() => setSelectedIds(new Set())} className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1">Clear</button>
+            <button onClick={() => setSelectedIds(new Set())} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1">Clear</button>
             {selectedUninvoicedIds.length > 0 && (
               <button
                 onClick={() => setCreateInvoiceModalOpen(true)}
-                className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-white border border-amber-300 rounded-lg px-3 py-1.5 hover:bg-amber-50"
+                className="inline-flex items-center gap-1 text-xs font-medium text-accent bg-card border border-warning/30 rounded-lg px-3 py-1.5 hover:bg-warning/10"
               >
                 <FileText className="w-3.5 h-3.5" />
                 Create Invoice ({selectedUninvoicedIds.length})

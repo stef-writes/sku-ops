@@ -29,7 +29,7 @@ export function StockHistoryModal({ product, open, onOpenChange }) {
           <DialogTitle className="font-heading font-bold text-xl uppercase tracking-wider">
             Stock History — {product?.sku || ""}
           </DialogTitle>
-          {product?.name && <p className="text-sm text-slate-500">{product.name}</p>}
+          {product?.name && <p className="text-sm text-muted-foreground">{product.name}</p>}
         </DialogHeader>
         <div className="flex-1 overflow-auto mt-4">
           {isLoading ? (
@@ -37,11 +37,11 @@ export function StockHistoryModal({ product, open, onOpenChange }) {
               {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
             </div>
           ) : history.length === 0 ? (
-            <p className="text-slate-500 text-center py-8">No transactions yet</p>
+            <p className="text-muted-foreground text-center py-8">No transactions yet</p>
           ) : (
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50">
+                <TableRow className="bg-muted">
                   <TableHead className="font-semibold">Date</TableHead>
                   <TableHead className="font-semibold">Type</TableHead>
                   <TableHead className="font-semibold text-right">Delta</TableHead>
@@ -60,7 +60,7 @@ export function StockHistoryModal({ product, open, onOpenChange }) {
                     <TableCell className="text-right font-mono">{tx.quantity_before}</TableCell>
                     <TableCell className="text-right font-mono">{tx.quantity_after}</TableCell>
                     <TableCell className="text-sm">{tx.user_name || "—"}</TableCell>
-                    <TableCell className="text-sm font-mono text-slate-500">{tx.reference_id?.slice(0, 8) || tx.reason || "—"}</TableCell>
+                    <TableCell className="text-sm font-mono text-muted-foreground">{tx.reference_id?.slice(0, 8) || tx.reason || "—"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

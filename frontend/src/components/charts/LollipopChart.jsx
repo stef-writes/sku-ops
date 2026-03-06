@@ -1,15 +1,9 @@
 import { useMemo, useCallback } from "react";
 import ReactECharts from "echarts-for-react";
 import * as echarts from "echarts/core";
-import "../../lib/chartTheme";
+import { themeColors } from "../../lib/chartTheme";
 
-const URGENCY_COLORS = {
-  critical: "#ef4444",
-  high: "#f97316",
-  medium: "#f59e0b",
-  low: "#10b981",
-  no_data: "#cbd5e1",
-};
+/* URGENCY_COLORS moved inside useMemo — depends on runtime theme */
 
 /**
  * Lollipop chart: thin line + dot for ranked single-value data.
@@ -27,7 +21,16 @@ export function LollipopChart({
   height = 320,
 }) {
   const option = useMemo(() => {
+    const t = themeColors();
     if (!data.length) return {};
+
+    const URGENCY_COLORS = {
+      critical: t.destructive,
+      high: t.category5,
+      medium: t.category1,
+      low: t.success,
+      no_data: t.muted,
+    };
 
     const sorted = [...data].sort((a, b) => (a.value ?? Infinity) - (b.value ?? Infinity));
     const categories = sorted.map((d) => {
@@ -53,12 +56,12 @@ export function LollipopChart({
       grid: { left: 8, right: 60, top: 8, bottom: 8, containLabel: true },
       xAxis: {
         type: "value",
-        splitLine: { lineStyle: { color: "#f1f5f9" } },
+        splitLine: { lineStyle: { color: t.border } },
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {
           fontSize: 11,
-          color: "#94a3b8",
+          color: t.mutedForeground,
           formatter: (v) => `${v}d`,
         },
       },
@@ -68,7 +71,7 @@ export function LollipopChart({
         inverse: true,
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { fontSize: 11, color: "#475569", width: 140, overflow: "truncate" },
+        axisLabel: { fontSize: 11, color: t.foreground, width: 140, overflow: "truncate" },
       },
       series: [
         {
@@ -98,13 +101,13 @@ export function LollipopChart({
             show: true,
             position: "right",
             fontSize: 11,
-            color: "#475569",
+            color: t.foreground,
             formatter: (p) =>
               p.value != null ? `${Math.round(p.value)}d` : "?",
           },
           emphasis: {
             itemStyle: {
-              borderColor: "#1e293b",
+              borderColor: t.foreground,
               borderWidth: 2,
               shadowBlur: 6,
               shadowColor: "rgba(0,0,0,.15)",

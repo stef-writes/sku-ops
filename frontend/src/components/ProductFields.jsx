@@ -19,7 +19,7 @@ function FieldTip({ children }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Info className="w-3.5 h-3.5 text-slate-400 cursor-help inline-block ml-1 align-middle" />
+        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help inline-block ml-1 align-middle" />
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-[220px] text-center">
         {children}
@@ -57,7 +57,7 @@ export function ProductFields({
   const ro = readOnlyFields instanceof Set ? readOnlyFields : new Set(readOnlyFields || []);
 
   const inputCls = compact ? "input-field h-9 text-sm" : "input-workshop mt-2";
-  const labelCls = compact ? "text-slate-500 font-medium text-xs" : "text-slate-600 font-medium text-sm";
+  const labelCls = compact ? "text-muted-foreground font-medium text-xs" : "text-muted-foreground font-medium text-sm";
   const gap = compact ? "gap-2" : "gap-4";
 
   const field = (name) => fields[name] ?? "";
@@ -108,7 +108,7 @@ export function ProductFields({
               {departments.map((dept) => (
                 <SelectItem key={dept.id} value={dept.id}>
                   <span className="font-mono font-medium">{dept.code}</span>
-                  <span className="text-slate-400 mx-1.5">—</span>
+                  <span className="text-muted-foreground mx-1.5">—</span>
                   {dept.name}
                 </SelectItem>
               ))}
@@ -275,7 +275,7 @@ export function ProductFields({
             data-testid="pf-barcode"
           />
           {!compact && (
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               UPC for vendor products; leave blank to use internal SKU (Code128)
             </p>
           )}

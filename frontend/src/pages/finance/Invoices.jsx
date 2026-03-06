@@ -32,7 +32,7 @@ const COLUMNS = [
     label: "Entity",
     type: "enum",
     render: (row) => (
-      <span className="text-slate-600">{row.billing_entity || "—"}</span>
+      <span className="text-muted-foreground">{row.billing_entity || "—"}</span>
     ),
   },
   {
@@ -62,7 +62,7 @@ const COLUMNS = [
     render: (row) => {
       const d = row.invoice_date || row.created_at;
       return (
-        <span className="font-mono text-xs text-slate-500">
+        <span className="font-mono text-xs text-muted-foreground">
           {d ? format(new Date(d), "MMM d, yyyy") : "—"}
         </span>
       );
@@ -79,7 +79,7 @@ const COLUMNS = [
         row.status !== "paid" && new Date(row.due_date) < new Date();
       return (
         <span
-          className={`font-mono text-xs ${overdue ? "text-red-600 font-semibold" : "text-slate-500"}`}
+          className={`font-mono text-xs ${overdue ? "text-destructive font-semibold" : "text-muted-foreground"}`}
         >
           {format(new Date(row.due_date), "MMM d, yyyy")}
         </span>
@@ -93,7 +93,7 @@ const COLUMNS = [
     type: "number",
     align: "right",
     render: (row) => (
-      <span className="font-mono text-slate-500">
+      <span className="font-mono text-muted-foreground">
         {row.withdrawal_count ?? 0}
       </span>
     ),
@@ -180,12 +180,12 @@ const Invoices = () => {
       <div className="flex flex-col gap-4 mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
+            <h1 className="text-2xl font-semibold text-foreground tracking-tight">
               Invoices
             </h1>
             <Link
               to="/"
-              className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 mt-1 transition-colors"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mt-1 transition-colors"
             >
               Dashboard <ArrowRight className="w-3 h-3" />
             </Link>
@@ -216,10 +216,10 @@ const Invoices = () => {
         <div className="flex flex-wrap gap-2 mb-6">
           {statusSummary.map(({ status, count, total }) => {
             const cls = {
-              draft: "bg-slate-50 border-slate-200 text-slate-700",
-              approved: "bg-amber-50 border-amber-200 text-amber-700",
-              sent: "bg-blue-50 border-blue-200 text-blue-700",
-              paid: "bg-emerald-50 border-emerald-200 text-emerald-700",
+              draft: "bg-muted border-border text-foreground",
+              approved: "bg-warning/10 border-warning/30 text-accent",
+              sent: "bg-info/10 border-info/30 text-info",
+              paid: "bg-success/10 border-success/30 text-success",
             }[status];
             return (
               <div
@@ -245,8 +245,8 @@ const Invoices = () => {
       />
 
       {selectedIds.size > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 flex items-center justify-between">
-          <span className="text-sm font-semibold text-slate-700">
+        <div className="bg-info/10 border border-info/30 rounded-xl p-4 mb-4 flex items-center justify-between">
+          <span className="text-sm font-semibold text-foreground">
             {selectedIds.size} selected
           </span>
           <div className="flex gap-2">
@@ -261,7 +261,7 @@ const Invoices = () => {
               size="sm"
               onClick={handleBulkSendToXero}
               disabled={bulkSyncXero.isPending}
-              className="bg-blue-600 hover:bg-blue-700 text-white gap-1"
+              className="bg-info hover:bg-info text-white gap-1"
             >
               <Send className="w-3.5 h-3.5" />
               {bulkSyncXero.isPending
@@ -291,7 +291,7 @@ const Invoices = () => {
                 e.stopPropagation();
                 setDetailInvoiceId(inv.id);
               }}
-              className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
             >
               <FileText className="w-3.5 h-3.5" />
               View
@@ -299,7 +299,7 @@ const Invoices = () => {
             <button
               onClick={(e) => handleSendToXero(inv.id, e)}
               disabled={syncXero.isPending}
-              className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1 ml-2"
+              className="text-xs text-info hover:text-info flex items-center gap-1 ml-2"
             >
               <Send className="w-3.5 h-3.5" />
               Xero

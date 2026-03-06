@@ -57,7 +57,7 @@ export function AddressPicker({ value, onChange, placeholder = "Where are these 
 
   return (
     <div ref={wrapperRef} className="relative">
-      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
       <Input
         value={query}
         onChange={handleInputChange}
@@ -68,23 +68,23 @@ export function AddressPicker({ value, onChange, placeholder = "Where are these 
         data-testid="address-picker-input"
       />
       {open && query.trim() && (
-        <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden max-h-56 overflow-y-auto">
+        <div className="absolute z-30 left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden max-h-56 overflow-y-auto">
           {results.map((addr) => (
             <button
               key={addr.id}
               type="button"
               onClick={() => select(addr.line1)}
-              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-left border-b border-slate-100 last:border-b-0"
+              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted text-left border-b border-border/50 last:border-b-0"
             >
               {(addr.line1 || "").toLowerCase() === query.trim().toLowerCase() ? (
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                <Check className="w-4 h-4 text-success shrink-0" />
               ) : (
-                <MapPin className="w-4 h-4 text-slate-300 shrink-0" />
+                <MapPin className="w-4 h-4 text-muted-foreground/60 shrink-0" />
               )}
               <div className="min-w-0">
-                <span className="text-sm font-medium text-slate-900">{addr.label || addr.line1}</span>
+                <span className="text-sm font-medium text-foreground">{addr.label || addr.line1}</span>
                 {addr.city && (
-                  <span className="text-xs text-slate-400 ml-2">{addr.city}{addr.state ? `, ${addr.state}` : ""}</span>
+                  <span className="text-xs text-muted-foreground ml-2">{addr.city}{addr.state ? `, ${addr.state}` : ""}</span>
                 )}
               </div>
             </button>
@@ -93,7 +93,7 @@ export function AddressPicker({ value, onChange, placeholder = "Where are these 
             <button
               type="button"
               onClick={handleCreate}
-              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-emerald-50 text-left text-emerald-700"
+              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-success/10 text-left text-success"
             >
               <Plus className="w-4 h-4 shrink-0" />
               <span className="text-sm">Save <strong>{query.trim().slice(0, 40)}{query.trim().length > 40 ? "..." : ""}</strong></span>

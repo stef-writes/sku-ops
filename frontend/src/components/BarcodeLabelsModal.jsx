@@ -30,11 +30,11 @@ export function BarcodeLabelsModal({ products, open, onOpenChange }) {
         <DialogHeader>
           <DialogTitle>Print Barcode Labels</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted-foreground">
           {products?.length || 0} labels · Standard 2×1" layout · Use browser Print
         </p>
 
-        <div className="flex-1 overflow-auto border rounded-lg bg-white p-4">
+        <div className="flex-1 overflow-auto border rounded-lg bg-card p-4">
           <div
             ref={printRef}
             className="grid grid-cols-3 gap-2 print:gap-1"
@@ -46,7 +46,7 @@ export function BarcodeLabelsModal({ products, open, onOpenChange }) {
               return (
               <div
                 key={p.id}
-                className="border border-slate-200 rounded p-2 flex flex-col items-center justify-center"
+                className="border border-border rounded p-2 flex flex-col items-center justify-center"
                 style={{ minWidth: 120, minHeight: 80 }}
               >
                 <Barcode
@@ -61,7 +61,7 @@ export function BarcodeLabelsModal({ products, open, onOpenChange }) {
                 <div className="text-[10px] font-mono mt-1 text-center truncate w-full">
                   {p.sku}
                 </div>
-                <div className="text-[9px] text-slate-500 text-center truncate w-full max-w-[100px]">
+                <div className="text-[9px] text-muted-foreground text-center truncate w-full max-w-[100px]">
                   {p.name?.slice(0, 20)}
                   {p.name?.length > 20 ? "…" : ""}
                 </div>

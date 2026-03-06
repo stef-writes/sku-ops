@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
-import "../../lib/chartTheme";
+import { themeColors } from "../../lib/chartTheme";
 
 /**
  * Waterfall chart for P&L decomposition.
@@ -17,6 +17,7 @@ export function WaterfallChart({
   height = 300,
 }) {
   const option = useMemo(() => {
+    const t = themeColors();
     if (!items.length) return {};
 
     const labels = items.map((i) => i.label);
@@ -63,16 +64,16 @@ export function WaterfallChart({
         data: labels,
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { fontSize: 11, color: "#64748b", interval: 0 },
+        axisLabel: { fontSize: 11, color: t.mutedForeground, interval: 0 },
       },
       yAxis: {
         type: "value",
-        splitLine: { lineStyle: { color: "#f1f5f9" } },
+        splitLine: { lineStyle: { color: t.border } },
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {
           fontSize: 11,
-          color: "#94a3b8",
+          color: t.mutedForeground,
           formatter: (v) => valueFormatter(v),
         },
       },
@@ -91,12 +92,12 @@ export function WaterfallChart({
           stack: "waterfall",
           data: positive,
           barMaxWidth: 40,
-          itemStyle: { color: "#10b981", borderRadius: [3, 3, 0, 0] },
+          itemStyle: { color: t.success, borderRadius: [3, 3, 0, 0] },
           label: {
             show: true,
             position: "top",
             fontSize: 11,
-            color: "#475569",
+            color: t.foreground,
             formatter: (p) => (p.value > 0 ? valueFormatter(p.value) : ""),
           },
           emphasis: {
@@ -109,12 +110,12 @@ export function WaterfallChart({
           stack: "waterfall",
           data: negative,
           barMaxWidth: 40,
-          itemStyle: { color: "#f87171", borderRadius: [0, 0, 3, 3] },
+          itemStyle: { color: t.destructive, borderRadius: [0, 0, 3, 3] },
           label: {
             show: true,
             position: "bottom",
             fontSize: 11,
-            color: "#475569",
+            color: t.foreground,
             formatter: (p) => (p.value > 0 ? valueFormatter(p.value) : ""),
           },
           emphasis: {

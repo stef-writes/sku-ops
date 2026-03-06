@@ -61,13 +61,13 @@ export function ProductDetailModal({
       <DialogContent className="sm:max-w-lg rounded-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
-            <Package className="w-5 h-5 text-slate-500" />
+            <Package className="w-5 h-5 text-muted-foreground" />
             <span>{product.name}</span>
             <StockBadge product={product} />
           </DialogTitle>
-          <div className="rounded-lg bg-slate-100 border border-slate-200/60 px-3 py-2 mt-2 inline-block">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">SKU (permanent ID)</p>
-            <p className="font-mono font-semibold text-slate-900">{product.sku}</p>
+          <div className="rounded-lg bg-muted border border-border/60 px-3 py-2 mt-2 inline-block">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">SKU (permanent ID)</p>
+            <p className="font-mono font-semibold text-foreground">{product.sku}</p>
           </div>
         </DialogHeader>
 
@@ -81,45 +81,45 @@ export function ProductDetailModal({
           <TabsContent value="info" className="flex-1 overflow-auto mt-4 space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <p className="text-slate-500">Department</p>
+                <p className="text-muted-foreground">Department</p>
                 <p className="font-medium">{product.department_name || "—"}</p>
               </div>
               <div>
-                <p className="text-slate-500">Unit</p>
+                <p className="text-muted-foreground">Unit</p>
                 <p className="font-medium">
                   {product.sell_uom || "each"}
                   {(product.pack_qty || 1) > 1 ? ` ×${product.pack_qty}` : ""}
                 </p>
               </div>
               <div>
-                <p className="text-slate-500">Price</p>
+                <p className="text-muted-foreground">Price</p>
                 <p className="font-mono font-medium">${product.price?.toFixed(2) ?? "—"}</p>
               </div>
               <div>
-                <p className="text-slate-500">Cost</p>
-                <p className="font-mono text-slate-600">${(product.cost || 0).toFixed(2)}</p>
+                <p className="text-muted-foreground">Cost</p>
+                <p className="font-mono text-muted-foreground">${(product.cost || 0).toFixed(2)}</p>
               </div>
               <div>
-                <p className="text-slate-500">Quantity</p>
+                <p className="text-muted-foreground">Quantity</p>
                 <p className="font-mono font-medium">{product.quantity ?? 0}</p>
               </div>
               <div>
-                <p className="text-slate-500">Min Stock</p>
+                <p className="text-muted-foreground">Min Stock</p>
                 <p className="font-mono">{product.min_stock ?? 5}</p>
               </div>
               <div className="col-span-2">
-                <p className="text-slate-500">Scan code (barcode)</p>
+                <p className="text-muted-foreground">Scan code (barcode)</p>
                 <p className="font-mono text-sm">
                   {product.barcode || product.sku || "—"}
                   {!product.barcode && product.sku && (
-                    <span className="text-slate-400 font-normal ml-1">(uses SKU)</span>
+                    <span className="text-muted-foreground font-normal ml-1">(uses SKU)</span>
                   )}
                 </p>
               </div>
               {product.original_sku && (
                 <div className="col-span-2">
-                  <p className="text-slate-500">Vendor / original SKU</p>
-                  <p className="font-mono text-sm text-slate-600">{product.original_sku}</p>
+                  <p className="text-muted-foreground">Vendor / original SKU</p>
+                  <p className="font-mono text-sm text-muted-foreground">{product.original_sku}</p>
                 </div>
               )}
             </div>
@@ -127,7 +127,7 @@ export function ProductDetailModal({
               <>
                 <Separator />
                 <div>
-                  <p className="text-slate-500 text-sm">Description</p>
+                  <p className="text-muted-foreground text-sm">Description</p>
                   <p className="text-sm">{product.description}</p>
                 </div>
               </>
@@ -159,7 +159,7 @@ export function ProductDetailModal({
               <Button
                 variant="outline"
                 size="sm"
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
                 onClick={handleDelete}
               >
                 <Trash2 className="w-4 h-4 mr-1.5" />
@@ -169,7 +169,7 @@ export function ProductDetailModal({
           </TabsContent>
 
           <TabsContent value="printables" className="flex-1 overflow-auto mt-4 space-y-4">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted-foreground">
               Print barcode labels for this product (2×1" format).
             </p>
             {hasBarcode ? (
@@ -194,7 +194,7 @@ export function ProductDetailModal({
                 </Button>
               </div>
             ) : (
-              <p className="text-sm text-amber-600">
+              <p className="text-sm text-accent">
                 No barcode or SKU set. Edit the product to add a barcode.
               </p>
             )}
@@ -202,24 +202,24 @@ export function ProductDetailModal({
 
           <TabsContent value="history" className="flex-1 overflow-auto mt-4">
             {historyLoading ? (
-              <p className="text-sm text-slate-500">Loading…</p>
+              <p className="text-sm text-muted-foreground">Loading…</p>
             ) : recentHistory.length === 0 ? (
-              <p className="text-sm text-slate-500">No transactions yet</p>
+              <p className="text-sm text-muted-foreground">No transactions yet</p>
             ) : (
               <div className="space-y-2">
                 {recentHistory.map((tx) => (
                   <div
                     key={tx.id}
-                    className="flex items-center justify-between text-sm py-2 border-b border-slate-100 last:border-0"
+                    className="flex items-center justify-between text-sm py-2 border-b border-border/50 last:border-0"
                   >
-                    <span className="text-slate-600">
+                    <span className="text-muted-foreground">
                       {TX_TYPE_LABELS[tx.transaction_type] || tx.transaction_type}
                     </span>
                     <span className="font-mono">
                       {tx.quantity_delta > 0 ? "+" : ""}
                       {tx.quantity_delta}
                     </span>
-                    <span className="text-slate-400 text-xs">
+                    <span className="text-muted-foreground text-xs">
                       {tx.created_at
                         ? format(new Date(tx.created_at), "MMM d, HH:mm")
                         : "—"}

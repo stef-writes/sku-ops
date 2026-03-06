@@ -93,7 +93,7 @@ export function EntityFormDialog({
 
             return (
               <div key={field.name}>
-                <Label className="text-slate-700 font-semibold uppercase text-sm tracking-wide">
+                <Label className="text-foreground font-semibold uppercase text-sm tracking-wide">
                   {field.label}
                 </Label>
                 {field.type === "textarea" ? (
@@ -135,10 +135,10 @@ export function EntityFormDialog({
                   />
                 )}
                 {field.note && isEditing && (
-                  <p className="text-xs text-slate-400 mt-1">{field.note}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{field.note}</p>
                 )}
                 {error && (
-                  <p className="text-xs text-red-500 mt-1">{error.message}</p>
+                  <p className="text-xs text-destructive mt-1">{error.message}</p>
                 )}
               </div>
             );

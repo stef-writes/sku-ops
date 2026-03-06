@@ -1,12 +1,6 @@
 import { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
-import "../../lib/chartTheme";
-
-const DEFAULT_ZONES = [
-  { max: 0.33, color: "#ef4444" },
-  { max: 0.66, color: "#f59e0b" },
-  { max: 1, color: "#10b981" },
-];
+import { themeColors } from "../../lib/chartTheme";
 
 /**
  * Thin-arc gauge ring for a single KPI value.
@@ -23,11 +17,17 @@ export function GaugeRing({
   max = 100,
   label = "",
   unit = "",
-  zones = DEFAULT_ZONES,
+  zones,
   size = 160,
 }) {
   const option = useMemo(() => {
-    const colorStops = zones.map((z) => [z.max, z.color]);
+    const t = themeColors();
+    const resolvedZones = zones ?? [
+      { max: 0.33, color: t.destructive },
+      { max: 0.66, color: t.category1 },
+      { max: 1, color: t.success },
+    ];
+    const colorStops = resolvedZones.map((z) => [z.max, z.color]);
 
     return {
       series: [
@@ -54,7 +54,7 @@ export function GaugeRing({
             fontSize: 22,
             fontWeight: 700,
             fontFamily: "Inter, system-ui, sans-serif",
-            color: "#1e293b",
+            color: t.foreground,
             offsetCenter: [0, "0%"],
             formatter: (v) => {
               const display = Number.isInteger(v) ? v : v.toFixed(1);
@@ -63,7 +63,7 @@ export function GaugeRing({
           },
           title: {
             fontSize: 11,
-            color: "#94a3b8",
+            color: t.mutedForeground,
             offsetCenter: [0, "28%"],
           },
           data: [{ value, name: label }],

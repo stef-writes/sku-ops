@@ -123,10 +123,10 @@ export function ReceiveReviewModal({
       <DialogContent className="sm:max-w-2xl rounded-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
-            <Package className="w-5 h-5 text-slate-500" />
+            <Package className="w-5 h-5 text-muted-foreground" />
             Review before receiving
           </DialogTitle>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Match items to existing products or create new ones. Verify details before adding to inventory.
           </p>
         </DialogHeader>
@@ -134,7 +134,7 @@ export function ReceiveReviewModal({
         <div className="flex-1 overflow-auto space-y-5 py-2">
           {matchedItems.length > 0 && (
             <div className="space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-500">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-success">
                 Matched — will update existing stock ({matchedItems.length})
               </p>
               {matchedItems.map((item) => (
@@ -153,7 +153,7 @@ export function ReceiveReviewModal({
 
           {newItems.length > 0 && (
             <div className="space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-500">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-warning">
                 New — will create product ({newItems.length})
               </p>
               {newItems.map((item) => (
@@ -172,14 +172,14 @@ export function ReceiveReviewModal({
           )}
         </div>
 
-        <div className="border-t border-slate-100 pt-4 space-y-3">
+        <div className="border-t border-border/50 pt-4 space-y-3">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-500">
+            <span className="text-muted-foreground">
               {resolvedItems.length} item{resolvedItems.length !== 1 ? "s" : ""}
               {matchedItems.length > 0 && ` (${matchedItems.length} matched, ${newItems.length} new)`}
             </span>
             {totalCost > 0 && (
-              <span className="font-mono text-slate-700">
+              <span className="font-mono text-foreground">
                 Est. cost: ${totalCost.toFixed(2)}
               </span>
             )}
@@ -214,7 +214,7 @@ function MatchedCard({ item, matchState, onSearch, onConfirmMatch, onClearMatch,
   const newQty = currentQty + deliveredQty;
 
   return (
-    <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/30 space-y-3">
+    <div className="p-4 rounded-xl border border-success/30 bg-success/10 space-y-3">
       <ProductMatchPicker
         matched={matched}
         options={matchState.options || []}
@@ -225,22 +225,22 @@ function MatchedCard({ item, matchState, onSearch, onConfirmMatch, onClearMatch,
       />
 
       <div className="grid grid-cols-3 gap-3 text-sm">
-        <div className="bg-white rounded-lg border border-slate-200 px-3 py-2">
-          <p className="text-[10px] font-medium text-slate-400 uppercase">Current stock</p>
-          <p className="font-mono font-semibold text-slate-700">{currentQty}</p>
+        <div className="bg-card rounded-lg border border-border px-3 py-2">
+          <p className="text-[10px] font-medium text-muted-foreground uppercase">Current stock</p>
+          <p className="font-mono font-semibold text-foreground">{currentQty}</p>
         </div>
         <div className="flex items-center justify-center">
-          <ArrowRight className="w-4 h-4 text-slate-300" />
+          <ArrowRight className="w-4 h-4 text-muted-foreground/60" />
         </div>
-        <div className="bg-white rounded-lg border border-emerald-200 px-3 py-2">
-          <p className="text-[10px] font-medium text-emerald-500 uppercase">New stock</p>
-          <p className="font-mono font-semibold text-emerald-700">{newQty}</p>
+        <div className="bg-card rounded-lg border border-success/30 px-3 py-2">
+          <p className="text-[10px] font-medium text-success uppercase">New stock</p>
+          <p className="font-mono font-semibold text-success">{newQty}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label className="text-slate-500 text-xs">Delivered qty</Label>
+          <Label className="text-muted-foreground text-xs">Delivered qty</Label>
           <Input
             type="number"
             min="0"
@@ -251,7 +251,7 @@ function MatchedCard({ item, matchState, onSearch, onConfirmMatch, onClearMatch,
           />
         </div>
         <div>
-          <Label className="text-slate-500 text-xs">Cost (for WAC)</Label>
+          <Label className="text-muted-foreground text-xs">Cost (for WAC)</Label>
           <Input
             type="number"
             step="0.01"
@@ -268,7 +268,7 @@ function MatchedCard({ item, matchState, onSearch, onConfirmMatch, onClearMatch,
 
 function NewCard({ item, matchState, departments, onSearch, onConfirmMatch, onClearMatch, onChange }) {
   return (
-    <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/30 space-y-3">
+    <div className="p-4 rounded-xl border border-warning/30 bg-warning/10 space-y-3">
       <ProductMatchPicker
         matched={null}
         options={matchState.options || []}
@@ -310,7 +310,7 @@ function NewCard({ item, matchState, departments, onSearch, onConfirmMatch, onCl
       />
 
       {item.original_sku && (
-        <p className="text-xs text-slate-400 font-mono">
+        <p className="text-xs text-muted-foreground font-mono">
           Vendor SKU: {item.original_sku}
         </p>
       )}

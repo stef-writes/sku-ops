@@ -69,24 +69,24 @@ const ScanModePage = () => {
   };
 
   const statusConfig = {
-    added:        { color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200", label: "Added" },
-    not_found:    { color: "text-amber-600",   bg: "bg-amber-50 border-amber-200",     label: "Not found" },
-    invalid:      { color: "text-red-600",     bg: "bg-red-50 border-red-200",         label: "Invalid barcode" },
-    out_of_stock: { color: "text-slate-500",   bg: "bg-slate-50 border-slate-200",     label: "Out of stock" },
+    added:        { color: "text-success", bg: "bg-success/10 border-success/30", label: "Added" },
+    not_found:    { color: "text-accent",   bg: "bg-warning/10 border-warning/30",     label: "Not found" },
+    invalid:      { color: "text-destructive",     bg: "bg-destructive/10 border-destructive/30",         label: "Invalid barcode" },
+    out_of_stock: { color: "text-muted-foreground",   bg: "bg-muted border-border",     label: "Out of stock" },
   };
 
   const status = lastScanned ? statusConfig[lastScanned.status] : null;
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50">
+    <div className="flex flex-col h-screen bg-muted">
 
       {/* ── Scan indicator ── */}
-      <div className="flex-shrink-0 bg-white border-b border-slate-200 p-6">
+      <div className="flex-shrink-0 bg-card border-b border-border p-6">
         <div className="max-w-xl mx-auto">
-          <div className={`rounded-2xl border-2 p-5 mb-4 transition-colors ${status ? status.bg : "bg-slate-50 border-slate-200"}`}>
+          <div className={`rounded-2xl border-2 p-5 mb-4 transition-colors ${status ? status.bg : "bg-muted border-border"}`}>
             <div className="flex items-center gap-3 mb-3">
-              <ScanLine className={`w-6 h-6 ${status ? status.color : "text-slate-400"}`} />
-              <span className={`font-semibold text-lg ${status ? status.color : "text-slate-400"}`}>
+              <ScanLine className={`w-6 h-6 ${status ? status.color : "text-muted-foreground"}`} />
+              <span className={`font-semibold text-lg ${status ? status.color : "text-muted-foreground"}`}>
                 {lastScanned
                   ? `${status?.label}: ${lastScanned.name || lastScanned.sku}`
                   : "Ready to scan…"}
@@ -104,7 +104,7 @@ const ScanModePage = () => {
               disabled={scanner.scanning}
             />
           </div>
-          <p className="text-xs text-center text-slate-400">
+          <p className="text-xs text-center text-muted-foreground">
             {scanner.scanning ? "Looking up…" : "Point scanner at barcode and pull trigger"}
           </p>
         </div>
@@ -114,24 +114,24 @@ const ScanModePage = () => {
       <div className="flex-1 overflow-auto p-4">
         <div className="max-w-xl mx-auto">
           {items.length === 0 ? (
-            <div className="text-center py-16 text-slate-400">
+            <div className="text-center py-16 text-muted-foreground">
               <CheckCircle2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
               <p className="text-sm">Scan items to add them to your request</p>
             </div>
           ) : (
             <div className="space-y-2">
               {items.map((item) => (
-                <div key={item.product_id} className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-center gap-3">
+                <div key={item.product_id} className="bg-card border border-border rounded-xl px-4 py-3 flex items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="font-mono text-[10px] text-slate-400">{item.sku}</p>
-                    <p className="font-medium text-slate-900 truncate">{item.name}</p>
+                    <p className="font-mono text-[10px] text-muted-foreground">{item.sku}</p>
+                    <p className="font-medium text-foreground truncate">{item.name}</p>
                   </div>
                   <QuantityControl
                     value={item.quantity}
                     onChange={(v) => updateQuantity(item.product_id, v)}
                     max={item.max_quantity}
                   />
-                  <button onClick={() => removeItem(item.product_id)} className="text-slate-300 hover:text-red-500 transition-colors p-1">
+                  <button onClick={() => removeItem(item.product_id)} className="text-muted-foreground/60 hover:text-destructive transition-colors p-1">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -142,11 +142,11 @@ const ScanModePage = () => {
       </div>
 
       {/* ── Footer ── */}
-      <div className="flex-shrink-0 bg-white border-t border-slate-200 p-4 safe-area-bottom">
+      <div className="flex-shrink-0 bg-card border-t border-border p-4 safe-area-bottom">
         <div className="max-w-xl mx-auto flex items-center gap-4">
           <div className="flex-1">
-            <p className="text-xs text-slate-500">{items.length} item{items.length !== 1 ? "s" : ""}</p>
-            <p className="font-semibold text-slate-900 tabular-nums">${subtotal.toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground">{items.length} item{items.length !== 1 ? "s" : ""}</p>
+            <p className="font-semibold text-foreground tabular-nums">${subtotal.toFixed(2)}</p>
           </div>
           <Button
             onClick={handleSubmit}

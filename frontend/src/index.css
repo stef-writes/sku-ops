@@ -15,45 +15,67 @@ code, .font-mono {
   font-family: 'JetBrains Mono', source-code-pro, Menlo, Monaco, monospace;
 }
 
-/* Design tokens - polished SaaS */
+/* Design tokens - dark tech */
 @layer base {
   :root {
-    --background: 220 20% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 222 47% 11%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-    --accent: 24 95% 53%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 84% 60%;
+    --background: 224 36% 8%;
+    --foreground: 210 30% 96%;
+    --card: 223 24% 12%;
+    --card-foreground: 210 30% 96%;
+    --popover: 223 24% 13%;
+    --popover-foreground: 210 30% 96%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 224 32% 10%;
+    --secondary: 223 20% 18%;
+    --secondary-foreground: 210 30% 96%;
+    --muted: 223 20% 16%;
+    --muted-foreground: 215 16% 70%;
+    --accent: 199 92% 54%;
+    --accent-foreground: 224 32% 10%;
+    --destructive: 0 72% 56%;
     --destructive-foreground: 0 0% 98%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 24 95% 53%;
-    --chart-1: 24 95% 53%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --border: 223 18% 24%;
+    --input: 223 18% 24%;
+    --ring: 199 92% 54%;
+    --chart-1: 199 92% 54%;
+    --chart-2: 217 91% 60%;
+    --chart-3: 262 83% 68%;
+    --chart-4: 160 84% 42%;
+    --chart-5: 36 95% 58%;
     --radius: 0.5rem;
     --radius-lg: 0.75rem;
-    --success: 142 76% 36%;
+    --success: 160 84% 42%;
     --success-foreground: 0 0% 100%;
-    --warning: 45 93% 47%;
-    --warning-foreground: 0 0% 0%;
+    --warning: 36 95% 58%;
+    --warning-foreground: 222 47% 10%;
     --info: 217 91% 60%;
     --info-foreground: 0 0% 100%;
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-sm: 0 2px 8px 0 rgb(0 0 0 / 0.25);
+    --shadow: 0 4px 16px 0 rgb(0 0 0 / 0.28), 0 2px 6px -1px rgb(0 0 0 / 0.22);
+    --shadow-md: 0 10px 28px -8px rgb(0 0 0 / 0.35), 0 6px 10px -6px rgb(0 0 0 / 0.25);
+    --shadow-lg: 0 22px 48px -18px rgb(0 0 0 / 0.44), 0 10px 20px -10px rgb(0 0 0 / 0.28);
+
+    --sidebar: 224 40% 7%;
+    --sidebar-foreground: 210 30% 96%;
+    --sidebar-muted: 216 15% 66%;
+    --sidebar-border: 223 28% 17%;
+    --sidebar-accent: 199 92% 54%;
+
+    --surface: 223 24% 12%;
+    --surface-muted: 223 20% 16%;
+    --surface-subtle: 223 18% 14%;
+
+    --accent-gradient-from: 199 92% 54%;
+    --accent-gradient-to: 217 91% 60%;
+
+    --category-1: 199 92% 54%;
+    --category-2: 160 84% 42%;
+    --category-3: 217 91% 60%;
+    --category-4: 262 83% 68%;
+    --category-5: 36 95% 58%;
+    --category-6: 319 83% 62%;
+    --category-7: 43 96% 56%;
+    --category-8: 215 16% 70%;
   }
 }
 
@@ -73,36 +95,36 @@ code, .font-mono {
 
 /* Polished button variants */
 .btn-primary {
-  @apply bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-lg shadow-sm hover:shadow transition-all duration-200 active:scale-[0.98];
+  @apply bg-gradient-to-r from-accent-gradient-from to-accent-gradient-to hover:from-accent-gradient-from/90 hover:to-accent-gradient-to/90 text-accent-foreground font-semibold rounded-lg shadow-sm hover:shadow transition-all duration-200 active:scale-[0.98];
 }
 
 .btn-secondary {
-  @apply bg-white border border-slate-200 text-slate-700 font-medium hover:bg-slate-50 hover:border-slate-300 rounded-lg shadow-sm transition-all duration-200;
+  @apply bg-card border border-border text-foreground font-medium hover:bg-muted hover:border-border rounded-lg shadow-sm transition-all duration-200;
 }
 
-/* Card variants - refined SaaS */
+/* Card variants */
 .card-elevated {
-  @apply bg-white rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-200;
+  @apply bg-card rounded-xl border border-border/70 shadow-sm hover:shadow-md hover:border-accent/30 transition-all duration-200;
 }
 
 .card-subtle {
-  @apply bg-white/80 backdrop-blur-sm rounded-xl border border-slate-200/60 shadow-sm;
+  @apply bg-surface-subtle/80 backdrop-blur-sm rounded-xl border border-border/60 shadow-sm;
 }
 
-/* Input - polished */
+/* Input */
 .input-field {
-  @apply h-11 px-4 rounded-lg border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 transition-all duration-200;
+  @apply h-11 px-4 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground transition-all duration-200;
 }
 
 .input-field:hover {
-  @apply border-slate-300;
+  @apply border-muted-foreground/30;
 }
 
 .input-field:focus {
-  @apply outline-none ring-2 ring-amber-500/20 border-amber-500;
+  @apply outline-none ring-2 ring-accent/20 border-accent;
 }
 
-/* Legacy aliases for gradual migration */
+/* Legacy aliases */
 .input-workshop {
   @apply input-field;
 }
@@ -113,48 +135,48 @@ code, .font-mono {
 
 /* SKU / Monospace styling */
 .sku-text {
-  @apply font-mono text-sm tracking-wide text-slate-600;
+  @apply font-mono text-sm tracking-wide text-muted-foreground;
 }
 
-/* Status badges - refined */
+/* Status badges */
 .badge-success {
-  @apply bg-emerald-500/15 text-emerald-700 px-2.5 py-1 rounded-md text-xs font-medium;
+  @apply bg-success/15 text-success px-2.5 py-1 rounded-md text-xs font-medium;
 }
 
 .badge-warning {
-  @apply bg-amber-500/15 text-amber-700 px-2.5 py-1 rounded-md text-xs font-medium;
+  @apply bg-warning/15 text-warning px-2.5 py-1 rounded-md text-xs font-medium;
 }
 
 .badge-error {
-  @apply bg-red-500/15 text-red-700 px-2.5 py-1 rounded-md text-xs font-medium;
+  @apply bg-destructive/15 text-destructive px-2.5 py-1 rounded-md text-xs font-medium;
 }
 
-/* Sidebar - refined */
+/* Sidebar */
 .sidebar-link {
-  @apply flex items-center gap-3 px-3 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all duration-200;
+  @apply flex items-center gap-3 px-3 py-2.5 text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-foreground/10 rounded-lg transition-all duration-200;
 }
 
 .sidebar-link.active {
-  @apply bg-white/10 text-white;
-  box-shadow: inset 3px 0 0 0 rgb(251 191 36);
+  @apply bg-sidebar-foreground/10 text-sidebar-foreground;
+  box-shadow: inset 3px 0 0 0 hsl(var(--sidebar-accent));
 }
 
-/* Table - polished */
+/* Table */
 .table-workshop th {
-  @apply bg-slate-50/80 text-slate-600 font-medium text-xs tracking-wider px-5 py-3.5 text-left border-b border-slate-200;
+  @apply bg-surface-muted/80 text-muted-foreground font-medium text-xs tracking-wider px-5 py-3.5 text-left border-b border-border;
 }
 
 .table-workshop td {
-  @apply px-5 py-3.5 border-b border-slate-100 text-slate-700;
+  @apply px-5 py-3.5 border-b border-border/50 text-foreground;
 }
 
 .table-workshop tbody tr:hover td {
-  @apply bg-slate-50/50;
+  @apply bg-surface-muted/60;
 }
 
-/* POS Grid item - refined */
+/* POS Grid item */
 .pos-item {
-  @apply bg-white rounded-xl border border-slate-200/80 overflow-hidden cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md hover:border-amber-200 hover:-translate-y-0.5;
+  @apply bg-card rounded-xl border border-border/80 overflow-hidden cursor-pointer transition-all duration-200 shadow-sm hover:shadow-md hover:border-accent/30 hover:-translate-y-0.5;
 }
 
 .pos-item:active {
@@ -163,10 +185,10 @@ code, .font-mono {
 
 /* AI feature accent */
 .ai-accent {
-  @apply bg-gradient-to-r from-violet-500/10 via-amber-500/10 to-orange-500/10 border border-violet-200/50;
+  @apply bg-gradient-to-r from-category-4/10 via-accent/10 to-category-3/10 border border-accent/25;
 }
 
-/* Scrollbar - refined */
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -177,11 +199,11 @@ code, .font-mono {
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 rounded-full;
+  @apply bg-sidebar-muted/50 rounded-full;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-400;
+  @apply bg-sidebar-muted/70;
 }
 
 /* Animations */
@@ -206,7 +228,7 @@ code, .font-mono {
 }
 
 .animate-shimmer {
-  background: linear-gradient(90deg, transparent, rgba(251,191,36,0.1), transparent);
+  background: linear-gradient(90deg, transparent, hsl(var(--accent) / 0.1), transparent);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }

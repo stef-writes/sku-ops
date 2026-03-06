@@ -125,7 +125,7 @@ const Contractors = () => {
 
       <div className="mb-6">
         <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
           <Input
             type="text"
             value={search}
@@ -139,9 +139,9 @@ const Contractors = () => {
 
       {contractors.length === 0 ? (
         <div className="card-workshop p-12 text-center">
-          <HardHat className="w-16 h-16 mx-auto mb-4 text-slate-300" />
-          <p className="text-slate-500 font-medium">{search.trim() ? "No contractors match your search" : "No contractors yet"}</p>
-          <p className="text-slate-400 text-sm mb-4">{search.trim() ? "Try a different search term" : "Add contractors to allow material withdrawals"}</p>
+          <HardHat className="w-16 h-16 mx-auto mb-4 text-muted-foreground/60" />
+          <p className="text-muted-foreground font-medium">{search.trim() ? "No contractors match your search" : "No contractors yet"}</p>
+          <p className="text-muted-foreground text-sm mb-4">{search.trim() ? "Try a different search term" : "Add contractors to allow material withdrawals"}</p>
           <Button onClick={() => openDialog()} className="btn-primary">
             <Plus className="w-5 h-5 mr-2" />
             Add First Contractor
@@ -153,32 +153,32 @@ const Contractors = () => {
             <div key={contractor.id} className={`card-workshop p-6 ${!contractor.is_active ? "opacity-60" : ""}`} data-testid={`contractor-card-${contractor.id}`}>
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className={`w-12 h-12 rounded-sm flex items-center justify-center ${contractor.is_active ? "bg-green-100" : "bg-slate-100"}`}>
-                    <HardHat className={`w-6 h-6 ${contractor.is_active ? "text-green-600" : "text-slate-400"}`} />
+                  <div className={`w-12 h-12 rounded-sm flex items-center justify-center ${contractor.is_active ? "bg-success/15" : "bg-muted"}`}>
+                    <HardHat className={`w-6 h-6 ${contractor.is_active ? "text-success" : "text-muted-foreground"}`} />
                   </div>
                   {!contractor.is_active && <span className="badge-error text-xs">Disabled</span>}
                 </div>
                 <div className="flex gap-1">
-                  <button onClick={() => toggleActive(contractor)} className="p-2 text-slate-600 hover:text-blue-500 hover:bg-blue-50 rounded-sm transition-colors" title={contractor.is_active ? "Disable" : "Enable"} data-testid={`toggle-contractor-${contractor.id}`}>
+                  <button onClick={() => toggleActive(contractor)} className="p-2 text-muted-foreground hover:text-info hover:bg-info/10 rounded-sm transition-colors" title={contractor.is_active ? "Disable" : "Enable"} data-testid={`toggle-contractor-${contractor.id}`}>
                     {contractor.is_active ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
                   </button>
-                  <button onClick={() => openDialog(contractor)} className="p-2 text-slate-600 hover:text-orange-500 hover:bg-orange-50 rounded-sm transition-colors" data-testid={`edit-contractor-${contractor.id}`}>
+                  <button onClick={() => openDialog(contractor)} className="p-2 text-muted-foreground hover:text-accent hover:bg-warning/10 rounded-sm transition-colors" data-testid={`edit-contractor-${contractor.id}`}>
                     <Edit2 className="w-4 h-4" />
                   </button>
-                  <button onClick={() => setDeleteConfirm({ open: true, contractor })} className="p-2 text-slate-600 hover:text-red-500 hover:bg-red-50 rounded-sm transition-colors" data-testid={`delete-contractor-${contractor.id}`}>
+                  <button onClick={() => setDeleteConfirm({ open: true, contractor })} className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-sm transition-colors" data-testid={`delete-contractor-${contractor.id}`}>
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
-              <h3 className="font-heading font-bold text-xl text-slate-900 uppercase tracking-wide mb-2">{contractor.name}</h3>
-              <div className="space-y-2 text-sm text-slate-500">
+              <h3 className="font-heading font-bold text-xl text-foreground uppercase tracking-wide mb-2">{contractor.name}</h3>
+              <div className="space-y-2 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2"><Mail className="w-4 h-4" /><span>{contractor.email}</span></div>
                 {contractor.phone && <div className="flex items-center gap-2"><Phone className="w-4 h-4" /><span>{contractor.phone}</span></div>}
                 {contractor.company && <div className="flex items-center gap-2"><Building2 className="w-4 h-4" /><span>{contractor.company}</span></div>}
                 {contractor.billing_entity && <div className="flex items-center gap-2"><DollarSign className="w-4 h-4" /><span className="text-xs">Bills to: {contractor.billing_entity}</span></div>}
               </div>
-              <div className="mt-4 pt-4 border-t border-slate-200">
-                <span className="text-xs text-slate-400">Created {new Date(contractor.created_at).toLocaleDateString()}</span>
+              <div className="mt-4 pt-4 border-t border-border">
+                <span className="text-xs text-muted-foreground">Created {new Date(contractor.created_at).toLocaleDateString()}</span>
               </div>
             </div>
           ))}

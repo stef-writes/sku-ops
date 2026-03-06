@@ -58,7 +58,7 @@ export function JobPicker({ value, onChange, placeholder = "e.g. JOB-2024-001", 
 
   return (
     <div ref={wrapperRef} className="relative">
-      <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+      <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
       <Input
         ref={inputRef}
         value={query}
@@ -70,23 +70,23 @@ export function JobPicker({ value, onChange, placeholder = "e.g. JOB-2024-001", 
         data-testid="job-picker-input"
       />
       {open && query.trim() && (
-        <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden max-h-56 overflow-y-auto">
+        <div className="absolute z-30 left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden max-h-56 overflow-y-auto">
           {results.map((job) => (
             <button
               key={job.id}
               type="button"
               onClick={() => select(job.code)}
-              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-left border-b border-slate-100 last:border-b-0"
+              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted text-left border-b border-border/50 last:border-b-0"
             >
               {job.code.toLowerCase() === query.trim().toLowerCase() ? (
-                <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                <Check className="w-4 h-4 text-success shrink-0" />
               ) : (
-                <FileText className="w-4 h-4 text-slate-300 shrink-0" />
+                <FileText className="w-4 h-4 text-muted-foreground/60 shrink-0" />
               )}
               <div className="min-w-0">
-                <span className="font-mono text-sm font-medium text-slate-900">{job.code}</span>
+                <span className="font-mono text-sm font-medium text-foreground">{job.code}</span>
                 {job.name && job.name !== job.code && (
-                  <span className="text-xs text-slate-400 ml-2">{job.name}</span>
+                  <span className="text-xs text-muted-foreground ml-2">{job.name}</span>
                 )}
               </div>
             </button>
@@ -95,7 +95,7 @@ export function JobPicker({ value, onChange, placeholder = "e.g. JOB-2024-001", 
             <button
               type="button"
               onClick={handleCreate}
-              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-emerald-50 text-left text-emerald-700"
+              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-success/10 text-left text-success"
             >
               <Plus className="w-4 h-4 shrink-0" />
               <span className="text-sm">Create <strong>{query.trim()}</strong></span>

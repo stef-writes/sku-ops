@@ -220,12 +220,12 @@ export function DataTable({
 
   return (
     <div className={cn("space-y-0", className)}>
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
         {showHeader && (
-          <div className="px-5 py-3 border-b border-slate-100 flex flex-wrap items-center gap-3 justify-between">
+          <div className="px-5 py-3 border-b border-border/50 flex flex-wrap items-center gap-3 justify-between">
             <div className="flex items-center gap-3">
               {title && (
-                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                   {title}
                   {filteredData.length !== data.length
                     ? ` (${filteredData.length}/${data.length})`
@@ -236,7 +236,7 @@ export function DataTable({
             <div className="flex items-center gap-2">
               {searchable && (
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <input
                     type="text"
                     placeholder="Search…"
@@ -245,7 +245,7 @@ export function DataTable({
                       setSearch(e.target.value);
                       setPage(1);
                     }}
-                    className="h-8 pl-8 pr-3 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400 w-48"
+                    className="h-8 pl-8 pr-3 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent w-48"
                   />
                 </div>
               )}
@@ -270,20 +270,20 @@ export function DataTable({
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
+              <TableRow className="bg-muted/80 hover:bg-muted/80">
                 {selectable && (
                   <TableHead className="w-10 px-3">
                     <button
                       type="button"
                       onClick={toggleAll}
-                      className="text-slate-400 hover:text-slate-600"
+                      className="text-muted-foreground hover:text-foreground"
                     >
                       {filteredData.length > 0 &&
                       (isSelectable
                         ? filteredData.filter(isSelectable)
                         : filteredData
                       ).every((r) => selectedSet.has(r.id)) ? (
-                        <CheckSquare className="w-4 h-4 text-blue-600" />
+                        <CheckSquare className="w-4 h-4 text-info" />
                       ) : (
                         <Square className="w-4 h-4" />
                       )}
@@ -294,11 +294,11 @@ export function DataTable({
                   <TableHead
                     key={col.key}
                     className={cn(
-                      "text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 px-3 py-2.5",
+                      "text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-3 py-2.5",
                       col.align === "right" && "text-right",
                       col.align === "center" && "text-center",
                       !disableSort && col.sortable !== false &&
-                        "cursor-pointer select-none hover:text-slate-600",
+                        "cursor-pointer select-none hover:text-foreground",
                       col.className
                     )}
                     onClick={() =>
@@ -330,7 +330,7 @@ export function DataTable({
                       (selectable ? 1 : 0) +
                       (rowActions ? 1 : 0)
                     }
-                    className="text-center py-12 text-slate-400 text-sm"
+                    className="text-center py-12 text-muted-foreground text-sm"
                   >
                     {searchLower ? "No results match your search" : emptyMessage}
                   </TableCell>
@@ -345,9 +345,9 @@ export function DataTable({
                     <TableRow
                       key={row.id ?? idx}
                       className={cn(
-                        "hover:bg-slate-50/60 transition-colors",
+                        "hover:bg-muted/60 transition-colors",
                         onRowClick && "cursor-pointer",
-                        isSelected && "bg-blue-50/40"
+                        isSelected && "bg-info/10"
                       )}
                       onClick={() => onRowClick?.(row)}
                     >
@@ -358,12 +358,12 @@ export function DataTable({
                         >
                           {rowSelectable ? (
                             isSelected ? (
-                              <CheckSquare className="w-4 h-4 text-blue-600" />
+                              <CheckSquare className="w-4 h-4 text-info" />
                             ) : (
-                              <Square className="w-4 h-4 text-slate-300" />
+                              <Square className="w-4 h-4 text-muted-foreground/60" />
                             )
                           ) : (
-                            <Square className="w-4 h-4 text-slate-200 opacity-30" />
+                            <Square className="w-4 h-4 text-border opacity-30" />
                           )}
                         </TableCell>
                       )}
@@ -394,8 +394,8 @@ export function DataTable({
         </div>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100">
-            <p className="text-xs text-slate-400 tabular-nums">
+          <div className="flex items-center justify-between px-5 py-3 border-t border-border/50">
+            <p className="text-xs text-muted-foreground tabular-nums">
               {(currentPage - 1) * effectivePageSize + 1}–
               {Math.min(currentPage * effectivePageSize, totalItems)} of{" "}
               {totalItems}
@@ -410,7 +410,7 @@ export function DataTable({
               >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <span className="text-xs text-slate-500 tabular-nums min-w-[4rem] text-center">
+              <span className="text-xs text-muted-foreground tabular-nums min-w-[4rem] text-center">
                 {currentPage} / {totalPages}
               </span>
               <Button

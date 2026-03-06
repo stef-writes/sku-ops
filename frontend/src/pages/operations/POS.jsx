@@ -148,59 +148,59 @@ const IssueMaterials = () => {
     <>
     <div className="max-w-3xl mx-auto p-8" data-testid="pos-page">
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Issue Materials</h1>
-        <p className="text-slate-500 mt-1 text-sm">Log materials going out for a job</p>
+        <h1 className="text-2xl font-semibold text-foreground tracking-tight">Issue Materials</h1>
+        <p className="text-muted-foreground mt-1 text-sm">Log materials going out for a job</p>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-6 mb-4 shadow-sm">
-        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 mb-4">Job Details</p>
+      <div className="bg-card border border-border rounded-xl p-6 mb-4 shadow-sm">
+        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground mb-4">Job Details</p>
         <div className={`grid gap-4 ${!isContractor ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
           {!isContractor && (
             <div>
-              <Label className="text-slate-600 font-medium text-sm mb-2 block"><HardHat className="w-4 h-4 inline mr-1" />Contractor</Label>
+              <Label className="text-muted-foreground font-medium text-sm mb-2 block"><HardHat className="w-4 h-4 inline mr-1" />Contractor</Label>
               <Select value={selectedContractor} onValueChange={setSelectedContractor}>
                 <SelectTrigger data-testid="select-contractor"><SelectValue placeholder="Select contractor" /></SelectTrigger>
                 <SelectContent>
                   {contractors.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}{c.company && <span className="text-slate-400 text-xs ml-1">· {c.company}</span>}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>{c.name}{c.company && <span className="text-muted-foreground text-xs ml-1">· {c.company}</span>}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           )}
           <div>
-            <Label className="text-slate-600 font-medium text-sm mb-2 block">Job ID *</Label>
+            <Label className="text-muted-foreground font-medium text-sm mb-2 block">Job ID *</Label>
             <JobPicker value={jobId} onChange={setJobId} required />
           </div>
           <div>
-            <Label className="text-slate-600 font-medium text-sm mb-2 block">Service Address *</Label>
+            <Label className="text-muted-foreground font-medium text-sm mb-2 block">Service Address *</Label>
             <AddressPicker value={serviceAddress} onChange={setServiceAddress} required />
           </div>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-6 mb-4 shadow-sm">
-        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 mb-4">Add Items</p>
+      <div className="bg-card border border-border rounded-xl p-6 mb-4 shadow-sm">
+        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground mb-4">Add Items</p>
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
           <Input ref={searchRef} type="text" value={search} onChange={(e) => { setSearch(e.target.value); setShowDropdown(true); }} onFocus={() => search && setShowDropdown(true)} onKeyDown={handleSearchKeyDown} placeholder="Scan barcode or search by SKU / name…" className="pl-12 pr-12 w-full" autoFocus data-testid="item-search-input" />
-          <ScanLine className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 pointer-events-none" />
+          <ScanLine className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none" />
           {showDropdown && search.trim().length > 0 && (
-            <div ref={dropdownRef} className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden" data-testid="search-dropdown">
+            <div ref={dropdownRef} className="absolute z-20 left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden" data-testid="search-dropdown">
               {searchResults.length > 0 ? searchResults.map((product) => (
-                <button key={product.id} onClick={() => handleAddItem(product)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-b-0 text-left transition-colors" data-testid={`search-result-${product.sku}`}>
+                <button key={product.id} onClick={() => handleAddItem(product)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted border-b border-border/50 last:border-b-0 text-left transition-colors" data-testid={`search-result-${product.sku}`}>
                   <div>
-                    <span className="font-mono text-xs text-slate-400 mr-2">{product.sku}</span>
-                    <span className="font-medium text-slate-900">{product.name}</span>
+                    <span className="font-mono text-xs text-muted-foreground mr-2">{product.sku}</span>
+                    <span className="font-medium text-foreground">{product.name}</span>
                   </div>
                   <div className="flex items-center gap-4 shrink-0 ml-4">
-                    <span className="text-xs text-slate-400">{Math.floor(product.sell_quantity ?? product.quantity)} in stock</span>
-                    <span className="font-semibold text-slate-700 tabular-nums">${(product.sell_price ?? product.price).toFixed(2)}<span className="text-xs font-normal text-slate-400 ml-0.5">/{product.sell_uom || "ea"}</span></span>
-                    <Plus className="w-4 h-4 text-slate-300" />
+                    <span className="text-xs text-muted-foreground">{Math.floor(product.sell_quantity ?? product.quantity)} in stock</span>
+                    <span className="font-semibold text-foreground tabular-nums">${(product.sell_price ?? product.price).toFixed(2)}<span className="text-xs font-normal text-muted-foreground ml-0.5">/{product.sell_uom || "ea"}</span></span>
+                    <Plus className="w-4 h-4 text-muted-foreground/60" />
                   </div>
                 </button>
               )) : (
-                <div className="px-4 py-3 text-sm text-slate-400">No matching products in stock</div>
+                <div className="px-4 py-3 text-sm text-muted-foreground">No matching products in stock</div>
               )}
             </div>
           )}
@@ -208,23 +208,23 @@ const IssueMaterials = () => {
       </div>
 
       {items.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm mb-4 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100">
-            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{items.length} item{items.length !== 1 ? "s" : ""}</p>
+        <div className="bg-card border border-border rounded-xl shadow-sm mb-4 overflow-hidden">
+          <div className="px-6 py-4 border-b border-border/50">
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">{items.length} item{items.length !== 1 ? "s" : ""}</p>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-border/50">
             {items.map((item) => (
               <div key={item.product_id} className="flex items-center gap-4 px-6 py-4" data-testid={`item-row-${item.sku}`}>
                 <div className="flex-1 min-w-0">
-                  <p className="font-mono text-xs text-slate-400">{item.sku}</p>
-                  <p className="font-medium text-slate-900 truncate">{item.name}</p>
-                  <p className="text-xs text-slate-400">${item.unit_price.toFixed(2)} / {item.unit}</p>
+                  <p className="font-mono text-xs text-muted-foreground">{item.sku}</p>
+                  <p className="font-medium text-foreground truncate">{item.name}</p>
+                  <p className="text-xs text-muted-foreground">${item.unit_price.toFixed(2)} / {item.unit}</p>
                 </div>
                 <QuantityControl value={item.quantity} onChange={(v) => updateQuantity(item.product_id, v)} max={item.max_quantity} unit={item.unit} />
                 <div className="w-20 text-right shrink-0">
-                  <p className="font-semibold text-slate-900 tabular-nums">${(item.quantity * item.unit_price).toFixed(2)}</p>
+                  <p className="font-semibold text-foreground tabular-nums">${(item.quantity * item.unit_price).toFixed(2)}</p>
                 </div>
-                <button onClick={() => removeItem(item.product_id)} className="text-slate-300 hover:text-red-500 transition-colors shrink-0" data-testid={`remove-item-${item.sku}`}>
+                <button onClick={() => removeItem(item.product_id)} className="text-muted-foreground/60 hover:text-destructive transition-colors shrink-0" data-testid={`remove-item-${item.sku}`}>
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
@@ -234,25 +234,25 @@ const IssueMaterials = () => {
       )}
 
       {items.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-5">
+        <div className="bg-card border border-border rounded-xl p-6 shadow-sm space-y-5">
           <div>
-            <Label className="text-slate-600 font-medium text-sm mb-2 block">Notes (optional)</Label>
+            <Label className="text-muted-foreground font-medium text-sm mb-2 block">Notes (optional)</Label>
             <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any additional notes…" data-testid="notes-input" />
           </div>
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50 border border-slate-200">
-            <Clock className="w-5 h-5 text-slate-400 shrink-0" />
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted border border-border">
+            <Clock className="w-5 h-5 text-muted-foreground shrink-0" />
             <div>
-              <span className="font-semibold text-slate-900 text-sm">Charge to Account</span>
-              <p className="text-xs text-slate-500">Tax and totals computed by backend. Invoice later via Xero.</p>
+              <span className="font-semibold text-foreground text-sm">Charge to Account</span>
+              <p className="text-xs text-muted-foreground">Tax and totals computed by backend. Invoice later via Xero.</p>
             </div>
           </div>
-          <div className="flex items-end justify-between pt-2 border-t border-slate-100">
+          <div className="flex items-end justify-between pt-2 border-t border-border/50">
             <div className="space-y-1 text-sm">
-              <div className="flex gap-6 text-slate-500">
+              <div className="flex gap-6 text-muted-foreground">
                 <span className="w-20">Est. Subtotal</span>
                 <span className="font-mono tabular-nums">${displaySubtotal.toFixed(2)}</span>
               </div>
-              <p className="text-xs text-slate-400">Final total (incl. tax) calculated on submit</p>
+              <p className="text-xs text-muted-foreground">Final total (incl. tax) calculated on submit</p>
             </div>
             <Button onClick={handleSubmit} disabled={isSubmitting} className="btn-primary h-12 px-8" data-testid="checkout-btn">
               {isSubmitting ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processing…</>) : (<><Check className="w-4 h-4 mr-2" />Log Withdrawal</>)}
