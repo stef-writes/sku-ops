@@ -92,10 +92,10 @@ async def list_payments(
 
 async def list_for_invoice(invoice_id: str, organization_id: str) -> list:
     conn = get_connection()
-    cursor = await conn.execute(
-        "SELECT " + _COLUMNS + " FROM payments WHERE invoice_id = ? AND organization_id = ? ORDER BY payment_date DESC",
-        (invoice_id, organization_id),
-    )
+    sel_q = "SELECT "
+    sel_q += _COLUMNS
+    sel_q += " FROM payments WHERE invoice_id = ? AND organization_id = ? ORDER BY payment_date DESC"
+    cursor = await conn.execute(sel_q, (invoice_id, organization_id))
     return [_row_to_dict(r) for r in await cursor.fetchall()]
 
 

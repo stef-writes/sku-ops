@@ -135,7 +135,7 @@ class TestLLMService:
 class TestChatStatus:
     """Test /chat/status endpoint (requires auth)."""
 
-    def _auth_headers(self, client):
+    def _auth_headers(self, _client):
         """Get auth headers using test user token."""
         from identity.application.auth_service import create_token
 
@@ -148,7 +148,7 @@ class TestChatStatus:
         assert response.status_code in (401, 403)
 
     @pytest.mark.asyncio
-    async def test_chat_status_unavailable_without_key(self, client, db):
+    async def test_chat_status_unavailable_without_key(self, client, _db):
         """Chat status reports available=false when no API key."""
         headers = self._auth_headers(client)
         with patch("assistant.api.chat.ANTHROPIC_AVAILABLE", False):
@@ -161,7 +161,7 @@ class TestChatStatus:
         assert data["setup_url"] == "https://console.anthropic.com/"
 
     @pytest.mark.asyncio
-    async def test_chat_status_available_when_configured(self, client, db):
+    async def test_chat_status_available_when_configured(self, client, _db):
         """Chat status reports available=true when Anthropic configured."""
         headers = self._auth_headers(client)
         with patch("assistant.api.chat.ANTHROPIC_AVAILABLE", True):
@@ -177,7 +177,7 @@ class TestChatStatus:
 class TestAssistant:
     """Test chat assistant service."""
 
-    async def test_chat_returns_setup_message_without_key(self, db):
+    async def test_chat_returns_setup_message_without_key(self, _db):
         """When no API key, chat returns setup instructions."""
         from assistant.application.assistant import chat
 
@@ -186,7 +186,7 @@ class TestAssistant:
         assert "ANTHROPIC_API_KEY" in result["response"] or "Anthropic" in result["response"]
         assert result["tool_calls"] == []
 
-    async def test_chat_dispatches_to_unified_agent(self, db):
+    async def test_chat_dispatches_to_unified_agent(self, _db):
         """assistant.chat() routes all messages through the unified agent."""
         from unittest.mock import AsyncMock
 

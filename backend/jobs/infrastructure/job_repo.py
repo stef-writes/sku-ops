@@ -18,9 +18,11 @@ async def insert(job: Job | dict, conn=None) -> None:
     d = job if isinstance(job, dict) else job.model_dump()
     in_tx = conn is not None
     conn = conn or get_connection()
+    ins_q = "INSERT INTO jobs ("
+    ins_q += _COLUMNS
+    ins_q += ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     await conn.execute(
-        "INSERT INTO jobs (" + _COLUMNS + ")"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ins_q,
         (
             d["id"], d["code"], d.get("name", ""), d.get("billing_entity_id"),
             d.get("status", "active"), d.get("service_address", ""),
@@ -34,19 +36,19 @@ async def insert(job: Job | dict, conn=None) -> None:
 
 async def get_by_id(job_id: str, organization_id: str) -> dict | None:
     conn = get_connection()
-    cursor = await conn.execute(
-        "SELECT " + _COLUMNS + " FROM jobs WHERE id = ? AND organization_id = ?",
-        (job_id, organization_id),
-    )
+    sel_q = "SELECT "
+    sel_q += _COLUMNS
+    sel_q += " FROM jobs WHERE id = ? AND organization_id = ?"
+    cursor = await conn.execute(sel_q, (job_id, organization_id))
     return _row_to_dict(await cursor.fetchone())
 
 
 async def get_by_code(code: str, organization_id: str) -> dict | None:
     conn = get_connection()
-    cursor = await conn.execute(
-        "SELECT " + _COLUMNS + " FROM jobs WHERE code = ? AND organization_id = ?",
-        (code, organization_id),
-    )
+    sel_q = "SELECT "
+    sel_q += _COLUMNS
+    sel_q += " FROM jobs WHERE code = ? AND organization_id = ?"
+    cursor = await conn.execute(sel_q, (code, organization_id))
     return _row_to_dict(await cursor.fetchone())
 
 
@@ -58,7 +60,9 @@ async def list_jobs(
     offset: int = 0,
 ) -> list:
     conn = get_connection()
-    sql = "SELECT " + _COLUMNS + " FROM jobs WHERE organization_id = ?"
+    sql = "SELECT "
+    sql += _COLUMNS
+    sql += " FROM jobs WHERE organization_id = ?"
     params: list = [organization_id]
     if status:
         sql += " AND status = ?"

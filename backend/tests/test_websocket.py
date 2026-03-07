@@ -9,6 +9,7 @@ import time
 import jwt
 import pytest
 from starlette.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from shared.infrastructure.config import JWT_ALGORITHM, JWT_SECRET
 
@@ -37,12 +38,12 @@ def _make_token(
 class TestRealtimeWebSocket:
 
     def test_rejects_missing_token(self, client: TestClient):
-        with pytest.raises(Exception), client.websocket_connect("/api/ws"):
+        with pytest.raises(WebSocketDisconnect, match="4001"), client.websocket_connect("/api/ws"):
             pass
 
     def test_rejects_expired_token(self, client: TestClient):
         token = _make_token(expired=True)
-        with pytest.raises(Exception), client.websocket_connect(f"/api/ws?token={token}"):
+        with pytest.raises(WebSocketDisconnect, match="4001"), client.websocket_connect(f"/api/ws?token={token}"):
             pass
 
     def test_accepts_valid_token(self, client: TestClient):
@@ -65,12 +66,12 @@ class TestRealtimeWebSocket:
 class TestChatWebSocket:
 
     def test_rejects_missing_token(self, client: TestClient):
-        with pytest.raises(Exception), client.websocket_connect("/api/ws/chat"):
+        with pytest.raises(WebSocketDisconnect, match="4001"), client.websocket_connect("/api/ws/chat"):
             pass
 
     def test_rejects_contractor_role(self, client: TestClient):
         token = _make_token(role="contractor")
-        with pytest.raises(Exception):
+        with pytest.raises(WebSocketDisconnect, match="4003"):
             with client.websocket_connect(f"/api/ws/chat?token={token}"):
                 pass
 

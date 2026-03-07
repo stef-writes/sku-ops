@@ -35,8 +35,11 @@ async def insert(user_dict: dict) -> None:
     conn = get_connection()
     org_id = user_dict.get("organization_id") or "default"
     cols = "id, email, password, name, role, company, billing_entity, phone, is_active, organization_id, created_at"
+    ins_q = "INSERT INTO users ("
+    ins_q += cols
+    ins_q += ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     await conn.execute(
-        "INSERT INTO users (" + cols + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ins_q,
         (
             user_dict["id"],
             user_dict["email"],
@@ -80,10 +83,10 @@ async def update(user_id: str, updates: dict, organization_id: str | None = None
     if organization_id:
         where += " AND organization_id = ?"
         values.append(organization_id)
-    await conn.execute(
-        "UPDATE users SET " + ", ".join(set_clauses) + " " + where,
-        values,
-    )
+    upd_q = "UPDATE users SET "
+    upd_q += ", ".join(set_clauses)
+    upd_q += " " + where
+    await conn.execute(upd_q, values)
     await conn.commit()
     return await get_by_id(user_id)
 
@@ -122,7 +125,9 @@ async def delete_contractor(contractor_id: str, organization_id: str | None = No
     if organization_id:
         where += " AND organization_id = ?"
         params.append(organization_id)
-    cursor = await conn.execute("DELETE FROM users " + where, params)
+    del_q = "DELETE FROM users "
+    del_q += where
+    cursor = await conn.execute(del_q, params)
     await conn.commit()
     return cursor.rowcount
 

@@ -120,22 +120,22 @@ def _make_mock_stream(text_chunks, tool_names=None):
 
 class TestWSChatAuth:
     def test_no_token_rejected(self, client):
-        with pytest.raises(Exception), client.websocket_connect("/api/ws/chat"):
+        with pytest.raises(WebSocketDisconnect, match="4001"), client.websocket_connect("/api/ws/chat"):
             pass
 
     def test_invalid_token_rejected(self, client):
-        with pytest.raises(Exception):
+        with pytest.raises(WebSocketDisconnect, match="4001"):
             with client.websocket_connect("/api/ws/chat?token=garbage"):
                 pass
 
     def test_expired_token_rejected(self, client):
-        with pytest.raises(Exception):
+        with pytest.raises(WebSocketDisconnect, match="4001"):
             with client.websocket_connect(f"/api/ws/chat?token={_expired_token()}"):
                 pass
 
     def test_contractor_role_rejected(self, client):
         """Contractors cannot use the AI assistant."""
-        with pytest.raises(Exception):
+        with pytest.raises(WebSocketDisconnect, match="4003"):
             with client.websocket_connect(f"/api/ws/chat?token={_contractor_token()}"):
                 pass
 
