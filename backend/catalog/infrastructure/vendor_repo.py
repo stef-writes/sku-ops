@@ -114,10 +114,9 @@ async def delete(vendor_id: str, organization_id: str | None = None) -> int:
     if organization_id:
         where += " AND organization_id = ?"
         params.append(organization_id)
-    cursor = await conn.execute(
-        "UPDATE vendors SET deleted_at = ? " + where,
-        params,
-    )
+    query = "UPDATE vendors SET deleted_at = ? "
+    query += where
+    cursor = await conn.execute(query, params)
     await conn.commit()
     return cursor.rowcount
 
@@ -143,10 +142,9 @@ async def increment_product_count(vendor_id: str, delta: int, conn=None, organiz
     if organization_id:
         where += " AND organization_id = ?"
         params.append(organization_id)
-    await conn.execute(
-        "UPDATE vendors SET product_count = product_count + ? " + where,
-        params,
-    )
+    query = "UPDATE vendors SET product_count = product_count + ? "
+    query += where
+    await conn.execute(query, params)
     if not in_transaction:
         await conn.commit()
 

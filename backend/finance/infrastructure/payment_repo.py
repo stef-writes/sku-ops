@@ -17,9 +17,11 @@ async def insert(payment: Payment | dict, withdrawal_ids: list[str] | None = Non
     d = payment if isinstance(payment, dict) else payment.model_dump()
     in_tx = conn is not None
     conn = conn or get_connection()
+    ins_q = "INSERT INTO payments ("
+    ins_q += _COLUMNS
+    ins_q += ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     await conn.execute(
-        "INSERT INTO payments (" + _COLUMNS + ")"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ins_q,
         (
             d["id"], d.get("invoice_id"), d.get("billing_entity_id"),
             d["amount"], d.get("method", "bank_transfer"), d.get("reference", ""),
@@ -39,10 +41,10 @@ async def insert(payment: Payment | dict, withdrawal_ids: list[str] | None = Non
 
 async def get_by_id(payment_id: str, organization_id: str) -> dict | None:
     conn = get_connection()
-    cursor = await conn.execute(
-        "SELECT " + _COLUMNS + " FROM payments WHERE id = ? AND organization_id = ?",
-        (payment_id, organization_id),
-    )
+    sel_q = "SELECT "
+    sel_q += _COLUMNS
+    sel_q += " FROM payments WHERE id = ? AND organization_id = ?"
+    cursor = await conn.execute(sel_q, (payment_id, organization_id))
     p = _row_to_dict(await cursor.fetchone())
     if p:
         wc = await conn.execute(
@@ -66,7 +68,9 @@ async def list_payments(
     offset: int = 0,
 ) -> list:
     conn = get_connection()
-    sql = "SELECT " + _COLUMNS + " FROM payments WHERE organization_id = ?"
+    sql = "SELECT "
+    sql += _COLUMNS
+    sql += " FROM payments WHERE organization_id = ?"
     params: list = [organization_id]
     if invoice_id:
         sql += " AND invoice_id = ?"
