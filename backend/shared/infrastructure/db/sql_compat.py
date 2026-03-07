@@ -8,8 +8,9 @@ from __future__ import annotations
 
 
 def _get_dialect() -> str:
-    from shared.infrastructure.db import _backend
-    return _backend.dialect if _backend else "sqlite"
+    from shared.infrastructure.db import _state
+    backend = _state["backend"]
+    return backend.dialect if backend else "sqlite"
 
 
 # ── Time window filters ──────────────────────────────────────────────────────

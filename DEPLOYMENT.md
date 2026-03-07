@@ -14,10 +14,18 @@ feature/*   ← your working branches
 
 1. Create a branch off `dev`: `git checkout -b feature/my-thing dev`
 2. Push and open a PR targeting `dev`
-3. CI runs automatically (lint, test, build, Docker)
+3. CI runs automatically (backend lint + format + test, frontend lint + format + build + test, Docker build)
 4. Merge to `dev` after review
-5. When `dev` is stable, open a PR from `dev` → `main`
-6. Merging to `main` triggers auto-deploy to production
+5. When `dev` is stable, open a PR from `dev` -> `main`
+6. Merging to `main` triggers auto-deploy to production and version bump (commitizen)
+
+**CI/CD Workflows:**
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `ci.yml` | Push/PR to main, dev | Backend: ruff lint + format check + pytest. Frontend: ESLint + Prettier check + build + vitest. Docker build. |
+| `bump.yml` | Push to main | Auto-bumps version via commitizen, generates CHANGELOG, creates GitHub Release |
+| `deploy.yml` | Push to main | SSH deploy to production VPS |
 
 ## GitHub Repository Setup
 
