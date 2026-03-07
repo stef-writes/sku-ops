@@ -63,7 +63,7 @@ class TestRoundMoney:
 class TestJournalGrouping:
 
     @pytest.mark.asyncio
-    async def test_journal_id_groups_related_entries(self, db):
+    async def test_journal_id_groups_related_entries(self, _db):
         journal_id = str(uuid4())
         entries = [
             FinancialEntry(
@@ -89,7 +89,7 @@ class TestJournalGrouping:
         assert all(e["journal_id"] == journal_id for e in journal)
 
     @pytest.mark.asyncio
-    async def test_different_journals_isolated(self, db):
+    async def test_different_journals_isolated(self, _db):
         j1, j2 = str(uuid4()), str(uuid4())
         await insert_entries([
             FinancialEntry(
@@ -119,7 +119,7 @@ class TestJournalGrouping:
 class TestCompleteSaleEntries:
 
     @pytest.mark.asyncio
-    async def test_withdrawal_produces_all_five_accounts(self, db):
+    async def test_withdrawal_produces_all_five_accounts(self, _db):
         """A withdrawal must produce REVENUE, COGS, INVENTORY, TAX, and AR entries."""
         from finance.application.ledger_service import record_withdrawal
 
@@ -140,7 +140,7 @@ class TestCompleteSaleEntries:
         assert Account.ACCOUNTS_RECEIVABLE.value in tb
 
     @pytest.mark.asyncio
-    async def test_withdrawal_inventory_entry_is_negative(self, db):
+    async def test_withdrawal_inventory_entry_is_negative(self, _db):
         """On sale, INVENTORY should decrease (negative amount)."""
         from finance.application.ledger_service import record_withdrawal
 
@@ -157,7 +157,7 @@ class TestCompleteSaleEntries:
         assert tb[Account.INVENTORY.value] < 0, "Inventory should decrease on sale"
 
     @pytest.mark.asyncio
-    async def test_return_reverses_withdrawal_entries(self, db):
+    async def test_return_reverses_withdrawal_entries(self, _db):
         """A return should reduce net revenue/COGS/AR and increase inventory."""
         from finance.application.ledger_service import record_return, record_withdrawal
 
@@ -182,7 +182,7 @@ class TestCompleteSaleEntries:
         assert tb.get(Account.INVENTORY.value, 0) == pytest.approx(0.0)
 
     @pytest.mark.asyncio
-    async def test_idempotent_withdrawal_recording(self, db):
+    async def test_idempotent_withdrawal_recording(self, _db):
         """Recording the same withdrawal twice should not duplicate entries."""
         from finance.application.ledger_service import record_withdrawal
 
@@ -205,12 +205,12 @@ class TestCompleteSaleEntries:
 class TestTrialBalance:
 
     @pytest.mark.asyncio
-    async def test_empty_org_returns_empty(self, db):
+    async def test_empty_org_returns_empty(self, _db):
         tb = await trial_balance("org-with-no-entries")
         assert tb == {}
 
     @pytest.mark.asyncio
-    async def test_po_receipt_balances_inventory_and_ap(self, db):
+    async def test_po_receipt_balances_inventory_and_ap(self, _db):
         from finance.application.ledger_service import record_po_receipt
 
         await record_po_receipt(
@@ -306,13 +306,13 @@ class TestInvoiceComplianceFields:
 class TestFiscalPeriodEnforcement:
 
     @pytest.mark.asyncio
-    async def test_check_open_period_passes(self, db):
+    async def test_check_open_period_passes(self, _db):
         """No closed periods → should not raise."""
         from finance.api.fiscal_periods import check_period_open
         await check_period_open("2025-06-15T00:00:00Z", "default")
 
     @pytest.mark.asyncio
-    async def test_closed_period_blocks_entries(self, db):
+    async def test_closed_period_blocks_entries(self, _db):
         """An entry falling in a closed period should raise ValueError."""
         from finance.api.fiscal_periods import check_period_open
         conn = get_connection()
@@ -329,7 +329,7 @@ class TestFiscalPeriodEnforcement:
             await check_period_open("2025-01-15T00:00:00Z", "default")
 
     @pytest.mark.asyncio
-    async def test_open_period_does_not_block(self, db):
+    async def test_open_period_does_not_block(self, _db):
         """An entry falling in an *open* period should pass."""
         from finance.api.fiscal_periods import check_period_open
         conn = get_connection()
@@ -350,7 +350,7 @@ class TestFiscalPeriodEnforcement:
 class TestPaymentAR:
 
     @pytest.mark.asyncio
-    async def test_payment_reduces_ar(self, db):
+    async def test_payment_reduces_ar(self, _db):
         """After withdrawal + payment, net AR should be zero."""
         from finance.application.ledger_service import record_payment, record_withdrawal
 

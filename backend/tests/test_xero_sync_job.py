@@ -88,7 +88,7 @@ async def _run_sync_with_stub(org_id="default"):
 class TestSyncJobIdempotency:
 
     @pytest.mark.asyncio
-    async def test_running_sync_twice_does_not_change_xero_invoice_id(self, db):
+    async def test_running_sync_twice_does_not_change_xero_invoice_id(self, _db):
         """The xero_invoice_id stored after first sync must be identical after second sync."""
         inv = await _make_approved_invoice()
         inv_id = inv["id"]
@@ -108,7 +108,7 @@ class TestSyncJobIdempotency:
         )
 
     @pytest.mark.asyncio
-    async def test_running_sync_twice_does_not_call_put_twice(self, db):
+    async def test_running_sync_twice_does_not_call_put_twice(self, _db):
         """StubXeroAdapter.sync_invoice should only be called once per invoice."""
         from finance.adapters.stub_xero import StubXeroAdapter
         from finance.application.xero_sync_job import run_sync
@@ -145,7 +145,7 @@ class TestSyncJobIdempotency:
         )
 
     @pytest.mark.asyncio
-    async def test_sync_sets_status_to_synced(self, db):
+    async def test_sync_sets_status_to_synced(self, _db):
         inv = await _make_approved_invoice()
         await _run_sync_with_stub()
         inv_after = await invoice_repo.get_by_id(inv["id"])
@@ -157,7 +157,7 @@ class TestSyncJobIdempotency:
 class TestSyncStatusGating:
 
     @pytest.mark.asyncio
-    async def test_draft_invoice_is_not_synced(self, db):
+    async def test_draft_invoice_is_not_synced(self, _db):
         """A draft invoice must never be pushed to Xero."""
         wid = await _make_withdrawal()
         inv = await invoice_repo.create_from_withdrawals([wid], organization_id="default")
@@ -172,14 +172,14 @@ class TestSyncStatusGating:
         assert inv_after["xero_sync_status"] == "pending"
 
     @pytest.mark.asyncio
-    async def test_approved_invoice_is_synced(self, db):
+    async def test_approved_invoice_is_synced(self, _db):
         inv = await _make_approved_invoice()
         await _run_sync_with_stub()
         inv_after = await invoice_repo.get_by_id(inv["id"])
         assert inv_after["xero_invoice_id"] is not None
 
     @pytest.mark.asyncio
-    async def test_paid_invoice_already_synced_is_not_re_synced(self, db):
+    async def test_paid_invoice_already_synced_is_not_re_synced(self, _db):
         """A paid invoice that already has a xero_invoice_id must not be touched."""
         inv = await _make_approved_invoice()
         inv_id = inv["id"]
@@ -223,7 +223,7 @@ class TestAdjustmentIdempotencyFix:
     """
 
     @pytest.mark.asyncio
-    async def test_two_adjustments_on_same_product_both_record_ledger_entries(self, db):
+    async def test_two_adjustments_on_same_product_both_record_ledger_entries(self, _db):
         from catalog.application.product_lifecycle import create_product
         from inventory.application.inventory_service import (
             process_adjustment_stock_changes,
@@ -270,7 +270,7 @@ class TestAdjustmentIdempotencyFix:
         )
 
     @pytest.mark.asyncio
-    async def test_adjustment_ref_ids_are_unique(self, db):
+    async def test_adjustment_ref_ids_are_unique(self, _db):
         """Each adjustment must produce a distinct reference_id in the ledger."""
         from catalog.application.product_lifecycle import create_product
         from inventory.application.inventory_service import (
@@ -315,7 +315,7 @@ class TestAdjustmentIdempotencyFix:
 class TestReconciliationMismatch:
 
     @pytest.mark.asyncio
-    async def test_total_mismatch_sets_mismatch_status(self, db):
+    async def test_total_mismatch_sets_mismatch_status(self, _db):
         """When Xero returns a different total, xero_sync_status must become 'mismatch'."""
         from finance.adapters.stub_xero import StubXeroAdapter
         from finance.application.xero_sync_job import run_sync
@@ -355,7 +355,7 @@ class TestReconciliationMismatch:
         )
 
     @pytest.mark.asyncio
-    async def test_matching_totals_keeps_synced_status(self, db):
+    async def test_matching_totals_keeps_synced_status(self, _db):
         """When Xero total matches local total, status stays 'synced'."""
         from finance.adapters.stub_xero import StubXeroAdapter
         from finance.application.xero_sync_job import run_sync
@@ -398,7 +398,7 @@ class TestReconciliationMismatch:
 class TestCreditNoteSync:
 
     @pytest.mark.asyncio
-    async def test_applied_credit_note_gets_xero_id(self, db):
+    async def test_applied_credit_note_gets_xero_id(self, _db):
         """An applied credit note must receive a xero_credit_note_id after sync."""
         cn_id = str(uuid4())
         cn_number = "CN-00001"
@@ -431,7 +431,7 @@ class TestCreditNoteSync:
         assert cn_after["xero_sync_status"] == "synced"
 
     @pytest.mark.asyncio
-    async def test_draft_credit_note_is_not_synced(self, db):
+    async def test_draft_credit_note_is_not_synced(self, _db):
         """A draft credit note must not be pushed to Xero."""
         cn_id = str(uuid4())
         conn = get_connection()
@@ -459,7 +459,7 @@ class TestCreditNoteSync:
 class TestPOQueuing:
 
     @pytest.mark.asyncio
-    async def test_queue_po_for_sync_sets_pending_status(self, db):
+    async def test_queue_po_for_sync_sets_pending_status(self, _db):
         from finance.application.po_sync_service import queue_po_for_sync
         from purchasing.domain.purchase_order import POStatus, PurchaseOrder
         from purchasing.infrastructure.po_repo import po_repo
@@ -478,7 +478,7 @@ class TestPOQueuing:
         assert po_after["xero_sync_status"] == "pending"
 
     @pytest.mark.asyncio
-    async def test_po_bill_sync_stores_xero_bill_id(self, db):
+    async def test_po_bill_sync_stores_xero_bill_id(self, _db):
         from finance.adapters.stub_xero import StubXeroAdapter
         from finance.application.po_sync_service import queue_po_for_sync, sync_po_bill
         from identity.domain.org_settings import OrgSettings
@@ -523,7 +523,7 @@ class TestPOQueuing:
         assert po_after["xero_sync_status"] == "synced"
 
     @pytest.mark.asyncio
-    async def test_po_bill_sync_idempotent(self, db):
+    async def test_po_bill_sync_idempotent(self, _db):
         """Calling sync_po_bill twice must not change the stored xero_bill_id."""
         from finance.adapters.stub_xero import StubXeroAdapter
         from finance.application.po_sync_service import sync_po_bill
@@ -568,7 +568,7 @@ class TestPOQueuing:
 class TestSyncSummaryCounts:
 
     @pytest.mark.asyncio
-    async def test_sync_summary_reflects_synced_count(self, db):
+    async def test_sync_summary_reflects_synced_count(self, _db):
         await _make_approved_invoice()
         await _make_approved_invoice()
 
@@ -578,7 +578,7 @@ class TestSyncSummaryCounts:
         assert summary["invoices_failed"] == 0
 
     @pytest.mark.asyncio
-    async def test_failed_sync_increments_failed_count(self, db):
+    async def test_failed_sync_increments_failed_count(self, _db):
         """A gateway that raises must increment failed count and set 'failed' status."""
         from finance.adapters.stub_xero import StubXeroAdapter
         from finance.application.xero_sync_job import run_sync
@@ -605,7 +605,7 @@ class TestSyncSummaryCounts:
         assert inv_after["xero_invoice_id"] is None
 
     @pytest.mark.asyncio
-    async def test_sync_summary_includes_cogs_repost_keys(self, db):
+    async def test_sync_summary_includes_cogs_repost_keys(self, _db):
         """run_sync summary must always include cogs_reposted / cogs_repost_failed keys."""
         summary = await _run_sync_with_stub()
         assert "cogs_reposted" in summary
@@ -617,7 +617,7 @@ class TestSyncSummaryCounts:
 class TestCogsRepost:
 
     @pytest.mark.asyncio
-    async def test_editing_line_items_on_synced_invoice_sets_cogs_stale(self, db):
+    async def test_editing_line_items_on_synced_invoice_sets_cogs_stale(self, _db):
         """After a successful sync, editing line items must set xero_sync_status='cogs_stale'."""
         inv = await _make_approved_invoice()
         inv_id = inv["id"]
@@ -648,7 +648,7 @@ class TestCogsRepost:
         )
 
     @pytest.mark.asyncio
-    async def test_editing_line_items_on_unsynced_invoice_does_not_set_cogs_stale(self, db):
+    async def test_editing_line_items_on_unsynced_invoice_does_not_set_cogs_stale(self, _db):
         """Editing a draft/unsynced invoice must NOT set cogs_stale — it was never in Xero."""
         wid = await _make_withdrawal()
         inv = await invoice_repo.create_from_withdrawals([wid], organization_id="default")
@@ -666,7 +666,7 @@ class TestCogsRepost:
         )
 
     @pytest.mark.asyncio
-    async def test_sync_job_repost_stale_cogs_updates_status_to_synced(self, db):
+    async def test_sync_job_repost_stale_cogs_updates_status_to_synced(self, _db):
         """The sync job must re-post the COGS journal and mark status back to 'synced'."""
         from finance.adapters.stub_xero import StubXeroAdapter
         from finance.application.xero_sync_job import run_sync
@@ -717,7 +717,7 @@ class TestCogsRepost:
         assert inv_final["xero_cogs_journal_id"] is not None
 
     @pytest.mark.asyncio
-    async def test_sync_job_skips_repost_when_no_stale_invoices(self, db):
+    async def test_sync_job_skips_repost_when_no_stale_invoices(self, _db):
         """When no invoices are cogs_stale, cogs_reposted must be 0."""
         inv = await _make_approved_invoice()
         await _run_sync_with_stub()
@@ -728,7 +728,7 @@ class TestCogsRepost:
         assert summary["cogs_repost_failed"] == 0
 
     @pytest.mark.asyncio
-    async def test_cogs_repost_failure_increments_failed_count(self, db):
+    async def test_cogs_repost_failure_increments_failed_count(self, _db):
         """When repost_cogs_journal raises, the job must increment cogs_repost_failed."""
         from finance.adapters.stub_xero import StubXeroAdapter
         from finance.application.xero_sync_job import run_sync

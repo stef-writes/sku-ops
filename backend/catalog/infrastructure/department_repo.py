@@ -81,10 +81,9 @@ async def update(dept_id: str, name: str, description: str, conn=None, organizat
     if organization_id:
         where += " AND organization_id = ?"
         params.append(organization_id)
-    await conn.execute(
-        "UPDATE departments SET name = ?, description = ? " + where,
-        params,
-    )
+    query = "UPDATE departments SET name = ?, description = ? "
+    query += where
+    await conn.execute(query, params)
     await conn.execute(
         "UPDATE products SET department_name = ? WHERE department_id = ?",
         (name, dept_id),
@@ -101,10 +100,9 @@ async def count_products_by_department(dept_id: str, organization_id: str | None
     if organization_id:
         where += " AND (organization_id = ? OR organization_id IS NULL)"
         params.append(organization_id)
-    cursor = await conn.execute(
-        "SELECT COUNT(*) FROM products " + where,
-        params,
-    )
+    query = "SELECT COUNT(*) FROM products "
+    query += where
+    cursor = await conn.execute(query, params)
     row = await cursor.fetchone()
     return row[0] if row else 0
 
@@ -117,10 +115,9 @@ async def delete(dept_id: str, organization_id: str | None = None) -> int:
     if organization_id:
         where += " AND organization_id = ?"
         params.append(organization_id)
-    cursor = await conn.execute(
-        "UPDATE departments SET deleted_at = ? " + where,
-        params,
-    )
+    query = "UPDATE departments SET deleted_at = ? "
+    query += where
+    cursor = await conn.execute(query, params)
     await conn.commit()
     return cursor.rowcount
 
@@ -133,10 +130,9 @@ async def increment_product_count(dept_id: str, delta: int, conn=None, organizat
     if organization_id:
         where += " AND organization_id = ?"
         params.append(organization_id)
-    await conn.execute(
-        "UPDATE departments SET product_count = product_count + ? " + where,
-        params,
-    )
+    query = "UPDATE departments SET product_count = product_count + ? "
+    query += where
+    await conn.execute(query, params)
     if not in_transaction:
         await conn.commit()
 

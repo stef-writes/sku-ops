@@ -76,10 +76,10 @@ async def list_runs(
 
     where = " AND ".join(clauses)
     params.append(limit)
-    cur = await conn.execute(
-        "SELECT * FROM agent_runs WHERE " + where + " ORDER BY created_at DESC LIMIT ?",
-        params,
-    )
+    query = "SELECT * FROM agent_runs WHERE "
+    query += where
+    query += " ORDER BY created_at DESC LIMIT ?"
+    cur = await conn.execute(query, params)
     return [dict(r) for r in await cur.fetchall()]
 
 
@@ -105,7 +105,7 @@ async def get_stats(*, hours: int = 24) -> dict:
     )
     by_agent = await cur.fetchall()
 
-    cur = await conn.execute(
+    query = (
         "SELECT"
         " COUNT(*) as total_runs,"
         " SUM(input_tokens) as total_input_tokens,"
@@ -114,9 +114,10 @@ async def get_stats(*, hours: int = 24) -> dict:
         " AVG(duration_ms) as avg_duration_ms,"
         " SUM(CASE WHEN error IS NOT NULL THEN 1 ELSE 0 END) as total_errors"
         " FROM agent_runs"
-        " WHERE " + since_expr,
-        list(since_params),
+        " WHERE "
     )
+    query += since_expr
+    cur = await conn.execute(query, list(since_params))
     totals = await cur.fetchone()
 
     cur = await conn.execute(
@@ -154,17 +155,24 @@ async def get_cost_breakdown(*, days: int = 7, group_by: str = "agent") -> list[
     day_expr = date_extract("created_at")
 
     col = {"agent": "agent_name", "model": "model", "org": "org_id"}.get(group_by, "agent_name")
-    cur = await conn.execute(
-        "SELECT " + col + " as group_key,"
-        " " + day_expr + " as day,"
+    query = "SELECT "
+    query += col
+    query += " as group_key, "
+    query += day_expr
+    query += (
+        " as day,"
         " COUNT(*) as runs,"
         " SUM(input_tokens) as input_tokens,"
         " SUM(output_tokens) as output_tokens,"
         " SUM(cost_usd) as cost"
         " FROM agent_runs"
-        " WHERE " + since_expr +
-        " GROUP BY " + col + ", " + day_expr +
-        " ORDER BY day DESC, cost DESC",
-        list(since_params),
+        " WHERE "
     )
+    query += since_expr
+    query += " GROUP BY "
+    query += col
+    query += ", "
+    query += day_expr
+    query += " ORDER BY day DESC, cost DESC"
+    cur = await conn.execute(query, list(since_params))
     return [dict(r) for r in await cur.fetchall()]

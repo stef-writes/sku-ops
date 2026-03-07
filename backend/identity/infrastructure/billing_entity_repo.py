@@ -21,9 +21,11 @@ async def insert(entity: BillingEntity | dict, conn=None) -> None:
     d = entity if isinstance(entity, dict) else entity.model_dump()
     in_tx = conn is not None
     conn = conn or get_connection()
+    ins_q = "INSERT INTO billing_entities ("
+    ins_q += _COLUMNS
+    ins_q += ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     await conn.execute(
-        "INSERT INTO billing_entities (" + _COLUMNS + ")"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ins_q,
         (
             d["id"], d["name"], d.get("contact_name", ""),
             d.get("contact_email", ""), d.get("billing_address", ""),
@@ -38,19 +40,19 @@ async def insert(entity: BillingEntity | dict, conn=None) -> None:
 
 async def get_by_id(entity_id: str, organization_id: str) -> dict | None:
     conn = get_connection()
-    cursor = await conn.execute(
-        "SELECT " + _COLUMNS + " FROM billing_entities WHERE id = ? AND organization_id = ?",
-        (entity_id, organization_id),
-    )
+    sel_q = "SELECT "
+    sel_q += _COLUMNS
+    sel_q += " FROM billing_entities WHERE id = ? AND organization_id = ?"
+    cursor = await conn.execute(sel_q, (entity_id, organization_id))
     return _row_to_dict(await cursor.fetchone())
 
 
 async def get_by_name(name: str, organization_id: str) -> dict | None:
     conn = get_connection()
-    cursor = await conn.execute(
-        "SELECT " + _COLUMNS + " FROM billing_entities WHERE LOWER(TRIM(name)) = ? AND organization_id = ?",
-        (name.strip().lower(), organization_id),
-    )
+    sel_q = "SELECT "
+    sel_q += _COLUMNS
+    sel_q += " FROM billing_entities WHERE LOWER(TRIM(name)) = ? AND organization_id = ?"
+    cursor = await conn.execute(sel_q, (name.strip().lower(), organization_id))
     return _row_to_dict(await cursor.fetchone())
 
 
@@ -62,7 +64,9 @@ async def list_billing_entities(
     offset: int = 0,
 ) -> list:
     conn = get_connection()
-    sql = "SELECT " + _COLUMNS + " FROM billing_entities WHERE organization_id = ?"
+    sql = "SELECT "
+    sql += _COLUMNS
+    sql += " FROM billing_entities WHERE organization_id = ?"
     params: list = [organization_id]
     if is_active is not None:
         sql += " AND is_active = ?"
@@ -93,10 +97,10 @@ async def update(entity_id: str, updates: dict, organization_id: str) -> dict | 
     set_clauses.append("updated_at = ?")
     params.append(datetime.now(UTC).isoformat())
     params.extend([entity_id, organization_id])
-    await conn.execute(
-        "UPDATE billing_entities SET " + ", ".join(set_clauses) + " WHERE id = ? AND organization_id = ?",
-        params,
-    )
+    upd_q = "UPDATE billing_entities SET "
+    upd_q += ", ".join(set_clauses)
+    upd_q += " WHERE id = ? AND organization_id = ?"
+    await conn.execute(upd_q, params)
     await conn.commit()
     return await get_by_id(entity_id, organization_id)
 
@@ -105,13 +109,15 @@ async def search(query: str, organization_id: str, limit: int = 20) -> list:
     """Fast prefix/substring search for autocomplete."""
     conn = get_connection()
     like = f"%{query.lower()}%"
-    cursor = await conn.execute(
-        "SELECT " + _COLUMNS + " FROM billing_entities"
+    sel_q = "SELECT "
+    sel_q += _COLUMNS
+    sel_q += (
+        " FROM billing_entities"
         " WHERE organization_id = ? AND is_active = 1"
         " AND (LOWER(name) LIKE ? OR LOWER(contact_name) LIKE ?)"
-        " ORDER BY name LIMIT ?",
-        (organization_id, like, like, limit),
+        " ORDER BY name LIMIT ?"
     )
+    cursor = await conn.execute(sel_q, (organization_id, like, like, limit))
     return [_row_to_dict(r) for r in await cursor.fetchall()]
 
 

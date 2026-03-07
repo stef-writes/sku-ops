@@ -46,7 +46,7 @@ async def _create_product(name, quantity, base_unit="each", **kw):
 class TestFractionalProductCreation:
 
     @pytest.mark.asyncio
-    async def test_create_product_with_fractional_quantity(self, db):
+    async def test_create_product_with_fractional_quantity(self, _db):
         """Product created with 10.5 must store 10.5, not 10."""
         product = await _create_product("Half Widget", 10.5)
         assert product.quantity == 10.5
@@ -57,7 +57,7 @@ class TestFractionalProductCreation:
         )
 
     @pytest.mark.asyncio
-    async def test_stock_transaction_records_fractional_quantity(self, db):
+    async def test_stock_transaction_records_fractional_quantity(self, _db):
         """The initial IMPORT stock transaction must record the fractional quantity."""
         product = await _create_product("Fractional Import", 7.25)
         history = await get_stock_history(product.id)
@@ -72,7 +72,7 @@ class TestFractionalProductCreation:
 class TestFractionalWithdrawal:
 
     @pytest.mark.asyncio
-    async def test_withdraw_fractional_quantity(self, db):
+    async def test_withdraw_fractional_quantity(self, _db):
         """Withdraw 2.5 from 10.0 → 7.5 remaining."""
         product = await _create_product("Wire", 10.0)
         decrements = [
@@ -86,7 +86,7 @@ class TestFractionalWithdrawal:
         assert updated["quantity"] == pytest.approx(7.5)
 
     @pytest.mark.asyncio
-    async def test_withdraw_fractional_insufficient_stock(self, db):
+    async def test_withdraw_fractional_insufficient_stock(self, _db):
         """Withdraw 5.5 from 5.0 must raise, not silently truncate to 5."""
         product = await _create_product("Wire", 5.0)
         decrements = [
@@ -104,7 +104,7 @@ class TestFractionalWithdrawal:
         assert unchanged["quantity"] == pytest.approx(5.0), "Stock should be unchanged after failed withdrawal"
 
     @pytest.mark.asyncio
-    async def test_withdraw_exactly_all_stock(self, db):
+    async def test_withdraw_exactly_all_stock(self, _db):
         """Withdraw 3.75 from 3.75 → exactly 0 remaining."""
         product = await _create_product("Sealant", 3.75)
         decrements = [
@@ -123,7 +123,7 @@ class TestFractionalWithdrawal:
 class TestUOMConversionWithdrawal:
 
     @pytest.mark.asyncio
-    async def test_withdraw_inches_from_feet_product(self, db):
+    async def test_withdraw_inches_from_feet_product(self, _db):
         """Product stored in feet (100). Withdraw 18 inches = 1.5 feet deducted."""
         product = await _create_product("Copper Pipe", 100.0, base_unit="foot")
 
@@ -143,7 +143,7 @@ class TestUOMConversionWithdrawal:
         )
 
     @pytest.mark.asyncio
-    async def test_withdraw_yards_from_feet_product(self, db):
+    async def test_withdraw_yards_from_feet_product(self, _db):
         """Product stored in feet (30). Withdraw 2 yards = 6 feet deducted."""
         product = await _create_product("Rope", 30.0, base_unit="foot")
 
@@ -161,7 +161,7 @@ class TestUOMConversionWithdrawal:
         assert updated["quantity"] == pytest.approx(24.0)
 
     @pytest.mark.asyncio
-    async def test_withdraw_pints_from_gallon_product(self, db):
+    async def test_withdraw_pints_from_gallon_product(self, _db):
         """Product stored in gallons (5). Withdraw 4 pints = 0.5 gallons."""
         product = await _create_product("Paint", 5.0, base_unit="gallon")
 
@@ -179,7 +179,7 @@ class TestUOMConversionWithdrawal:
         assert updated["quantity"] == pytest.approx(4.5)
 
     @pytest.mark.asyncio
-    async def test_stock_transaction_records_base_unit(self, db):
+    async def test_stock_transaction_records_base_unit(self, _db):
         """Stock transaction should record the converted quantity in base_unit."""
         product = await _create_product("Chain", 50.0, base_unit="foot")
 
@@ -206,7 +206,7 @@ class TestUOMConversionWithdrawal:
 class TestUOMConversionReceiving:
 
     @pytest.mark.asyncio
-    async def test_receive_inches_into_feet_product(self, db):
+    async def test_receive_inches_into_feet_product(self, _db):
         """Product stored in feet (50). Receive 36 inches = 3 feet added."""
         product = await _create_product("Tubing", 50.0, base_unit="foot")
 
@@ -222,7 +222,7 @@ class TestUOMConversionReceiving:
         )
 
     @pytest.mark.asyncio
-    async def test_receive_ounces_into_pounds_product(self, db):
+    async def test_receive_ounces_into_pounds_product(self, _db):
         """Product stored in pounds (10). Receive 32 ounces = 2 pounds added."""
         product = await _create_product("Solder", 10.0, base_unit="pound")
 
@@ -240,7 +240,7 @@ class TestUOMConversionReceiving:
 class TestFractionalAdjustment:
 
     @pytest.mark.asyncio
-    async def test_positive_adjustment_with_decimal(self, db):
+    async def test_positive_adjustment_with_decimal(self, _db):
         product = await _create_product("Bolts", 10.0)
         await process_adjustment_stock_changes(
             product_id=product.id, quantity_delta=0.5,
@@ -250,7 +250,7 @@ class TestFractionalAdjustment:
         assert updated["quantity"] == pytest.approx(10.5)
 
     @pytest.mark.asyncio
-    async def test_negative_adjustment_with_decimal(self, db):
+    async def test_negative_adjustment_with_decimal(self, _db):
         product = await _create_product("Nuts", 10.0)
         await process_adjustment_stock_changes(
             product_id=product.id, quantity_delta=-3.25,
@@ -260,7 +260,7 @@ class TestFractionalAdjustment:
         assert updated["quantity"] == pytest.approx(6.75)
 
     @pytest.mark.asyncio
-    async def test_adjustment_that_would_go_negative_raises(self, db):
+    async def test_adjustment_that_would_go_negative_raises(self, _db):
         product = await _create_product("Screws", 2.0)
         with pytest.raises(NegativeStockError):
             await process_adjustment_stock_changes(
@@ -271,7 +271,7 @@ class TestFractionalAdjustment:
         assert unchanged["quantity"] == pytest.approx(2.0)
 
     @pytest.mark.asyncio
-    async def test_zero_adjustment_raises(self, db):
+    async def test_zero_adjustment_raises(self, _db):
         product = await _create_product("Washers", 5.0)
         with pytest.raises(ValueError, match="zero"):
             await process_adjustment_stock_changes(

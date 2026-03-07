@@ -517,10 +517,9 @@ async def mark_paid_for_withdrawal(withdrawal_id: str, organization_id: str | No
     if organization_id:
         where += " AND (organization_id = ? OR organization_id IS NULL)"
         params.append(organization_id)
-    cursor = await conn.execute(
-        "SELECT invoice_id FROM withdrawals " + where,
-        params,
-    )
+    sel_q = "SELECT invoice_id FROM withdrawals "
+    sel_q += where
+    cursor = await conn.execute(sel_q, params)
     row = await cursor.fetchone()
     if row and row[0]:
         now = datetime.now(UTC).isoformat()
@@ -544,10 +543,9 @@ async def set_xero_invoice_id(
     if organization_id:
         where += " AND organization_id = ?"
         params.append(organization_id)
-    await conn.execute(
-        "UPDATE invoices SET xero_invoice_id = ?, xero_cogs_journal_id = ?, xero_sync_status = 'synced', updated_at = ? " + where,
-        params,
-    )
+    upd_q = "UPDATE invoices SET xero_invoice_id = ?, xero_cogs_journal_id = ?, xero_sync_status = 'synced', updated_at = ? "
+    upd_q += where
+    await conn.execute(upd_q, params)
     await conn.commit()
 
 
@@ -559,10 +557,9 @@ async def set_xero_sync_status(invoice_id: str, status: str, organization_id: st
     if organization_id:
         where += " AND organization_id = ?"
         params.append(organization_id)
-    await conn.execute(
-        "UPDATE invoices SET xero_sync_status = ?, updated_at = ? " + where,
-        params,
-    )
+    upd_q = "UPDATE invoices SET xero_sync_status = ?, updated_at = ? "
+    upd_q += where
+    await conn.execute(upd_q, params)
     await conn.commit()
 
 

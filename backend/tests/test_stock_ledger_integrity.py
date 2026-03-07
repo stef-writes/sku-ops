@@ -47,7 +47,7 @@ class TestLedgerBalanceInvariant:
     """For any product, current quantity must equal the sum of all ledger deltas."""
 
     @pytest.mark.asyncio
-    async def test_balance_after_mixed_operations(self, db):
+    async def test_balance_after_mixed_operations(self, _db):
         """Create → withdraw → receive → adjust → verify balance."""
         product = await _create_product("Copper Fitting", 20.0, base_unit="foot")
 
@@ -87,7 +87,7 @@ class TestLedgerBalanceInvariant:
         )
 
     @pytest.mark.asyncio
-    async def test_failed_withdrawal_preserves_ledger_balance(self, db):
+    async def test_failed_withdrawal_preserves_ledger_balance(self, _db):
         """A failed withdrawal must not leave orphan transactions."""
         product = await _create_product("Valve", 5.0)
 
@@ -111,7 +111,7 @@ class TestLedgerBalanceInvariant:
         assert current["quantity"] == pytest.approx(ledger_sum)
 
     @pytest.mark.asyncio
-    async def test_multiple_withdrawals_ledger_consistency(self, db):
+    async def test_multiple_withdrawals_ledger_consistency(self, _db):
         """Three successive fractional withdrawals — ledger must stay balanced."""
         product = await _create_product("Wire Spool", 100.0)
 
@@ -140,7 +140,7 @@ class TestTransactionFieldCompleteness:
     """Every stock transaction must have complete, correctly-typed fields."""
 
     @pytest.mark.asyncio
-    async def test_transaction_fields_are_float(self, db):
+    async def test_transaction_fields_are_float(self, _db):
         """quantity_delta, quantity_before, quantity_after must be float, not int."""
         product = await _create_product("Test Float Fields", 10.5)
         history = await get_stock_history(product.id)
@@ -153,7 +153,7 @@ class TestTransactionFieldCompleteness:
             )
 
     @pytest.mark.asyncio
-    async def test_transaction_has_unit_field(self, db):
+    async def test_transaction_has_unit_field(self, _db):
         """Every stock transaction must record the unit."""
         product = await _create_product("Piping", 50.0, base_unit="foot")
         await process_withdrawal_stock_changes(
@@ -171,7 +171,7 @@ class TestTransactionFieldCompleteness:
         assert withdrawal_txs[0]["unit"] == "foot", "Unit should be the product's base_unit"
 
     @pytest.mark.asyncio
-    async def test_transaction_before_after_arithmetic(self, db):
+    async def test_transaction_before_after_arithmetic(self, _db):
         """For every transaction: quantity_after == quantity_before + quantity_delta."""
         product = await _create_product("Audit Product", 25.0)
 
@@ -202,7 +202,7 @@ class TestTransactionFieldCompleteness:
 class TestOrganizationIsolation:
 
     @pytest.mark.asyncio
-    async def test_product_isolated_by_org(self, db):
+    async def test_product_isolated_by_org(self, _db):
         """Products from org-A must not appear in org-B queries."""
         from shared.infrastructure.database import get_connection
         conn = get_connection()

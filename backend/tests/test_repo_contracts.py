@@ -35,7 +35,7 @@ from shared.infrastructure.database import get_connection
 class TestProductRepoContract:
 
     @pytest.mark.asyncio
-    async def test_round_trip_preserves_float_quantity(self, db):
+    async def test_round_trip_preserves_float_quantity(self, _db):
         """Insert a product with float quantity, read it back, assert float."""
         product = await create_product(
             department_id="dept-1", department_name="Hardware",
@@ -61,7 +61,7 @@ class TestProductRepoContract:
         assert row["sell_uom"] == "inch"
 
     @pytest.mark.asyncio
-    async def test_list_products_returns_float_quantities(self, db):
+    async def test_list_products_returns_float_quantities(self, _db):
         """Listing products must return float quantities, not int."""
         await create_product(
             department_id="dept-1", department_name="Hardware",
@@ -82,7 +82,7 @@ class TestProductRepoContract:
 class TestStockRepoContract:
 
     @pytest.mark.asyncio
-    async def test_transaction_round_trip_field_types(self, db):
+    async def test_transaction_round_trip_field_types(self, _db):
         """Stock transaction read-back must have float quantity fields and unit."""
         product = await create_product(
             department_id="dept-1", department_name="Hardware",
@@ -115,7 +115,7 @@ class TestStockRepoContract:
 class TestPORepoContract:
 
     @pytest.mark.asyncio
-    async def test_po_item_round_trip_has_unit_price_not_price(self, db):
+    async def test_po_item_round_trip_has_unit_price_not_price(self, _db):
         """PO items read from DB must use 'unit_price', not the raw column name 'price'."""
         po = PurchaseOrder(
             vendor_id="v1", vendor_name="Acme", status=POStatus.ORDERED,
@@ -143,7 +143,7 @@ class TestPORepoContract:
         assert read_item["base_unit"] == "foot"
 
     @pytest.mark.asyncio
-    async def test_po_item_float_quantities(self, db):
+    async def test_po_item_float_quantities(self, _db):
         """PO item quantities must be float after read-back."""
         po = PurchaseOrder(
             vendor_id="v1", vendor_name="Acme", status=POStatus.ORDERED,
@@ -173,7 +173,7 @@ class TestPORepoContract:
 class TestCreditNoteRepoContract:
 
     @pytest.mark.asyncio
-    async def test_credit_note_line_items_have_float_amounts(self, db):
+    async def test_credit_note_line_items_have_float_amounts(self, _db):
         """Credit note line items must have float quantity, unit_price, amount, cost."""
         cn = await credit_note_repo.insert_credit_note(
             return_id="ret-1",
@@ -206,7 +206,7 @@ class TestCreditNoteRepoContract:
 class TestInvoiceRepoContract:
 
     @pytest.mark.asyncio
-    async def test_invoice_line_items_have_float_amounts(self, db):
+    async def test_invoice_line_items_have_float_amounts(self, _db):
         """Invoice line items must have float quantity and amounts."""
         conn = get_connection()
         await conn.execute(
@@ -243,7 +243,7 @@ class TestInvoiceRepoContract:
 class TestMaterialRequestRepoContract:
 
     @pytest.mark.asyncio
-    async def test_round_trip_preserves_items_json(self, db):
+    async def test_round_trip_preserves_items_json(self, _db):
         """Material request items (JSON blob) must survive round-trip."""
         from operations.domain.material_request import MaterialRequest
         from operations.domain.withdrawal import WithdrawalItem

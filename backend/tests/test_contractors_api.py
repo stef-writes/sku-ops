@@ -16,7 +16,7 @@ class TestContractorsList:
         r = client.get("/api/contractors")
         assert r.status_code in (401, 403)
 
-    def test_list_returns_contractors(self, client, db, auth_headers):
+    def test_list_returns_contractors(self, client, _db, auth_headers):
         """With seeded contractor, list returns at least one."""
         r = client.get("/api/contractors", headers=auth_headers)
         assert r.status_code == 200
@@ -28,7 +28,7 @@ class TestContractorsList:
         assert contractor["name"] == "Contractor User"
         assert contractor["company"] == "ACME"
 
-    def test_search_filters_by_name(self, client, db, auth_headers):
+    def test_search_filters_by_name(self, client, _db, auth_headers):
         """search param filters by name, email, company, etc."""
         r = client.get("/api/contractors", params={"search": "Contractor User"}, headers=auth_headers)
         assert r.status_code == 200
@@ -36,14 +36,14 @@ class TestContractorsList:
         assert len(data) >= 1
         assert any(c["name"] == "Contractor User" for c in data)
 
-    def test_search_filters_by_company(self, client, db, auth_headers):
+    def test_search_filters_by_company(self, client, _db, auth_headers):
         r = client.get("/api/contractors", params={"search": "ACME"}, headers=auth_headers)
         assert r.status_code == 200
         data = r.json()
         assert len(data) >= 1
         assert any(c.get("company") == "ACME" for c in data)
 
-    def test_search_empty_when_no_match(self, client, db, auth_headers):
+    def test_search_empty_when_no_match(self, client, _db, auth_headers):
         r = client.get("/api/contractors", params={"search": "xyznonexistent123"}, headers=auth_headers)
         assert r.status_code == 200
         data = r.json()

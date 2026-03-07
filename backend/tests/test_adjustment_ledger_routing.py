@@ -37,7 +37,7 @@ async def _get_entries_for_ref(ref_id: str) -> list[dict]:
 class TestAdjustmentAccountRouting:
 
     @pytest.mark.asyncio
-    async def test_damage_reason_hits_damage_account(self, db):
+    async def test_damage_reason_hits_damage_account(self, _db):
         """reason='damage' must produce an entry on Account.DAMAGE, not SHRINKAGE."""
         ref = str(uuid4())
         await record_adjustment(
@@ -53,7 +53,7 @@ class TestAdjustmentAccountRouting:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("reason", ["theft", "correction", "count", None])
-    async def test_non_damage_reasons_hit_shrinkage(self, db, reason):
+    async def test_non_damage_reasons_hit_shrinkage(self, _db, reason):
         """Any reason other than 'damage' must route to SHRINKAGE."""
         ref = str(uuid4())
         await record_adjustment(
@@ -68,7 +68,7 @@ class TestAdjustmentAccountRouting:
         assert Account.DAMAGE.value not in accounts, f"Should NOT use DAMAGE for reason={reason!r}"
 
     @pytest.mark.asyncio
-    async def test_damage_account_appears_in_trial_balance(self, db):
+    async def test_damage_account_appears_in_trial_balance(self, _db):
         """After a damage adjustment, trial_balance must expose 'damage' as a key."""
         await record_adjustment(
             adjustment_ref_id=str(uuid4()), product_id="p1",
@@ -80,7 +80,7 @@ class TestAdjustmentAccountRouting:
         assert Account.DAMAGE.value in tb, "'damage' account must appear in trial balance"
 
     @pytest.mark.asyncio
-    async def test_shrinkage_account_appears_in_trial_balance(self, db):
+    async def test_shrinkage_account_appears_in_trial_balance(self, _db):
         await record_adjustment(
             adjustment_ref_id=str(uuid4()), product_id="p1",
             product_cost=5.0, quantity_delta=-2.0,
@@ -96,7 +96,7 @@ class TestAdjustmentAccountRouting:
 class TestAdjustmentDoubleEntry:
 
     @pytest.mark.asyncio
-    async def test_negative_delta_decreases_inventory_increases_contra(self, db):
+    async def test_negative_delta_decreases_inventory_increases_contra(self, _db):
         """Loss adjustment: INVENTORY goes down (negative), DAMAGE/SHRINKAGE goes up (positive)."""
         ref = str(uuid4())
         cost, qty = 10.0, 5.0
@@ -117,7 +117,7 @@ class TestAdjustmentDoubleEntry:
         )
 
     @pytest.mark.asyncio
-    async def test_positive_delta_increases_inventory_decreases_contra(self, db):
+    async def test_positive_delta_increases_inventory_decreases_contra(self, _db):
         """Found-stock adjustment reverses the correct account."""
         ref = str(uuid4())
         cost, qty = 8.0, 3.0
@@ -134,7 +134,7 @@ class TestAdjustmentDoubleEntry:
         assert by_account[Account.DAMAGE.value] == pytest.approx(-expected)
 
     @pytest.mark.asyncio
-    async def test_damage_and_shrinkage_entries_independent(self, db):
+    async def test_damage_and_shrinkage_entries_independent(self, _db):
         """Two adjustments with different reasons must not bleed into each other."""
         ref_damage = str(uuid4())
         ref_shrink = str(uuid4())
@@ -164,7 +164,7 @@ class TestAdjustmentDoubleEntry:
         assert Account.DAMAGE.value not in shrink_accounts
 
     @pytest.mark.asyncio
-    async def test_zero_cost_product_skips_ledger_entry(self, db):
+    async def test_zero_cost_product_skips_ledger_entry(self, _db):
         """Products with cost=0 should produce no ledger entries (amount=0 guard)."""
         ref = str(uuid4())
         await record_adjustment(
@@ -177,7 +177,7 @@ class TestAdjustmentDoubleEntry:
         assert len(entries) == 0, "Zero-cost product should not produce ledger entries"
 
     @pytest.mark.asyncio
-    async def test_idempotent_adjustment_recording(self, db):
+    async def test_idempotent_adjustment_recording(self, _db):
         """Calling record_adjustment twice with the same ref_id must not duplicate entries."""
         ref = str(uuid4())
         kwargs = {

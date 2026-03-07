@@ -94,10 +94,9 @@ async def update(vendor_id: str, vendor_dict: dict, conn=None, organization_id: 
     if organization_id:
         where += " AND organization_id = ?"
         params.append(organization_id)
-    await conn.execute(
-        "UPDATE vendors SET name = ?, contact_name = ?, email = ?, phone = ?, address = ? " + where,
-        params,
-    )
+    query = "UPDATE vendors SET name = ?, contact_name = ?, email = ?, phone = ?, address = ? "
+    query += where
+    await conn.execute(query, params)
     await conn.execute(
         "UPDATE products SET vendor_name = ? WHERE vendor_id = ?",
         (new_name, vendor_id),
