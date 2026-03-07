@@ -149,7 +149,7 @@ async def main():
             "id": vid, **v, "product_count": 0,
             "created_at": now_iso, "organization_id": org_id,
         })
-        logger.info("  %s", v['name'])
+        logger.info("  %s", v["name"])
 
     # ══════════════════════════════════════════════════════════════════════
     # 2. PRODUCTS (from seed_realistic)
@@ -182,9 +182,9 @@ async def main():
             if p["name"] not in products_by_name:
                 products_by_name[p["name"]] = prod_dict
             all_products.append(prod_dict)
-            logger.info("  %s | %s", product.sku, p['name'])
+            logger.info("  %s | %s", product.sku, p["name"])
         except (ValueError, RuntimeError, OSError) as e:
-            logger.warning("  Skip %s: %s", p['name'], e)
+            logger.warning("  Skip %s: %s", p["name"], e)
 
     logger.info("  %d unique products", len(products_by_name))
 
@@ -212,7 +212,7 @@ async def main():
         u = await user_repo.get_by_id(user.id)
         if u:
             contractor_users.append(u)
-        logger.info("  %s — %s (%s)", c['name'], c['email'], c['company'])
+        logger.info("  %s — %s (%s)", c["name"], c["email"], c["company"])
 
     # ══════════════════════════════════════════════════════════════════════
     # 4. WITHDRAWALS — 60 across contractors/jobs over 120 days
@@ -300,7 +300,7 @@ async def main():
             "total": withdrawal.total, "tax": withdrawal.tax, "subtotal": withdrawal.subtotal,
         })
         if i < 3 or i % 15 == 0:
-            logger.info("  [%d/60] %s | %s | $%.2f", i + 1, job['id'], contractor.get('company', '')[:25], withdrawal.total)
+            logger.info("  [%d/60] %s | %s | $%.2f", i + 1, job["id"], contractor.get("company", "")[:25], withdrawal.total)
 
     logger.info("  %d withdrawals created", len(withdrawal_records))
 
@@ -420,7 +420,7 @@ async def main():
                 created_at=received_at,
             )
 
-        logger.info("  PO %s... | %s | %s | $%.2f", po.id[:8], vendor['name'][:25], scenario['status'], po_total)
+        logger.info("  PO %s... | %s | %s | $%.2f", po.id[:8], vendor["name"][:25], scenario["status"], po_total)
 
     await conn.commit()
 
@@ -448,7 +448,7 @@ async def main():
             try:
                 inv = await invoice_repo.create_from_withdrawals(wids, organization_id=org_id)
                 invoice_count += 1
-                logger.info("  INV %s | %s | %d w/d | $%.2f", inv.get('invoice_number', '?'), entity[:30], len(wids), inv.get('total', 0))
+                logger.info("  INV %s | %s | %d w/d | $%.2f", inv.get("invoice_number", "?"), entity[:30], len(wids), inv.get("total", 0))
 
                 if _rng.random() < 0.4:
                     paid_at = (now - timedelta(days=_rng.randint(1, 8))).isoformat()
@@ -525,7 +525,7 @@ async def main():
             created_at=return_created_at,
         )
         items_str = ", ".join(f"{ri.name[:20]} x{ri.quantity}" for ri in return_items)
-        logger.info("  Return | %s | $%.2f | %s", contractor.get('company', '')[:25], ret.total, items_str)
+        logger.info("  Return | %s | $%.2f | %s", contractor.get("company", "")[:25], ret.total, items_str)
 
     # ══════════════════════════════════════════════════════════════════════
     # 9. MATERIAL REQUESTS — 8 (pending / approved / fulfilled)
@@ -600,7 +600,7 @@ async def main():
                 organization_id=org_id,
             )
             cn_count += 1
-            logger.info("  %s | %s | $%.2f", cn.get('credit_note_number', '?'), r['billing_entity'][:25], r['total'])
+            logger.info("  %s | %s | $%.2f", cn.get("credit_note_number", "?"), r["billing_entity"][:25], r["total"])
         except (ValueError, RuntimeError, OSError) as e:
             logger.warning("  Credit note skip: %s", e)
 
@@ -618,7 +618,7 @@ async def main():
         if prod:
             low_qty = _rng.randint(1, prod["min_stock"])
             await conn.execute("UPDATE products SET quantity = ? WHERE id = ?", (low_qty, prod["id"]))
-            logger.info("  %s | %s → qty=%d (min=%d)", prod['sku'], name, low_qty, prod['min_stock'])
+            logger.info("  %s | %s → qty=%d (min=%d)", prod["sku"], name, low_qty, prod["min_stock"])
     await conn.commit()
 
     # ══════════════════════════════════════════════════════════════════════
@@ -644,7 +644,7 @@ async def main():
     logger.info("    %-40s Admin", "admin@demo.local")
     logger.info("    %-40s Demo Contractor", "contractor@demo.local")
     for c in CONTRACTORS:
-        logger.info("    %-40s %s", c['email'], c['company'])
+        logger.info("    %-40s %s", c["email"], c["company"])
     logger.info("=" * 60)
 
     return counts

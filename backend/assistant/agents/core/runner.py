@@ -302,7 +302,7 @@ async def run_specialist(
             agent_name=agent_name, agent_label=agent_label,
             session_id=session_id,
         )
-    except (RuntimeError, OSError, ValueError, asyncio.TimeoutError) as e:
+    except (TimeoutError, RuntimeError, OSError, ValueError) as e:
         logger.exception("%s failed", agent_name)
         return {
             "response": "I ran into an issue. Please try again in a moment.",

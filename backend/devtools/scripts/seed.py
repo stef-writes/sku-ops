@@ -130,7 +130,7 @@ async def seed_demo_inventory(organization_id: str = "default") -> None:
                 )
                 imported += 1
             except (ValueError, RuntimeError, OSError, KeyError) as e:
-                logger.debug("Demo seed skip %s: %s", item.get('name'), e)
+                logger.debug("Demo seed skip %s: %s", item.get("name"), e)
 
         logger.info("Demo inventory seeded: %d products", imported)
     except (ValueError, RuntimeError, OSError) as e:
@@ -193,7 +193,7 @@ async def seed_demo_tenants() -> None:
                 "slug": org["slug"],
                 "created_at": now,
             })
-            logger.info("Created org: %s", org['name'])
+            logger.info("Created org: %s", org["name"])
 
             await seed_standard_departments(org_id)
 
@@ -250,8 +250,8 @@ async def seed_demo_tenants() -> None:
                         )
                         imported += 1
                     except (ValueError, RuntimeError, OSError, KeyError) as e:
-                        logger.debug("Demo product skip %s: %s", item.get('name'), e)
-                logger.info("Seeded %d products for %s", imported, org['name'])
+                        logger.debug("Demo product skip %s: %s", item.get("name"), e)
+                logger.info("Seeded %d products for %s", imported, org["name"])
 
         logger.info("Demo tenants seeded successfully")
     except (ValueError, RuntimeError, OSError) as e:

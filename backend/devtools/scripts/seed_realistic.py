@@ -205,7 +205,7 @@ async def main():
             "created_at": datetime.now(UTC).isoformat(),
             "organization_id": org_id,
         })
-        logger.info("  Vendor: %s", v['name'])
+        logger.info("  Vendor: %s", v["name"])
 
     # 2. Create products
     logger.info("--- Creating products ---")
@@ -213,7 +213,7 @@ async def main():
     for p in PRODUCTS:
         dept = dept_by_code.get(p["dept"])
         if not dept:
-            logger.warning("  Skipping %s: dept %s not found", p['name'], p['dept'])
+            logger.warning("  Skipping %s: dept %s not found", p["name"], p["dept"])
             continue
         vid = vendor_ids[p["vendor"]]
         vname = VENDORS[p["vendor"]]["name"]
@@ -237,9 +237,9 @@ async def main():
             )
             if p["name"] not in product_map:
                 product_map[p["name"]] = product
-            logger.info("  %s | %s | qty=%d | %s", product.sku, p['name'], p['qty'], vname)
+            logger.info("  %s | %s | qty=%d | %s", product.sku, p["name"], p["qty"], vname)
         except (ValueError, RuntimeError, OSError) as e:
-            logger.warning("  Skip %s: %s", p['name'], e)
+            logger.warning("  Skip %s: %s", p["name"], e)
 
     logger.info("--- %d unique products, %d total (with vendor overlaps) ---", len(product_map), len(PRODUCTS))
 
@@ -302,7 +302,7 @@ async def main():
         item_summary = ", ".join(f"{i.name} x{i.quantity}" for i in items[:3])
         if len(items) > 3:
             item_summary += f" +{len(items)-3} more"
-        logger.info("  %s @ %s | $%.2f | %s", scenario['job_id'], scenario['service_address'][:25], withdrawal.total, item_summary)
+        logger.info("  %s @ %s | $%.2f | %s", scenario["job_id"], scenario["service_address"][:25], withdrawal.total, item_summary)
 
     # 4. Create invoices from some withdrawals
     logger.info("--- Creating invoices ---")
@@ -313,7 +313,7 @@ async def main():
                 inv = await invoice_repo.create_from_withdrawals(
                     [wid], organization_id=org_id,
                 )
-                logger.info("  Invoice %s... for withdrawal %s...", inv['id'][:8], wid[:8])
+                logger.info("  Invoice %s... for withdrawal %s...", inv["id"][:8], wid[:8])
             except (ValueError, RuntimeError, OSError) as e:
                 logger.warning("  Invoice skip: %s", e)
 

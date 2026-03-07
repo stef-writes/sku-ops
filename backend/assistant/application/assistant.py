@@ -184,7 +184,7 @@ async def _synthesize_dag_results(query: str, sections: dict) -> str:
             timeout=15,
         )
         return result.output if isinstance(result.output, str) else str(result.output)
-    except (ValueError, RuntimeError, OSError, asyncio.TimeoutError) as e:
+    except (TimeoutError, ValueError, RuntimeError, OSError) as e:
         logger.warning("DAG synthesis failed, using raw format: %s", e)
         return _format_dag_sections(sections)
 
