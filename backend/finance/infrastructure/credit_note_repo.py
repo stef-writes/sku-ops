@@ -2,7 +2,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, transaction
 
 
 async def _next_credit_note_number(organization_id: str | None = None, conn=None) -> str:
@@ -176,7 +176,6 @@ async def apply_credit_note(credit_note_id: str, organization_id: str | None = N
     If the invoice balance_due reaches 0, auto-marks the invoice as paid.
     Returns the updated credit note.
     """
-    conn = get_connection()
     cn = await get_by_id(credit_note_id, organization_id)
     if not cn:
         raise ValueError("Credit note not found")
@@ -188,35 +187,36 @@ async def apply_credit_note(credit_note_id: str, organization_id: str | None = N
     inv_id = cn["invoice_id"]
     cn_total = float(cn.get("total", 0))
 
-    cursor = await conn.execute("SELECT total, amount_credited, status FROM invoices WHERE id = ?", (inv_id,))
-    inv_row = await cursor.fetchone()
-    if not inv_row:
-        raise ValueError(f"Linked invoice {inv_id} not found")
-    inv = dict(inv_row)
-    new_credited = round(float(inv.get("amount_credited", 0)) + cn_total, 2)
-    balance_due = round(float(inv["total"]) - new_credited, 2)
-    now = datetime.now(UTC).isoformat()
+    async with transaction() as conn:
+        cursor = await conn.execute("SELECT total, amount_credited, status FROM invoices WHERE id = ?", (inv_id,))
+        inv_row = await cursor.fetchone()
+        if not inv_row:
+            raise ValueError(f"Linked invoice {inv_id} not found")
+        inv = dict(inv_row)
+        new_credited = round(float(inv.get("amount_credited", 0)) + cn_total, 2)
+        balance_due = round(float(inv["total"]) - new_credited, 2)
+        now = datetime.now(UTC).isoformat()
 
-    await conn.execute(
-        "UPDATE invoices SET amount_credited = ?, updated_at = ? WHERE id = ?",
-        (new_credited, now, inv_id),
-    )
-
-    if balance_due <= 0 and inv.get("status") != "paid":
         await conn.execute(
-            "UPDATE invoices SET status = 'paid', updated_at = ? WHERE id = ?",
-            (now, inv_id),
-        )
-        await conn.execute(
-            "UPDATE withdrawals SET payment_status = 'paid', paid_at = ? WHERE invoice_id = ?",
-            (now, inv_id),
+            "UPDATE invoices SET amount_credited = ?, updated_at = ? WHERE id = ?",
+            (new_credited, now, inv_id),
         )
 
-    await conn.execute(
-        "UPDATE credit_notes SET status = 'applied', updated_at = ? WHERE id = ?",
-        (now, credit_note_id),
-    )
-    await conn.commit()
+        if balance_due <= 0 and inv.get("status") != "paid":
+            await conn.execute(
+                "UPDATE invoices SET status = 'paid', updated_at = ? WHERE id = ?",
+                (now, inv_id),
+            )
+            await conn.execute(
+                "UPDATE withdrawals SET payment_status = 'paid', paid_at = ? WHERE invoice_id = ?",
+                (now, inv_id),
+            )
+
+        await conn.execute(
+            "UPDATE credit_notes SET status = 'applied', updated_at = ? WHERE id = ?",
+            (now, credit_note_id),
+        )
+
     return (await get_by_id(credit_note_id)) or {}
 
 

@@ -43,7 +43,7 @@ async def chat(
     user_message: str,
     history: list[dict] | None,
     ctx: dict | None = None,
-    _agent_type: str = "auto",
+    agent_type: str = "auto",
     session_id: str = "",
 ) -> dict:
     """Route all messages to the unified agent."""

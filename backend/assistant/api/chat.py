@@ -4,6 +4,7 @@ The primary chat path is the WebSocket endpoint at /api/ws/chat which provides
 real-time token streaming. This POST endpoint is the fallback for environments
 where WebSocket connections are unreliable (e.g. some corporate proxies).
 """
+import asyncio
 import uuid
 
 from fastapi import APIRouter
@@ -86,13 +87,26 @@ async def chat_assistant(
         "user_name": current_user.name,
     }
 
-    result = await chat(
-        (data.message or "").strip(),
-        history=history,
-        ctx=ctx,
-        agent_type=data.agent_type,
-        session_id=session_id,
-    )
+    try:
+        result = await asyncio.wait_for(
+            chat(
+                (data.message or "").strip(),
+                history=history,
+                ctx=ctx,
+                agent_type=data.agent_type,
+                session_id=session_id,
+            ),
+            timeout=120,
+        )
+    except asyncio.TimeoutError:
+        return {
+            "response": "The AI assistant took too long to respond. Please try again.",
+            "tool_calls": [],
+            "thinking": [],
+            "agent": None,
+            "session_id": session_id,
+            "usage": {"cost_usd": 0, "timed_out": True},
+        }
 
     agent_history = result.pop("history", [])
     turn_cost = result.get("usage", {}).get("cost_usd", 0.0)

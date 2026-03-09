@@ -16,6 +16,7 @@ from unittest.mock import MagicMock, patch
 import jwt
 import pytest
 from starlette.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from identity.application.auth_service import create_token
 from shared.infrastructure.config import JWT_ALGORITHM, JWT_SECRET
@@ -118,26 +119,29 @@ def _make_mock_stream(text_chunks, tool_names=None):
 
 # ── Authentication tests ──────────────────────────────────────────────────────
 
+def _assert_ws_close(client, url: str, expected_code: int):
+    """Connect and assert the server closes with the given code."""
+    try:
+        with client.websocket_connect(url):
+            pass
+        pytest.fail(f"Expected WebSocketDisconnect({expected_code})")
+    except WebSocketDisconnect as exc:
+        assert exc.code == expected_code, f"Expected close code {expected_code}, got {exc.code}"
+
+
 class TestWSChatAuth:
     def test_no_token_rejected(self, client):
-        with pytest.raises(WebSocketDisconnect, match="4001"), client.websocket_connect("/api/ws/chat"):
-            pass
+        _assert_ws_close(client, "/api/ws/chat", 4001)
 
     def test_invalid_token_rejected(self, client):
-        with pytest.raises(WebSocketDisconnect, match="4001"):
-            with client.websocket_connect("/api/ws/chat?token=garbage"):
-                pass
+        _assert_ws_close(client, "/api/ws/chat?token=garbage", 4001)
 
     def test_expired_token_rejected(self, client):
-        with pytest.raises(WebSocketDisconnect, match="4001"):
-            with client.websocket_connect(f"/api/ws/chat?token={_expired_token()}"):
-                pass
+        _assert_ws_close(client, f"/api/ws/chat?token={_expired_token()}", 4001)
 
     def test_contractor_role_rejected(self, client):
         """Contractors cannot use the AI assistant."""
-        with pytest.raises(WebSocketDisconnect, match="4003"):
-            with client.websocket_connect(f"/api/ws/chat?token={_contractor_token()}"):
-                pass
+        _assert_ws_close(client, f"/api/ws/chat?token={_contractor_token()}", 4003)
 
     def test_admin_connects_successfully(self, client):
         token = _admin_token()

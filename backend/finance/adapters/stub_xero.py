@@ -29,6 +29,9 @@ class StubXeroAdapter:
         inv_id = invoice.get("id", "unknown")
         return f"XERO-STUB-COGS-REPOST-{inv_id}"
 
+    async def fetch_invoice_by_number(self, _invoice_number: str, _settings: OrgSettings) -> dict | None:
+        return None
+
     async def fetch_invoice(self, _xero_invoice_id: str, _settings: OrgSettings) -> dict:
         return {"total": 0.0, "line_count": 0, "status": "STUB"}
 

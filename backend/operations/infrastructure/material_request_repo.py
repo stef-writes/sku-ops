@@ -1,6 +1,7 @@
 """Material request repository."""
 import json
 
+from kernel.errors import InvalidTransitionError
 from operations.domain.material_request import MaterialRequest
 from shared.infrastructure.database import get_connection
 
@@ -86,11 +87,13 @@ async def mark_processed(
 ) -> bool:
     in_transaction = conn is not None
     conn = conn or get_connection()
-    await conn.execute(
+    cursor = await conn.execute(
         """UPDATE material_requests SET status = 'processed', withdrawal_id = ?, processed_by_id = ?, processed_at = ?
-           WHERE id = ?""",
+           WHERE id = ? AND status = 'pending'""",
         (withdrawal_id, processed_by_id, processed_at, request_id),
     )
+    if cursor.rowcount == 0:
+        raise InvalidTransitionError("MaterialRequest", "processed", "processed")
     if not in_transaction:
         await conn.commit()
     return True

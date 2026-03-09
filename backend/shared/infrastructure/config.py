@@ -58,6 +58,12 @@ DATABASE_URL = os.environ.get("DATABASE_URL") or (
     "sqlite:///:memory:" if is_test else "sqlite:///./data/sku_ops.db"
 )
 
+if is_deployed and not DATABASE_URL.startswith(("postgresql://", "postgres://")):
+    raise RuntimeError(
+        "DATABASE_URL must be a PostgreSQL connection string in staging/production. "
+        "Got a non-PostgreSQL URL. Set DATABASE_URL=postgresql://user:pass@host:5432/db"
+    )
+
 # Auth
 _DEV_JWT_FALLBACK = "hardware-store-" + "secret-key"
 

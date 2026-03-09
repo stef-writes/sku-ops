@@ -27,6 +27,14 @@ class Event:
     user_id: str = ""
 
 
+SHUTDOWN = Event(type="__shutdown__", org_id="")
+"""Sentinel event pushed to a subscriber queue to signal the sender to exit."""
+
+
+def is_shutdown(event: Event) -> bool:
+    return event.type == "__shutdown__"
+
+
 class _Hub:
     """Manages subscriber queues and broadcasts events."""
 
@@ -52,6 +60,14 @@ class _Hub:
                 logger.warning("Dropping slow WebSocket subscriber (queue full)")
         for q in dead:
             self._subscribers.discard(q)
+            try:
+                q.get_nowait()
+            except asyncio.QueueEmpty:
+                pass
+            try:
+                q.put_nowait(SHUTDOWN)
+            except asyncio.QueueFull:
+                pass
 
 
 _hub = _Hub()

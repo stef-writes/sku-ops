@@ -81,10 +81,13 @@ async def _relay_loop(
     """Forward hub events to the client, with periodic heartbeats."""
     async def _sender():
         while True:
-            event = await queue.get()
-            if not _should_deliver(event, org_id, role, user_id):
+            ev = await queue.get()
+            if event_hub.is_shutdown(ev):
+                logger.info("Subscriber shutdown — closing WebSocket")
+                return
+            if not _should_deliver(ev, org_id, role, user_id):
                 continue
-            msg = {"type": event.type, **event.data}
+            msg = {"type": ev.type, **ev.data}
             try:
                 await websocket.send_text(json.dumps(msg))
             except (RuntimeError, OSError):
@@ -99,7 +102,6 @@ async def _relay_loop(
                 return
 
     async def _receiver():
-        """Consume client messages to detect disconnects."""
         try:
             while True:
                 await websocket.receive_text()
@@ -115,6 +117,8 @@ async def _relay_loop(
         _done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         for t in pending:
             t.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
     except (RuntimeError, OSError):
         for t in tasks:
             t.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)

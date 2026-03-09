@@ -40,7 +40,7 @@ services:
       XERO_REDIRECT_URI: ${XERO_REDIRECT_URI:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      WORKERS: ${WORKERS:-4}
+      WORKERS: ${WORKERS:-1}
     deploy:
       resources:
         limits:

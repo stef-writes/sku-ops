@@ -1,9 +1,20 @@
 """
 Supply Yard API - Material Management System.
 Main entry point: composes FastAPI app with routers from api package.
+
+Architecture note — single-process constraints:
+  The following subsystems use in-process memory and are NOT safe under
+  multiple uvicorn workers (--workers > 1):
+    - Event hub (shared/infrastructure/event_hub.py) — asyncio queues
+    - Chat session store (assistant/application/session_store.py) — dict
+    - Xero sync scheduler (_xero_sync_loop below) — asyncio.Task
+    - Xero manual sync lock (finance/api/xero_health._sync_tasks) — dict
+    - BM25 search index (assistant/agents/tools/search) — in-memory
+  Keep WORKERS=1 until these are backed by Redis or Postgres pub/sub.
 """
 import asyncio
 import logging
+import os
 import traceback
 from contextlib import asynccontextmanager, suppress
 
@@ -18,6 +29,7 @@ setup_logging()
 from datetime import UTC
 
 from api import api_router  # noqa: E402
+from inventory.domain.errors import InsufficientStockError  # noqa: E402
 from kernel.errors import DomainError  # noqa: E402
 from shared.infrastructure.config import (  # noqa: E402
     CORS_ORIGINS,
@@ -37,11 +49,21 @@ from shared.infrastructure.middleware.security_headers import (
 logger = logging.getLogger(__name__)
 
 
+async def _get_active_org_ids() -> list[str]:
+    """Return org IDs that should run scheduled jobs.
+
+    Currently returns ["default"]. When multi-org is needed, query the
+    organizations table for active orgs instead.
+    """
+    return ["default"]
+
+
 async def _xero_sync_loop() -> None:
     """Background task: run the Xero sync job once per day at XERO_SYNC_HOUR UTC.
 
     Wakes up every minute, checks whether the target hour has arrived, and
-    fires run_sync exactly once per calendar day. Skipped in test environment.
+    fires run_sync for each active org exactly once per calendar day.
+    Skipped in test environment.
     """
     from datetime import datetime
     last_run_date = None
@@ -52,20 +74,22 @@ async def _xero_sync_loop() -> None:
             now = datetime.now(UTC)
             if now.hour == XERO_SYNC_HOUR and now.date() != last_run_date:
                 last_run_date = now.date()
-                logger.info("Xero nightly sync starting for org 'default'")
-                try:
-                    from finance.application.xero_sync_job import run_sync
-                    summary = await run_sync("default")
-                    logger.info("Xero nightly sync complete: %s", {
-                        k: v for k, v in summary.items() if k != "errors"
-                    })
-                    if summary.get("errors"):
-                        logger.warning(
-                            "Xero nightly sync had %d error(s): %s",
-                            len(summary["errors"]), summary["errors"],
-                        )
-                except Exception:
-                    logger.exception("Xero nightly sync failed")
+                org_ids = await _get_active_org_ids()
+                for org_id in org_ids:
+                    logger.info("Xero nightly sync starting for org '%s'", org_id)
+                    try:
+                        from finance.application.xero_sync_job import run_sync
+                        summary = await run_sync(org_id)
+                        logger.info("Xero nightly sync complete for org '%s': %s", org_id, {
+                            k: v for k, v in summary.items() if k != "errors"
+                        })
+                        if summary.get("errors"):
+                            logger.warning(
+                                "Xero nightly sync for org '%s' had %d error(s): %s",
+                                org_id, len(summary["errors"]), summary["errors"],
+                            )
+                    except Exception:
+                        logger.exception("Xero nightly sync failed for org '%s'", org_id)
         except asyncio.CancelledError:
             logger.info("Xero nightly sync scheduler stopped")
             return
@@ -76,6 +100,16 @@ async def _xero_sync_loop() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize DB and seed data on startup; close DB on shutdown."""
+    worker_count = int(os.environ.get("WORKERS", "1"))
+    if worker_count > 1:
+        logger.warning(
+            "WORKERS=%d — this app uses in-memory state (event hub, chat sessions, "
+            "sync scheduler) that is NOT shared across workers. WebSocket events, "
+            "chat continuity, and scheduled sync WILL break. Set WORKERS=1 unless "
+            "you have migrated these subsystems to Redis or equivalent.",
+            worker_count,
+        )
+
     if cors_warn_in_deployed:
         logger.warning("CORS_ORIGINS is permissive (*). Set CORS_ORIGINS explicitly for staging/production.")
     await init_db()
@@ -90,16 +124,19 @@ async def lifespan(app: FastAPI):
     from operations.application.queries import get_withdrawal_by_id
     set_withdrawal_getter(get_withdrawal_by_id)
     logger.info("Cross-domain DI wired")
-    try:
-        from assistant.agents.tools.search import get_index
-        await get_index("default")
-    except (RuntimeError, OSError, ValueError) as e:
-        logger.warning("BM25 index warm-up skipped: %s", e)
-    try:
-        from finance.application.xero_startup_check import run_startup_check
-        await run_startup_check("default")
-    except (RuntimeError, OSError, ValueError) as e:
-        logger.warning("Xero startup check failed: %s", e)
+
+    org_ids = await _get_active_org_ids()
+    for org_id in org_ids:
+        try:
+            from assistant.agents.tools.search import get_index
+            await get_index(org_id)
+        except (RuntimeError, OSError, ValueError) as e:
+            logger.warning("BM25 index warm-up skipped for org '%s': %s", org_id, e)
+        try:
+            from finance.application.xero_startup_check import run_startup_check
+            await run_startup_check(org_id)
+        except (RuntimeError, OSError, ValueError) as e:
+            logger.warning("Xero startup check failed for org '%s': %s", org_id, e)
 
     from shared.infrastructure.config import (
         ANTHROPIC_AVAILABLE,
@@ -156,6 +193,20 @@ setup_sentry()
 setup_prometheus(app)
 
 # ── Exception handlers ────────────────────────────────────────────────────────
+
+@app.exception_handler(InsufficientStockError)
+async def insufficient_stock_handler(_request, exc: InsufficientStockError):
+    return JSONResponse(
+        status_code=exc.status_hint,
+        content={
+            "detail": str(exc),
+            "error_type": "insufficient_stock",
+            "sku": exc.sku,
+            "requested": exc.requested,
+            "available": exc.available,
+        },
+    )
+
 
 @app.exception_handler(DomainError)
 async def domain_error_handler(_request, exc: DomainError):

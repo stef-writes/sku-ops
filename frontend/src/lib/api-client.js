@@ -218,6 +218,7 @@ const api = {
   xero: {
     health: () => axios.get(`${API}/xero/health`).then((r) => r.data),
     triggerSync: () => axios.post(`${API}/xero/sync`).then((r) => r.data),
+    syncStatus: () => axios.get(`${API}/xero/sync-status`).then((r) => r.data),
   },
 };
 

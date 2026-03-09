@@ -6,7 +6,7 @@ from catalog.domain.units import are_compatible, convert_quantity, cost_per_sell
 from finance.application.ledger_service import record_withdrawal as _record_ledger
 from identity.application.billing_entity_service import ensure_billing_entity
 from inventory.domain.stock import StockDecrement
-from jobs.infrastructure.job_repo import job_repo as _job_repo
+from jobs.application.job_service import ensure_job as _ensure_job
 from kernel.types import CurrentUser
 from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalCreate
 from operations.infrastructure.withdrawal_repo import withdrawal_repo as _default_withdrawal_repo
@@ -52,7 +52,7 @@ async def create_withdrawal(
     """
     org_id = current_user.organization_id
     if data.job_id:
-        await _job_repo.ensure_job(data.job_id, org_id)
+        await _ensure_job(data.job_id, org_id)
     products = await list_products(organization_id=org_id)
     product_map = {p["id"]: p for p in products}
     dept_map = {p["id"]: p.get("department_name", "") for p in products}

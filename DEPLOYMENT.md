@@ -197,7 +197,9 @@ Deploy `backend/` using the Dockerfile. The platform must support Docker-based d
   - `FRONTEND_URL=https://app.yourdomain.com`
 - **Optional env vars:** `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `OPENAI_API_KEY`,
   `XERO_CLIENT_ID`, `XERO_CLIENT_SECRET`, `XERO_REDIRECT_URI`, `SENTRY_DSN`,
-  `WORKERS` (default 4)
+  `WORKERS` (default 1; **must stay at 1** — see WebSocket support note above),
+  `PG_POOL_MIN` (default 2), `PG_POOL_MAX` (default 10),
+  `PG_COMMAND_TIMEOUT` (default 60s), `PG_ACQUIRE_TIMEOUT` (default 30s — pool acquire timeout, prevents unbounded hangs under load)
 
 ### Database
 
@@ -206,8 +208,18 @@ The backend auto-creates tables on first startup.
 
 ### WebSocket Support
 
-The backend exposes `GET /api/ws` for realtime updates. Ensure the platform
-supports WebSocket connections (both Render and DO App Platform do).
+The backend exposes two WebSocket endpoints:
+
+- `GET /api/ws` — realtime domain event broadcasting (inventory, withdrawals, material requests)
+- `GET /api/ws/chat` — AI assistant streaming
+
+Ensure the platform supports WebSocket connections (both Render and DO App Platform do).
+
+**Important production constraints:**
+
+- `WORKERS` must be set to `1`. The event hub is in-process memory; multiple workers will not share domain events and WebSocket clients on different workers will not receive updates. See `server.py` for the full warning.
+- The client reconnects automatically with exponential backoff (1s–30s). Heartbeat timeout is 45s — if no ping is received within that window, the client closes and reconnects. This handles half-open connections and NAT timeouts transparently.
+- If a subscriber's event queue fills (256 events, e.g. a very slow client), the server closes that connection cleanly so the client can reconnect rather than silently orphaning it.
 
 ### Domain and HTTPS
 

@@ -80,23 +80,10 @@ async def parse_document(
     filename = file.filename or ""
 
     if not use_ai:
-        try:
-            from documents.application.ocr_service import extract_from_document
-            extracted = await asyncio.to_thread(
-                extract_from_document, contents, content_type, filename
-            )
-            for p in extracted.get("products", []):
-                qty = p.get("quantity", 1)
-                if "ordered_qty" not in p or p["ordered_qty"] is None:
-                    p["ordered_qty"] = qty
-                if "delivered_qty" not in p or p["delivered_qty"] is None:
-                    p["delivered_qty"] = qty
-            return await _persist_parsed_document(extracted, filename, content_type, len(contents), current_user)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e)) from e
-        except Exception as e:
-            logger.exception("OCR parse error")
-            raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(
+            status_code=501,
+            detail="OCR parsing is not available. Use use_ai=true with an Anthropic API key.",
+        )
 
     if not ANTHROPIC_AVAILABLE:
         raise HTTPException(

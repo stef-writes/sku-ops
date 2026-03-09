@@ -49,3 +49,9 @@ async def db():
 
     yield
     await close_db()
+
+
+@pytest_asyncio.fixture
+async def _db(db):
+    """Alias for ``db`` — many test files reference this name."""
+    yield

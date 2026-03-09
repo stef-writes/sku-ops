@@ -266,7 +266,7 @@ class XeroAdapter:
                         json={"Status": "VOIDED"},
                         timeout=20,
                     )
-            except (httpx.HTTPError, RuntimeError, OSError) as e:
+            except Exception as e:
                 logger.warning("Could not void old COGS journal %s: %s", old_journal_id, e)
 
         first_job_id = next(
@@ -403,6 +403,21 @@ class XeroAdapter:
             return InvoiceSyncResult(success=False, error="Xero returned no credit note in response")
         xero_cn_id = credit_notes[0].get("CreditNoteID")
         return InvoiceSyncResult(success=True, xero_invoice_id=xero_cn_id)
+
+    async def fetch_invoice_by_number(self, invoice_number: str, settings: OrgSettings) -> dict | None:
+        """Look up a Xero invoice by InvoiceNumber. Returns the first match or None."""
+        if self._is_token_expired(settings):
+            settings = await self.refresh_token(settings)
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{XERO_API}/Invoices",
+                headers=self._auth_headers(settings),
+                params={"InvoiceNumbers": invoice_number},
+                timeout=15,
+            )
+        resp.raise_for_status()
+        invoices = resp.json().get("Invoices", [])
+        return invoices[0] if invoices else None
 
     async def fetch_invoice(self, xero_invoice_id: str, settings: OrgSettings) -> dict:
         """Fetch an invoice from Xero for reconciliation verification."""

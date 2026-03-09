@@ -1,8 +1,6 @@
-import { toast } from "sonner";
 import { RefreshCw, CheckCircle2, AlertTriangle, XCircle, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useXeroHealth, useTriggerXeroSync } from "@/hooks/useXeroHealth";
-import { getErrorMessage } from "@/lib/api-client";
 
 function formatDate(iso) {
   if (!iso) return "—";
@@ -112,22 +110,11 @@ const MISMATCH_INVOICE_COLS = [
 
 export default function XeroHealthPage() {
   const { data, isLoading, error } = useXeroHealth();
-  const syncMutation = useTriggerXeroSync();
+  const { triggerSync, syncing, isPending } = useTriggerXeroSync();
+  const isBusy = syncing || isPending;
 
   const handleSync = () => {
-    syncMutation.mutate(undefined, {
-      onSuccess: (res) => {
-        if (res.success) {
-          const s = res.summary;
-          toast.success(
-            `Sync complete — ${s.invoices_synced} invoices, ${s.credit_notes_synced} credits, ${s.po_bills_synced} bills synced`
-          );
-        } else {
-          toast.error(res.error || "Sync failed");
-        }
-      },
-      onError: (err) => toast.error(getErrorMessage(err)),
-    });
+    triggerSync();
   };
 
   if (isLoading) {
@@ -160,12 +147,12 @@ export default function XeroHealthPage() {
         </div>
         <Button
           onClick={handleSync}
-          disabled={syncMutation.isPending}
+          disabled={isBusy}
           className="gap-2"
           variant="outline"
         >
-          <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? "animate-spin" : ""}`} />
-          {syncMutation.isPending ? "Syncing…" : "Run Sync Now"}
+          <RefreshCw className={`w-4 h-4 ${isBusy ? "animate-spin" : ""}`} />
+          {isBusy ? "Syncing…" : "Run Sync Now"}
         </Button>
       </div>
 

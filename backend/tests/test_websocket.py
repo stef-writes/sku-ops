@@ -33,18 +33,26 @@ def _make_token(
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
+def _assert_ws_close(client: TestClient, url: str, expected_code: int):
+    """Connect and assert the server closes with the given code."""
+    try:
+        with client.websocket_connect(url):
+            pass
+        pytest.fail(f"Expected WebSocketDisconnect({expected_code})")
+    except WebSocketDisconnect as exc:
+        assert exc.code == expected_code, f"Expected close code {expected_code}, got {exc.code}"
+
+
 # ── /api/ws (realtime domain events) ────────────────────────────────────────
 
 class TestRealtimeWebSocket:
 
     def test_rejects_missing_token(self, client: TestClient):
-        with pytest.raises(WebSocketDisconnect, match="4001"), client.websocket_connect("/api/ws"):
-            pass
+        _assert_ws_close(client, "/api/ws", 4001)
 
     def test_rejects_expired_token(self, client: TestClient):
         token = _make_token(expired=True)
-        with pytest.raises(WebSocketDisconnect, match="4001"), client.websocket_connect(f"/api/ws?token={token}"):
-            pass
+        _assert_ws_close(client, f"/api/ws?token={token}", 4001)
 
     def test_accepts_valid_token(self, client: TestClient):
         token = _make_token()
@@ -59,6 +67,7 @@ class TestRealtimeWebSocket:
             with client.websocket_connect(f"/api/ws?token={token}") as ws:
                 data = ws.receive_json()
                 assert data["type"] == "ping"
+                ws.close()
 
 
 # ── /api/ws/chat (AI chat streaming) ────────────────────────────────────────
@@ -66,14 +75,11 @@ class TestRealtimeWebSocket:
 class TestChatWebSocket:
 
     def test_rejects_missing_token(self, client: TestClient):
-        with pytest.raises(WebSocketDisconnect, match="4001"), client.websocket_connect("/api/ws/chat"):
-            pass
+        _assert_ws_close(client, "/api/ws/chat", 4001)
 
     def test_rejects_contractor_role(self, client: TestClient):
         token = _make_token(role="contractor")
-        with pytest.raises(WebSocketDisconnect, match="4003"):
-            with client.websocket_connect(f"/api/ws/chat?token={token}"):
-                pass
+        _assert_ws_close(client, f"/api/ws/chat?token={token}", 4003)
 
     def test_accepts_admin_token(self, client: TestClient):
         token = _make_token(role="admin")

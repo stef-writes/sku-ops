@@ -1,4 +1,5 @@
 """Xero sync health — surfaces unsynced documents, failures, and mismatches."""
+import asyncio
 import logging
 
 from fastapi import APIRouter
@@ -11,6 +12,8 @@ from shared.api.deps import AdminDep
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/xero", tags=["xero"])
+
+_sync_tasks: dict[str, asyncio.Task] = {}
 
 
 @router.get("/health")
@@ -47,15 +50,32 @@ async def get_xero_health(
 
 
 @router.post("/sync")
-async def trigger_sync(
-    current_user: AdminDep,
-):
-    """Manually trigger a full Xero sync + reconciliation for the org."""
+async def trigger_sync(current_user: AdminDep):
+    """Manually trigger a full Xero sync + reconciliation for the org (background)."""
     from finance.application.xero_sync_job import run_sync
+
     org_id = current_user.organization_id
-    try:
-        summary = await run_sync(org_id)
-        return {"success": True, "summary": summary}
-    except Exception as e:
-        logger.exception("Manual Xero sync failed for org %s", org_id)
-        return {"success": False, "error": str(e)}
+    existing = _sync_tasks.get(org_id)
+    if existing and not existing.done():
+        return {"success": True, "status": "in_progress"}
+
+    async def _run():
+        try:
+            return await run_sync(org_id)
+        except Exception:
+            logger.exception("Xero sync failed for org %s", org_id)
+        finally:
+            _sync_tasks.pop(org_id, None)
+
+    _sync_tasks[org_id] = asyncio.create_task(_run())
+    return {"success": True, "status": "started"}
+
+
+@router.get("/sync-status")
+async def get_sync_status(current_user: AdminDep):
+    """Check if a background Xero sync is running."""
+    org_id = current_user.organization_id
+    task = _sync_tasks.get(org_id)
+    if task and not task.done():
+        return {"status": "in_progress"}
+    return {"status": "idle"}

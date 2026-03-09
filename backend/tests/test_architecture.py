@@ -19,7 +19,10 @@ BOUNDED_CONTEXTS = frozenset({
 })
 
 # Files that compose routers/schemas from all contexts — architecture rules don't apply.
-COMPOSITION_ROOTS = frozenset({"server.py", "api/__init__.py", "full_schema.py"})
+# shared/api/deps.py is a FastAPI dependency-injection composition helper: it wires
+# identity.application auth functions into Annotated type aliases used across all routes.
+# It is a composition root by function even though it lives in shared/api/.
+COMPOSITION_ROOTS = frozenset({"server.py", "api/__init__.py", "full_schema.py", "shared/api/deps.py"})
 
 # ── Known cross-context infrastructure violations (pre-DDD coupling to clean up) ──────────
 # Each entry is "relative/path/from/backend:imported.module".
@@ -58,14 +61,22 @@ def _all_backend_py_files(skip_roots: bool = True):
 # ── Test 1: shared kernel is dependency-free ─────────────────────────────────────────────
 
 def test_shared_kernel_has_no_context_imports():
-    """shared/ must not import from any bounded context."""
+    """shared/ must not import from any bounded context.
+
+    Exception: shared/api/deps.py is a FastAPI dependency-injection composition
+    helper that wires identity auth into Annotated type aliases used across all
+    routes.  It is a composition root by function (same category as server.py)
+    even though it lives in shared/api/ for import-path convenience.
+    """
     violations = []
     for py_file in (BACKEND / "shared").rglob("*.py"):
         if "__pycache__" in py_file.parts:
             continue
+        rel = py_file.relative_to(BACKEND)
+        if str(rel) in COMPOSITION_ROOTS:
+            continue
         for module in _from_imports(py_file):
             if module.split(".")[0] in BOUNDED_CONTEXTS:
-                rel = py_file.relative_to(BACKEND)
                 violations.append(f"  {rel}: from {module}")
     assert not violations, (
         "shared/ imports from bounded contexts:\n" + "\n".join(violations)

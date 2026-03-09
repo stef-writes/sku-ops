@@ -2,7 +2,7 @@
 
 import pytest
 
-from shared.infrastructure.event_hub import Event, _Hub
+from shared.infrastructure.event_hub import Event, SHUTDOWN, _Hub, is_shutdown
 
 
 class TestEventHub:
@@ -40,14 +40,28 @@ class TestEventHub:
         await hub.emit("test.event", org_id="org-1")
         assert q.empty()
 
-    async def test_full_queue_drops_slow_subscriber(self):
+    async def test_full_queue_drops_and_sends_shutdown(self):
+        """When a subscriber queue overflows, the hub removes it and injects
+        a SHUTDOWN sentinel so the sender task can exit deterministically."""
         hub = _Hub()
         q = hub.subscribe()
         for i in range(256):
             await hub.emit("flood", org_id="org-1", i=i)
         assert q.full()
+
         await hub.emit("overflow", org_id="org-1")
+
         assert q not in hub._subscribers
+        # Drain the 255 remaining events (one was evicted to make room for SHUTDOWN)
+        events = []
+        while not q.empty():
+            events.append(q.get_nowait())
+        last = events[-1]
+        assert is_shutdown(last), f"Expected SHUTDOWN sentinel as last event, got {last.type}"
+
+    async def test_shutdown_sentinel_is_recognisable(self):
+        assert is_shutdown(SHUTDOWN) is True
+        assert is_shutdown(Event(type="inventory.updated", org_id="org-1")) is False
 
     async def test_event_is_frozen_dataclass(self):
         event = Event(type="t", org_id="o")

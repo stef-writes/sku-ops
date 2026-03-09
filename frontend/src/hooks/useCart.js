@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { toast } from "sonner";
 
 /**
@@ -67,7 +67,20 @@ export function useCart({ getPrice } = {}) {
     setItems([]);
   }
 
+  const syncStock = useCallback((products) => {
+    if (!products?.length) return;
+    const productMap = new Map(products.map((p) => [p.id, p]));
+    setItems((prev) =>
+      prev.map((item) => {
+        const fresh = productMap.get(item.product_id);
+        if (!fresh) return item;
+        const newMax = fresh.sell_quantity ?? fresh.quantity;
+        return { ...item, max_quantity: newMax };
+      })
+    );
+  }, []);
+
   const total = items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
 
-  return { items, addItem, updateQuantity, removeItem, clear, total };
+  return { items, addItem, updateQuantity, removeItem, clear, syncStock, total };
 }

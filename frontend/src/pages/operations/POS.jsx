@@ -32,9 +32,11 @@ const IssueMaterials = () => {
   const allProducts = Array.isArray(productsData) ? productsData : (productsData?.items || []);
   const contractors = (contractorsData || []).filter((c) => c.is_active !== false);
 
-  const { items, addItem, updateQuantity, removeItem, clear: clearCart, total: displaySubtotal } = useCart({
+  const { items, addItem, updateQuantity, removeItem, clear: clearCart, syncStock, total: displaySubtotal } = useCart({
     getPrice: (p) => p.sell_price ?? p.price ?? 0,
   });
+
+  useEffect(() => { syncStock(allProducts); }, [allProducts, syncStock]);
   const [search, setSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedContractor, setSelectedContractor] = useState("");
@@ -138,7 +140,12 @@ const IssueMaterials = () => {
       setNotes("");
       if (!isContractor) setSelectedContractor("");
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      const data = error.response?.data;
+      if (data?.error_type === "insufficient_stock") {
+        toast.error(`Not enough ${data.sku} — only ${data.available} available (you requested ${data.requested})`);
+      } else {
+        toast.error(getErrorMessage(error));
+      }
     }
   };
 

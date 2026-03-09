@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from finance.domain.invoice import Invoice, compute_due_date
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, transaction
 
 # Injected at module level by the API layer to avoid circular import with operations
 _wiring: dict[str, Callable[..., Awaitable[dict | None]]] = {}
@@ -210,113 +210,110 @@ async def update(
     line_items: list | None = None,
     organization_id: str | None = None,
 ) -> dict | None:
-    conn = get_connection()
     inv = await get_by_id(invoice_id, organization_id=organization_id)
     if not inv:
         return None
 
     now = datetime.now(UTC).isoformat()
 
-    if line_items is not None:
-        await conn.execute("DELETE FROM invoice_line_items WHERE invoice_id = ?", (invoice_id,))
-        subtotal = 0.0
-        for item in line_items:
-            amt = round(float(item.get("quantity", 1)) * float(item.get("unit_price", 0)), 2)
-            item_id = item.get("id") or str(uuid4())
-            cost_val = float(item.get("cost", 0))
-            await conn.execute(
-                """INSERT INTO invoice_line_items
-                   (id, invoice_id, description, quantity, unit_price, amount, cost, product_id, job_id, unit, sell_cost)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    item_id,
-                    invoice_id,
-                    item.get("description", ""),
-                    float(item.get("quantity", 1)),
-                    float(item.get("unit_price", 0)),
-                    amt,
-                    cost_val,
-                    item.get("product_id"),
-                    item.get("job_id"),
-                    item.get("unit") or "each",
-                    float(item.get("sell_cost") or cost_val),
-                ),
-            )
-            subtotal += amt
-        tax_val = tax if tax is not None else float(inv.get("tax", 0))
-        total = round(subtotal + tax_val, 2)
-        # If already synced to Xero, mark COGS journal as stale so the sync job
-        # re-posts the invoice and re-posts the COGS journal with the updated cost.
-        sync_status_update = ""
-        if inv.get("xero_invoice_id"):
-            sync_status_update = ", xero_sync_status = 'cogs_stale'"
-        upd_q = "UPDATE invoices SET subtotal = ?, tax = ?, total = ?, updated_at = ?"
-        upd_q += sync_status_update
-        upd_q += " WHERE id = ?"
-        await conn.execute(upd_q, (subtotal, tax_val, total, now, invoice_id))
-    else:
-        updates: list[str] = []
-        params: list = []
-        if billing_entity is not None:
-            updates.append("billing_entity = ?")
-            params.append(billing_entity)
-        if contact_name is not None:
-            updates.append("contact_name = ?")
-            params.append(contact_name)
-        if contact_email is not None:
-            updates.append("contact_email = ?")
-            params.append(contact_email)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if notes is not None:
-            updates.append("notes = ?")
-            params.append(notes)
-        if tax is not None:
-            inv_subtotal = float(inv.get("subtotal", 0))
-            total = round(inv_subtotal + tax, 2)
-            updates.append("tax = ?")
-            params.append(tax)
-            updates.append("total = ?")
-            params.append(total)
-        if tax_rate is not None:
-            updates.append("tax_rate = ?")
-            params.append(tax_rate)
-        if invoice_date is not None:
-            updates.append("invoice_date = ?")
-            params.append(invoice_date)
-        if due_date is not None:
-            updates.append("due_date = ?")
-            params.append(due_date)
-        elif payment_terms is not None:
-            inv_date = invoice_date or inv.get("invoice_date") or inv.get("created_at")
-            updates.append("due_date = ?")
-            params.append(compute_due_date(inv_date, payment_terms))
-        if payment_terms is not None:
-            updates.append("payment_terms = ?")
-            params.append(payment_terms)
-        if billing_address is not None:
-            updates.append("billing_address = ?")
-            params.append(billing_address)
-        if po_reference is not None:
-            updates.append("po_reference = ?")
-            params.append(po_reference)
-        if updates:
-            updates.append("updated_at = ?")
-            params.append(now)
-            params.append(invoice_id)
-            upd_q = "UPDATE invoices SET "
-            upd_q += ", ".join(updates)
+    async with transaction() as conn:
+        if line_items is not None:
+            await conn.execute("DELETE FROM invoice_line_items WHERE invoice_id = ?", (invoice_id,))
+            subtotal = 0.0
+            for item in line_items:
+                amt = round(float(item.get("quantity", 1)) * float(item.get("unit_price", 0)), 2)
+                item_id = item.get("id") or str(uuid4())
+                cost_val = float(item.get("cost", 0))
+                await conn.execute(
+                    """INSERT INTO invoice_line_items
+                       (id, invoice_id, description, quantity, unit_price, amount, cost, product_id, job_id, unit, sell_cost)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        item_id,
+                        invoice_id,
+                        item.get("description", ""),
+                        float(item.get("quantity", 1)),
+                        float(item.get("unit_price", 0)),
+                        amt,
+                        cost_val,
+                        item.get("product_id"),
+                        item.get("job_id"),
+                        item.get("unit") or "each",
+                        float(item.get("sell_cost") or cost_val),
+                    ),
+                )
+                subtotal += amt
+            tax_val = tax if tax is not None else float(inv.get("tax", 0))
+            total = round(subtotal + tax_val, 2)
+            sync_status_update = ""
+            if inv.get("xero_invoice_id"):
+                sync_status_update = ", xero_sync_status = 'cogs_stale'"
+            upd_q = "UPDATE invoices SET subtotal = ?, tax = ?, total = ?, updated_at = ?"
+            upd_q += sync_status_update
             upd_q += " WHERE id = ?"
-            await conn.execute(upd_q, params)
+            await conn.execute(upd_q, (subtotal, tax_val, total, now, invoice_id))
+        else:
+            updates: list[str] = []
+            params: list = []
+            if billing_entity is not None:
+                updates.append("billing_entity = ?")
+                params.append(billing_entity)
+            if contact_name is not None:
+                updates.append("contact_name = ?")
+                params.append(contact_name)
+            if contact_email is not None:
+                updates.append("contact_email = ?")
+                params.append(contact_email)
+            if status is not None:
+                updates.append("status = ?")
+                params.append(status)
+            if notes is not None:
+                updates.append("notes = ?")
+                params.append(notes)
+            if tax is not None:
+                inv_subtotal = float(inv.get("subtotal", 0))
+                total = round(inv_subtotal + tax, 2)
+                updates.append("tax = ?")
+                params.append(tax)
+                updates.append("total = ?")
+                params.append(total)
+            if tax_rate is not None:
+                updates.append("tax_rate = ?")
+                params.append(tax_rate)
+            if invoice_date is not None:
+                updates.append("invoice_date = ?")
+                params.append(invoice_date)
+            if due_date is not None:
+                updates.append("due_date = ?")
+                params.append(due_date)
+            elif payment_terms is not None:
+                inv_date = invoice_date or inv.get("invoice_date") or inv.get("created_at")
+                updates.append("due_date = ?")
+                params.append(compute_due_date(inv_date, payment_terms))
+            if payment_terms is not None:
+                updates.append("payment_terms = ?")
+                params.append(payment_terms)
+            if billing_address is not None:
+                updates.append("billing_address = ?")
+                params.append(billing_address)
+            if po_reference is not None:
+                updates.append("po_reference = ?")
+                params.append(po_reference)
+            if updates:
+                updates.append("updated_at = ?")
+                params.append(now)
+                params.append(invoice_id)
+                upd_q = "UPDATE invoices SET "
+                upd_q += ", ".join(updates)
+                upd_q += " WHERE id = ?"
+                await conn.execute(upd_q, params)
 
-    if status == "paid":
-        await conn.execute(
-            "UPDATE withdrawals SET payment_status = 'paid', paid_at = ? WHERE invoice_id = ?",
-            (now, invoice_id),
-        )
+        if status == "paid":
+            await conn.execute(
+                "UPDATE withdrawals SET payment_status = 'paid', paid_at = ? WHERE invoice_id = ?",
+                (now, invoice_id),
+            )
 
-    await conn.commit()
     return await get_by_id(invoice_id)
 
 
@@ -324,7 +321,6 @@ async def add_withdrawals(invoice_id: str, withdrawal_ids: list, organization_id
     """Link withdrawals to invoice. Validates: unpaid, same billing_entity, not already on another invoice."""
     if not withdrawal_ids:
         return await get_by_id(invoice_id)
-    conn = get_connection()
     org_id = organization_id or "default"
 
     withdrawals = []
@@ -352,62 +348,61 @@ async def add_withdrawals(invoice_id: str, withdrawal_ids: list, organization_id
     if not inv:
         return None
 
-    # Ensure invoice billing matches
     if inv.get("billing_entity") and inv["billing_entity"] != billing_entity:
         raise ValueError("Invoice billing_entity does not match withdrawals")
-    if not inv.get("billing_entity") and billing_entity:
-        await conn.execute(
-            "UPDATE invoices SET billing_entity = ?, contact_name = ?, updated_at = ? WHERE id = ?",
-            (billing_entity, contact_name or inv.get("contact_name", ""), datetime.now(UTC).isoformat(), invoice_id),
-        )
 
-    # Copy line items from withdrawals
-    total_subtotal = 0.0
-    total_tax = 0.0
-    for w in withdrawals:
-        for item in w.get("items", []):
-            qty = item.get("quantity", 1)
-            price = item.get("unit_price") or item.get("price") or 0
-            amt = round(qty * float(price), 2)
-            total_subtotal += amt
-            cost_val = float(item.get("cost", 0))
+    async with transaction() as conn:
+        if not inv.get("billing_entity") and billing_entity:
             await conn.execute(
-                """INSERT INTO invoice_line_items
-                   (id, invoice_id, description, quantity, unit_price, amount, cost, product_id, job_id, unit, sell_cost)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    str(uuid4()),
-                    invoice_id,
-                    item.get("name", ""),
-                    qty,
-                    float(price),
-                    amt,
-                    cost_val,
-                    item.get("product_id"),
-                    w.get("job_id"),
-                    item.get("unit") or "each",
-                    float(item.get("sell_cost") or cost_val),
-                ),
+                "UPDATE invoices SET billing_entity = ?, contact_name = ?, updated_at = ? WHERE id = ?",
+                (billing_entity, contact_name or inv.get("contact_name", ""), datetime.now(UTC).isoformat(), invoice_id),
             )
-        total_tax += w.get("tax", 0)
 
-    total = round(total_subtotal + total_tax, 2)
-    await conn.execute(
-        "UPDATE invoices SET subtotal = ?, tax = ?, total = ?, updated_at = ? WHERE id = ?",
-        (total_subtotal, total_tax, total, datetime.now(UTC).isoformat(), invoice_id),
-    )
+        total_subtotal = 0.0
+        total_tax = 0.0
+        for w in withdrawals:
+            for item in w.get("items", []):
+                qty = item.get("quantity", 1)
+                price = item.get("unit_price") or item.get("price") or 0
+                amt = round(qty * float(price), 2)
+                total_subtotal += amt
+                cost_val = float(item.get("cost", 0))
+                await conn.execute(
+                    """INSERT INTO invoice_line_items
+                       (id, invoice_id, description, quantity, unit_price, amount, cost, product_id, job_id, unit, sell_cost)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        str(uuid4()),
+                        invoice_id,
+                        item.get("name", ""),
+                        qty,
+                        float(price),
+                        amt,
+                        cost_val,
+                        item.get("product_id"),
+                        w.get("job_id"),
+                        item.get("unit") or "each",
+                        float(item.get("sell_cost") or cost_val),
+                    ),
+                )
+            total_tax += w.get("tax", 0)
 
-    for wid in withdrawal_ids:
+        total = round(total_subtotal + total_tax, 2)
         await conn.execute(
-            "INSERT OR IGNORE INTO invoice_withdrawals (invoice_id, withdrawal_id) VALUES (?, ?)",
-            (invoice_id, wid),
-        )
-        await conn.execute(
-            "UPDATE withdrawals SET invoice_id = ?, payment_status = 'invoiced' WHERE id = ?",
-            (invoice_id, wid),
+            "UPDATE invoices SET subtotal = ?, tax = ?, total = ?, updated_at = ? WHERE id = ?",
+            (total_subtotal, total_tax, total, datetime.now(UTC).isoformat(), invoice_id),
         )
 
-    await conn.commit()
+        for wid in withdrawal_ids:
+            await conn.execute(
+                "INSERT OR IGNORE INTO invoice_withdrawals (invoice_id, withdrawal_id) VALUES (?, ?)",
+                (invoice_id, wid),
+            )
+            await conn.execute(
+                "UPDATE withdrawals SET invoice_id = ?, payment_status = 'invoiced' WHERE id = ?",
+                (invoice_id, wid),
+            )
+
     return await get_by_id(invoice_id)
 
 
@@ -564,14 +559,15 @@ async def set_xero_sync_status(invoice_id: str, status: str, organization_id: st
 
 
 async def list_unsynced_invoices(organization_id: str) -> list:
-    """Return invoices that are approved/sent but not yet synced to Xero."""
+    """Return invoices that are approved/sent but not yet synced to Xero,
+    including those stuck in 'syncing' status from interrupted attempts."""
     conn = get_connection()
     cursor = await conn.execute(
-        """SELECT id, invoice_number, billing_entity, total, status, created_at
+        """SELECT id, invoice_number, billing_entity, total, status, xero_sync_status, created_at
            FROM invoices
            WHERE organization_id = ?
              AND status IN ('approved', 'sent')
-             AND xero_invoice_id IS NULL
+             AND (xero_invoice_id IS NULL OR xero_sync_status = 'syncing')
              AND deleted_at IS NULL
            ORDER BY created_at""",
         (organization_id,),
@@ -654,7 +650,6 @@ async def list_stale_cogs_invoices(organization_id: str) -> list:
 
 async def delete_draft(invoice_id: str, organization_id: str | None = None) -> bool:
     """Soft-delete draft invoice and unlink withdrawals."""
-    conn = get_connection()
     inv = await get_by_id(invoice_id, organization_id=organization_id)
     if not inv:
         return False
@@ -662,17 +657,17 @@ async def delete_draft(invoice_id: str, organization_id: str | None = None) -> b
         raise ValueError("Can only delete draft invoices")
 
     now = datetime.now(UTC).isoformat()
-    for wid in inv.get("withdrawal_ids", []):
+    async with transaction() as conn:
+        for wid in inv.get("withdrawal_ids", []):
+            await conn.execute(
+                "UPDATE withdrawals SET invoice_id = NULL, payment_status = 'unpaid' WHERE id = ?",
+                (wid,),
+            )
+        await conn.execute("DELETE FROM invoice_withdrawals WHERE invoice_id = ?", (invoice_id,))
         await conn.execute(
-            "UPDATE withdrawals SET invoice_id = NULL, payment_status = 'unpaid' WHERE id = ?",
-            (wid,),
+            "UPDATE invoices SET status = 'deleted', deleted_at = ?, updated_at = ? WHERE id = ?",
+            (now, now, invoice_id),
         )
-    await conn.execute("DELETE FROM invoice_withdrawals WHERE invoice_id = ?", (invoice_id,))
-    await conn.execute(
-        "UPDATE invoices SET status = 'deleted', deleted_at = ?, updated_at = ? WHERE id = ?",
-        (now, now, invoice_id),
-    )
-    await conn.commit()
     return True
 
 

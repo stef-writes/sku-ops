@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ import { SubmitRequestModal } from "./_SubmitRequestModal";
 const RequestMaterials = () => {
   const { user } = useAuth();
 
-  const { items: cart, addItem: addToCart, updateQuantity, removeItem, clear: clearCart, total: subtotal } = useCart();
+  const { items: cart, addItem: addToCart, updateQuantity, removeItem, clear: clearCart, syncStock, total: subtotal } = useCart();
   const [search, setSearch] = useState("");
   const [selectedDept, setSelectedDept] = useState("all");
   const [submitOpen, setSubmitOpen] = useState(false);
@@ -38,6 +38,8 @@ const RequestMaterials = () => {
   const rawProducts = Array.isArray(productsData) ? productsData : (productsData?.items || []);
   const products = rawProducts.filter((p) => (p.sell_quantity ?? p.quantity) > 0);
   const allProducts = Array.isArray(allProductsData) ? allProductsData : (allProductsData?.items || []);
+
+  useEffect(() => { syncStock(allProducts); }, [allProducts, syncStock]);
 
   const scanner = useBarcodeScanner({
     onSuccess: (product) => {

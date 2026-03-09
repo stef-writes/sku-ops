@@ -1,12 +1,15 @@
 """PostgreSQL backend using asyncpg with connection pooling."""
 from __future__ import annotations
 
+import logging
 import os
 import re
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
 import asyncpg
+
+logger = logging.getLogger(__name__)
 
 from shared.infrastructure.db.protocol import Connection, DictRow
 
@@ -74,15 +77,15 @@ class PgCursor:
 
 class PgPoolProxy:
     """Returned by ``get_connection()`` — acquires per-execute, auto-commits."""
-    __slots__ = ("_pool",)
+    __slots__ = ("_pool", "_acquire_timeout")
 
-    def __init__(self, pool: asyncpg.Pool):
+    def __init__(self, pool: asyncpg.Pool, acquire_timeout: float):
         self._pool = pool
+        self._acquire_timeout = acquire_timeout
 
     async def execute(self, sql: str, params: tuple | list = ()) -> PgCursor:
         converted = _convert_sql(sql)
-        async with self._pool.acquire() as conn:
-            # Statements that return rows (SELECT / RETURNING)
+        async with self._pool.acquire(timeout=self._acquire_timeout) as conn:
             if converted.lstrip().upper().startswith("SELECT") or "RETURNING" in converted.upper():
                 rows = await conn.fetch(converted, *params)
                 return PgCursor(rows)
@@ -91,7 +94,7 @@ class PgPoolProxy:
 
     async def executemany(self, sql: str, params_list: Sequence[tuple | list]) -> None:
         converted = _convert_sql(sql)
-        async with self._pool.acquire() as conn:
+        async with self._pool.acquire(timeout=self._acquire_timeout) as conn:
             await conn.executemany(converted, params_list)
 
     async def commit(self) -> None:
@@ -143,26 +146,39 @@ class PostgresBackend:
 
     def __init__(self) -> None:
         self._pool: asyncpg.Pool | None = None
+        self._acquire_timeout: float = 30.0
 
     async def connect(self, url: str) -> None:
         min_size = int(os.environ.get("PG_POOL_MIN", "2"))
         max_size = int(os.environ.get("PG_POOL_MAX", "10"))
+        command_timeout = int(os.environ.get("PG_COMMAND_TIMEOUT", "60"))
+        self._acquire_timeout = float(os.environ.get("PG_ACQUIRE_TIMEOUT", "30"))
+
+        if ":6543" in url:
+            logger.warning(
+                "DATABASE_URL uses port 6543 (Supabase pgbouncer). "
+                "asyncpg uses prepared statements which are incompatible with "
+                "pgbouncer in transaction mode. Use the direct connection on "
+                "port 5432 instead."
+            )
+
         self._pool = await asyncpg.create_pool(
             url,
             min_size=min_size,
             max_size=max_size,
+            command_timeout=command_timeout,
         )
 
     def connection(self) -> Connection:
         if self._pool is None:
             raise RuntimeError("Database not initialized. Call connect() at startup.")
-        return PgPoolProxy(self._pool)
+        return PgPoolProxy(self._pool, self._acquire_timeout)
 
     @asynccontextmanager
     async def transaction(self) -> AsyncIterator[Connection]:
         if self._pool is None:
             raise RuntimeError("Database not initialized. Call connect() at startup.")
-        async with self._pool.acquire() as conn:
+        async with self._pool.acquire(timeout=self._acquire_timeout) as conn:
             tx = conn.transaction()
             await tx.start()
             try:

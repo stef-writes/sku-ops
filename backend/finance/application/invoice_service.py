@@ -22,9 +22,26 @@ async def sync_invoice(
     settings = await get_org_settings(org_id)
     gateway = get_invoicing_gateway(settings)
 
+    # Recovery: if a previous sync attempt was interrupted after calling Xero but
+    # before persisting the xero_invoice_id locally, check Xero by invoice number.
+    if inv.get("xero_sync_status") == "syncing":
+        try:
+            existing = await gateway.fetch_invoice_by_number(
+                inv.get("invoice_number"), settings
+            )
+            if existing:
+                xero_id = existing["InvoiceID"]
+                await invoice_repo.set_xero_invoice_id(inv_id, xero_id)
+                return {"invoice_id": inv_id, "xero_invoice_id": xero_id, "success": True}
+        except (RuntimeError, OSError, ValueError) as e:
+            logger.warning("Idempotency check failed for %s: %s", inv_id, e)
+
+    await invoice_repo.set_xero_sync_status(inv_id, "syncing")
+
     try:
         result = await gateway.sync_invoice(inv, settings)
     except (RuntimeError, OSError, ValueError) as e:
+        await invoice_repo.set_xero_sync_status(inv_id, "failed")
         return {"invoice_id": inv_id, "invoice_number": inv.get("invoice_number"), "error": str(e), "success": False}
 
     if result.success and result.xero_invoice_id:
@@ -33,6 +50,8 @@ async def sync_invoice(
             result.xero_invoice_id,
             xero_cogs_journal_id=result.xero_journal_id,
         )
+    else:
+        await invoice_repo.set_xero_sync_status(inv_id, "failed")
 
     return {
         "invoice_id": inv_id,
