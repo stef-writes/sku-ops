@@ -8,6 +8,7 @@ from inventory.application.inventory_service import (
     get_stock_history,
     process_adjustment_stock_changes,
 )
+from kernel import events
 from shared.api.deps import ManagerDep
 from shared.infrastructure import event_hub
 from shared.infrastructure.middleware.audit import audit_log
@@ -57,5 +58,5 @@ async def adjust_stock(
         details={"quantity_delta": data.quantity_delta, "reason": data.reason},
         request=request, org_id=current_user.organization_id,
     )
-    await event_hub.emit("inventory.updated", org_id=current_user.organization_id, ids=[product_id])
+    await event_hub.emit(events.INVENTORY_UPDATED, org_id=current_user.organization_id, ids=[product_id])
     return {"message": "Stock adjusted"}

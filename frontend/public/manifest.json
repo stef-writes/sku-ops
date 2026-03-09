@@ -1,0 +1,29 @@
+{
+  "name": "SKU Ops",
+  "short_name": "SKU Ops",
+  "description": "Warehouse inventory and contractor checkout",
+  "display": "standalone",
+  "start_url": "/scan",
+  "scope": "/",
+  "background_color": "#0b0f19",
+  "theme_color": "#0b0f19",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,8 +1,14 @@
-"""Tests for the in-process event hub (pub/sub)."""
+"""Tests for the event hub (pub/sub) — covers the in-process fallback path
+and, when REDIS_URL is set, the Redis pub/sub path.
+"""
+import os
 
 import pytest
 
-from shared.infrastructure.event_hub import Event, SHUTDOWN, _Hub, is_shutdown
+from kernel.events import SHUTDOWN, Event, is_shutdown
+from shared.infrastructure.event_hub import _Hub, _deserialize, _serialize
+
+_REDIS_URL = os.environ.get("REDIS_URL", "")
 
 
 class TestEventHub:
@@ -67,3 +73,74 @@ class TestEventHub:
         event = Event(type="t", org_id="o")
         with pytest.raises(AttributeError):
             event.type = "changed"
+
+    async def test_serialize_deserialize_round_trip(self):
+        original = Event(type="inventory.updated", org_id="org-1", user_id="u-1", data={"ids": [1, 2]})
+        raw = _serialize(original)
+        restored = _deserialize(raw)
+        assert restored.type == original.type
+        assert restored.org_id == original.org_id
+        assert restored.user_id == original.user_id
+        assert restored.data == original.data
+
+    async def test_serialize_shutdown_round_trip(self):
+        raw = _serialize(SHUTDOWN)
+        restored = _deserialize(raw)
+        assert is_shutdown(restored)
+
+
+@pytest.mark.skipif(not _REDIS_URL, reason="Redis not available")
+class TestEventHubRedis:
+    """Tests the Redis pub/sub path — only runs when a local Redis is reachable."""
+
+    async def test_publish_and_receive_via_redis(self):
+        """Emit an event through Redis and verify a subscriber receives it."""
+        import asyncio
+
+        from shared.infrastructure.redis import close_redis, init_redis
+
+        await init_redis()
+        try:
+            hub = _Hub()
+            hub.activate_redis()
+            q = hub.subscribe()
+
+            await asyncio.sleep(0.2)
+
+            await hub.emit("inventory.updated", org_id="org-redis", ids=["p-1"])
+
+            event = await asyncio.wait_for(q.get(), timeout=3.0)
+            assert event.type == "inventory.updated"
+            assert event.org_id == "org-redis"
+            assert event.data["ids"] == ["p-1"]
+
+            hub.unsubscribe(q)
+        finally:
+            await close_redis()
+
+    async def test_multiple_subscribers_via_redis(self):
+        """Two subscribers should both receive the same event via Redis."""
+        import asyncio
+
+        from shared.infrastructure.redis import close_redis, init_redis
+
+        await init_redis()
+        try:
+            hub = _Hub()
+            hub.activate_redis()
+            q1 = hub.subscribe()
+            q2 = hub.subscribe()
+
+            await asyncio.sleep(0.2)
+
+            await hub.emit("test.multi", org_id="org-r2")
+
+            ev1 = await asyncio.wait_for(q1.get(), timeout=3.0)
+            ev2 = await asyncio.wait_for(q2.get(), timeout=3.0)
+            assert ev1.type == "test.multi"
+            assert ev2.type == "test.multi"
+
+            hub.unsubscribe(q1)
+            hub.unsubscribe(q2)
+        finally:
+            await close_redis()

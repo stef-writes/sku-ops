@@ -8,6 +8,7 @@ from starlette.testclient import TestClient
 # Test environment: set before any app/config imports
 os.environ["ENV"] = "test"
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+os.environ.setdefault("REDIS_URL", "")
 _TEST_JWT_KEY = "test-" + "secret-key-for-pytest-32bytes!"
 os.environ["JWT_SECRET"] = _TEST_JWT_KEY
 # Provide a dummy key so pydantic-ai can instantiate Agent at import time.

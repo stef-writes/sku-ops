@@ -22,10 +22,8 @@ data/
 :memory:-shm
 :memory:-wal
 
-# Tooling config that doesn't affect runtime
-pyproject.toml
+# Legacy tooling config
 requirements-dev.txt
-uv.lock
 .flake8
 .isort.cfg
 mypy.ini

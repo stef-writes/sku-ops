@@ -11,7 +11,7 @@ Tests cover:
 import asyncio
 import json
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import jwt
 import pytest
@@ -379,8 +379,8 @@ class TestWSChatCostCap:
     @patch("assistant.api.ws_chat.SESSION_COST_CAP", 1.00)
     @patch("assistant.api.ws_chat.ANTHROPIC_AVAILABLE", True)
     def test_cost_cap_reached_returns_done_with_capped(self, mock_store, client):
-        mock_store.get_cost.return_value = 1.50
-        mock_store.get_or_create.return_value = []
+        mock_store.get_cost = AsyncMock(return_value=1.50)
+        mock_store.get_or_create = AsyncMock(return_value=[])
 
         token = _admin_token()
         with client.websocket_connect(f"/api/ws/chat?token={token}") as ws:

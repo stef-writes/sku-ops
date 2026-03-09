@@ -1,17 +1,17 @@
 ---
-description: Core project architecture rules — pre-launch, no production data, no backward compat needed
+description: Core project architecture rules — launch-focused, production-ready
 alwaysApply: true
 ---
 
 # Project Architecture
 
-This is a **pre-launch product** with no production users and no live database to migrate.
+This is a **launch-focused product** preparing for production deployment with real users and live data.
 
 ## Database / Schema
 
-- **No migrations.** Schema changes go directly in the context's `{context}/infrastructure/schema.py` file.
-- `full_schema.py` aggregates all context schemas for fresh DB bootstrap. The runner reads it once on startup if the DB is empty.
-- Never add migration functions to `runner.py`. Never assume backward compatibility with existing data.
+- **Pre-launch (current):** Schema changes go directly in the context's `{context}/infrastructure/schema.py` file. `full_schema.py` aggregates all context schemas for fresh DB bootstrap.
+- **Post-first-deploy:** Once live data exists, every schema change requires a migration. Add alembic or a custom migration runner before the first production schema change. Never drop or alter columns without a migration that preserves existing data.
+- Never add migration functions to `runner.py`. The runner reads `full_schema.py` once on startup if the DB is empty.
 
 ## Dependency hygiene
 
@@ -23,13 +23,32 @@ This is a **pre-launch product** with no production users and no live database t
 Each context (`identity`, `operations`, `finance`, `catalog`, `purchasing`, `jobs`, `documents`) owns its own domain, infrastructure, and API layers. Cross-context access must go through an application-layer facade, never through a direct import of another context's infrastructure.
 
 ```
-# ❌ BAD — direct infra import across contexts
+# BAD — direct infra import across contexts
 from identity.infrastructure.billing_entity_repo import billing_entity_repo
 
-# ✅ GOOD — application facade
+# GOOD — application facade
 from identity.application.billing_entity_service import ensure_billing_entity
 ```
+
+## Shared infrastructure
+
+`shared/infrastructure/` contains kernel-level modules (config, db, redis, event_hub, logging, metrics, middleware). These import nothing from any bounded context. Bounded contexts may import from `shared/infrastructure/`.
 
 ## File size
 
 Keep files under 300 lines. Split by responsibility when a file grows beyond that.
+
+## Commit conventions
+
+Use commitizen with gitmoji conventional commits. Run `./bin/dev commit` for interactive commit, or format manually as `type(scope): message` (e.g. `feat(finance): add credit note sync`).
+
+## Branch workflow
+
+```
+main        <- production (auto-deploys, protected)
+  ^ PR
+dev         <- integration branch
+  ^ PR
+feature/*   <- working branches
+fix/*
+```

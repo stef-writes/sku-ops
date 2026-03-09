@@ -10,6 +10,7 @@ from operations.application.queries import get_withdrawal_by_id
 from operations.application.queries import list_returns as _list_returns
 from operations.application.return_service import create_return
 from operations.domain.returns import ReturnCreate
+from kernel import events
 from shared.api.deps import CurrentUserDep, ManagerDep
 from shared.infrastructure import event_hub
 from shared.infrastructure.middleware.audit import audit_log
@@ -42,8 +43,8 @@ async def create_material_return(
             request=request, org_id=current_user.organization_id,
         )
         org_id = current_user.organization_id
-        await event_hub.emit("inventory.updated", org_id=org_id)
-        await event_hub.emit("withdrawal.updated", org_id=org_id, id=data.withdrawal_id)
+        await event_hub.emit(events.INVENTORY_UPDATED, org_id=org_id)
+        await event_hub.emit(events.WITHDRAWAL_UPDATED, org_id=org_id, id=data.withdrawal_id)
         return result
     except (ValueError, RuntimeError, OSError) as e:
         status = getattr(e, "status_hint", 400)

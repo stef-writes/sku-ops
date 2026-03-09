@@ -8,6 +8,7 @@ from finance.application.ledger_service import record_payment as _record_ledger_
 from finance.domain.payment import Payment, PaymentCreate
 from finance.infrastructure.payment_repo import payment_repo
 from operations.application.queries import get_withdrawal_by_id, mark_withdrawal_paid
+from kernel import events
 from shared.api.deps import AdminDep, ManagerDep
 from shared.infrastructure import event_hub
 
@@ -71,7 +72,7 @@ async def create_payment(
                 performed_by_user_id=current_user.id,
             )
 
-    await event_hub.emit("withdrawal.updated", org_id=org_id, ids=data.withdrawal_ids)
+    await event_hub.emit(events.WITHDRAWAL_UPDATED, org_id=org_id, ids=data.withdrawal_ids)
     return payment.model_dump()
 
 

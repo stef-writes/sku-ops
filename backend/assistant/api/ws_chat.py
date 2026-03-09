@@ -198,17 +198,17 @@ async def _handle_chat(
         await _send(ws, {"type": "chat.error", "detail": "AI not configured."})
         return
 
-    if SESSION_COST_CAP > 0 and session_store.get_cost(session_id) >= SESSION_COST_CAP:
+    if SESSION_COST_CAP > 0 and await session_store.get_cost(session_id) >= SESSION_COST_CAP:
         await _send(ws, {
             "type": "chat.done",
             "response": f"This session has reached the ${SESSION_COST_CAP:.2f} AI spend limit. Start a new chat.",
             "tool_calls": [], "thinking": [], "agent": None,
             "session_id": session_id,
-            "usage": {"cost_usd": 0, "capped": True, "session_cost_usd": session_store.get_cost(session_id)},
+            "usage": {"cost_usd": 0, "capped": True, "session_cost_usd": await session_store.get_cost(session_id)},
         })
         return
 
-    history = session_store.get_or_create(session_id)
+    history = await session_store.get_or_create(session_id)
     if not history:
         try:
             memory_ctx = await recall_memory(org_id=org_id, user_id=user_id)
@@ -288,7 +288,7 @@ async def _handle_chat(
                     new_history.append({"role": "user", "content": user_message})
                     new_history.append({"role": "assistant", "content": full_text})
 
-                session_store.update(session_id, new_history, cost_usd=turn_cost)
+                await session_store.update(session_id, new_history, cost_usd=turn_cost)
 
                 if len(new_history) % 8 == 0:
                     schedule_memory_extraction(
@@ -313,14 +313,14 @@ async def _handle_chat(
                         "input_tokens": usage.input_tokens,
                         "output_tokens": usage.output_tokens,
                         "model": model_name,
-                        "session_cost_usd": session_store.get_cost(session_id),
+                        "session_cost_usd": await session_store.get_cost(session_id),
                     },
                 })
                 return
 
         if cancel_event.is_set():
             response = full_text or "Generation cancelled."
-            _save_turn(session_id, history, user_message, response)
+            await _save_turn(session_id, history, user_message, response)
             await _send(ws, {
                 "type": "chat.done",
                 "response": response,
@@ -328,11 +328,11 @@ async def _handle_chat(
                 "tool_calls": tool_calls_seen,
                 "thinking": [],
                 "session_id": session_id,
-                "usage": {"cost_usd": 0, "session_cost_usd": session_store.get_cost(session_id)},
+                "usage": {"cost_usd": 0, "session_cost_usd": await session_store.get_cost(session_id)},
                 "cancelled": True,
             })
         elif full_text:
-            _save_turn(session_id, history, user_message, full_text)
+            await _save_turn(session_id, history, user_message, full_text)
             await _send(ws, {
                 "type": "chat.done",
                 "response": full_text,
@@ -340,13 +340,13 @@ async def _handle_chat(
                 "tool_calls": tool_calls_seen,
                 "thinking": [],
                 "session_id": session_id,
-                "usage": {"cost_usd": 0, "session_cost_usd": session_store.get_cost(session_id)},
+                "usage": {"cost_usd": 0, "session_cost_usd": await session_store.get_cost(session_id)},
             })
 
     except asyncio.CancelledError:
         logger.debug("Chat generation task cancelled: session=%s", session_id)
         if full_text:
-            _save_turn(session_id, history, user_message, full_text)
+            await _save_turn(session_id, history, user_message, full_text)
             await _send(ws, {
                 "type": "chat.done",
                 "response": full_text,
@@ -354,7 +354,7 @@ async def _handle_chat(
                 "tool_calls": tool_calls_seen,
                 "thinking": [],
                 "session_id": session_id,
-                "usage": {"cost_usd": 0, "session_cost_usd": session_store.get_cost(session_id)},
+                "usage": {"cost_usd": 0, "session_cost_usd": await session_store.get_cost(session_id)},
                 "cancelled": True,
             })
     except Exception as e:
@@ -362,9 +362,9 @@ async def _handle_chat(
         await _send(ws, {"type": "chat.error", "detail": "Something went wrong. Please try again."})
 
 
-def _save_turn(session_id: str, history: list[dict] | None, user_msg: str, assistant_msg: str) -> None:
+async def _save_turn(session_id: str, history: list[dict] | None, user_msg: str, assistant_msg: str) -> None:
     """Persist a user+assistant turn to the session store."""
     new_history = list(history or [])
     new_history.append({"role": "user", "content": user_msg})
     new_history.append({"role": "assistant", "content": assistant_msg})
-    session_store.update(session_id, new_history, cost_usd=0)
+    await session_store.update(session_id, new_history, cost_usd=0)

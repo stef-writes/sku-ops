@@ -49,7 +49,8 @@ See [docs/MULTI_TENANT_DEMO_SCRIPT.md](docs/MULTI_TENANT_DEMO_SCRIPT.md) for a f
 - **Backend:** Python 3.13, FastAPI, uv (package manager), SQLite (dev) / PostgreSQL (prod)
 - **Frontend:** React 18, Vite, Tailwind CSS, Radix UI, TanStack Query, ECharts
 - **AI:** Anthropic Claude (documents, UOM, assistant), OpenAI (embeddings), OpenRouter (agent gateway)
-- **Quality:** Ruff (Python lint + format), ESLint 9 + Prettier (frontend), CI on every push
+- **Infra:** Redis (event pub/sub, chat sessions, distributed locks), Prometheus metrics, Sentry error tracking
+- **Quality:** Ruff (Python lint + format), ESLint 9 + Prettier (frontend), commitizen (conventional commits), CI on every push
 - **Deploy:** Docker, Nginx, docker-compose, GitHub Actions CI/CD
 
 ## Dev Commands
@@ -79,6 +80,8 @@ Configuration is environment-aware (`ENV=development|staging|production|test`). 
 | CORS | permissive (*) | required | required |
 | Demo seed | auto | opt-in | disabled |
 | Database | SQLite file | Postgres | Postgres |
+| Redis | optional | required | required |
+| WORKERS | 1 | 1+ (with Redis) | 2+ (with Redis) |
 
 ## Architecture
 
@@ -113,22 +116,24 @@ Each backend context owns its domain, infrastructure, and API layers. Cross-cont
 ## Real-time Architecture
 
 ```
-Backend domain event -> event_hub.emit() -> asyncio queues -> WebSocket /api/ws
-                                                           -> WebSocket /api/ws/chat (AI streaming)
+Backend domain event -> event_hub.emit() -> Redis pub/sub (multi-worker)
+                                         -> asyncio queues (single-worker fallback)
+                                         -> WebSocket /api/ws
+                                         -> WebSocket /api/ws/chat (AI streaming)
 
 Frontend: useRealtimeSync() -> invalidates TanStack Query cache -> UI re-renders
           useChatSocket()   -> streams AI responses (delta, tool_start, done)
 ```
 
-Events are org-scoped and role-filtered. Contractors only receive events relevant to their role.
+Events are org-scoped and role-filtered. Contractors only receive events relevant to their role. With `REDIS_URL` set, events propagate across all workers via Redis Pub/Sub. Chat sessions are stored in Redis hashes with TTL expiry. The Xero sync lock uses a distributed Redis key.
 
 ## Docker
 
 ```bash
-cp .env.production.example .env   # set JWT_SECRET, CORS_ORIGINS, etc.
+cp .env.production.example .env   # set JWT_SECRET, CORS_ORIGINS, REDIS_URL, etc.
 docker compose up -d
 ```
 
-The backend runs behind Nginx with the frontend served as static files from `frontend/dist`.
+The stack includes PostgreSQL, Redis, the backend (FastAPI + uvicorn), Nginx (reverse proxy + static frontend), and Certbot (TLS). The backend runs behind Nginx with the frontend served as static files from `frontend/dist`.
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for full VPS and managed-platform deployment guides.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for full VPS and managed-platform deployment guides, and [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md) for the production readiness checklist.

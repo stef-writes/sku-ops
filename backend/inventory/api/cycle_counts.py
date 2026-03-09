@@ -11,6 +11,7 @@ from inventory.application.cycle_count_service import (
     update_counted_qty,
 )
 from kernel.errors import ResourceNotFoundError
+from kernel import events
 from shared.api.deps import ManagerDep
 from shared.infrastructure import event_hub
 from shared.infrastructure.middleware.audit import audit_log
@@ -119,5 +120,5 @@ async def commit_count(
         details={"items_adjusted": result.get("items_adjusted", 0)},
         request=request, org_id=current_user.organization_id,
     )
-    await event_hub.emit("inventory.updated", org_id=current_user.organization_id)
+    await event_hub.emit(events.INVENTORY_UPDATED, org_id=current_user.organization_id)
     return result

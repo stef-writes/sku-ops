@@ -1,4 +1,14 @@
 services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    networks:
+      - internal
+
   db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -26,9 +36,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     environment:
       ENV: ${ENV:-production}
       DATABASE_URL: postgresql://sku_ops:${POSTGRES_PASSWORD}@db:5432/sku_ops
+      REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS must be set}
       METRICS_TOKEN: ${METRICS_TOKEN:-}

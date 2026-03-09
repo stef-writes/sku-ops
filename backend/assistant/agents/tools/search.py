@@ -2,6 +2,7 @@
 Product search index. Uses OpenAI text-embedding-3-small for semantic search when
 OPENAI_API_KEY is set; falls back to BM25 keyword search otherwise.
 """
+import asyncio
 import logging
 import re
 
@@ -151,3 +152,51 @@ async def refresh_index(org_id: str = "default") -> None:
         index = ProductSearchIndex()
         _indexes[org_id] = index
     await index.rebuild(org_id)
+
+
+from kernel.events import CATALOG_UPDATED, INVENTORY_UPDATED
+
+_INVALIDATION_EVENTS = frozenset({INVENTORY_UPDATED, CATALOG_UPDATED})
+
+
+async def _index_invalidation_listener() -> None:
+    """Subscribe to the event hub and rebuild the search index on catalog/inventory changes."""
+    from kernel.events import is_shutdown
+    from shared.infrastructure import event_hub
+
+    queue = event_hub.subscribe()
+    try:
+        while True:
+            ev = await queue.get()
+            if is_shutdown(ev):
+                return
+            if ev.type in _INVALIDATION_EVENTS:
+                try:
+                    await refresh_index(ev.org_id)
+                    logger.info("Search index rebuilt for org=%s after %s", ev.org_id, ev.type)
+                except (RuntimeError, OSError, ValueError) as exc:
+                    logger.warning("Search index rebuild failed for org=%s: %s", ev.org_id, exc)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        event_hub.unsubscribe(queue)
+
+
+_invalidation_task: asyncio.Task | None = None
+
+
+def start_invalidation_listener() -> None:
+    """Spawn the background task.  Called once from server.py lifespan."""
+    global _invalidation_task
+    if _invalidation_task is not None:
+        return
+    _invalidation_task = asyncio.create_task(_index_invalidation_listener())
+
+
+async def stop_invalidation_listener() -> None:
+    global _invalidation_task
+    if _invalidation_task is not None:
+        _invalidation_task.cancel()
+        with asyncio.suppress(asyncio.CancelledError):
+            await _invalidation_task
+        _invalidation_task = None

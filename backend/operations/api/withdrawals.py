@@ -19,6 +19,7 @@ from kernel.types import CurrentUser
 from operations.application.withdrawal_service import create_withdrawal as _do_create_withdrawal
 from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalCreate
 from operations.infrastructure.withdrawal_repo import withdrawal_repo
+from kernel import events
 from shared.api.deps import AdminDep, CurrentUserDep, ManagerDep
 from shared.infrastructure import event_hub
 from shared.infrastructure.middleware.audit import audit_log
@@ -48,8 +49,8 @@ async def create_withdrawal(data: MaterialWithdrawalCreate, request: Request, cu
         details={"total": result.get("total"), "job_id": data.job_id},
         request=request, org_id=current_user.organization_id,
     )
-    await event_hub.emit("withdrawal.created", org_id=current_user.organization_id, id=result.get("id"))
-    await event_hub.emit("inventory.updated", org_id=current_user.organization_id)
+    await event_hub.emit(events.WITHDRAWAL_CREATED, org_id=current_user.organization_id, id=result.get("id"))
+    await event_hub.emit(events.INVENTORY_UPDATED, org_id=current_user.organization_id)
     return result
 
 
@@ -74,8 +75,8 @@ async def create_withdrawal_for_contractor(
         details={"contractor_id": contractor_id, "total": result.get("total")},
         request=request, org_id=org_id,
     )
-    await event_hub.emit("withdrawal.created", org_id=org_id, id=result.get("id"))
-    await event_hub.emit("inventory.updated", org_id=org_id)
+    await event_hub.emit(events.WITHDRAWAL_CREATED, org_id=org_id, id=result.get("id"))
+    await event_hub.emit(events.INVENTORY_UPDATED, org_id=org_id)
     return result
 
 
@@ -137,7 +138,7 @@ async def mark_withdrawal_paid(withdrawal_id: str, request: Request, current_use
         details={"total": withdrawal.get("total")},
         request=request, org_id=org_id,
     )
-    await event_hub.emit("withdrawal.updated", org_id=org_id, id=withdrawal_id)
+    await event_hub.emit(events.WITHDRAWAL_UPDATED, org_id=org_id, id=withdrawal_id)
     return result
 
 
@@ -169,5 +170,5 @@ async def bulk_mark_paid(request: Request, withdrawal_ids: Annotated[list[str], 
         details={"withdrawal_ids": withdrawal_ids, "count": len(withdrawal_ids)},
         request=request, org_id=org_id,
     )
-    await event_hub.emit("withdrawal.updated", org_id=org_id, ids=withdrawal_ids)
+    await event_hub.emit(events.WITHDRAWAL_UPDATED, org_id=org_id, ids=withdrawal_ids)
     return {"updated": updated}

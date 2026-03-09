@@ -17,17 +17,11 @@ import logging
 import jwt
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
+from kernel.events import CONTRACTOR_VISIBLE_EVENTS, Event
 from shared.infrastructure import event_hub
 from shared.infrastructure.config import JWT_ALGORITHM, JWT_SECRET
 
 logger = logging.getLogger(__name__)
-
-CONTRACTOR_VISIBLE_EVENTS = frozenset({
-    "material_request.created",
-    "material_request.processed",
-    "withdrawal.created",
-    "withdrawal.updated",
-})
 
 HEARTBEAT_INTERVAL = 30
 
@@ -40,7 +34,7 @@ def _authenticate(token: str) -> dict | None:
         return None
 
 
-def _should_deliver(event: event_hub.Event, org_id: str, role: str, user_id: str) -> bool:
+def _should_deliver(event: Event, org_id: str, role: str, user_id: str) -> bool:
     if event.org_id != org_id:
         return False
     if event.user_id and event.user_id != user_id:
@@ -73,7 +67,7 @@ def mount_websocket(app: FastAPI) -> None:
 
 async def _relay_loop(
     websocket: WebSocket,
-    queue: asyncio.Queue[event_hub.Event],
+    queue: asyncio.Queue[Event],
     org_id: str,
     role: str,
     user_id: str = "",

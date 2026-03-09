@@ -2,15 +2,10 @@
 Supply Yard API - Material Management System.
 Main entry point: composes FastAPI app with routers from api package.
 
-Architecture note — single-process constraints:
-  The following subsystems use in-process memory and are NOT safe under
-  multiple uvicorn workers (--workers > 1):
-    - Event hub (shared/infrastructure/event_hub.py) — asyncio queues
-    - Chat session store (assistant/application/session_store.py) — dict
-    - Xero sync scheduler (_xero_sync_loop below) — asyncio.Task
-    - Xero manual sync lock (finance/api/xero_health._sync_tasks) — dict
-    - BM25 search index (assistant/agents/tools/search) — in-memory
-  Keep WORKERS=1 until these are backed by Redis or Postgres pub/sub.
+Multi-worker support:
+  When REDIS_URL is set, the event hub, chat session store, and Xero sync
+  lock use Redis — safe to run with WORKERS > 1.  Without Redis (local dev)
+  all subsystems fall back to in-process memory and WORKERS must be 1.
 """
 import asyncio
 import logging
@@ -39,7 +34,9 @@ from shared.infrastructure.config import (  # noqa: E402
     is_test,
 )
 from shared.infrastructure.database import close_db, init_db  # noqa: E402
-from shared.infrastructure.metrics import setup_prometheus, setup_sentry  # noqa: E402
+from shared.infrastructure.redis import close_redis, init_redis, is_redis_available  # noqa: E402
+from shared.infrastructure.prometheus import setup_prometheus  # noqa: E402
+from shared.infrastructure.sentry import setup_sentry  # noqa: E402
 from shared.infrastructure.middleware.rate_limit import setup_rate_limiting  # noqa: E402
 from shared.infrastructure.middleware.request_id import RequestIDMiddleware  # noqa: E402
 from shared.infrastructure.middleware.security_headers import (
@@ -101,13 +98,18 @@ async def _xero_sync_loop() -> None:
 async def lifespan(app: FastAPI):
     """Initialize DB and seed data on startup; close DB on shutdown."""
     worker_count = int(os.environ.get("WORKERS", "1"))
-    if worker_count > 1:
-        logger.warning(
-            "WORKERS=%d — this app uses in-memory state (event hub, chat sessions, "
-            "sync scheduler) that is NOT shared across workers. WebSocket events, "
-            "chat continuity, and scheduled sync WILL break. Set WORKERS=1 unless "
-            "you have migrated these subsystems to Redis or equivalent.",
-            worker_count,
+
+    await init_redis()
+    if is_redis_available():
+        from shared.infrastructure.event_hub import activate_redis
+        activate_redis()
+        if worker_count > 1:
+            logger.info("WORKERS=%d — Redis is connected, multi-worker mode is safe", worker_count)
+    elif worker_count > 1:
+        raise RuntimeError(
+            f"WORKERS={worker_count} but REDIS_URL is not set. "
+            "Multi-worker mode requires Redis for event hub, sessions, and sync locks. "
+            "Set REDIS_URL or use WORKERS=1."
         )
 
     if cors_warn_in_deployed:
@@ -165,17 +167,21 @@ async def lifespan(app: FastAPI):
     await conn.execute("SELECT 1")
     logger.info("Database connectivity verified")
 
+    from assistant.agents.tools.search import start_invalidation_listener, stop_invalidation_listener
     sync_task = None
     if not is_test:
         sync_task = asyncio.create_task(_xero_sync_loop())
+        start_invalidation_listener()
 
     yield
 
+    await stop_invalidation_listener()
     if sync_task is not None:
         sync_task.cancel()
         with suppress(asyncio.CancelledError):
             await sync_task
     await close_db()
+    await close_redis()
 
 
 app = FastAPI(lifespan=lifespan)

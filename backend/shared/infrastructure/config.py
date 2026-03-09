@@ -64,6 +64,9 @@ if is_deployed and not DATABASE_URL.startswith(("postgresql://", "postgres://"))
         "Got a non-PostgreSQL URL. Set DATABASE_URL=postgresql://user:pass@host:5432/db"
     )
 
+# Redis — required for multi-worker (WORKERS > 1); optional in dev/test
+REDIS_URL = os.environ.get("REDIS_URL", "").strip()
+
 # Auth
 _DEV_JWT_FALLBACK = "hardware-store-" + "secret-key"
 

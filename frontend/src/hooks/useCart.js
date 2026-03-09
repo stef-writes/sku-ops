@@ -1,16 +1,35 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 
+const CART_KEY = "sku_ops_cart";
+
+function loadPersistedCart() {
+  try {
+    const raw = localStorage.getItem(CART_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch { /* corrupted data — start fresh */ }
+  return [];
+}
+
 /**
- * Shared cart state for material-picking flows (POS, RequestMaterials).
+ * Shared cart state for material-picking flows (POS, RequestMaterials, ScanMode).
  *
  * Each item shape: { product_id, sku, name, quantity, max_quantity, unit, unit_price }
+ * Cart is persisted to localStorage so a page refresh doesn't lose items.
  *
  * @param {object} [options]
  * @param {(product: object) => number} [options.getPrice] - derive unit_price from a product. Defaults to sell_price ?? price.
+ * @param {boolean} [options.persist=false] - enable localStorage persistence
  */
-export function useCart({ getPrice } = {}) {
-  const [items, setItems] = useState([]);
+export function useCart({ getPrice, persist = false } = {}) {
+  const [items, setItems] = useState(() => (persist ? loadPersistedCart() : []));
+
+  useEffect(() => {
+    if (persist) localStorage.setItem(CART_KEY, JSON.stringify(items));
+  }, [items, persist]);
 
   const resolvePrice = getPrice || ((p) => p.sell_price ?? p.price ?? 0);
 
@@ -65,6 +84,7 @@ export function useCart({ getPrice } = {}) {
 
   function clear() {
     setItems([]);
+    if (persist) localStorage.removeItem(CART_KEY);
   }
 
   const syncStock = useCallback((products) => {

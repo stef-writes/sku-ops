@@ -171,6 +171,7 @@ For a managed hosting setup, the app runs as two separate services plus a manage
 Frontend (static site)  →  app.yourdomain.com
 Backend  (Docker)       →  api.yourdomain.com
 Database (managed PG)   →  provided by platform
+Redis                   →  Upstash / platform add-on (free tier works)
 ```
 
 ### Frontend (Static Site)
@@ -197,7 +198,8 @@ Deploy `backend/` using the Dockerfile. The platform must support Docker-based d
   - `FRONTEND_URL=https://app.yourdomain.com`
 - **Optional env vars:** `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `OPENAI_API_KEY`,
   `XERO_CLIENT_ID`, `XERO_CLIENT_SECRET`, `XERO_REDIRECT_URI`, `SENTRY_DSN`,
-  `WORKERS` (default 1; **must stay at 1** — see WebSocket support note above),
+  `REDIS_URL` (required when `WORKERS > 1`; enables cross-worker event hub, sessions, and sync locks),
+  `WORKERS` (default 1; set > 1 with `REDIS_URL` for multi-worker mode),
   `PG_POOL_MIN` (default 2), `PG_POOL_MAX` (default 10),
   `PG_COMMAND_TIMEOUT` (default 60s), `PG_ACQUIRE_TIMEOUT` (default 30s — pool acquire timeout, prevents unbounded hangs under load)
 
@@ -217,9 +219,10 @@ Ensure the platform supports WebSocket connections (both Render and DO App Platf
 
 **Important production constraints:**
 
-- `WORKERS` must be set to `1`. The event hub is in-process memory; multiple workers will not share domain events and WebSocket clients on different workers will not receive updates. See `server.py` for the full warning.
+- **Multi-worker mode:** Set `REDIS_URL` to enable `WORKERS > 1`. With Redis, the event hub uses Pub/Sub (all workers receive domain events), chat sessions are stored as Redis hashes, and the Xero sync lock is a distributed Redis key. Without Redis, the server refuses to start with `WORKERS > 1`.
 - The client reconnects automatically with exponential backoff (1s–30s). Heartbeat timeout is 45s — if no ping is received within that window, the client closes and reconnects. This handles half-open connections and NAT timeouts transparently.
 - If a subscriber's event queue fills (256 events, e.g. a very slow client), the server closes that connection cleanly so the client can reconnect rather than silently orphaning it.
+- The BM25/embedding search index is rebuilt per-worker on startup and automatically refreshed when `inventory.updated` or `catalog.updated` events arrive via the event hub.
 
 ### Domain and HTTPS
 
@@ -235,9 +238,10 @@ before deploying.
 ### Launch Checklist
 
 1. Provision managed Postgres and note the connection string
-2. Deploy backend Docker service with env vars
-3. Deploy frontend static site with `VITE_BACKEND_URL`
-4. Attach domain, verify HTTPS
-5. Create first admin user
-6. Test admin and contractor flows on desktop and iPad Safari
-7. Invite real users
+2. Provision Redis (Upstash free tier or platform add-on) and note the URL
+3. Deploy backend Docker service with env vars (including `REDIS_URL`)
+4. Deploy frontend static site with `VITE_BACKEND_URL`
+5. Attach domain, verify HTTPS
+6. Create first admin user
+7. Test admin and contractor flows on desktop and iPad Safari
+8. Invite real users
