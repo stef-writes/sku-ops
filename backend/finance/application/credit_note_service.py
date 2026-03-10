@@ -1,6 +1,7 @@
 """Credit note application service — safe for cross-context import."""
 
 from finance.infrastructure.credit_note_repo import credit_note_repo as _repo
+from shared.infrastructure.config import DEFAULT_ORG_ID
 
 
 async def insert_credit_note(
@@ -40,7 +41,7 @@ async def apply_credit_note(
         amount=float(cn.get("total", 0)),
         billing_entity=cn.get("billing_entity", ""),
         contractor_id="",
-        organization_id=organization_id or "default",
+        organization_id=organization_id or DEFAULT_ORG_ID,
         performed_by_user_id=performed_by_user_id,
     )
     return cn

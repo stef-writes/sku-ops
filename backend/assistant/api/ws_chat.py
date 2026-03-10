@@ -23,7 +23,6 @@ Protocol (server -> client):
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
 import logging
 import uuid
@@ -54,6 +53,7 @@ from assistant.application import session_store
 from assistant.application.assistant import recall_memory, schedule_memory_extraction
 from shared.infrastructure.config import (
     ANTHROPIC_AVAILABLE,
+    DEFAULT_ORG_ID,
     JWT_ALGORITHM,
     JWT_SECRET,
     OPENROUTER_AVAILABLE,
@@ -93,7 +93,7 @@ def mount_chat_websocket(app: FastAPI) -> None:
             await websocket.close(code=4001, reason="Invalid or expired token")
             return
 
-        org_id = payload.get("organization_id", "default")
+        org_id = payload.get("organization_id", DEFAULT_ORG_ID)
         user_id = payload.get("user_id", "")
         user_name = payload.get("name", "")
         role = payload.get("role", "")
@@ -168,8 +168,12 @@ def mount_chat_websocket(app: FastAPI) -> None:
             finally:
                 if generation_task and not generation_task.done():
                     generation_task.cancel()
-                    with contextlib.suppress(asyncio.CancelledError, Exception):
+                    try:
                         await generation_task
+                    except asyncio.CancelledError:
+                        pass
+                    except Exception:
+                        logger.warning("Chat generation task raised on cancel", exc_info=True)
 
         ws = websocket
         tasks = [

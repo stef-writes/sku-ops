@@ -12,7 +12,7 @@ from identity.domain.user import AdminUserCreate, User, UserCreate, UserLogin
 from identity.infrastructure.refresh_token_repo import refresh_token_repo
 from identity.infrastructure.user_repo import user_repo
 from shared.api.deps import AdminDep, CurrentUserDep
-from shared.infrastructure.config import ALLOW_RESET
+from shared.infrastructure.config import ALLOW_RESET, DEFAULT_ORG_ID
 from shared.infrastructure.middleware.audit import audit_log
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -48,11 +48,11 @@ async def register(data: UserCreate, request: Request):
     )
     user_dict = user.model_dump()
     user_dict["password"] = hash_password(data.password)
-    user_dict["organization_id"] = "default"
+    user_dict["organization_id"] = DEFAULT_ORG_ID
 
     await user_repo.insert(user_dict)
 
-    org_id = "default"
+    org_id = DEFAULT_ORG_ID
     token = create_token(user.id, user.email, user.role, org_id)
     raw_refresh, _ = await refresh_token_repo.create(user.id)
     await audit_log(
@@ -115,7 +115,7 @@ async def login(data: UserLogin, request: Request):
     if not user.get("is_active", True):
         raise HTTPException(status_code=401, detail="Account is disabled")
 
-    org_id = user.get("organization_id") or "default"
+    org_id = user.get("organization_id") or DEFAULT_ORG_ID
     token = create_token(user["id"], user["email"], user["role"], org_id)
     raw_refresh, _ = await refresh_token_repo.create(user["id"])
     user_response = {k: v for k, v in user.items() if k != "password"}
@@ -144,7 +144,7 @@ async def refresh(data: RefreshRequest, _request: Request):
     if not user.get("is_active", True):
         raise HTTPException(status_code=401, detail="Account is disabled")
 
-    org_id = user.get("organization_id") or "default"
+    org_id = user.get("organization_id") or DEFAULT_ORG_ID
     token = create_token(user["id"], user["email"], user["role"], org_id)
     new_refresh, _ = await refresh_token_repo.create(user["id"])
     return {"token": token, "refresh_token": new_refresh}

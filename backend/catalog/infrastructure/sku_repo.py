@@ -1,11 +1,12 @@
 """SKU counter repository."""
 
+from shared.infrastructure.config import DEFAULT_ORG_ID
 from shared.infrastructure.database import get_connection
 
 
 def _counter_key(organization_id: str | None, department_code: str) -> str:
     """Composite key for org-scoped SKU counters. Backward compat: use plain code if no org."""
-    org = organization_id or "default"
+    org = organization_id or DEFAULT_ORG_ID
     code = (department_code or "").strip().upper()
     return f"{org}|{code}"
 

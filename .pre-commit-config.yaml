@@ -12,19 +12,14 @@ repos:
         files: ^backend/
 
   # ── JavaScript/JSX (frontend) ─────────────────────────────────────────────
-  - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: v9.28.0
+  - repo: local
     hooks:
       - id: eslint
         name: eslint
+        language: system
+        entry: bash -c 'cd frontend && node_modules/.bin/eslint --max-warnings=0 "${@#frontend/}"' --
         files: ^frontend/src/.*\.(js|jsx)$
-        additional_dependencies:
-          - eslint@9
-          - eslint-plugin-react
-          - eslint-plugin-react-hooks
-          - eslint-plugin-react-refresh
-          - eslint-config-prettier
-          - globals
+        pass_filenames: true
 
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v4.0.0-alpha.8

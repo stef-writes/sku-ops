@@ -33,7 +33,7 @@ function exportCSV(columns, data, filename = "export.csv") {
         const val = c.exportValue ? c.exportValue(row) : row[c.key];
         return `"${String(val ?? "").replace(/"/g, '""')}"`;
       })
-      .join(",")
+      .join(","),
   );
   const csv = [header, ...rows].join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
@@ -109,13 +109,13 @@ export function DataTable({
       controlledSelected instanceof Set
         ? controlledSelected
         : new Set(controlledSelected ?? []),
-    [controlledSelected]
+    [controlledSelected],
   );
 
   const searchLower = search.toLowerCase().trim();
   const searchableKeys = useMemo(
     () => columns.filter((c) => c.searchable !== false).map((c) => c.key),
-    [columns]
+    [columns],
   );
 
   const filteredData = useMemo(() => {
@@ -124,8 +124,8 @@ export function DataTable({
       searchableKeys.some((key) =>
         String(row[key] ?? "")
           .toLowerCase()
-          .includes(searchLower)
-      )
+          .includes(searchLower),
+      ),
     );
   }, [data, searchLower, searchableKeys]);
 
@@ -143,16 +143,23 @@ export function DataTable({
           : String(va).localeCompare(String(vb));
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [filteredData, sortKey, sortDir]);
+  }, [filteredData, sortKey, sortDir, disableSort]);
 
   const isServerPaged = !!serverPagination;
-  const effectivePageSize = isServerPaged ? serverPagination.pageSize : pageSize;
+  const effectivePageSize = isServerPaged
+    ? serverPagination.pageSize
+    : pageSize;
   const totalItems = isServerPaged ? serverPagination.total : sortedData.length;
   const totalPages = Math.ceil(totalItems / effectivePageSize) || 1;
-  const currentPage = isServerPaged ? serverPagination.page + 1 : Math.min(page, totalPages);
+  const currentPage = isServerPaged
+    ? serverPagination.page + 1
+    : Math.min(page, totalPages);
   const paginatedData = isServerPaged
     ? sortedData
-    : sortedData.slice((currentPage - 1) * effectivePageSize, currentPage * effectivePageSize);
+    : sortedData.slice(
+        (currentPage - 1) * effectivePageSize,
+        currentPage * effectivePageSize,
+      );
 
   const goToPage = (p) => {
     if (isServerPaged) {
@@ -180,7 +187,7 @@ export function DataTable({
       else next.add(id);
       onSelectionChange?.(next);
     },
-    [selectedSet, onSelectionChange]
+    [selectedSet, onSelectionChange],
   );
 
   const toggleAll = useCallback(() => {
@@ -191,7 +198,7 @@ export function DataTable({
       selectableRows.length > 0 &&
       selectableRows.every((r) => selectedSet.has(r.id));
     onSelectionChange?.(
-      allSelected ? new Set() : new Set(selectableRows.map((r) => r.id))
+      allSelected ? new Set() : new Set(selectableRows.map((r) => r.id)),
     );
   }, [filteredData, selectedSet, isSelectable, onSelectionChange]);
 
@@ -210,11 +217,7 @@ export function DataTable({
 
   if (data.length === 0 && !showHeader) {
     return (
-      <EmptyState
-        icon={emptyIcon}
-        title={emptyMessage}
-        className={className}
-      />
+      <EmptyState icon={emptyIcon} title={emptyMessage} className={className} />
     );
   }
 
@@ -255,9 +258,7 @@ export function DataTable({
                   variant="outline"
                   size="sm"
                   className="gap-1.5 h-8"
-                  onClick={() =>
-                    exportCSV(columns, sortedData, exportFilename)
-                  }
+                  onClick={() => exportCSV(columns, sortedData, exportFilename)}
                 >
                   <Download className="w-3.5 h-3.5" />
                   CSV
@@ -297,18 +298,21 @@ export function DataTable({
                       "text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-3 py-2.5",
                       col.align === "right" && "text-right",
                       col.align === "center" && "text-center",
-                      !disableSort && col.sortable !== false &&
+                      !disableSort &&
+                        col.sortable !== false &&
                         "cursor-pointer select-none hover:text-foreground",
-                      col.className
+                      col.className,
                     )}
                     onClick={() =>
-                      !disableSort && col.sortable !== false && handleSort(col.key)
+                      !disableSort &&
+                      col.sortable !== false &&
+                      handleSort(col.key)
                     }
                   >
                     <span
                       className={cn(
                         "inline-flex items-center",
-                        col.align === "right" && "justify-end w-full"
+                        col.align === "right" && "justify-end w-full",
                       )}
                     >
                       {col.label}
@@ -316,9 +320,7 @@ export function DataTable({
                     </span>
                   </TableHead>
                 ))}
-                {rowActions && (
-                  <TableHead className="w-[140px] px-3 py-2.5" />
-                )}
+                {rowActions && <TableHead className="w-[140px] px-3 py-2.5" />}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -332,14 +334,14 @@ export function DataTable({
                     }
                     className="text-center py-12 text-muted-foreground text-sm"
                   >
-                    {searchLower ? "No results match your search" : emptyMessage}
+                    {searchLower
+                      ? "No results match your search"
+                      : emptyMessage}
                   </TableCell>
                 </TableRow>
               ) : (
                 paginatedData.map((row, idx) => {
-                  const rowSelectable = isSelectable
-                    ? isSelectable(row)
-                    : true;
+                  const rowSelectable = isSelectable ? isSelectable(row) : true;
                   const isSelected = selectedSet.has(row.id);
                   return (
                     <TableRow
@@ -347,7 +349,7 @@ export function DataTable({
                       className={cn(
                         "hover:bg-muted/60 transition-colors",
                         onRowClick && "cursor-pointer",
-                        isSelected && "bg-info/10"
+                        isSelected && "bg-info/10",
                       )}
                       onClick={() => onRowClick?.(row)}
                     >
@@ -374,7 +376,7 @@ export function DataTable({
                             "px-3 py-2.5",
                             col.align === "right" && "text-right",
                             col.align === "center" && "text-center",
-                            col.cellClassName
+                            col.cellClassName,
                           )}
                         >
                           {col.render ? col.render(row) : row[col.key]}

@@ -8,27 +8,43 @@ import { Label } from "../components/ui/label";
 import { ShieldCheck, HardHat } from "lucide-react";
 import { AuthLayout } from "../components/AuthLayout";
 
-function LoginPanel({ title, icon: Icon, accentClass, demoHint, testPrefix, onSubmit, loading }) {
+function LoginPanel({
+  title,
+  icon: Icon,
+  accentClass,
+  demoHint,
+  testPrefix,
+  onSubmit,
+  loading,
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!email || !password) { toast.error("Please fill in all fields"); return; }
+    if (!email || !password) {
+      toast.error("Please fill in all fields");
+      return;
+    }
     onSubmit(email, password);
   };
 
   return (
     <div className="bg-surface rounded-2xl p-8 shadow-soft-lg border border-border/70 backdrop-blur-sm flex flex-col">
       <div className={`flex items-center gap-3 mb-6`}>
-        <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${accentClass}`}>
+        <div
+          className={`w-9 h-9 rounded-lg flex items-center justify-center ${accentClass}`}
+        >
           <Icon className="w-5 h-5" />
         </div>
         <h2 className="text-base font-semibold text-foreground">{title}</h2>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4 flex-1">
         <div>
-          <Label htmlFor={`${testPrefix}-email`} className="text-muted-foreground font-medium text-sm">
+          <Label
+            htmlFor={`${testPrefix}-email`}
+            className="text-muted-foreground font-medium text-sm"
+          >
             Email
           </Label>
           <Input
@@ -42,7 +58,10 @@ function LoginPanel({ title, icon: Icon, accentClass, demoHint, testPrefix, onSu
           />
         </div>
         <div>
-          <Label htmlFor={`${testPrefix}-password`} className="text-muted-foreground font-medium text-sm">
+          <Label
+            htmlFor={`${testPrefix}-password`}
+            className="text-muted-foreground font-medium text-sm"
+          >
             Password
           </Label>
           <Input
@@ -65,7 +84,9 @@ function LoginPanel({ title, icon: Icon, accentClass, demoHint, testPrefix, onSu
         </Button>
       </form>
       {demoHint && (
-        <p className="text-center mt-4 text-muted-foreground text-xs">{demoHint}</p>
+        <p className="text-center mt-4 text-muted-foreground text-xs">
+          {demoHint}
+        </p>
       )}
     </div>
   );
@@ -112,7 +133,7 @@ const Login = () => {
         />
       </div>
       <p className="text-center mt-6 text-muted-foreground text-sm">
-        Don't have an account?{" "}
+        Don&apos;t have an account?{" "}
         <Link
           to="/register"
           className="text-accent font-medium hover:text-accent transition-colors"

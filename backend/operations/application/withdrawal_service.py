@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
@@ -178,7 +179,11 @@ async def create_withdrawal(
                 result["invoice_id"] = inv.get("id")
                 return result
             except ValueError:
-                pass
+                logging.getLogger(__name__).warning(
+                    "Auto-invoice failed for withdrawal %s, continuing without invoice",
+                    withdrawal.id,
+                    exc_info=True,
+                )
         return withdrawal.model_dump()
 
     if conn is not None:

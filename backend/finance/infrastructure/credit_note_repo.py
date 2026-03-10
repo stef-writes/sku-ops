@@ -3,13 +3,14 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from shared.infrastructure.config import DEFAULT_ORG_ID
 from shared.infrastructure.database import get_connection, transaction
 
 
 async def _next_credit_note_number(organization_id: str | None = None, conn=None) -> str:
     in_transaction = conn is not None
     conn = conn or get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     key = f"{org_id}|cn"
     await conn.execute(
         """INSERT INTO invoice_counters (key, counter) VALUES (?, 1)
@@ -54,7 +55,7 @@ async def insert_credit_note(
     """Create a credit note linked to a return and its original invoice."""
     in_transaction = conn is not None
     conn = conn or get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     cn_id = str(uuid4())
     now = datetime.now(UTC).isoformat()
     cn_number = await _next_credit_note_number(org_id, conn)
@@ -63,7 +64,7 @@ async def insert_credit_note(
     if invoice_id:
         inv_params: list = [invoice_id]
         inv_where = "WHERE id = ?"
-        if org_id != "default":
+        if org_id != DEFAULT_ORG_ID:
             inv_where += " AND (organization_id = ? OR organization_id IS NULL)"
             inv_params.append(org_id)
         cursor = await conn.execute("SELECT billing_entity FROM invoices " + inv_where, inv_params)
@@ -162,7 +163,7 @@ async def list_credit_notes(
     organization_id: str | None = None,
 ) -> list:
     conn = get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     query = "SELECT * FROM credit_notes WHERE (organization_id = ? OR organization_id IS NULL)"
     params: list = [org_id]
     if invoice_id:

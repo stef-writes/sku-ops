@@ -31,6 +31,18 @@ export default [
       "react/prop-types": "off",
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      "no-console": ["warn", { allow: ["error", "debug"] }],
+    },
+  },
+
+  {
+    files: [
+      "src/components/ui/**/*.{js,jsx}",
+      "src/context/**/*.{js,jsx}",
+      "src/components/reports/ReportHelpers.jsx",
+    ],
+    rules: {
+      "react-refresh/only-export-components": "off",
     },
   },
 

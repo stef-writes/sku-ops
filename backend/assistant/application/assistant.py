@@ -23,7 +23,12 @@ from assistant.agents.routing.router import classify_domain, is_trivial
 from assistant.agents.tools.registry import run_tool
 from assistant.infrastructure.llm import get_model
 from assistant.infrastructure.llm.catalog import resolve_tier_model
-from shared.infrastructure.config import ANTHROPIC_AVAILABLE, LLM_SETUP_URL, OPENROUTER_AVAILABLE
+from shared.infrastructure.config import (
+    ANTHROPIC_AVAILABLE,
+    DEFAULT_ORG_ID,
+    LLM_SETUP_URL,
+    OPENROUTER_AVAILABLE,
+)
 from shared.infrastructure.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
@@ -53,7 +58,7 @@ async def chat(
 
     ctx = ctx or {}
     deps = AgentDeps(
-        org_id=ctx.get("org_id", "default"),
+        org_id=ctx.get("org_id", DEFAULT_ORG_ID),
         user_id=ctx.get("user_id", ""),
         user_name=ctx.get("user_name", ""),
     )
@@ -79,7 +84,7 @@ async def _chat_multipath(
     """Original 4-path dispatch: trivial -> lookup -> DAG -> specialist agent. Not active."""
     ctx = ctx or {}
     deps = AgentDeps(
-        org_id=ctx.get("org_id", "default"),
+        org_id=ctx.get("org_id", DEFAULT_ORG_ID),
         user_id=ctx.get("user_id", ""),
         user_name=ctx.get("user_name", ""),
     )

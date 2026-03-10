@@ -1,12 +1,7 @@
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -47,9 +42,17 @@ import {
  * }} props
  */
 export function EntityFormDialog({
-  open, onOpenChange, title, schema, fields,
-  entity = null, entityToForm, defaults = {},
-  onSubmit, saving = false, testIdPrefix = "entity",
+  open,
+  onOpenChange,
+  title,
+  schema,
+  fields,
+  entity = null,
+  entityToForm,
+  defaults = {},
+  onSubmit,
+  saving = false,
+  testIdPrefix = "entity",
 }) {
   const isEditing = !!entity;
 
@@ -64,12 +67,15 @@ export function EntityFormDialog({
         form.reset(entityToForm(entity));
       } else if (entity) {
         const vals = {};
-        fields.forEach((f) => { vals[f.name] = entity[f.name] ?? defaults[f.name] ?? ""; });
+        fields.forEach((f) => {
+          vals[f.name] = entity[f.name] ?? defaults[f.name] ?? "";
+        });
         form.reset(vals);
       } else {
         form.reset(defaults);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset form only when dialog opens or entity changes; defaults/fields/entityToForm are stable config props
   }, [open, entity]);
 
   const handleSubmit = form.handleSubmit(async (data) => {
@@ -78,7 +84,10 @@ export function EntityFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md" data-testid={`${testIdPrefix}-dialog`}>
+      <DialogContent
+        className="sm:max-w-md"
+        data-testid={`${testIdPrefix}-dialog`}
+      >
         <DialogHeader>
           <DialogTitle className="font-heading font-bold text-xl uppercase tracking-wider">
             {isEditing ? `Edit ${title}` : `Add New ${title}`}
@@ -87,9 +96,10 @@ export function EntityFormDialog({
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
           {fields.map((field) => {
             const error = form.formState.errors[field.name];
-            const isDisabled = typeof field.disabled === "function"
-              ? field.disabled(isEditing)
-              : field.disabled;
+            const isDisabled =
+              typeof field.disabled === "function"
+                ? field.disabled(isEditing)
+                : field.disabled;
 
             return (
               <div key={field.name}>
@@ -110,12 +120,17 @@ export function EntityFormDialog({
                     onValueChange={(v) => form.setValue(field.name, v)}
                     disabled={isDisabled}
                   >
-                    <SelectTrigger className="mt-2" data-testid={`${testIdPrefix}-${field.name}-input`}>
+                    <SelectTrigger
+                      className="mt-2"
+                      data-testid={`${testIdPrefix}-${field.name}-input`}
+                    >
                       <SelectValue placeholder={field.placeholder} />
                     </SelectTrigger>
                     <SelectContent>
                       {(field.options || []).map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -124,7 +139,9 @@ export function EntityFormDialog({
                     type={field.type || "text"}
                     {...form.register(field.name, {
                       onChange: field.transform
-                        ? (e) => { e.target.value = field.transform(e.target.value); }
+                        ? (e) => {
+                            e.target.value = field.transform(e.target.value);
+                          }
                         : undefined,
                     })}
                     placeholder={field.placeholder}
@@ -135,10 +152,14 @@ export function EntityFormDialog({
                   />
                 )}
                 {field.note && isEditing && (
-                  <p className="text-xs text-muted-foreground mt-1">{field.note}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {field.note}
+                  </p>
                 )}
                 {error && (
-                  <p className="text-xs text-destructive mt-1">{error.message}</p>
+                  <p className="text-xs text-destructive mt-1">
+                    {error.message}
+                  </p>
                 )}
               </div>
             );

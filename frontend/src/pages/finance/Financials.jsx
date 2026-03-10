@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { themeColors } from "@/lib/chartTheme";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { FileText, HardHat, Building2, DollarSign as DollarSignIcon, Briefcase } from "lucide-react";
+import { FileText, HardHat, Building2 } from "lucide-react";
 import { format } from "date-fns";
 import { PageSkeleton } from "@/components/LoadingSkeleton";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -45,7 +45,9 @@ const buildColumns = (onViewJob) => [
         <HardHat className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         <div>
           <p className="font-medium text-foreground">{row.contractor_name}</p>
-          <p className="text-[10px] text-muted-foreground">{row.contractor_company}</p>
+          <p className="text-[10px] text-muted-foreground">
+            {row.contractor_company}
+          </p>
         </div>
       </div>
     ),
@@ -56,15 +58,21 @@ const buildColumns = (onViewJob) => [
     key: "job_id",
     label: "Job",
     type: "text",
-    render: (row) => row.job_id ? (
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); onViewJob(row.job_id); }}
-        className="font-mono text-xs text-info hover:text-info hover:underline"
-      >
-        {row.job_id}
-      </button>
-    ) : <span className="text-xs text-muted-foreground">—</span>,
+    render: (row) =>
+      row.job_id ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewJob(row.job_id);
+          }}
+          className="font-mono text-xs text-info hover:text-info hover:underline"
+        >
+          {row.job_id}
+        </button>
+      ) : (
+        <span className="text-xs text-muted-foreground">—</span>
+      ),
   },
   {
     key: "billing_entity",
@@ -107,8 +115,7 @@ const buildColumns = (onViewJob) => [
         ${((row.total || 0) - (row.cost_total || 0)).toFixed(2)}
       </span>
     ),
-    exportValue: (row) =>
-      ((row.total || 0) - (row.cost_total || 0)).toFixed(2),
+    exportValue: (row) => ((row.total || 0) - (row.cost_total || 0)).toFixed(2),
   },
   {
     key: "_invoice_status",
@@ -146,16 +153,19 @@ const Financials = () => {
 
   const syncFiltersToURL = useCallback(
     (updates) => {
-      setSearchParams((prev) => {
-        const next = new URLSearchParams(prev);
-        for (const [key, val] of Object.entries(updates)) {
-          if (val) next.set(key, val);
-          else next.delete(key);
-        }
-        return next;
-      }, { replace: true });
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          for (const [key, val] of Object.entries(updates)) {
+            if (val) next.set(key, val);
+            else next.delete(key);
+          }
+          return next;
+        },
+        { replace: true },
+      );
     },
-    [setSearchParams]
+    [setSearchParams],
   );
 
   const dateParams = useMemo(
@@ -163,11 +173,13 @@ const Financials = () => {
       start_date: dateToISO(dateRange.from),
       end_date: endOfDayISO(dateRange.to),
     }),
-    [dateRange]
+    [dateRange],
   );
 
-  const { data: summary, isLoading: summaryLoading } = useFinancialSummary(dateParams);
-  const { data: withdrawals = [], isLoading: wdLoading } = useWithdrawals(dateParams);
+  const { data: summary, isLoading: summaryLoading } =
+    useFinancialSummary(dateParams);
+  const { data: withdrawals = [], isLoading: wdLoading } =
+    useWithdrawals(dateParams);
   const { data: arAging } = useReportArAging();
 
   const arAgingByEntity = useMemo(() => {
@@ -181,11 +193,7 @@ const Financials = () => {
 
   const selectAllUninvoiced = () => {
     setSelectedIds(
-      new Set(
-        withdrawals
-          .filter((w) => !w.invoice_id)
-          .map((w) => w.id)
-      )
+      new Set(withdrawals.filter((w) => !w.invoice_id).map((w) => w.id)),
     );
   };
 
@@ -195,7 +203,7 @@ const Financials = () => {
         const w = withdrawals.find((x) => x.id === id);
         return w && !w.invoice_id;
       }),
-    [selectedIds, withdrawals]
+    [selectedIds, withdrawals],
   );
 
   const invoiceTotals = useMemo(() => {
@@ -278,16 +286,28 @@ const Financials = () => {
             <SectionHead title="Top Contractors by Spend" variant="report" />
             <HorizontalBarChart
               data={[...summary.by_contractor]
-                .sort((a, b) => (b.revenue ?? b.total ?? 0) - (a.revenue ?? a.total ?? 0))
+                .sort(
+                  (a, b) =>
+                    (b.revenue ?? b.total ?? 0) - (a.revenue ?? a.total ?? 0),
+                )
                 .slice(0, 10)
                 .map((c) => ({
                   name: c.name || c.company || c.contractor_id || "Unknown",
                   revenue: c.revenue ?? c.total ?? 0,
                 }))}
               categoryKey="name"
-              series={[{ key: "revenue", label: "Revenue", color: themeColors().category1 }]}
+              series={[
+                {
+                  key: "revenue",
+                  label: "Revenue",
+                  color: themeColors().category1,
+                },
+              ]}
               valueFormatter={valueFormatter}
-              height={Math.max(200, Math.min(summary.by_contractor.length, 10) * 36)}
+              height={Math.max(
+                200,
+                Math.min(summary.by_contractor.length, 10) * 36,
+              )}
             />
           </Panel>
         )}
@@ -304,13 +324,16 @@ const Financials = () => {
                 "90d+": r.overdue_90_plus || 0,
               }))}
               categoryKey="name"
-              series={(() => { const t = themeColors(); return [
-                { key: "current", label: "Current", color: t.success },
-                { key: "1-30d", label: "1–30d", color: t.warning },
-                { key: "31-60d", label: "31–60d", color: t.category5 },
-                { key: "61-90d", label: "61–90d", color: t.destructive },
-                { key: "90d+", label: "90d+", color: t.destructive },
-              ]; })()}
+              series={(() => {
+                const t = themeColors();
+                return [
+                  { key: "current", label: "Current", color: t.success },
+                  { key: "1-30d", label: "1–30d", color: t.warning },
+                  { key: "31-60d", label: "31–60d", color: t.category5 },
+                  { key: "61-90d", label: "61–90d", color: t.destructive },
+                  { key: "90d+", label: "90d+", color: t.destructive },
+                ];
+              })()}
               valueFormatter={valueFormatter}
               height={Math.max(200, arAging.length * 40)}
             />
@@ -328,11 +351,26 @@ const Financials = () => {
               {Object.entries(summary.by_billing_entity).map(
                 ([entity, data]) => {
                   const aging = arAgingByEntity[entity];
-                  const hasOverdue90 = aging && ((aging.overdue_61_90 || 0) > 0 || (aging.overdue_90_plus || 0) > 0);
-                  const hasOverdue30 = aging && ((aging.overdue_31_60 || 0) > 0);
-                  const hasOverdue = aging && ((aging.overdue_1_30 || 0) > 0);
-                  const badgeColor = hasOverdue90 ? "bg-destructive/15 text-destructive border-destructive/30" : hasOverdue30 ? "bg-warning/15 text-category-5 border-warning/30" : hasOverdue ? "bg-warning/15 text-accent border-warning/30" : null;
-                  const badgeLabel = hasOverdue90 ? "60d+ overdue" : hasOverdue30 ? "31–60d overdue" : hasOverdue ? "1–30d overdue" : null;
+                  const hasOverdue90 =
+                    aging &&
+                    ((aging.overdue_61_90 || 0) > 0 ||
+                      (aging.overdue_90_plus || 0) > 0);
+                  const hasOverdue30 = aging && (aging.overdue_31_60 || 0) > 0;
+                  const hasOverdue = aging && (aging.overdue_1_30 || 0) > 0;
+                  const badgeColor = hasOverdue90
+                    ? "bg-destructive/15 text-destructive border-destructive/30"
+                    : hasOverdue30
+                      ? "bg-warning/15 text-category-5 border-warning/30"
+                      : hasOverdue
+                        ? "bg-warning/15 text-accent border-warning/30"
+                        : null;
+                  const badgeLabel = hasOverdue90
+                    ? "60d+ overdue"
+                    : hasOverdue30
+                      ? "31–60d overdue"
+                      : hasOverdue
+                        ? "1–30d overdue"
+                        : null;
                   return (
                     <div
                       key={entity}
@@ -344,7 +382,9 @@ const Financials = () => {
                           {entity}
                         </span>
                         {badgeColor && (
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${badgeColor}`}>
+                          <span
+                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${badgeColor}`}
+                          >
                             {badgeLabel}
                           </span>
                         )}
@@ -357,7 +397,9 @@ const Financials = () => {
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">AR Balance</span>
+                          <span className="text-muted-foreground">
+                            AR Balance
+                          </span>
                           <span className="font-mono tabular-nums text-accent">
                             ${(data.ar_balance ?? 0).toFixed(2)}
                           </span>
@@ -371,7 +413,7 @@ const Financials = () => {
                       </div>
                     </div>
                   );
-                }
+                },
               )}
             </div>
           </div>

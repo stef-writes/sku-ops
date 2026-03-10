@@ -31,13 +31,20 @@ function buildWsUrl(token) {
  *   lastError     — last error message from the server
  *   clearResult() — reset lastResult/lastError
  */
-export function useChatSocket({ onDelta, onToolStart, onDone, onError, enabled = true } = {}) {
+export function useChatSocket({
+  onDelta,
+  onToolStart,
+  onDone,
+  onError,
+  enabled = true,
+} = {}) {
   const { token } = useAuth();
   const wsRef = useRef(null);
   const retriesRef = useRef(0);
   const timerRef = useRef(null);
   const heartbeatTimerRef = useRef(null);
   const callbacksRef = useRef({ onDelta, onToolStart, onDone, onError });
+  const scheduleReconnectRef = useRef(null);
 
   const [connected, setConnected] = useState(false);
   const [streaming, setStreaming] = useState(false);
@@ -85,7 +92,11 @@ export function useChatSocket({ onDelta, onToolStart, onDone, onError, enabled =
       const { type } = msg;
 
       if (type === "ping") {
-        try { ws.send(JSON.stringify({ type: "pong" })); } catch {}
+        try {
+          ws.send(JSON.stringify({ type: "pong" }));
+        } catch {
+          /* WS may be closing */
+        }
         return;
       }
 
@@ -133,7 +144,7 @@ export function useChatSocket({ onDelta, onToolStart, onDone, onError, enabled =
       wsRef.current = null;
       clearTimeout(heartbeatTimerRef.current);
       if (e.code !== 4001 && e.code !== 4003) {
-        scheduleReconnect();
+        scheduleReconnectRef.current?.();
       }
     };
 
@@ -154,6 +165,10 @@ export function useChatSocket({ onDelta, onToolStart, onDone, onError, enabled =
       connect();
     }, delay);
   }, [connect]);
+
+  useEffect(() => {
+    scheduleReconnectRef.current = scheduleReconnect;
+  });
 
   useEffect(() => {
     if (enabled) {
@@ -177,12 +192,14 @@ export function useChatSocket({ onDelta, onToolStart, onDone, onError, enabled =
   const send = useCallback((message, sessionId, agentType = "auto") => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) return false;
     try {
-      wsRef.current.send(JSON.stringify({
-        type: "chat",
-        message,
-        session_id: sessionId,
-        agent_type: agentType,
-      }));
+      wsRef.current.send(
+        JSON.stringify({
+          type: "chat",
+          message,
+          session_id: sessionId,
+          agent_type: agentType,
+        }),
+      );
       return true;
     } catch {
       return false;
@@ -193,7 +210,9 @@ export function useChatSocket({ onDelta, onToolStart, onDone, onError, enabled =
     if (wsRef.current?.readyState !== WebSocket.OPEN) return;
     try {
       wsRef.current.send(JSON.stringify({ type: "cancel" }));
-    } catch {}
+    } catch {
+      /* WS may be closing */
+    }
     setStreaming(false);
     setStreamText("");
     setActiveTools([]);

@@ -23,6 +23,7 @@ from inventory.domain.stock import StockDecrement, StockTransaction, StockTransa
 from inventory.infrastructure.stock_repo import stock_repo as _default_stock_repo
 from inventory.ports.stock_repo_port import StockRepoPort
 from kernel.errors import ResourceNotFoundError
+from shared.infrastructure.config import DEFAULT_ORG_ID
 
 
 async def _record_stock_transaction(
@@ -58,7 +59,7 @@ async def _record_stock_transaction(
         user_id=user_id,
         user_name=user_name,
     )
-    tx.organization_id = organization_id or "default"
+    tx.organization_id = organization_id or DEFAULT_ORG_ID
     await repo.insert_transaction(tx, conn=conn)
 
 
@@ -257,7 +258,7 @@ async def process_adjustment_stock_changes(
         product_cost=float(product.get("cost", 0)),
         quantity_delta=quantity_delta,
         department=product.get("department_name"),
-        organization_id=product.get("organization_id", "default"),
+        organization_id=product.get("organization_id", DEFAULT_ORG_ID),
         reason=reason,
         performed_by_user_id=user_id,
         conn=conn,

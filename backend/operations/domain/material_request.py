@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from kernel.entity import Entity
 from operations.domain.withdrawal import WithdrawalItem
+from shared.infrastructure.config import DEFAULT_ORG_ID
 
 
 class MaterialRequestCreate(BaseModel):
@@ -30,4 +31,4 @@ class MaterialRequest(Entity):
     notes: str | None = None
     processed_at: str | None = None
     processed_by_id: str | None = None
-    organization_id: str = "default"
+    organization_id: str = DEFAULT_ORG_ID

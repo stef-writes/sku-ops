@@ -8,12 +8,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle, Package, ArrowRight } from "lucide-react";
+import { Package, ArrowRight } from "lucide-react";
 import { useProductMatch } from "@/hooks/useProductMatch";
 import { ProductMatchPicker } from "@/components/ProductMatchPicker";
 import { ProductFields } from "@/components/ProductFields";
 
-const COMPACT_HIDDEN = new Set(["description", "vendor_id", "min_stock", "quantity"]);
+const COMPACT_HIDDEN = new Set([
+  "description",
+  "vendor_id",
+  "min_stock",
+  "quantity",
+]);
 
 export function ReceiveReviewModal({
   open,
@@ -24,14 +29,20 @@ export function ReceiveReviewModal({
   isSubmitting = false,
 }) {
   const [items, setItems] = useState([]);
-  const { matches, autoMatch, searchMatch, confirmMatch, clearMatch, reset } = useProductMatch();
+  const { matches, autoMatch, searchMatch, confirmMatch, clearMatch, reset } =
+    useProductMatch();
 
   useEffect(() => {
-    if (!open || !rawItems?.length) { setItems([]); reset(); return; }
+    if (!open || !rawItems?.length) {
+      setItems([]);
+      reset();
+      return;
+    }
 
     const seeded = rawItems.map((item) => ({
       ...item,
-      _delivered_qty: item._delivered_qty ?? item.delivered_qty ?? item.ordered_qty ?? 1,
+      _delivered_qty:
+        item._delivered_qty ?? item.delivered_qty ?? item.ordered_qty ?? 1,
       _cost: item.cost > 0 ? item.cost : "",
     }));
     setItems(seeded);
@@ -63,7 +74,7 @@ export function ReceiveReviewModal({
 
   const updateItem = (itemId, field, value) => {
     setItems((prev) =>
-      prev.map((it) => (it.id === itemId ? { ...it, [field]: value } : it))
+      prev.map((it) => (it.id === itemId ? { ...it, [field]: value } : it)),
     );
   };
 
@@ -92,15 +103,18 @@ export function ReceiveReviewModal({
         id: it.id,
         delivered_qty: parseFloat(it._delivered_qty) || 1,
       };
-      if (it._cost !== "" && it._cost != null) entry.cost = parseFloat(it._cost);
+      if (it._cost !== "" && it._cost != null)
+        entry.cost = parseFloat(it._cost);
 
       const matched = it._resolved_match;
       if (matched) {
         entry.product_id = matched.id;
       } else {
         if (it._name && it._name !== it.name) entry.name = it._name;
-        if (it._unit_price != null && it._unit_price !== "") entry.unit_price = parseFloat(it._unit_price);
-        if (it._suggested_department) entry.suggested_department = it._suggested_department;
+        if (it._unit_price != null && it._unit_price !== "")
+          entry.unit_price = parseFloat(it._unit_price);
+        if (it._suggested_department)
+          entry.suggested_department = it._suggested_department;
         if (it._base_unit) entry.base_unit = it._base_unit;
         if (it._sell_uom) entry.sell_uom = it._sell_uom;
         if (it._pack_qty != null) entry.pack_qty = parseInt(it._pack_qty) || 1;
@@ -127,7 +141,8 @@ export function ReceiveReviewModal({
             Review before receiving
           </DialogTitle>
           <p className="text-sm text-muted-foreground mt-1">
-            Match items to existing products or create new ones. Verify details before adding to inventory.
+            Match items to existing products or create new ones. Verify details
+            before adding to inventory.
           </p>
         </DialogHeader>
 
@@ -176,7 +191,8 @@ export function ReceiveReviewModal({
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
               {resolvedItems.length} item{resolvedItems.length !== 1 ? "s" : ""}
-              {matchedItems.length > 0 && ` (${matchedItems.length} matched, ${newItems.length} new)`}
+              {matchedItems.length > 0 &&
+                ` (${matchedItems.length} matched, ${newItems.length} new)`}
             </span>
             {totalCost > 0 && (
               <span className="font-mono text-foreground">
@@ -207,7 +223,14 @@ export function ReceiveReviewModal({
   );
 }
 
-function MatchedCard({ item, matchState, onSearch, onConfirmMatch, onClearMatch, onChange }) {
+function MatchedCard({
+  item,
+  matchState,
+  onSearch,
+  onConfirmMatch,
+  onClearMatch,
+  onChange,
+}) {
   const matched = item._resolved_match;
   const currentQty = matched?.quantity ?? 0;
   const deliveredQty = parseFloat(item._delivered_qty) || 0;
@@ -226,14 +249,20 @@ function MatchedCard({ item, matchState, onSearch, onConfirmMatch, onClearMatch,
 
       <div className="grid grid-cols-3 gap-3 text-sm">
         <div className="bg-card rounded-lg border border-border px-3 py-2">
-          <p className="text-[10px] font-medium text-muted-foreground uppercase">Current stock</p>
-          <p className="font-mono font-semibold text-foreground">{currentQty}</p>
+          <p className="text-[10px] font-medium text-muted-foreground uppercase">
+            Current stock
+          </p>
+          <p className="font-mono font-semibold text-foreground">
+            {currentQty}
+          </p>
         </div>
         <div className="flex items-center justify-center">
           <ArrowRight className="w-4 h-4 text-muted-foreground/60" />
         </div>
         <div className="bg-card rounded-lg border border-success/30 px-3 py-2">
-          <p className="text-[10px] font-medium text-success uppercase">New stock</p>
+          <p className="text-[10px] font-medium text-success uppercase">
+            New stock
+          </p>
           <p className="font-mono font-semibold text-success">{newQty}</p>
         </div>
       </div>
@@ -251,7 +280,9 @@ function MatchedCard({ item, matchState, onSearch, onConfirmMatch, onClearMatch,
           />
         </div>
         <div>
-          <Label className="text-muted-foreground text-xs">Cost (for WAC)</Label>
+          <Label className="text-muted-foreground text-xs">
+            Cost (for WAC)
+          </Label>
           <Input
             type="number"
             step="0.01"
@@ -266,7 +297,15 @@ function MatchedCard({ item, matchState, onSearch, onConfirmMatch, onClearMatch,
   );
 }
 
-function NewCard({ item, matchState, departments, onSearch, onConfirmMatch, onClearMatch, onChange }) {
+function NewCard({
+  item,
+  matchState,
+  departments,
+  onSearch,
+  onConfirmMatch,
+  onClearMatch,
+  onChange,
+}) {
   return (
     <div className="p-4 rounded-xl border border-warning/30 bg-warning/10 space-y-3">
       <ProductMatchPicker
@@ -288,7 +327,8 @@ function NewCard({ item, matchState, departments, onSearch, onConfirmMatch, onCl
           sell_uom: item._sell_uom ?? item.sell_uom ?? "each",
           pack_qty: item._pack_qty ?? item.pack_qty ?? 1,
           barcode: item._barcode ?? "",
-          department_id: item._suggested_department ?? item.suggested_department ?? "",
+          department_id:
+            item._suggested_department ?? item.suggested_department ?? "",
           quantity: item._delivered_qty ?? item.delivered_qty ?? 1,
         }}
         onChange={(field, value) => {

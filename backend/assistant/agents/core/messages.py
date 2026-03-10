@@ -29,7 +29,7 @@ def build_message_history(history: list[dict] | None) -> list | None:
     return messages or None
 
 
-def extract_text_history(messages) -> list[dict]:  # type: ignore[type-arg]
+def extract_text_history(messages: list[ModelRequest | ModelResponse]) -> list[dict]:
     """Extract text-only turns from PydanticAI all_messages() for session storage."""
     out: list[dict] = []
     for msg in messages:
@@ -48,7 +48,7 @@ def extract_text_history(messages) -> list[dict]:  # type: ignore[type-arg]
     return out
 
 
-def extract_tool_calls(messages) -> list[dict]:
+def extract_tool_calls(messages: list[ModelRequest | ModelResponse]) -> list[dict]:
     """Extract tool call names only (lightweight, for API response)."""
     out = []
     for msg in messages:
@@ -59,7 +59,7 @@ def extract_tool_calls(messages) -> list[dict]:
     return out
 
 
-def extract_tool_calls_detailed(messages) -> list[dict]:
+def extract_tool_calls_detailed(messages: list[ModelRequest | ModelResponse]) -> list[dict]:
     """Extract tool calls with arguments and return values for monitoring."""
     return_map: dict[str, str] = {}
     for msg in messages:

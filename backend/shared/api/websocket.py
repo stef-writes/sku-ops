@@ -20,7 +20,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 from kernel.events import CONTRACTOR_VISIBLE_EVENTS, Event
 from shared.infrastructure import event_hub
-from shared.infrastructure.config import JWT_ALGORITHM, JWT_SECRET
+from shared.infrastructure.config import DEFAULT_ORG_ID, JWT_ALGORITHM, JWT_SECRET
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ def mount_websocket(app: FastAPI) -> None:
             await websocket.close(code=4001, reason="Invalid or expired token")
             return
 
-        org_id = payload.get("organization_id", "default")
+        org_id = payload.get("organization_id", DEFAULT_ORG_ID)
         role = payload.get("role", "")
         user_id = payload.get("user_id", "")
         await websocket.accept()

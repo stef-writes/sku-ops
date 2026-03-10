@@ -54,11 +54,17 @@ export function ProductFields({
   compact = false,
   uomAction,
 }) {
-  const h = hiddenFields instanceof Set ? hiddenFields : new Set(hiddenFields || []);
-  const ro = readOnlyFields instanceof Set ? readOnlyFields : new Set(readOnlyFields || []);
+  const h =
+    hiddenFields instanceof Set ? hiddenFields : new Set(hiddenFields || []);
+  const ro =
+    readOnlyFields instanceof Set
+      ? readOnlyFields
+      : new Set(readOnlyFields || []);
 
   const inputCls = compact ? "input-field h-9 text-sm" : "input-workshop mt-2";
-  const labelCls = compact ? "text-muted-foreground font-medium text-xs" : "text-muted-foreground font-medium text-sm";
+  const labelCls = compact
+    ? "text-muted-foreground font-medium text-xs"
+    : "text-muted-foreground font-medium text-sm";
   const gap = compact ? "gap-2" : "gap-4";
 
   const field = (name) => fields[name] ?? "";
@@ -132,7 +138,9 @@ export function ProductFields({
             <SelectContent>
               <SelectItem value="none">None</SelectItem>
               {vendors.map((v) => (
-                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                <SelectItem key={v.id} value={v.id}>
+                  {v.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -191,7 +199,12 @@ export function ProductFields({
         <div>
           <Label className={labelCls}>
             Min stock{!compact && " level"}
-            {!compact && <FieldTip>Alert threshold — item shows as Low Stock when quantity falls to or below this number.</FieldTip>}
+            {!compact && (
+              <FieldTip>
+                Alert threshold — item shows as Low Stock when quantity falls to
+                or below this number.
+              </FieldTip>
+            )}
           </Label>
           <Input
             type="number"
@@ -206,20 +219,37 @@ export function ProductFields({
       )}
 
       {!isHidden(h, "base_unit") && (
-        <div className={compact ? "col-span-2 flex items-end gap-2 flex-wrap" : "col-span-3 flex items-end gap-2 flex-wrap"}>
+        <div
+          className={
+            compact
+              ? "col-span-2 flex items-end gap-2 flex-wrap"
+              : "col-span-3 flex items-end gap-2 flex-wrap"
+          }
+        >
           <div className="flex-1 min-w-[100px]">
             <Label className={labelCls}>
               Base Unit
-              {!compact && <FieldTip>The physical unit this product is stored and counted in (e.g. each, roll, gallon).</FieldTip>}
+              {!compact && (
+                <FieldTip>
+                  The physical unit this product is stored and counted in (e.g.
+                  each, roll, gallon).
+                </FieldTip>
+              )}
             </Label>
             <Select
               value={field("base_unit") || "each"}
               onValueChange={(v) => set("base_unit", v)}
               disabled={isReadOnly(ro, "base_unit")}
             >
-              <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
+              <SelectTrigger className={inputCls}>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                {UOM_OPTIONS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                {UOM_OPTIONS.map((u) => (
+                  <SelectItem key={u} value={u}>
+                    {u}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -228,16 +258,26 @@ export function ProductFields({
             <div className="flex-1 min-w-[100px]">
               <Label className={labelCls}>
                 Sell Unit
-                {!compact && <FieldTip>The unit shown to customers and used when issuing materials.</FieldTip>}
+                {!compact && (
+                  <FieldTip>
+                    The unit shown to customers and used when issuing materials.
+                  </FieldTip>
+                )}
               </Label>
               <Select
                 value={field("sell_uom") || "each"}
                 onValueChange={(v) => set("sell_uom", v)}
                 disabled={isReadOnly(ro, "sell_uom")}
               >
-                <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
+                <SelectTrigger className={inputCls}>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {UOM_OPTIONS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                  {UOM_OPTIONS.map((u) => (
+                    <SelectItem key={u} value={u}>
+                      {u}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -247,7 +287,12 @@ export function ProductFields({
             <div className="min-w-[80px]">
               <Label className={labelCls}>
                 Pack Qty
-                {!compact && <FieldTip>How many Base Units are in one Sell Unit. E.g. a box of 12 screws = 12.</FieldTip>}
+                {!compact && (
+                  <FieldTip>
+                    How many Base Units are in one Sell Unit. E.g. a box of 12
+                    screws = 12.
+                  </FieldTip>
+                )}
               </Label>
               <Input
                 type="number"
@@ -268,7 +313,13 @@ export function ProductFields({
         <div className="col-span-2" data-testid="pf-product-group">
           <Label className={labelCls}>
             Product Group
-            {!compact && <FieldTip>Group related variants together (e.g. "1/2 PEX Tubing") so you can view combined stock across sizes and vendors.</FieldTip>}
+            {!compact && (
+              <FieldTip>
+                Group related variants together (e.g. &quot;1/2 PEX
+                Tubing&quot;) so you can view combined stock across sizes and
+                vendors.
+              </FieldTip>
+            )}
           </Label>
           <GroupCombobox
             value={field("product_group")}
@@ -285,7 +336,11 @@ export function ProductFields({
           <Input
             value={field("barcode")}
             onChange={(e) => set("barcode", e.target.value)}
-            placeholder={compact ? "UPC / barcode" : "UPC (12 digits) or leave blank to use SKU"}
+            placeholder={
+              compact
+                ? "UPC / barcode"
+                : "UPC (12 digits) or leave blank to use SKU"
+            }
             className={inputCls}
             readOnly={isReadOnly(ro, "barcode")}
             data-testid="pf-barcode"

@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 
 from catalog.domain.department import Department
+from shared.infrastructure.config import DEFAULT_ORG_ID
 from shared.infrastructure.database import get_connection
 
 
@@ -14,7 +15,7 @@ def _row_to_dict(row) -> dict | None:
 
 async def list_all(organization_id: str | None = None) -> list:
     conn = get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     cursor = await conn.execute(
         """SELECT id, name, code, description, product_count, organization_id, created_at FROM departments
            WHERE (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL""",
@@ -43,7 +44,7 @@ async def get_by_id(dept_id: str, organization_id: str | None = None) -> dict | 
 
 async def get_by_code(code: str, organization_id: str | None = None) -> dict | None:
     conn = get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     cursor = await conn.execute(
         """SELECT id, name, code, description, product_count, organization_id, created_at FROM departments
            WHERE code = ? AND (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL""",
@@ -55,7 +56,7 @@ async def get_by_code(code: str, organization_id: str | None = None) -> dict | N
 
 async def insert(department: Department | dict) -> None:
     dept_dict = department if isinstance(department, dict) else department.model_dump()
-    dept_dict["organization_id"] = dept_dict.get("organization_id") or "default"
+    dept_dict["organization_id"] = dept_dict.get("organization_id") or DEFAULT_ORG_ID
     conn = get_connection()
     org_id = dept_dict["organization_id"]
     await conn.execute(

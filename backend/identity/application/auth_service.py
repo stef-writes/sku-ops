@@ -13,6 +13,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from identity.infrastructure.user_repo import user_repo
 from kernel.types import CurrentUser
 from shared.infrastructure.config import (
+    DEFAULT_ORG_ID,
     JWT_ACCESS_EXPIRATION_MINUTES,
     JWT_ALGORITHM,
     JWT_SECRET,
@@ -32,12 +33,12 @@ def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
 
 
-def create_token(user_id: str, email: str, role: str, organization_id: str = "default") -> str:
+def create_token(user_id: str, email: str, role: str, organization_id: str = DEFAULT_ORG_ID) -> str:
     payload = {
         "user_id": user_id,
         "email": email,
         "role": role,
-        "organization_id": organization_id or "default",
+        "organization_id": organization_id or DEFAULT_ORG_ID,
         "exp": datetime.now(UTC) + timedelta(minutes=JWT_ACCESS_EXPIRATION_MINUTES),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
@@ -53,7 +54,7 @@ async def get_current_user(
             raise HTTPException(status_code=401, detail="User not found")
         if not user.get("is_active", True):
             raise HTTPException(status_code=401, detail="User account is disabled")
-        org_id = user.get("organization_id") or payload.get("organization_id") or "default"
+        org_id = user.get("organization_id") or payload.get("organization_id") or DEFAULT_ORG_ID
         user["organization_id"] = org_id
         user_id_var.set(user.get("id", ""))
         org_id_var.set(org_id)

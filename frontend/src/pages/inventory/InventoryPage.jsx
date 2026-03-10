@@ -12,7 +12,11 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DataTable } from "@/components/DataTable";
 import { ViewToolbar } from "@/components/ViewToolbar";
 import { GroupCombobox } from "@/components/GroupCombobox";
-import { useProducts, useDeleteProduct, useAssignGroup } from "@/hooks/useProducts";
+import {
+  useProducts,
+  useDeleteProduct,
+  useAssignGroup,
+} from "@/hooks/useProducts";
 import { useDepartments } from "@/hooks/useDepartments";
 import { useVendors } from "@/hooks/useVendors";
 import { useViewController } from "@/hooks/useViewController";
@@ -30,23 +34,32 @@ const InventoryPage = () => {
   const [adjustProduct, setAdjustProduct] = useState(null);
   const [labelsModalOpen, setLabelsModalOpen] = useState(false);
   const [labelsProducts, setLabelsProducts] = useState([]);
-  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, product: null });
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    open: false,
+    product: null,
+  });
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkGroupOpen, setBulkGroupOpen] = useState(false);
 
   const deleteMutation = useDeleteProduct();
   const assignGroupMutation = useAssignGroup();
 
-  const { data: productsData, isLoading: productsLoading } = useProducts({ limit: 500 });
+  const { data: productsData, isLoading: productsLoading } = useProducts({
+    limit: 500,
+  });
   const { data: departments = [], isLoading: deptsLoading } = useDepartments();
   const { data: vendors = [] } = useVendors();
 
-  const allProducts = productsData?.items ?? (Array.isArray(productsData) ? productsData : []);
+  const allProducts = useMemo(
+    () =>
+      productsData?.items ?? (Array.isArray(productsData) ? productsData : []),
+    [productsData],
+  );
   const loading = productsLoading || deptsLoading;
 
   const groupFilterValues = useMemo(
     () => [...new Set(allProducts.map((p) => p.product_group).filter(Boolean))],
-    [allProducts]
+    [allProducts],
   );
 
   const [groupDrilldown, setGroupDrilldown] = useState(null);
@@ -67,7 +80,9 @@ const InventoryPage = () => {
           <div>
             <p className="font-semibold">{row.name}</p>
             {row.original_sku && (
-              <p className="text-xs text-muted-foreground">Orig: {row.original_sku}</p>
+              <p className="text-xs text-muted-foreground">
+                Orig: {row.original_sku}
+              </p>
             )}
           </div>
         ),
@@ -89,19 +104,20 @@ const InventoryPage = () => {
         label: "Group",
         type: "enum",
         filterValues: groupFilterValues,
-        render: (row) => row.product_group ? (
-          <button
-            className="text-sm text-accent hover:underline text-left"
-            onClick={(e) => {
-              e.stopPropagation();
-              setGroupDrilldown(row.product_group);
-            }}
-          >
-            {row.product_group}
-          </button>
-        ) : (
-          <span className="text-sm text-muted-foreground">—</span>
-        ),
+        render: (row) =>
+          row.product_group ? (
+            <button
+              className="text-sm text-accent hover:underline text-left"
+              onClick={(e) => {
+                e.stopPropagation();
+                setGroupDrilldown(row.product_group);
+              }}
+            >
+              {row.product_group}
+            </button>
+          ) : (
+            <span className="text-sm text-muted-foreground">—</span>
+          ),
       },
       {
         key: "base_unit",
@@ -118,7 +134,9 @@ const InventoryPage = () => {
               </span>
             )}
             {row.sell_uom === row.base_unit && (row.pack_qty || 1) > 1 && (
-              <span className="block text-xs text-muted-foreground">×{row.pack_qty}</span>
+              <span className="block text-xs text-muted-foreground">
+                ×{row.pack_qty}
+              </span>
             )}
           </span>
         ),
@@ -128,7 +146,9 @@ const InventoryPage = () => {
         label: "Price",
         type: "number",
         align: "right",
-        render: (row) => <span className="font-mono">${row.price.toFixed(2)}</span>,
+        render: (row) => (
+          <span className="font-mono">${row.price.toFixed(2)}</span>
+        ),
         exportValue: (row) => row.price.toFixed(2),
       },
       {
@@ -137,7 +157,9 @@ const InventoryPage = () => {
         type: "number",
         align: "right",
         render: (row) => (
-          <span className="font-mono text-muted-foreground">${(row.cost || 0).toFixed(2)}</span>
+          <span className="font-mono text-muted-foreground">
+            ${(row.cost || 0).toFixed(2)}
+          </span>
         ),
         exportValue: (row) => (row.cost || 0).toFixed(2),
       },
@@ -176,7 +198,7 @@ const InventoryPage = () => {
               : "In Stock",
       },
     ],
-    [departments, vendors, groupFilterValues]
+    [departments, vendors, groupFilterValues],
   );
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -189,6 +211,7 @@ const InventoryPage = () => {
       view.setFilter("product_group", groupParam);
       setSearchParams({}, { replace: true });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount to parse initial URL params
   }, []);
 
   useEffect(() => {
@@ -196,6 +219,7 @@ const InventoryPage = () => {
       view.setFilter("product_group", groupDrilldown);
       setGroupDrilldown(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only fires when groupDrilldown is set; view is a stable hook
   }, [groupDrilldown]);
 
   const openDialog = (product = null) => {
@@ -231,7 +255,7 @@ const InventoryPage = () => {
         toast.success(
           groupName
             ? `Assigned ${selectedIds.size} product${selectedIds.size > 1 ? "s" : ""} to "${groupName}"`
-            : `Removed group from ${selectedIds.size} product${selectedIds.size > 1 ? "s" : ""}`
+            : `Removed group from ${selectedIds.size} product${selectedIds.size > 1 ? "s" : ""}`,
         );
         setSelectedIds(new Set());
         setBulkGroupOpen(false);
@@ -239,18 +263,23 @@ const InventoryPage = () => {
         toast.error(getErrorMessage(err));
       }
     },
-    [selectedIds, assignGroupMutation]
+    [selectedIds, assignGroupMutation],
   );
 
   const activeGroupFilter = view.filters?.product_group || null;
   const groupSummary = useMemo(() => {
     if (!activeGroupFilter) return null;
-    const grouped = allProducts.filter((p) => p.product_group === activeGroupFilter);
+    const grouped = allProducts.filter(
+      (p) => p.product_group === activeGroupFilter,
+    );
     return {
       name: activeGroupFilter,
       count: grouped.length,
       totalQty: grouped.reduce((sum, p) => sum + (p.quantity || 0), 0),
-      totalValue: grouped.reduce((sum, p) => sum + (p.price || 0) * (p.quantity || 0), 0),
+      totalValue: grouped.reduce(
+        (sum, p) => sum + (p.price || 0) * (p.quantity || 0),
+        0,
+      ),
     };
   }, [activeGroupFilter, allProducts]);
 
@@ -303,7 +332,8 @@ const InventoryPage = () => {
             <div className="flex-1 min-w-0">
               <span className="font-medium text-sm">{groupSummary.name}</span>
               <span className="text-xs text-muted-foreground ml-3">
-                {groupSummary.count} variant{groupSummary.count !== 1 ? "s" : ""}
+                {groupSummary.count} variant
+                {groupSummary.count !== 1 ? "s" : ""}
                 {" · "}Total qty: {Math.round(groupSummary.totalQty)}
                 {" · "}Value: ${groupSummary.totalValue.toFixed(2)}
               </span>
@@ -322,22 +352,28 @@ const InventoryPage = () => {
 
         {selectedIds.size > 0 && (
           <div className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-muted px-4 py-2.5">
-            <span className="text-sm font-medium">{selectedIds.size} selected</span>
+            <span className="text-sm font-medium">
+              {selectedIds.size} selected
+            </span>
             <div className="flex items-center gap-2 ml-auto">
               {bulkGroupOpen ? (
                 <div className="flex items-center gap-2">
-                  <GroupCombobox
-                    value=""
-                    onChange={handleBulkAssign}
-                    compact
-                  />
-                  <Button variant="ghost" size="sm" onClick={() => setBulkGroupOpen(false)}>
+                  <GroupCombobox value="" onChange={handleBulkAssign} compact />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setBulkGroupOpen(false)}
+                  >
                     Cancel
                   </Button>
                 </div>
               ) : (
                 <>
-                  <Button variant="outline" size="sm" onClick={() => setBulkGroupOpen(true)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setBulkGroupOpen(true)}
+                  >
                     <Layers className="w-3.5 h-3.5 mr-1.5" />
                     Assign Group
                   </Button>

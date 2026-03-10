@@ -175,7 +175,7 @@ class _Hub:
         except Exception:
             logger.warning("Redis reader died — subscriber will not receive events", exc_info=True)
         finally:
-            with asyncio.suppress(Exception):
+            with contextlib.suppress(Exception):
                 await pubsub.unsubscribe(_CHANNEL)
                 await pubsub.aclose()
 

@@ -29,6 +29,7 @@ from inventory.domain.errors import InsufficientStockError
 from kernel.errors import DomainError
 from shared.infrastructure.config import (
     CORS_ORIGINS,
+    DEFAULT_ORG_ID,
     XERO_SYNC_HOUR,
     cors_warn_in_deployed,
     is_deployed,
@@ -108,17 +109,24 @@ async def _ensure_demo_users() -> None:
 
     from identity.application.auth_service import hash_password
     from identity.infrastructure.user_repo import get_by_email, insert
-    from shared.infrastructure.config import DEMO_USER_EMAIL, DEMO_USER_PASSWORD
+    from shared.infrastructure.config import (
+        DEMO_CONTRACTOR_EMAIL,
+        DEMO_USER_EMAIL,
+        DEMO_USER_PASSWORD,
+    )
 
     demo_users = [
         {"email": DEMO_USER_EMAIL, "name": "Admin", "role": "admin"},
-        {
-            "email": "contractor@demo.local",
-            "name": "Demo Contractor",
-            "role": "contractor",
-            "company": "ABC Plumbing",
-        },
     ]
+    if DEMO_CONTRACTOR_EMAIL:
+        demo_users.append(
+            {
+                "email": DEMO_CONTRACTOR_EMAIL,
+                "name": "Demo Contractor",
+                "role": "contractor",
+                "company": "ABC Plumbing",
+            }
+        )
     for u in demo_users:
         existing = await get_by_email(u["email"])
         if existing:
@@ -132,7 +140,7 @@ async def _ensure_demo_users() -> None:
                 "role": u["role"],
                 "company": u.get("company", ""),
                 "is_active": True,
-                "organization_id": "default",
+                "organization_id": DEFAULT_ORG_ID,
                 "created_at": datetime.now(UTC).isoformat(),
             }
         )

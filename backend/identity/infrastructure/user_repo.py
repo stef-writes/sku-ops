@@ -1,5 +1,6 @@
 """User repository."""
 
+from shared.infrastructure.config import DEFAULT_ORG_ID
 from shared.infrastructure.database import get_connection
 
 
@@ -31,7 +32,7 @@ async def get_by_email(email: str) -> dict | None:
 
 async def insert(user_dict: dict) -> None:
     conn = get_connection()
-    org_id = user_dict.get("organization_id") or "default"
+    org_id = user_dict.get("organization_id") or DEFAULT_ORG_ID
     cols = "id, email, password, name, role, company, billing_entity, phone, is_active, organization_id, created_at"
     ins_q = "INSERT INTO users ("
     ins_q += cols
@@ -91,7 +92,7 @@ async def update(user_id: str, updates: dict, organization_id: str | None = None
 
 async def list_contractors(organization_id: str | None = None, search: str | None = None) -> list:
     conn = get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     base = """SELECT id, email, name, role, company, billing_entity, phone, is_active, organization_id, created_at
               FROM users WHERE role = 'contractor' AND (organization_id = ? OR organization_id IS NULL)"""
     params: list = [org_id]
@@ -107,7 +108,7 @@ async def list_contractors(organization_id: str | None = None, search: str | Non
 
 async def count_contractors(organization_id: str | None = None) -> int:
     conn = get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     cursor = await conn.execute(
         "SELECT COUNT(*) FROM users WHERE role = 'contractor' AND (organization_id = ? OR organization_id IS NULL)",
         (org_id,),

@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class OpenRouterProvider:
     """LLMProvider backed by the OpenRouter unified gateway."""
 
-    def __init__(self, api_key: str, base_url: str = "https://openrouter.ai/api/v1"):
+    def __init__(self, api_key: str, base_url: str):
         self._api_key = api_key
         self._base_url = base_url
 

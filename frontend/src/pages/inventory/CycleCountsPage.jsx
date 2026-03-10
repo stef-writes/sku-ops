@@ -26,7 +26,9 @@ import { getErrorMessage } from "@/lib/api-client";
 function formatDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString(undefined, {
-    month: "short", day: "numeric", year: "numeric",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 }
 
@@ -48,7 +50,7 @@ function OpenCountDialog({ open, onOpenChange }) {
           navigate(`/cycle-counts/${count.id}`);
         },
         onError: (err) => toast.error(getErrorMessage(err)),
-      }
+      },
     );
   };
 
@@ -66,7 +68,9 @@ function OpenCountDialog({ open, onOpenChange }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__all__">Full warehouse (all departments)</SelectItem>
+                <SelectItem value="__all__">
+                  Full warehouse (all departments)
+                </SelectItem>
                 {departments.map((d) => (
                   <SelectItem key={d.id} value={d.name}>
                     {d.name}
@@ -79,10 +83,19 @@ function OpenCountDialog({ open, onOpenChange }) {
             </p>
           </div>
           <div className="flex gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="flex-1"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={openMutation.isPending} className="flex-1">
+            <Button
+              type="submit"
+              disabled={openMutation.isPending}
+              className="flex-1"
+            >
               {openMutation.isPending ? "Opening…" : "Open Count"}
             </Button>
           </div>
@@ -101,7 +114,10 @@ const COLUMNS = [
   {
     key: "scope",
     label: "Scope",
-    render: (row) => row.scope || <span className="text-muted-foreground">Full warehouse</span>,
+    render: (row) =>
+      row.scope || (
+        <span className="text-muted-foreground">Full warehouse</span>
+      ),
   },
   {
     key: "status",
@@ -122,14 +138,16 @@ const COLUMNS = [
 
 export default function CycleCountsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { data: counts = [], isLoading } = useCycleCounts();
+  const { data: counts = [] } = useCycleCounts();
   const navigate = useNavigate();
 
   return (
     <div className="flex-1 p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Cycle Counts</h1>
+          <h1 className="text-xl font-semibold text-foreground">
+            Cycle Counts
+          </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Physical inventory counts — snapshot, count, reconcile.
           </p>

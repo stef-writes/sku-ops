@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 
 from catalog.domain.vendor import Vendor
+from shared.infrastructure.config import DEFAULT_ORG_ID
 from shared.infrastructure.database import get_connection
 
 
@@ -14,7 +15,7 @@ def _row_to_dict(row) -> dict | None:
 
 async def list_all(organization_id: str | None = None) -> list:
     conn = get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     cursor = await conn.execute(
         """SELECT id, name, contact_name, email, phone, address, product_count, organization_id, created_at FROM vendors
            WHERE (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL""",
@@ -47,7 +48,7 @@ async def find_by_name(name: str, organization_id: str | None = None) -> dict | 
         return None
     normalized = name.strip().lower()
     conn = get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     cursor = await conn.execute(
         """SELECT id, name, contact_name, email, phone, address, product_count, organization_id, created_at FROM vendors
            WHERE TRIM(LOWER(name)) = ? AND (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL""",
@@ -60,7 +61,7 @@ async def find_by_name(name: str, organization_id: str | None = None) -> dict | 
 async def insert(vendor: Vendor | dict) -> None:
     vendor_dict = vendor if isinstance(vendor, dict) else vendor.model_dump()
     conn = get_connection()
-    org_id = vendor_dict.get("organization_id") or "default"
+    org_id = vendor_dict.get("organization_id") or DEFAULT_ORG_ID
     await conn.execute(
         """INSERT INTO vendors (id, name, contact_name, email, phone, address, product_count, organization_id, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",

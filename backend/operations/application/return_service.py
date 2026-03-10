@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import contextlib
+import logging
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
@@ -144,6 +144,7 @@ async def create_return(
         result = ret.model_dump()
 
         if create_credit_note and withdrawal.get("invoice_id"):
+            _log = logging.getLogger(__name__)
             try:
                 cn = await create_credit_note(
                     return_id=ret.id,
@@ -157,17 +158,26 @@ async def create_return(
                 )
                 result["credit_note_id"] = cn.get("id")
 
-                # Auto-apply the credit note against the invoice
                 from finance.application.credit_note_service import apply_credit_note as _apply_cn
 
-                with contextlib.suppress(Exception):
+                try:
                     await _apply_cn(
                         credit_note_id=cn["id"],
                         organization_id=org_id,
                         performed_by_user_id=current_user.id,
                     )
+                except Exception:
+                    _log.warning(
+                        "Auto-apply credit note %s failed, credit note still created",
+                        cn.get("id"),
+                        exc_info=True,
+                    )
             except (ValueError, RuntimeError, OSError):
-                pass
+                _log.warning(
+                    "Credit note creation failed for return %s, continuing without credit note",
+                    ret.id,
+                    exc_info=True,
+                )
 
         return result
 

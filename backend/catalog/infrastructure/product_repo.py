@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 
 from catalog.domain.product import Product
+from shared.infrastructure.config import DEFAULT_ORG_ID
 from shared.infrastructure.database import get_connection
 
 # Whitelist for get_by_id(columns=) to prevent SQL injection
@@ -55,7 +56,7 @@ async def list_products(
     product_group: str | None = None,
 ) -> list:
     conn = get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     base = "SELECT * FROM products WHERE (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL"
     params: list = [org_id]
     if department_id:
@@ -87,7 +88,7 @@ async def count_products(
     product_group: str | None = None,
 ) -> int:
     conn = get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     query = "SELECT COUNT(*) FROM products WHERE (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL"
     params: list = [org_id]
     if department_id:
@@ -168,7 +169,7 @@ async def find_by_barcode(
     if not b:
         return None
     c = conn or get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     if exclude_product_id:
         cursor = await c.execute(
             "SELECT * FROM products WHERE (barcode = ? OR sku = ? OR vendor_barcode = ?) AND id != ? AND (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL",
@@ -190,7 +191,7 @@ async def find_by_original_sku_and_vendor(
     if not original_sku or not str(original_sku).strip() or not vendor_id:
         return None
     norm = str(original_sku).strip().lower()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     conn = get_connection()
     cursor = await conn.execute(
         """SELECT * FROM products
@@ -210,7 +211,7 @@ async def find_by_name_and_vendor(
     if not name or not str(name).strip() or not vendor_id:
         return None
     norm = str(name).strip().lower()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     conn = get_connection()
     cursor = await conn.execute(
         """SELECT * FROM products
@@ -226,7 +227,7 @@ async def insert(product: Product | dict, conn=None) -> None:
     product_dict = product if isinstance(product, dict) else product.model_dump()
     in_transaction = conn is not None
     conn = conn or get_connection()
-    org_id = product_dict.get("organization_id") or "default"
+    org_id = product_dict.get("organization_id") or DEFAULT_ORG_ID
     await conn.execute(
         """INSERT INTO products (id, sku, name, description, price, cost, quantity, min_stock,
            department_id, department_name, vendor_id, vendor_name, original_sku, barcode, vendor_barcode,
@@ -416,7 +417,7 @@ async def atomic_adjust(
 
 async def count_all(organization_id: str | None = None) -> int:
     conn = get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     cursor = await conn.execute(
         "SELECT COUNT(*) FROM products WHERE (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL",
         (org_id,),
@@ -427,7 +428,7 @@ async def count_all(organization_id: str | None = None) -> int:
 
 async def count_low_stock(organization_id: str | None = None) -> int:
     conn = get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     cursor = await conn.execute(
         "SELECT COUNT(*) FROM products WHERE quantity <= min_stock AND (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL",
         (org_id,),
@@ -438,7 +439,7 @@ async def count_low_stock(organization_id: str | None = None) -> int:
 
 async def list_low_stock(limit: int = 10, organization_id: str | None = None) -> list:
     conn = get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     cursor = await conn.execute(
         "SELECT * FROM products WHERE quantity <= min_stock AND (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL ORDER BY quantity LIMIT ?",
         (org_id, limit),
@@ -450,7 +451,7 @@ async def list_low_stock(limit: int = 10, organization_id: str | None = None) ->
 async def list_product_groups(organization_id: str | None = None) -> list[dict]:
     """Return distinct product groups with their product count."""
     conn = get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     cursor = await conn.execute(
         """SELECT product_group, COUNT(*) as product_count,
                   SUM(quantity) as total_quantity

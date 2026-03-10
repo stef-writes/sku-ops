@@ -4,13 +4,14 @@ OPENAI_API_KEY is set; falls back to BM25 keyword search otherwise.
 """
 
 import asyncio
+import contextlib
 import logging
 import re
 
 import numpy as np
 
 from catalog.application.queries import list_products
-from shared.infrastructure.config import OPENAI_API_KEY
+from shared.infrastructure.config import DEFAULT_ORG_ID, OPENAI_API_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ class ProductSearchIndex:
         # Keyword fallback (BM25)
         self._bm25 = None
 
-    async def rebuild(self, org_id: str = "default") -> None:
+    async def rebuild(self, org_id: str = DEFAULT_ORG_ID) -> None:
         products = await list_products(limit=10000, organization_id=org_id)
         if not products:
             self._products = []
@@ -141,7 +142,7 @@ class ProductSearchIndex:
         return bool(self._products)
 
 
-async def get_index(org_id: str = "default") -> ProductSearchIndex:
+async def get_index(org_id: str = DEFAULT_ORG_ID) -> ProductSearchIndex:
     if org_id not in _indexes:
         index = ProductSearchIndex()
         _indexes[org_id] = index
@@ -149,7 +150,7 @@ async def get_index(org_id: str = "default") -> ProductSearchIndex:
     return _indexes[org_id]
 
 
-async def refresh_index(org_id: str = "default") -> None:
+async def refresh_index(org_id: str = DEFAULT_ORG_ID) -> None:
     index = _indexes.get(org_id)
     if index is None:
         index = ProductSearchIndex()
@@ -200,6 +201,6 @@ async def stop_invalidation_listener() -> None:
     global _invalidation_task
     if _invalidation_task is not None:
         _invalidation_task.cancel()
-        with asyncio.suppress(asyncio.CancelledError):
+        with contextlib.suppress(asyncio.CancelledError):
             await _invalidation_task
         _invalidation_task = None

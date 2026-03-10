@@ -31,7 +31,9 @@ export function ProductBubblePlot({
     };
     const FALLBACK_COLOR = t.mutedForeground;
 
-    const departments = [...new Set(products.map((p) => p.department || "Other"))];
+    const departments = [
+      ...new Set(products.map((p) => p.department || "Other")),
+    ];
     const maxRevenue = Math.max(...products.map((p) => p.revenue || 0), 1);
 
     const seriesList = departments.map((dept) => ({
@@ -64,19 +66,6 @@ export function ProductBubblePlot({
       },
     }));
 
-    const medianSellThrough =
-      products.length > 0
-        ? products
-            .map((p) => p.sell_through_pct || 0)
-            .sort((a, b) => a - b)[Math.floor(products.length / 2)]
-        : 50;
-    const medianMargin =
-      products.length > 0
-        ? products
-            .map((p) => p.margin_pct || 0)
-            .sort((a, b) => a - b)[Math.floor(products.length / 2)]
-        : 40;
-
     return {
       tooltip: {
         formatter: (params) => {
@@ -106,7 +95,11 @@ export function ProductBubblePlot({
         splitLine: { lineStyle: { color: t.border } },
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { fontSize: 11, color: t.mutedForeground, formatter: "{value}%" },
+        axisLabel: {
+          fontSize: 11,
+          color: t.mutedForeground,
+          formatter: "{value}%",
+        },
       },
       yAxis: {
         name: "Margin %",
@@ -117,7 +110,11 @@ export function ProductBubblePlot({
         splitLine: { lineStyle: { color: t.border } },
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { fontSize: 11, color: t.mutedForeground, formatter: "{value}%" },
+        axisLabel: {
+          fontSize: 11,
+          color: t.mutedForeground,
+          formatter: "{value}%",
+        },
       },
       graphic: [
         {
@@ -130,7 +127,12 @@ export function ProductBubblePlot({
           type: "text",
           right: 36,
           top: 36,
-          style: { text: "Stars", fontSize: 10, fill: "#86efac", fontWeight: 600 },
+          style: {
+            text: "Stars",
+            fontSize: 10,
+            fill: "#86efac",
+            fontWeight: 600,
+          },
         },
         {
           type: "text",

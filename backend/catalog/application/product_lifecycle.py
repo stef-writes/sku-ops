@@ -19,6 +19,7 @@ from catalog.infrastructure.department_repo import department_repo
 from catalog.infrastructure.product_repo import product_repo
 from catalog.infrastructure.vendor_repo import vendor_repo
 from kernel.errors import ResourceNotFoundError
+from shared.infrastructure.config import DEFAULT_ORG_ID
 from shared.infrastructure.database import transaction
 
 StockChangesFn = Callable[..., Awaitable[None]] | None
@@ -52,7 +53,7 @@ async def create_product(
     All operations run in a single transaction.
     Caller must resolve department and vendor before calling.
     """
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     department = await department_repo.get_by_id(department_id, org_id)
     if not department:
         raise ResourceNotFoundError("Department", department_id)
@@ -148,14 +149,14 @@ async def update_product(
                         update_data["barcode"],
                         "Invalid UPC (12 digits) or EAN-13 (13 digits) check digit",
                     )
-            org_id = product.get("organization_id") or "default"
+            org_id = product.get("organization_id") or DEFAULT_ORG_ID
             existing = await product_repo.find_by_barcode(
                 update_data["barcode"], exclude_product_id=product_id, organization_id=org_id
             )
             if existing:
                 raise DuplicateBarcodeError(update_data["barcode"], existing.get("name", "Unknown"))
 
-    org_id = product.get("organization_id") or "default"
+    org_id = product.get("organization_id") or DEFAULT_ORG_ID
     if "department_id" in update_data:
         department = await department_repo.get_by_id(update_data["department_id"], org_id)
         if department:

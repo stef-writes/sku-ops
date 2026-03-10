@@ -11,6 +11,7 @@ from typing import ClassVar
 from pydantic import BaseModel
 
 from kernel.entity import AuditedEntity, Entity
+from shared.infrastructure.config import DEFAULT_ORG_ID
 
 # ── Status enums ───────────────────────────────────────────────────────────────
 
@@ -42,7 +43,7 @@ class PurchaseOrder(AuditedEntity):
     received_at: str | None = None
     received_by_id: str | None = None
     received_by_name: str | None = None
-    organization_id: str = "default"
+    organization_id: str = DEFAULT_ORG_ID
 
     ALLOWED_TRANSITIONS: ClassVar[dict[str, set[str]]] = {
         "ordered": {"partial", "received"},
@@ -68,7 +69,7 @@ class PurchaseOrderItem(Entity):
     suggested_department: str = "HDW"
     status: POItemStatus = POItemStatus.ORDERED
     product_id: str | None = None
-    organization_id: str = "default"
+    organization_id: str = DEFAULT_ORG_ID
 
     ALLOWED_TRANSITIONS: ClassVar[dict[str, set[str]]] = {
         "ordered": {"pending"},

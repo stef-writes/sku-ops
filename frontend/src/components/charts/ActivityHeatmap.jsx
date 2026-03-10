@@ -16,7 +16,7 @@ export function ActivityHeatmap({
   tooltipExtra,
   height = 164,
 }) {
-  const { calendarRange, option } = useMemo(() => {
+  const { option } = useMemo(() => {
     const t = themeColors();
     if (!data.length) return { calendarRange: null, option: {} };
 

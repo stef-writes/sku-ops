@@ -1,10 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
@@ -36,18 +31,23 @@ export function ProductDetailModal({
 }) {
   const [printQty, setPrintQty] = useState(1);
 
-  const { data: historyData, isLoading: historyLoading } = useStockHistory(open ? product?.id : null);
+  const { data: historyData, isLoading: historyLoading } = useStockHistory(
+    open ? product?.id : null,
+  );
   const recentHistory = (historyData?.history || []).slice(0, 5);
 
   useEffect(() => {
     if (open && product) setPrintQty(1);
-  }, [open, product?.id]);
+  }, [open, product]);
 
   const hasBarcode = (product?.barcode || product?.sku)?.toString().trim();
 
   const handlePrint = () => {
     if (!hasBarcode) return;
-    const copies = Array.from({ length: Math.max(1, Math.min(99, printQty)) }, () => product);
+    const copies = Array.from(
+      { length: Math.max(1, Math.min(99, printQty)) },
+      () => product,
+    );
     onPrintLabels?.(copies);
   };
 
@@ -68,8 +68,12 @@ export function ProductDetailModal({
             <StockBadge product={product} />
           </DialogTitle>
           <div className="rounded-lg bg-muted border border-border/60 px-3 py-2 mt-2 inline-block">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">SKU (permanent ID)</p>
-            <p className="font-mono font-semibold text-foreground">{product.sku}</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              SKU (permanent ID)
+            </p>
+            <p className="font-mono font-semibold text-foreground">
+              {product.sku}
+            </p>
           </div>
         </DialogHeader>
 
@@ -80,7 +84,10 @@ export function ProductDetailModal({
             <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="info" className="flex-1 overflow-auto mt-4 space-y-4">
+          <TabsContent
+            value="info"
+            className="flex-1 overflow-auto mt-4 space-y-4"
+          >
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <p className="text-muted-foreground">Department</p>
@@ -95,11 +102,15 @@ export function ProductDetailModal({
               </div>
               <div>
                 <p className="text-muted-foreground">Price</p>
-                <p className="font-mono font-medium">${product.price?.toFixed(2) ?? "—"}</p>
+                <p className="font-mono font-medium">
+                  ${product.price?.toFixed(2) ?? "—"}
+                </p>
               </div>
               <div>
                 <p className="text-muted-foreground">Cost</p>
-                <p className="font-mono text-muted-foreground">${(product.cost || 0).toFixed(2)}</p>
+                <p className="font-mono text-muted-foreground">
+                  ${(product.cost || 0).toFixed(2)}
+                </p>
               </div>
               <div>
                 <p className="text-muted-foreground">Quantity</p>
@@ -114,7 +125,9 @@ export function ProductDetailModal({
                 <p className="font-mono text-sm">
                   {product.barcode || product.sku || "—"}
                   {!product.barcode && product.sku && (
-                    <span className="text-muted-foreground font-normal ml-1">(uses SKU)</span>
+                    <span className="text-muted-foreground font-normal ml-1">
+                      (uses SKU)
+                    </span>
                   )}
                 </p>
               </div>
@@ -130,11 +143,14 @@ export function ProductDetailModal({
                     </button>
                     {(() => {
                       const siblings = allProducts.filter(
-                        (p) => p.product_group === product.product_group && p.id !== product.id
+                        (p) =>
+                          p.product_group === product.product_group &&
+                          p.id !== product.id,
                       );
                       return siblings.length > 0 ? (
                         <span className="text-xs text-muted-foreground">
-                          ({siblings.length} other variant{siblings.length !== 1 ? "s" : ""})
+                          ({siblings.length} other variant
+                          {siblings.length !== 1 ? "s" : ""})
                         </span>
                       ) : null;
                     })()}
@@ -144,7 +160,9 @@ export function ProductDetailModal({
               {product.original_sku && (
                 <div className="col-span-2">
                   <p className="text-muted-foreground">Vendor / original SKU</p>
-                  <p className="font-mono text-sm text-muted-foreground">{product.original_sku}</p>
+                  <p className="font-mono text-sm text-muted-foreground">
+                    {product.original_sku}
+                  </p>
                 </div>
               )}
             </div>
@@ -193,14 +211,19 @@ export function ProductDetailModal({
             </div>
           </TabsContent>
 
-          <TabsContent value="printables" className="flex-1 overflow-auto mt-4 space-y-4">
+          <TabsContent
+            value="printables"
+            className="flex-1 overflow-auto mt-4 space-y-4"
+          >
             <p className="text-sm text-muted-foreground">
-              Print barcode labels for this product (2×1" format).
+              Print barcode labels for this product (2×1&quot; format).
             </p>
             {hasBarcode ? (
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-3">
-                  <label className="text-sm font-medium">Number of labels</label>
+                  <label className="text-sm font-medium">
+                    Number of labels
+                  </label>
                   <Input
                     type="number"
                     min={1}
@@ -229,7 +252,9 @@ export function ProductDetailModal({
             {historyLoading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : recentHistory.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No transactions yet</p>
+              <p className="text-sm text-muted-foreground">
+                No transactions yet
+              </p>
             ) : (
               <div className="space-y-2">
                 {recentHistory.map((tx) => (
@@ -238,7 +263,8 @@ export function ProductDetailModal({
                     className="flex items-center justify-between text-sm py-2 border-b border-border/50 last:border-0"
                   >
                     <span className="text-muted-foreground">
-                      {TX_TYPE_LABELS[tx.transaction_type] || tx.transaction_type}
+                      {TX_TYPE_LABELS[tx.transaction_type] ||
+                        tx.transaction_type}
                     </span>
                     <span className="font-mono">
                       {tx.quantity_delta > 0 ? "+" : ""}

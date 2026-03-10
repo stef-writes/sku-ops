@@ -1,6 +1,7 @@
 """Stock transaction repository."""
 
 from inventory.domain.stock import StockTransaction
+from shared.infrastructure.config import DEFAULT_ORG_ID
 from shared.infrastructure.database import get_connection
 
 
@@ -14,7 +15,7 @@ async def insert_transaction(transaction: StockTransaction | dict, conn=None) ->
     tx_dict = transaction if isinstance(transaction, dict) else transaction.model_dump()
     in_transaction = conn is not None
     conn = conn or get_connection()
-    org_id = tx_dict.get("organization_id") or "default"
+    org_id = tx_dict.get("organization_id") or DEFAULT_ORG_ID
     await conn.execute(
         """INSERT INTO stock_transactions (id, product_id, sku, product_name, quantity_delta, quantity_before,
            quantity_after, unit, transaction_type, reference_id, reference_type, reason, user_id, user_name, organization_id, created_at)

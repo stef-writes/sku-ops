@@ -4,6 +4,7 @@ import json
 from uuid import uuid4
 
 from operations.domain.withdrawal import MaterialWithdrawal
+from shared.infrastructure.config import DEFAULT_ORG_ID
 from shared.infrastructure.database import get_connection
 
 
@@ -20,7 +21,7 @@ async def insert(withdrawal: MaterialWithdrawal | dict, conn=None) -> None:
     withdrawal_dict = withdrawal if isinstance(withdrawal, dict) else withdrawal.model_dump()
     in_transaction = conn is not None
     conn = conn or get_connection()
-    org_id = withdrawal_dict.get("organization_id") or "default"
+    org_id = withdrawal_dict.get("organization_id") or DEFAULT_ORG_ID
     items_json = json.dumps(
         [i if isinstance(i, dict) else i.model_dump() for i in withdrawal_dict["items"]]
     )
@@ -98,7 +99,7 @@ async def list_withdrawals(
     organization_id: str | None = None,
 ) -> list:
     conn = get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     query = "SELECT * FROM withdrawals WHERE (organization_id = ? OR organization_id IS NULL)"
     params: list = [org_id]
     if contractor_id:
@@ -162,7 +163,7 @@ async def bulk_mark_paid(
     if not withdrawal_ids:
         return 0
     conn = get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     placeholders = ",".join("?" * len(withdrawal_ids))
     cursor = await conn.execute(
         "UPDATE withdrawals SET payment_status = 'paid', paid_at = ? WHERE id IN ("

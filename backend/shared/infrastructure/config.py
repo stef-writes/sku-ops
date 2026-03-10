@@ -56,6 +56,10 @@ is_test = _is("test")
 # Derived: any non-dev deployment
 is_deployed = is_staging or is_production
 
+# Single-tenant default org ID. When multi-org is added, remove this default
+# and require explicit org_id everywhere.
+DEFAULT_ORG_ID = "default"
+
 # Database
 DATABASE_URL = os.environ.get("DATABASE_URL") or (
     "sqlite:///:memory:" if is_test else "sqlite:///./data/sku_ops.db"
@@ -131,6 +135,9 @@ def _demo_password() -> str:
 
 DEMO_USER_EMAIL = _demo_email()
 DEMO_USER_PASSWORD = _demo_password()
+DEMO_CONTRACTOR_EMAIL = os.environ.get("DEMO_CONTRACTOR_EMAIL", "").strip() or (
+    "contractor@demo.local" if is_development else ""
+)
 
 # Seed on startup: dev/test only. Never in production, even if demo creds are set.
 seed_on_startup = (is_development or is_test) and bool(DEMO_USER_EMAIL)
@@ -175,7 +182,11 @@ def _load_agent_model() -> str:
             if model:
                 return model
     except (OSError, ValueError, KeyError):
-        pass
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "Failed to parse models.yaml, using built-in default", exc_info=True
+        )
     return "anthropic:claude-sonnet-4-6"
 
 

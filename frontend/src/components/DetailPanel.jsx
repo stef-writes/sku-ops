@@ -1,6 +1,5 @@
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "./ui/sheet";
-import { Button } from "./ui/button";
-import { X, Loader2 } from "lucide-react";
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from "./ui/sheet";
+import { Loader2 } from "lucide-react";
 import { StatusBadge } from "./StatusBadge";
 
 /**
@@ -21,19 +20,31 @@ import { StatusBadge } from "./StatusBadge";
  * }} props
  */
 export function DetailPanel({
-  open, onOpenChange, title, subtitle, status, icon: Icon,
-  loading, actions, width = "md", children,
+  open,
+  onOpenChange,
+  title,
+  subtitle,
+  status,
+  icon: Icon,
+  loading,
+  actions,
+  width = "md",
+  children,
 }) {
-  const widthClass = {
-    sm: "sm:max-w-sm",
-    md: "sm:max-w-lg",
-    lg: "sm:max-w-2xl",
-    xl: "sm:max-w-3xl",
-  }[width] || "sm:max-w-lg";
+  const widthClass =
+    {
+      sm: "sm:max-w-sm",
+      md: "sm:max-w-lg",
+      lg: "sm:max-w-2xl",
+      xl: "sm:max-w-3xl",
+    }[width] || "sm:max-w-lg";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className={`${widthClass} w-full p-0 flex flex-col`}>
+      <SheetContent
+        side="right"
+        className={`${widthClass} w-full p-0 flex flex-col`}
+      >
         <div className="px-6 py-4 border-b border-border bg-card shrink-0">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3 min-w-0">
@@ -63,9 +74,7 @@ export function DetailPanel({
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <div className="px-6 py-5 space-y-6">
-              {children}
-            </div>
+            <div className="px-6 py-5 space-y-6">{children}</div>
           )}
         </div>
 
@@ -86,7 +95,9 @@ export function DetailSection({ label, children, className = "" }) {
   return (
     <div className={className}>
       {label && (
-        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground mb-3">{label}</p>
+        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground mb-3">
+          {label}
+        </p>
       )}
       {children}
     </div>
@@ -100,7 +111,9 @@ export function DetailField({ label, value, mono = false, className = "" }) {
   return (
     <div className={className}>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`text-sm text-foreground mt-0.5 ${mono ? "font-mono tabular-nums" : ""}`}>
+      <p
+        className={`text-sm text-foreground mt-0.5 ${mono ? "font-mono tabular-nums" : ""}`}
+      >
         {value || "—"}
       </p>
     </div>

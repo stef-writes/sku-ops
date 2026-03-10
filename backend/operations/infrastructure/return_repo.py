@@ -4,6 +4,7 @@ import json
 from uuid import uuid4
 
 from operations.domain.returns import MaterialReturn
+from shared.infrastructure.config import DEFAULT_ORG_ID
 from shared.infrastructure.database import get_connection
 
 
@@ -20,7 +21,7 @@ async def insert(ret: MaterialReturn | dict, conn=None) -> None:
     ret_dict = ret if isinstance(ret, dict) else ret.model_dump()
     in_transaction = conn is not None
     conn = conn or get_connection()
-    org_id = ret_dict.get("organization_id") or "default"
+    org_id = ret_dict.get("organization_id") or DEFAULT_ORG_ID
     items_json = json.dumps(
         [i if isinstance(i, dict) else i.model_dump() for i in ret_dict["items"]]
     )
@@ -107,7 +108,7 @@ async def list_returns(
     organization_id: str | None = None,
 ) -> list:
     conn = get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     query = "SELECT * FROM returns WHERE (organization_id = ? OR organization_id IS NULL)"
     params: list = [org_id]
     if contractor_id:

@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from finance.domain.invoice import Invoice, compute_due_date
+from shared.infrastructure.config import DEFAULT_ORG_ID
 from shared.infrastructure.database import get_connection, transaction
 
 # Injected at module level by the API layer to avoid circular import with operations
@@ -40,7 +41,7 @@ async def _next_invoice_number(organization_id: str | None = None, conn=None) ->
     """Generate next invoice number: INV-00001, INV-00002, etc. Org-scoped counter."""
     in_transaction = conn is not None
     conn = conn or get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     key = f"{org_id}|inv"
     await conn.execute(
         """INSERT INTO invoice_counters (key, counter) VALUES (?, 1)
@@ -61,7 +62,7 @@ async def _next_invoice_number(organization_id: str | None = None, conn=None) ->
 async def insert(invoice: Invoice | dict) -> dict | None:
     invoice_dict = invoice if isinstance(invoice, dict) else invoice.model_dump()
     conn = get_connection()
-    org_id = invoice_dict.get("organization_id") or "default"
+    org_id = invoice_dict.get("organization_id") or DEFAULT_ORG_ID
     invoice_id = invoice_dict.get("id") or str(uuid4())
     invoice_number = invoice_dict.get("invoice_number") or await _next_invoice_number(org_id)
     now = datetime.now(UTC).isoformat()
@@ -151,7 +152,7 @@ async def list_invoices(
     organization_id: str | None = None,
 ) -> list:
     conn = get_connection()
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     query = "SELECT * FROM invoices WHERE (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL"
     params: list = [org_id]
     if status:
@@ -324,7 +325,7 @@ async def add_withdrawals(
     """Link withdrawals to invoice. Validates: unpaid, same billing_entity, not already on another invoice."""
     if not withdrawal_ids:
         return await get_by_id(invoice_id)
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
 
     withdrawals = []
     billing_entity = None
@@ -421,7 +422,7 @@ async def create_from_withdrawals(
     if not withdrawal_ids:
         raise ValueError("At least one withdrawal required")
 
-    org_id = organization_id or "default"
+    org_id = organization_id or DEFAULT_ORG_ID
     withdrawals = []
     billing_entity = None
     contact_name = ""

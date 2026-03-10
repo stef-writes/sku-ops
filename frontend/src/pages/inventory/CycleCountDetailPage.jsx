@@ -1,9 +1,7 @@
 import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import {
-  ArrowLeft, CheckCircle2, AlertTriangle, Loader2,
-} from "lucide-react";
+import { ArrowLeft, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,7 +13,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Panel } from "@/components/Panel";
 import { cn } from "@/lib/utils";
 import { getErrorMessage } from "@/lib/api-client";
 import {
@@ -27,28 +24,36 @@ import {
 function formatDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleString(undefined, {
-    month: "short", day: "numeric", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
 function VarianceCell({ variance }) {
-  if (variance == null) return <span className="text-muted-foreground/60">—</span>;
-  if (variance === 0) return <span className="text-muted-foreground tabular-nums">0</span>;
+  if (variance == null)
+    return <span className="text-muted-foreground/60">—</span>;
+  if (variance === 0)
+    return <span className="text-muted-foreground tabular-nums">0</span>;
   const positive = variance > 0;
   return (
-    <span className={cn(
-      "tabular-nums font-semibold",
-      positive ? "text-success" : "text-destructive"
-    )}>
-      {positive ? "+" : ""}{variance}
+    <span
+      className={cn(
+        "tabular-nums font-semibold",
+        positive ? "text-success" : "text-destructive",
+      )}
+    >
+      {positive ? "+" : ""}
+      {variance}
     </span>
   );
 }
 
 function CountInput({ item, countId, disabled }) {
   const [value, setValue] = useState(
-    item.counted_qty != null ? String(item.counted_qty) : ""
+    item.counted_qty != null ? String(item.counted_qty) : "",
   );
   const [saving, setSaving] = useState(false);
   const updateMutation = useUpdateCountItem(countId);
@@ -66,14 +71,18 @@ function CountInput({ item, countId, disabled }) {
           toast.error(getErrorMessage(err));
           setSaving(false);
         },
-      }
+      },
     );
   };
 
   if (disabled) {
     return (
       <span className="text-sm tabular-nums text-foreground">
-        {item.counted_qty != null ? item.counted_qty : <span className="text-muted-foreground/60">—</span>}
+        {item.counted_qty != null ? (
+          item.counted_qty
+        ) : (
+          <span className="text-muted-foreground/60">—</span>
+        )}
       </span>
     );
   }
@@ -115,15 +124,32 @@ function VarianceSummary({ items }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
       {[
-        { label: "Total lines",   value: stats.total },
-        { label: "Counted",       value: stats.counted },
-        { label: "Variances",     value: stats.withVariance },
-        { label: "Shortages",     value: stats.shortages,  color: stats.shortages > 0 ? "text-destructive" : undefined },
-        { label: "Overages",      value: stats.overages,   color: stats.overages > 0  ? "text-success" : undefined },
+        { label: "Total lines", value: stats.total },
+        { label: "Counted", value: stats.counted },
+        { label: "Variances", value: stats.withVariance },
+        {
+          label: "Shortages",
+          value: stats.shortages,
+          color: stats.shortages > 0 ? "text-destructive" : undefined,
+        },
+        {
+          label: "Overages",
+          value: stats.overages,
+          color: stats.overages > 0 ? "text-success" : undefined,
+        },
       ].map(({ label, value, color }) => (
         <div key={label} className="bg-muted rounded-lg px-4 py-3">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
-          <p className={cn("text-2xl font-semibold tabular-nums text-foreground", color)}>{value}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+            {label}
+          </p>
+          <p
+            className={cn(
+              "text-2xl font-semibold tabular-nums text-foreground",
+              color,
+            )}
+          >
+            {value}
+          </p>
         </div>
       ))}
     </div>
@@ -137,22 +163,25 @@ export default function CycleCountDetailPage() {
   const commitMutation = useCommitCycleCount();
 
   const isOpen = count?.status === "open";
-  const items = count?.items ?? [];
+  const items = useMemo(() => count?.items ?? [], [count]);
 
   const canCommit = useMemo(
     () => items.some((i) => i.counted_qty != null),
-    [items]
+    [items],
   );
 
   const handleCommit = () => {
-    if (!window.confirm(
-      "Apply all variances as stock adjustments? This cannot be undone."
-    )) return;
+    if (
+      !window.confirm(
+        "Apply all variances as stock adjustments? This cannot be undone.",
+      )
+    )
+      return;
 
     commitMutation.mutate(countId, {
       onSuccess: (result) => {
         toast.success(
-          `Count committed — ${result.items_adjusted} adjustment${result.items_adjusted !== 1 ? "s" : ""} applied`
+          `Count committed — ${result.items_adjusted} adjustment${result.items_adjusted !== 1 ? "s" : ""} applied`,
         );
       },
       onError: (err) => toast.error(getErrorMessage(err)),
@@ -194,11 +223,15 @@ export default function CycleCountDetailPage() {
               <StatusBadge status={count.status} />
             </div>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {count.scope
-                ? <><span className="font-medium">{count.scope}</span> department</>
-                : "Full warehouse"
-              }
-              {" · "}Opened {formatDate(count.created_at)} by {count.created_by_name || "—"}
+              {count.scope ? (
+                <>
+                  <span className="font-medium">{count.scope}</span> department
+                </>
+              ) : (
+                "Full warehouse"
+              )}
+              {" · "}Opened {formatDate(count.created_at)} by{" "}
+              {count.created_by_name || "—"}
               {count.committed_at && (
                 <> · Committed {formatDate(count.committed_at)}</>
               )}
@@ -228,8 +261,9 @@ export default function CycleCountDetailPage() {
       {isOpen && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground bg-warning/10 border border-warning/30 rounded-lg px-4 py-2.5">
           <AlertTriangle className="w-3.5 h-3.5 text-accent shrink-0" />
-          Enter the physical count for each line. Changes save automatically on blur.
-          Committing will apply all non-zero variances as stock adjustments.
+          Enter the physical count for each line. Changes save automatically on
+          blur. Committing will apply all non-zero variances as stock
+          adjustments.
         </div>
       )}
 
@@ -239,18 +273,33 @@ export default function CycleCountDetailPage() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/80 hover:bg-muted/80">
-                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5">SKU</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5">Product</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5 text-right">On Hand (snapshot)</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5 text-right">Counted</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5 text-right">Variance</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5">Unit</TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5">
+                  SKU
+                </TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5">
+                  Product
+                </TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5 text-right">
+                  On Hand (snapshot)
+                </TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5 text-right">
+                  Counted
+                </TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5 text-right">
+                  Variance
+                </TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground px-4 py-2.5">
+                  Unit
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12 text-muted-foreground text-sm">
+                  <TableCell
+                    colSpan={6}
+                    className="text-center py-12 text-muted-foreground text-sm"
+                  >
                     No items in this count
                   </TableCell>
                 </TableRow>
@@ -260,11 +309,15 @@ export default function CycleCountDetailPage() {
                     key={item.id}
                     className={cn(
                       "hover:bg-muted/60 transition-colors",
-                      item.variance != null && item.variance !== 0 && "bg-warning/10"
+                      item.variance != null &&
+                        item.variance !== 0 &&
+                        "bg-warning/10",
                     )}
                   >
                     <TableCell className="px-4 py-2.5">
-                      <span className="font-mono text-xs text-muted-foreground">{item.sku}</span>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {item.sku}
+                      </span>
                     </TableCell>
                     <TableCell className="px-4 py-2.5 text-sm text-foreground max-w-xs truncate">
                       {item.product_name}
@@ -274,7 +327,11 @@ export default function CycleCountDetailPage() {
                     </TableCell>
                     <TableCell className="px-4 py-2.5 text-right">
                       <div className="flex justify-end">
-                        <CountInput item={item} countId={countId} disabled={!isOpen} />
+                        <CountInput
+                          item={item}
+                          countId={countId}
+                          disabled={!isOpen}
+                        />
                       </div>
                     </TableCell>
                     <TableCell className="px-4 py-2.5 text-right">

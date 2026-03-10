@@ -12,20 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Columns3,
-  Search,
-  ArrowUp,
-  ArrowDown,
-  ArrowUpDown,
-  X,
-} from "lucide-react";
+import { Columns3, Search, ArrowUp, ArrowDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function getOptions(col, data) {
   if (col.filterValues) {
     return col.filterValues.map((v) =>
-      typeof v === "object" ? v : { value: v, label: v }
+      typeof v === "object" ? v : { value: v, label: v },
     );
   }
   if (!data?.length) return [];
@@ -38,7 +31,7 @@ function getOptions(col, data) {
             : row[col.key];
           return raw != null ? String(raw) : null;
         })
-        .filter(Boolean)
+        .filter(Boolean),
     ),
   ].sort();
   return unique.map((v) => ({ value: v, label: v }));
@@ -57,7 +50,7 @@ function PillFilter({ label, value, onChange, options }) {
             "text-xs px-2.5 py-1 rounded-md font-medium transition-all",
             !value
               ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
           All
@@ -70,7 +63,7 @@ function PillFilter({ label, value, onChange, options }) {
               "text-xs px-2.5 py-1 rounded-md font-medium transition-all",
               value === opt.value
                 ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             {opt.label}
@@ -83,14 +76,19 @@ function PillFilter({ label, value, onChange, options }) {
 
 function DropdownFilter({ label, value, onChange, options }) {
   return (
-    <Select value={value || "__all__"} onValueChange={(v) => onChange(v === "__all__" ? null : v)}>
+    <Select
+      value={value || "__all__"}
+      onValueChange={(v) => onChange(v === "__all__" ? null : v)}
+    >
       <SelectTrigger className="h-7 text-xs w-auto min-w-[100px]">
         <SelectValue placeholder={`All ${label}`} />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="__all__">All {label}</SelectItem>
         {options.map((opt) => (
-          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+          <SelectItem key={opt.value} value={opt.value}>
+            {opt.label}
+          </SelectItem>
         ))}
       </SelectContent>
     </Select>
@@ -101,14 +99,21 @@ function SortDropdown({ columns, sortBy, sortDir, onSortChange }) {
   if (columns.length === 0) return null;
   return (
     <div className="flex items-center gap-1">
-      <Select value={sortBy || "__none__"} onValueChange={(v) => onSortChange(v === "__none__" ? null : v, sortDir)}>
+      <Select
+        value={sortBy || "__none__"}
+        onValueChange={(v) =>
+          onSortChange(v === "__none__" ? null : v, sortDir)
+        }
+      >
         <SelectTrigger className="h-7 text-xs w-auto min-w-[90px]">
           <SelectValue placeholder="Sort by…" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="__none__">Sort by…</SelectItem>
           {columns.map((col) => (
-            <SelectItem key={col.key} value={col.key}>{col.label}</SelectItem>
+            <SelectItem key={col.key} value={col.key}>
+              {col.label}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -143,7 +148,7 @@ function ColumnsPopover({ columns, hiddenColumns, onToggle, onShowAll }) {
             "h-7 w-7 flex items-center justify-center rounded-lg border text-xs transition-colors",
             hiddenCount > 0
               ? "border-warning/30 bg-warning/10 text-accent"
-              : "border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted"
+              : "border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted",
           )}
           title="Show/hide columns"
         >
@@ -211,21 +216,19 @@ export function ViewToolbar({
   } = controller;
 
   const filterableColumns = columns.filter(
-    (c) => c.type === "enum" && c.filterable !== false
+    (c) => c.type === "enum" && c.filterable !== false,
   );
   const sortableColumns = columns.filter((c) => c.sortable !== false);
 
   const totalCount = data.length;
   const showResultCount =
-    resultCount != null &&
-    hasActiveFilters &&
-    resultCount !== totalCount;
+    resultCount != null && hasActiveFilters && resultCount !== totalCount;
 
   return (
     <div
       className={cn(
         "bg-card border border-border rounded-xl shadow-sm",
-        className
+        className,
       )}
     >
       <div className="px-4 py-2.5 flex flex-wrap items-center gap-2.5">
@@ -240,15 +243,12 @@ export function ViewToolbar({
           />
         </div>
 
-        {filterableColumns.length > 0 && (
-          <div className="w-px h-5 bg-border" />
-        )}
+        {filterableColumns.length > 0 && <div className="w-px h-5 bg-border" />}
 
         {filterableColumns.map((col) => {
           const options = getOptions(col, data);
           const style =
-            col.filterStyle ||
-            (options.length <= 5 ? "pills" : "dropdown");
+            col.filterStyle || (options.length <= 5 ? "pills" : "dropdown");
 
           if (style === "pills") {
             return (

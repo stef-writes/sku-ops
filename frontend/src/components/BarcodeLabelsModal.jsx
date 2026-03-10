@@ -3,12 +3,7 @@ import { useReactToPrint } from "react-to-print";
 import Barcode from "react-barcode";
 import { getBarcodeFormat } from "@/lib/barcodeFormat";
 import { Button } from "./ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Printer } from "lucide-react";
 
 /** Printable barcode labels - 2" x 1" style, 3 per row */
@@ -31,7 +26,8 @@ export function BarcodeLabelsModal({ products, open, onOpenChange }) {
           <DialogTitle>Print Barcode Labels</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          {products?.length || 0} labels · Standard 2×1" layout · Use browser Print
+          {products?.length || 0} labels · Standard 2×1&quot; layout · Use
+          browser Print
         </p>
 
         <div className="flex-1 overflow-auto border rounded-lg bg-card p-4">
@@ -40,34 +36,36 @@ export function BarcodeLabelsModal({ products, open, onOpenChange }) {
             className="grid grid-cols-3 gap-2 print:gap-1"
             style={{ minHeight: 200 }}
           >
-            {products?.filter((p) => (p.barcode || p.sku)?.toString().trim()).map((p) => {
-              const code = (p.barcode || p.sku).toString().trim();
-              const format = getBarcodeFormat(code);
-              return (
-              <div
-                key={p.id}
-                className="border border-border rounded p-2 flex flex-col items-center justify-center"
-                style={{ minWidth: 120, minHeight: 80 }}
-              >
-                <Barcode
-                  value={code}
-                  format={format}
-                  width={1.2}
-                  height={28}
-                  margin={0}
-                  fontSize={10}
-                  displayValue={true}
-                />
-                <div className="text-[10px] font-mono mt-1 text-center truncate w-full">
-                  {p.sku}
-                </div>
-                <div className="text-[9px] text-muted-foreground text-center truncate w-full max-w-[100px]">
-                  {p.name?.slice(0, 20)}
-                  {p.name?.length > 20 ? "…" : ""}
-                </div>
-              </div>
-            );
-            })}
+            {products
+              ?.filter((p) => (p.barcode || p.sku)?.toString().trim())
+              .map((p) => {
+                const code = (p.barcode || p.sku).toString().trim();
+                const format = getBarcodeFormat(code);
+                return (
+                  <div
+                    key={p.id}
+                    className="border border-border rounded p-2 flex flex-col items-center justify-center"
+                    style={{ minWidth: 120, minHeight: 80 }}
+                  >
+                    <Barcode
+                      value={code}
+                      format={format}
+                      width={1.2}
+                      height={28}
+                      margin={0}
+                      fontSize={10}
+                      displayValue={true}
+                    />
+                    <div className="text-[10px] font-mono mt-1 text-center truncate w-full">
+                      {p.sku}
+                    </div>
+                    <div className="text-[9px] text-muted-foreground text-center truncate w-full max-w-[100px]">
+                      {p.name?.slice(0, 20)}
+                      {p.name?.length > 20 ? "…" : ""}
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         </div>
 
