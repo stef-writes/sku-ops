@@ -20,12 +20,12 @@ from kernel import events
 from operations.application.withdrawal_service import create_withdrawal as _do_create_withdrawal
 from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalCreate
 from operations.infrastructure.withdrawal_repo import withdrawal_repo
+from shared.api.deps import AdminDep, CurrentUserDep
 from shared.infrastructure import event_hub
 from shared.infrastructure.middleware.audit import audit_log
 
 if TYPE_CHECKING:
     from kernel.types import CurrentUser
-    from shared.api.deps import AdminDep, CurrentUserDep
 
 
 async def do_create_withdrawal(data, contractor, current_user: CurrentUser):

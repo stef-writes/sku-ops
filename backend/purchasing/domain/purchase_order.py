@@ -10,8 +10,8 @@ from typing import ClassVar
 
 from pydantic import BaseModel
 
+from kernel.constants import DEFAULT_ORG_ID
 from kernel.entity import AuditedEntity, Entity
-from shared.infrastructure.config import DEFAULT_ORG_ID
 
 # ── Status enums ───────────────────────────────────────────────────────────────
 

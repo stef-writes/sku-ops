@@ -56,9 +56,8 @@ is_test = _is("test")
 # Derived: any non-dev deployment
 is_deployed = is_staging or is_production
 
-# Single-tenant default org ID. When multi-org is added, remove this default
-# and require explicit org_id everywhere.
-DEFAULT_ORG_ID = "default"
+# Re-export from kernel so infra/app layers can import from here too
+from kernel.constants import DEFAULT_ORG_ID  # noqa: F401, E402
 
 # Database
 DATABASE_URL = os.environ.get("DATABASE_URL") or (

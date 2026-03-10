@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from shared.infrastructure.config import DEFAULT_ORG_ID
+from kernel.constants import DEFAULT_ORG_ID
 
 
 class Entity(BaseModel):

@@ -9,7 +9,7 @@ from decimal import ROUND_HALF_EVEN, Decimal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, computed_field, field_validator
 
-from shared.infrastructure.config import DEFAULT_ORG_ID
+from kernel.constants import DEFAULT_ORG_ID
 
 
 def round_money(value: float) -> float:
