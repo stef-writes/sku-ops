@@ -172,6 +172,7 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 pythonpath = ["."]
+addopts = ["--import-mode=importlib"]
 
 # =============================================================================
 # COMMITIZEN — conventional commit message validation (pre-commit hook)
