@@ -52,7 +52,7 @@ Production readiness checklist for sku-ops. Work through each section before goi
 - [ ] Add branch protection rules for `dev`: require PR, require status checks (Backend, Frontend)
 - [ ] Run `cz bump --dry-run` to verify commitizen config produces correct version tags
 - [ ] Verify `CHANGELOG.md` gets populated on first real bump
-- [ ] Install pre-commit hooks locally: `pip install pre-commit && pre-commit install --install-hooks && pre-commit install --hook-type commit-msg`
+- [ ] Install pre-commit hooks locally: `uv run --directory backend pre-commit install --install-hooks && uv run --directory backend pre-commit install --hook-type commit-msg`
 
 ## Testing
 

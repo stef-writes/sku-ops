@@ -20,7 +20,7 @@ npm run dev          # from project root — starts backend + frontend together
 - Seed realistic data (run once after first start):
 
 ```bash
-cd backend && python -m devtools.scripts.seed_realistic
+uv run --directory backend python -m devtools.scripts.seed_realistic
 ```
 
 ### Mode 2: Production verification (before deploy)
@@ -45,6 +45,23 @@ docker compose up --build    # nginx/certbot excluded via override profile
 | Backend  | :8000           | :8000           |
 | Frontend | :3000           | —               |
 | Postgres | —               | :5433           |
+
+## Common dev commands
+
+All commands run from the project root via `./bin/dev`:
+
+```bash
+./bin/dev test [args]    # run pytest (uses uv)
+./bin/dev lint           # ruff lint backend
+./bin/dev fmt            # ruff format backend
+./bin/dev lint:fe        # ESLint frontend
+./bin/dev fmt:fe         # Prettier frontend
+./bin/dev commit         # commitizen conventional commit
+./bin/dev server         # backend only (no frontend)
+./bin/dev ui             # frontend only (no backend)
+```
+
+Never suggest `pip`, `python -m pytest`, or `ruff` directly. All backend execution goes through `uv` (via `./bin/dev` or `uv run --directory backend <cmd>`). The project uses `uv` as its Python package manager — not pip, not virtualenv.
 
 ## Frontend always proxies /api → localhost:8000
 Configured in `frontend/vite.config.js`. Works with both modes as long as backend is on :8000.
