@@ -9,9 +9,9 @@ import json
 import logging
 import re
 
-from catalog.domain.units import ALLOWED_BASE_UNITS
 from shared.infrastructure.config import LLM_AVAILABLE
 from shared.infrastructure.prompt_loader import load_prompt
+from shared.kernel.units import ALLOWED_BASE_UNITS
 
 logger = logging.getLogger(__name__)
 

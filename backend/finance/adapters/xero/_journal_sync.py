@@ -6,8 +6,8 @@ import httpx
 
 from finance.adapters.xero._base import XERO_API
 from finance.domain.invoice import InvoiceWithDetails
+from finance.domain.xero_settings import XeroSettings
 from finance.ports.invoicing_port import InvoiceSyncResult
-from identity.domain.org_settings import OrgSettings
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class XeroJournalSyncMixin:
     def _build_cogs_journal_lines(
         self,
         invoice: dict,
-        settings: OrgSettings,
+        settings: XeroSettings,
         _xero_invoice_id: str | None,
         first_job_id: str | None = None,
     ) -> tuple[list, float]:
@@ -72,7 +72,7 @@ class XeroJournalSyncMixin:
     async def _post_cogs_journal(
         self,
         invoice: dict,
-        settings: OrgSettings,
+        settings: XeroSettings,
         xero_invoice_id: str | None,
         first_job_id: str | None = None,
         client: httpx.AsyncClient | None = None,
@@ -114,7 +114,7 @@ class XeroJournalSyncMixin:
     async def repost_cogs_journal(
         self,
         invoice: InvoiceWithDetails,
-        settings: OrgSettings,
+        settings: XeroSettings,
         old_journal_id: str | None = None,
     ) -> str | None:
         """Void the previous COGS manual journal (if we have its ID) then post a fresh one.
@@ -150,7 +150,7 @@ class XeroJournalSyncMixin:
         )
 
     async def sync_po_receipt(
-        self, po: dict, cost_total: float, settings: OrgSettings
+        self, po: dict, cost_total: float, settings: XeroSettings
     ) -> InvoiceSyncResult:
         """Send a vendor purchase to Xero as an ACCPAY Bill (not a manual journal).
 

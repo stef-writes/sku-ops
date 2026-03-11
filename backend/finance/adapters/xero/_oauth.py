@@ -5,13 +5,13 @@ from datetime import UTC, datetime
 import httpx
 
 from finance.adapters.xero._base import XERO_CONNECTIONS_URL, XERO_OAUTH_ENDPOINT
+from finance.domain.xero_settings import XeroSettings
 from identity.application.org_service import upsert_org_settings
-from identity.domain.org_settings import OrgSettings
 from shared.infrastructure.config import XERO_CLIENT_ID, XERO_CLIENT_SECRET
 
 
 class XeroOAuthMixin:
-    async def refresh_token(self, settings: OrgSettings) -> OrgSettings:
+    async def refresh_token(self, settings: XeroSettings) -> XeroSettings:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
                 XERO_OAUTH_ENDPOINT,
@@ -34,7 +34,8 @@ class XeroOAuthMixin:
                 "xero_token_expiry": datetime.fromtimestamp(expiry, tz=UTC).isoformat(),
             }
         )
-        return await upsert_org_settings(updated)
+        persisted = await upsert_org_settings(updated)
+        return XeroSettings.model_validate(persisted.model_dump())
 
     async def get_tenants(self, access_token: str) -> list[dict]:
         async with httpx.AsyncClient() as client:

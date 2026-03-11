@@ -8,6 +8,7 @@ import logging
 from datetime import UTC, datetime
 
 from finance.adapters.invoicing_factory import get_invoicing_gateway
+from finance.domain.xero_settings import XeroSettings
 from identity.application.org_service import get_org_settings
 from purchasing.application.queries import (
     get_po_with_cost,
@@ -38,11 +39,12 @@ async def sync_po_bill(po_id: str, org_id: str, cost_total: float | None = None)
         await set_xero_sync_status(po_id, "skipped", now)
         return {"po_id": po_id, "success": True, "skipped": True, "reason": "zero cost"}
 
-    settings = await get_org_settings(org_id)
-    gateway = get_invoicing_gateway(settings)
+    org_settings = await get_org_settings(org_id)
+    xero_settings = XeroSettings.model_validate(org_settings.model_dump())
+    gateway = get_invoicing_gateway(xero_settings)
 
     try:
-        result = await gateway.sync_po_receipt(po, cost_total, settings)
+        result = await gateway.sync_po_receipt(po, cost_total, xero_settings)
     except Exception as e:
         now = datetime.now(UTC).isoformat()
         await set_xero_sync_status(po_id, "failed", now)

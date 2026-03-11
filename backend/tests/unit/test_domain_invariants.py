@@ -17,17 +17,17 @@ Categories:
 import pytest
 
 from catalog.domain.product import Product, ProductCreate, ProductUpdate
-from catalog.domain.units import (
+from inventory.domain.errors import InsufficientStockError, NegativeStockError
+from inventory.domain.stock import StockDecrement, StockTransaction, StockTransactionType
+from kernel.types import LineItem
+from operations.domain.withdrawal import MaterialWithdrawal, WithdrawalItem
+from shared.kernel.units import (
     ALLOWED_BASE_UNITS,
     UNIT_FAMILIES,
     are_compatible,
     convert_quantity,
     family_for_unit,
 )
-from inventory.domain.errors import InsufficientStockError, NegativeStockError
-from inventory.domain.stock import StockDecrement, StockTransaction, StockTransactionType
-from kernel.types import LineItem
-from operations.domain.withdrawal import MaterialWithdrawal, WithdrawalItem
 
 # ── 1. UOM conversion correctness ────────────────────────────────────────────
 

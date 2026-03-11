@@ -2,19 +2,10 @@
 
 from enum import StrEnum
 
-from pydantic import BaseModel
-
 from kernel.entity import Entity
+from shared.kernel.stock import StockDecrement
 
-
-class StockDecrement(BaseModel):
-    """What inventory needs to know to reduce stock — no pricing or billing."""
-
-    product_id: str
-    sku: str
-    name: str
-    quantity: float
-    unit: str = "each"
+__all__ = ["StockDecrement", "StockTransaction", "StockTransactionType"]
 
 
 class StockTransactionType(StrEnum):

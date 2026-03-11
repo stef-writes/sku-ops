@@ -8,21 +8,19 @@ from typing import TYPE_CHECKING
 
 from finance.application.credit_note_service import apply_credit_note as _apply_cn
 from finance.application.ledger_service import record_return as _record_ledger
-from finance.domain.credit_note import CreditNote
-from inventory.domain.stock import StockTransactionType
-from kernel.errors import DomainError, ResourceNotFoundError
 from operations.domain.returns import MaterialReturn, ReturnCreate, ReturnItem
 from operations.domain.withdrawal import MaterialWithdrawal
 from operations.infrastructure.return_repo import return_repo as _default_return_repo
 from shared.infrastructure.database import transaction
+from shared.kernel.errors import DomainError, ResourceNotFoundError
 
 if TYPE_CHECKING:
-    from kernel.types import CurrentUser
     from operations.ports.return_repo_port import ReturnRepoPort
+    from shared.kernel.types import CurrentUser
 
 GetWithdrawalFn = Callable[..., Awaitable[MaterialWithdrawal | None]]
 RestockFn = Callable[..., Awaitable[None]]
-CreateCreditNoteFn = Callable[..., Awaitable[CreditNote]] | None
+CreateCreditNoteFn = Callable[..., Awaitable[object]] | None
 
 
 async def create_return(
@@ -110,7 +108,6 @@ async def create_return(
                 reference_id=ret.id,
                 unit=item.unit,
                 organization_id=org_id,
-                transaction_type=StockTransactionType.RETURN,
             )
 
         await return_repo.insert(ret)

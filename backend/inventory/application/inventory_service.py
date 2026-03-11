@@ -16,7 +16,6 @@ from catalog.application.queries import (
     get_product_by_id,
     increment_product_quantity,
 )
-from catalog.domain.units import are_compatible, convert_quantity
 from finance.application.ledger_service import record_adjustment as _record_ledger_adjustment
 from inventory.domain.errors import InsufficientStockError, NegativeStockError
 from inventory.domain.stock import StockDecrement, StockTransaction, StockTransactionType
@@ -24,6 +23,7 @@ from inventory.infrastructure.stock_repo import stock_repo as _default_stock_rep
 from inventory.ports.stock_repo_port import StockRepoPort
 from kernel.errors import ResourceNotFoundError
 from shared.infrastructure.config import DEFAULT_ORG_ID
+from shared.kernel.units import are_compatible, convert_quantity
 
 
 async def _record_stock_transaction(
@@ -247,4 +247,30 @@ async def process_adjustment_stock_changes(
         organization_id=product.organization_id,
         reason=reason,
         performed_by_user_id=user_id,
+    )
+
+
+async def restock_as_return(
+    product_id: str,
+    sku: str,
+    product_name: str,
+    quantity: float,
+    user_id: str,
+    user_name: str,
+    reference_id: str | None = None,
+    unit: str = "each",
+    organization_id: str | None = None,
+) -> None:
+    """Restock inventory as a customer/vendor return (RETURN transaction type)."""
+    await process_receiving_stock_changes(
+        product_id=product_id,
+        sku=sku,
+        product_name=product_name,
+        quantity=quantity,
+        user_id=user_id,
+        user_name=user_name,
+        reference_id=reference_id,
+        unit=unit,
+        organization_id=organization_id,
+        transaction_type=StockTransactionType.RETURN,
     )

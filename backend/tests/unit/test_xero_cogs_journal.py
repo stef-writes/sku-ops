@@ -5,8 +5,8 @@ Extracted from test_sell_cost_normalization.py — no DB, no network.
 
 import pytest
 
-from catalog.domain.units import cost_per_sell_unit
 from finance.adapters.xero_adapter import XeroAdapter
+from shared.kernel.units import cost_per_sell_unit
 from tests.helpers.xero import make_settings
 
 # ── cost_per_sell_unit ────────────────────────────────────────────────────────

@@ -2,8 +2,8 @@
 
 from pydantic import BaseModel, field_validator
 
-from catalog.domain.units import ALLOWED_BASE_UNITS
 from kernel.entity import AuditedEntity
+from shared.kernel.units import ALLOWED_BASE_UNITS
 
 
 def _validate_unit(v: str) -> str:

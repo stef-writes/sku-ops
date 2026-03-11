@@ -12,7 +12,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 from catalog.application.sku_service import generate_sku
-from catalog.domain.barcode import validate_barcode
 from catalog.domain.errors import DuplicateBarcodeError, InvalidBarcodeError
 from catalog.domain.product import Product
 from catalog.infrastructure.department_repo import department_repo
@@ -21,6 +20,7 @@ from catalog.infrastructure.vendor_repo import vendor_repo
 from kernel.errors import ResourceNotFoundError
 from shared.infrastructure.config import DEFAULT_ORG_ID
 from shared.infrastructure.database import transaction
+from shared.kernel.barcode import validate_barcode
 
 StockChangesFn = Callable[..., Awaitable[None]] | None
 

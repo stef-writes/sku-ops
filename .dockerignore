@@ -1,0 +1,25 @@
+# Python artifacts
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.pyc
+.venv/
+
+# Git
+.git/
+
+# Environment
+.env
+.env.*
+backend/.env
+backend/.env.*
+
+# Non-production directories
+backend/tests/
+tests/
+devtools/
+frontend/
+deploy/
+.cursor/
+.devcontainer/
+node_modules/

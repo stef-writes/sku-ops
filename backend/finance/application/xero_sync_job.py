@@ -13,6 +13,7 @@ import logging
 from finance.adapters.invoicing_factory import get_invoicing_gateway
 from finance.application.invoice_service import repost_cogs_for_invoice, sync_invoice
 from finance.application.po_sync_service import sync_po_bill
+from finance.domain.xero_settings import XeroSettings
 from finance.infrastructure.credit_note_repo import credit_note_repo
 from finance.infrastructure.invoice_repo import invoice_repo
 from identity.application.org_service import get_org_settings
@@ -237,13 +238,13 @@ async def run_sync(org_id: str, reconcile: bool = True) -> dict:
     Returns a summary dict suitable for logging or returning from an API endpoint.
     Safe to call repeatedly — idempotency is enforced per document via xero_invoice_id guards.
     """
-    settings = await get_org_settings(org_id)
-    gateway = get_invoicing_gateway(settings)
+    xero_settings = XeroSettings.model_validate((await get_org_settings(org_id)).model_dump())
+    gateway = get_invoicing_gateway(xero_settings)
 
     # Pass 1 — outbound sync
     invoice_sync = await _sync_outbound_invoices(org_id)
     cogs_repost = await _repost_stale_cogs(org_id)
-    cn_sync = await _sync_outbound_credit_notes(org_id, gateway, settings)
+    cn_sync = await _sync_outbound_credit_notes(org_id, gateway, xero_settings)
     po_sync = await _sync_outbound_po_bills(org_id)
 
     # Pass 2 — reconciliation
@@ -251,10 +252,10 @@ async def run_sync(org_id: str, reconcile: bool = True) -> dict:
     cn_reconcile: dict = {"verified": 0, "mismatch": 0, "errors": []}
     if reconcile:
         # Re-fetch settings in case token was refreshed during outbound
-        settings = await get_org_settings(org_id)
-        gateway = get_invoicing_gateway(settings)
-        invoice_reconcile = await _reconcile_invoices(org_id, gateway, settings)
-        cn_reconcile = await _reconcile_credit_notes(org_id, gateway, settings)
+        xero_settings = XeroSettings.model_validate((await get_org_settings(org_id)).model_dump())
+        gateway = get_invoicing_gateway(xero_settings)
+        invoice_reconcile = await _reconcile_invoices(org_id, gateway, xero_settings)
+        cn_reconcile = await _reconcile_credit_notes(org_id, gateway, xero_settings)
 
     summary = {
         "org_id": org_id,

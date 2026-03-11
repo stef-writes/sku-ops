@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 import httpx
 
-from identity.domain.org_settings import OrgSettings
+from finance.domain.xero_settings import XeroSettings
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ XERO_CONNECTIONS_URL = "https://api.xero.com/connections"
 
 
 class XeroBaseMixin:
-    def _auth_headers(self, settings: OrgSettings) -> dict:
+    def _auth_headers(self, settings: XeroSettings) -> dict:
         return {
             "Authorization": f"Bearer {settings.xero_access_token}",
             "Xero-tenant-id": settings.xero_tenant_id or "",
@@ -23,7 +23,7 @@ class XeroBaseMixin:
             "Content-Type": "application/json",
         }
 
-    def _is_token_expired(self, settings: OrgSettings) -> bool:
+    def _is_token_expired(self, settings: XeroSettings) -> bool:
         if not settings.xero_token_expiry:
             return True
         try:
@@ -37,7 +37,7 @@ class XeroBaseMixin:
         self,
         category_id: str,
         option_name: str,
-        settings: OrgSettings,
+        settings: XeroSettings,
         client: httpx.AsyncClient,
     ) -> None:
         """Upsert a tracking option in Xero so it can be referenced on line items.

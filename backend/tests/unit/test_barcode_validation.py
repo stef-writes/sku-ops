@@ -1,6 +1,6 @@
 """Tests for barcode validation (UPC-A, EAN-13)."""
 
-from catalog.domain.barcode import validate_barcode, validate_ean13, validate_upc
+from shared.kernel.barcode import validate_barcode, validate_ean13, validate_upc
 
 
 class TestValidateUpc:

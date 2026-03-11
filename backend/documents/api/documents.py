@@ -17,7 +17,6 @@ from catalog.application.queries import (
     list_products_by_vendor,
     update_product,
 )
-from catalog.domain.barcode import validate_barcode
 from documents.application.import_parser import infer_uom as rule_infer_uom
 from documents.application.import_service import ImportDeps
 from documents.application.import_service import import_document as do_import_document
@@ -29,6 +28,7 @@ from inventory.application.inventory_service import process_receiving_stock_chan
 from inventory.application.uom_classifier import classify_uom_batch as _classify_uom_batch
 from shared.api.deps import AdminDep
 from shared.infrastructure.config import LLM_AVAILABLE as _LLM_AVAILABLE
+from shared.kernel.barcode import validate_barcode
 
 logger = logging.getLogger(__name__)
 

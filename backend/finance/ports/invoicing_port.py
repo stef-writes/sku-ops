@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from finance.domain.invoice import InvoiceWithDetails
-from identity.domain.org_settings import OrgSettings
+from finance.domain.xero_settings import XeroSettings
 
 
 @dataclass
@@ -22,23 +22,23 @@ class InvoicingGateway(Protocol):
     """
 
     async def sync_invoice(
-        self, invoice: InvoiceWithDetails, settings: OrgSettings
+        self, invoice: InvoiceWithDetails, settings: XeroSettings
     ) -> InvoiceSyncResult: ...
 
     async def sync_po_receipt(
-        self, po: dict, cost_total: float, settings: OrgSettings
+        self, po: dict, cost_total: float, settings: XeroSettings
     ) -> InvoiceSyncResult: ...
 
     async def sync_credit_note(
-        self, credit_note: dict, settings: OrgSettings
+        self, credit_note: dict, settings: XeroSettings
     ) -> InvoiceSyncResult: ...
 
-    async def fetch_invoice(self, xero_invoice_id: str, settings: OrgSettings) -> dict: ...
+    async def fetch_invoice(self, xero_invoice_id: str, settings: XeroSettings) -> dict: ...
 
-    async def fetch_credit_note(self, xero_credit_note_id: str, settings: OrgSettings) -> dict: ...
+    async def fetch_credit_note(self, xero_credit_note_id: str, settings: XeroSettings) -> dict: ...
 
-    async def list_tracking_categories(self, settings: OrgSettings) -> list[dict]: ...
+    async def list_tracking_categories(self, settings: XeroSettings) -> list[dict]: ...
 
-    async def refresh_token(self, settings: OrgSettings) -> OrgSettings: ...
+    async def refresh_token(self, settings: XeroSettings) -> XeroSettings: ...
 
     async def get_tenants(self, access_token: str) -> list[dict]: ...

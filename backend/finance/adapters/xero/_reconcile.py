@@ -3,12 +3,12 @@
 import httpx
 
 from finance.adapters.xero._base import XERO_API
-from identity.domain.org_settings import OrgSettings
+from finance.domain.xero_settings import XeroSettings
 
 
 class XeroReconcileMixin:
     async def fetch_invoice_by_number(
-        self, invoice_number: str, settings: OrgSettings
+        self, invoice_number: str, settings: XeroSettings
     ) -> dict | None:
         """Look up a Xero invoice by InvoiceNumber. Returns the first match or None."""
         if self._is_token_expired(settings):
@@ -24,7 +24,7 @@ class XeroReconcileMixin:
         invoices = resp.json().get("Invoices", [])
         return invoices[0] if invoices else None
 
-    async def fetch_invoice(self, xero_invoice_id: str, settings: OrgSettings) -> dict:
+    async def fetch_invoice(self, xero_invoice_id: str, settings: XeroSettings) -> dict:
         """Fetch an invoice from Xero for reconciliation verification."""
         if self._is_token_expired(settings):
             settings = await self.refresh_token(settings)
@@ -45,7 +45,7 @@ class XeroReconcileMixin:
             "status": inv.get("Status", ""),
         }
 
-    async def fetch_credit_note(self, xero_credit_note_id: str, settings: OrgSettings) -> dict:
+    async def fetch_credit_note(self, xero_credit_note_id: str, settings: XeroSettings) -> dict:
         """Fetch a credit note from Xero for reconciliation verification."""
         if self._is_token_expired(settings):
             settings = await self.refresh_token(settings)
@@ -66,7 +66,7 @@ class XeroReconcileMixin:
             "status": cn.get("Status", ""),
         }
 
-    async def list_tracking_categories(self, settings: OrgSettings) -> list[dict]:
+    async def list_tracking_categories(self, settings: XeroSettings) -> list[dict]:
         if self._is_token_expired(settings):
             settings = await self.refresh_token(settings)
         async with httpx.AsyncClient() as client:

@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from catalog.domain.units import ALLOWED_BASE_UNITS
 from kernel.errors import ResourceNotFoundError
 from kernel.types import CurrentUser
 from purchasing.domain.purchase_order import (
@@ -22,6 +21,7 @@ from purchasing.domain.purchase_order import (
 )
 from purchasing.infrastructure.po_repo import po_repo as _default_repo
 from purchasing.ports.po_repo_port import PORepoPort
+from shared.kernel.units import ALLOWED_BASE_UNITS
 
 
 @dataclass

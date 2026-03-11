@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from finance.application.credit_note_service import insert_credit_note
 from identity.application.org_service import get_org_settings
-from inventory.application.inventory_service import process_receiving_stock_changes
+from inventory.application.inventory_service import restock_as_return
 from kernel import events
 from operations.application.queries import get_return_by_id as _get_return_by_id
 from operations.application.queries import get_withdrawal_by_id
@@ -31,7 +31,7 @@ async def create_material_return(
             data,
             current_user,
             get_withdrawal=get_withdrawal_by_id,
-            restock=process_receiving_stock_changes,
+            restock=restock_as_return,
             create_credit_note=insert_credit_note,
             tax_rate=settings.default_tax_rate,
         )

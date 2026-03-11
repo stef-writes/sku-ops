@@ -8,7 +8,7 @@ import csv
 import io
 import re
 
-from catalog.domain.units import ALLOWED_BASE_UNITS
+from shared.kernel.units import ALLOWED_BASE_UNITS
 
 
 def resolve_uom(item: dict) -> tuple[str, str, int]:

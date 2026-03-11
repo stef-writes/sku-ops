@@ -25,16 +25,16 @@ from catalog.application.queries import (
     list_product_groups,
     list_products,
 )
-from catalog.domain.barcode import validate_barcode
 from catalog.domain.errors import DuplicateBarcodeError, InvalidBarcodeError
 from catalog.domain.product import ProductCreate, ProductUpdate
-from catalog.domain.units import compute_sell_fields
 from inventory.application.inventory_service import process_import_stock_changes
 from inventory.application.uom_classifier import classify_uom
 from kernel.errors import ResourceNotFoundError
 from shared.api.deps import AdminDep, CurrentUserDep
 from shared.infrastructure.config import LLM_AVAILABLE
 from shared.infrastructure.middleware.audit import audit_log
+from shared.kernel.barcode import validate_barcode
+from shared.kernel.units import compute_sell_fields
 
 router = APIRouter(prefix="/products", tags=["products"])
 

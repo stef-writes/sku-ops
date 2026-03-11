@@ -6,15 +6,15 @@ import httpx
 
 from finance.adapters.xero._base import XERO_API, _xero_status
 from finance.domain.invoice import InvoiceWithDetails
+from finance.domain.xero_settings import XeroSettings
 from finance.ports.invoicing_port import InvoiceSyncResult
-from identity.domain.org_settings import OrgSettings
 
 logger = logging.getLogger(__name__)
 
 
 class XeroInvoiceSyncMixin:
     async def sync_invoice(
-        self, invoice: InvoiceWithDetails, settings: OrgSettings
+        self, invoice: InvoiceWithDetails, settings: XeroSettings
     ) -> InvoiceSyncResult:
         if self._is_token_expired(settings):
             settings = await self.refresh_token(settings)

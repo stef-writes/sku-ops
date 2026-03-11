@@ -3,12 +3,12 @@
 import httpx
 
 from finance.adapters.xero._base import XERO_API
+from finance.domain.xero_settings import XeroSettings
 from finance.ports.invoicing_port import InvoiceSyncResult
-from identity.domain.org_settings import OrgSettings
 
 
 class XeroCreditNoteSyncMixin:
-    async def sync_credit_note(self, credit_note, settings: OrgSettings) -> InvoiceSyncResult:
+    async def sync_credit_note(self, credit_note, settings: XeroSettings) -> InvoiceSyncResult:
         """Send a credit note to Xero as an ACCREC credit note.
 
         Returns/credits are reflected here so Xero Revenue/COGS/Inventory reverse correctly.

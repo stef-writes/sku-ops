@@ -8,7 +8,6 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from catalog.application.queries import list_products
-from catalog.domain.units import are_compatible, convert_quantity, cost_per_sell_unit
 from finance.application.invoice_service import (
     create_invoice_from_withdrawals,
     mark_paid_for_withdrawal,
@@ -18,11 +17,12 @@ from finance.application.ledger_service import record_withdrawal as _record_ledg
 from identity.application.billing_entity_service import ensure_billing_entity
 from identity.application.org_service import get_org_settings
 from inventory.application.inventory_service import process_withdrawal_stock_changes
-from inventory.domain.stock import StockDecrement
 from jobs.application.job_service import ensure_job as _ensure_job
 from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalCreate
 from operations.infrastructure.withdrawal_repo import withdrawal_repo as _default_withdrawal_repo
 from shared.infrastructure.database import transaction
+from shared.kernel.stock import StockDecrement
+from shared.kernel.units import are_compatible, convert_quantity, cost_per_sell_unit
 
 if TYPE_CHECKING:
     from kernel.types import CurrentUser

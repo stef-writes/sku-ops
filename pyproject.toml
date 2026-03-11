@@ -1,0 +1,142 @@
+[project]
+name = "sku-ops"
+version = "0.0.0"
+description = "SKU Operations — monorepo workspace root"
+requires-python = ">=3.13,<3.14"
+
+[tool.uv.workspace]
+members = ["backend"]
+
+[tool.uv.sources]
+sku-ops-backend = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "sku-ops-backend",
+    "pytest>=8.0,<9",
+    "pytest-asyncio>=0.23,<0.24",
+    "pytest-cov>=6.0",
+    "ruff>=0.14.0",
+    "commitizen>=4.12.1",
+    "cz-conventional-gitmoji>=0.7.0",
+    "rich>=14.0.0",
+]
+
+# =============================================================================
+# PYTEST
+# =============================================================================
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["backend/tests"]
+python_files = ["test_*.py"]
+pythonpath = ["backend"]
+addopts = ["--import-mode=importlib"]
+
+# =============================================================================
+# RUFF — linter + formatter
+# =============================================================================
+[tool.ruff]
+fix = true
+line-length = 100
+src = ["backend", "tests", "devtools"]
+target-version = "py313"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [
+    "A",      # flake8-builtins
+    "ARG",    # flake8-unused-arguments
+    "ASYNC",  # flake8-async
+    "B",      # flake8-bugbear
+    "BLE",    # flake8-blind-except
+    "C4",     # flake8-comprehensions
+    "DTZ",    # flake8-datetimez
+    "E",      # pycodestyle errors
+    "ERA",    # eradicate (commented-out code)
+    "F",      # pyflakes
+    "FLY",    # flynt
+    "FURB",   # refurb
+    "G",      # flake8-logging-format
+    "I",      # isort
+    "ICN",    # flake8-import-conventions
+    "INP",    # flake8-no-pep420
+    "INT",    # flake8-gettext
+    "ISC",    # flake8-implicit-str-concat
+    "LOG",    # flake8-logging
+    "N",      # pep8-naming
+    "PERF",   # perflint
+    "PGH",    # pygrep-hooks
+    "PIE",    # flake8-pie
+    "PLC",    # pylint conventions
+    "PLE",    # pylint errors
+    "PLW",    # pylint warnings
+    "PT",     # flake8-pytest-style
+    "PYI",    # flake8-pyi
+    "Q",      # flake8-quotes
+    "RET",    # flake8-return
+    "RSE",    # flake8-raise
+    "RUF",    # ruff-specific
+    "S",      # bandit (security)
+    "SIM",    # flake8-simplify
+    "SLF",    # flake8-self
+    "SLOT",   # flake8-slots
+    "T10",    # flake8-debugger
+    "T20",    # flake8-print
+    "TC",     # flake8-type-checking
+    "TID",    # flake8-tidy-imports
+    "TRY",    # tryceratops
+    "UP",     # pyupgrade
+    "W",      # pycodestyle warnings
+    "YTT",    # flake8-2020
+]
+ignore = [
+    "E501",     # line-too-long (formatter handles)
+    "PLC0415",  # import-outside-top-level: lazy imports to avoid circular deps
+    "S101",     # assert used in tests + runtime contracts
+    "TRY003",   # inline raise messages (project style)
+    "TRY300",   # try-consider-else (stylistic)
+    "RET504",   # assign-before-return (stylistic)
+    "W505",     # doc-line-too-long: agent prompts/descriptions are intentionally long
+    "SLF001",   # private-member-access: cross-module access common in modular monolith
+    "S608",     # possible-sql-injection: all queries are parameterized, ruff can't verify
+    "N811",     # constant-imported-as-non-constant: aliasing pattern used throughout
+    "E741",     # ambiguous-variable-name: short vars in financial/math code
+    "RUF001",   # ambiguous-unicode: intentional unicode characters
+    "RUF002",   # ambiguous-unicode-docstring: intentional
+    "RUF003",   # ambiguous-unicode-comment: gitmoji and i18n
+    "PERF401",  # manual-list-comprehension: readability over micro-optimization
+    "SIM117",   # multiple-with-statements: readability choice
+    "BLE001",   # blind-except: intentional resilience in agent/infra code
+    "S311",     # suspicious-non-cryptographic-random-usage: fine for non-crypto
+    "PLW0603",  # global-statement: intentional singletons
+    "ERA001",   # commented-out-code: intentional documentation
+    "TRY301",   # raise-within-try: intentional re-raise patterns
+]
+
+[tool.ruff.lint.per-file-ignores]
+"backend/tests/**" = ["N806", "PLR2004", "PLR0913", "PLR0915", "S108", "ARG001", "ARG002", "S105", "B017", "PT011", "PT017", "PT018", "INP001"]
+"devtools/**" = ["T201", "INP001", "ASYNC230", "ASYNC240"]
+"backend/server.py" = ["T201", "E402"]
+"backend/assistant/**" = ["ASYNC230", "ASYNC240", "E402", "RUF006", "PLW2901", "B019", "ARG002"]
+"backend/shared/infrastructure/db/**" = ["ASYNC240", "E402"]
+"backend/finance/api/**" = ["RUF006"]
+"backend/operations/**" = ["PLW2901"]
+"backend/*/api/**" = ["TC001", "TC002", "TC003"]
+"backend/shared/api/**" = ["TC001", "TC002", "TC003"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.pycodestyle]
+max-doc-length = 100
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+# =============================================================================
+# COMMITIZEN — conventional commit message validation (pre-commit hook)
+# =============================================================================
+[tool.commitizen]
+name = "cz_gitmoji"

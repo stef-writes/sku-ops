@@ -48,13 +48,32 @@ def _get_context(path: Path) -> str | None:
     return parts[0] if parts[0] in BOUNDED_CONTEXTS else None
 
 
+def _is_type_checking_block(node: ast.If) -> bool:
+    """Return True if this If node is `if TYPE_CHECKING:` or `if typing.TYPE_CHECKING:`."""
+    test = node.test
+    if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING":
+        return True
+    return isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING"
+
+
 def _from_imports(path: Path) -> list[str]:
+    """Return all runtime `from X import Y` module names, skipping TYPE_CHECKING blocks."""
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"))
     except (SyntaxError, UnicodeDecodeError):
         return []
+
+    # Collect nodes that are inside TYPE_CHECKING guards so we can exclude them.
+    type_checking_nodes: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.If) and _is_type_checking_block(node):
+            for child in ast.walk(node):
+                type_checking_nodes.add(id(child))
+
     return [
-        node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module
+        node.module
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module and id(node) not in type_checking_nodes
     ]
 
 
@@ -173,4 +192,56 @@ def test_cross_context_infrastructure_violations_not_growing():
         "NEW cross-context infrastructure imports detected (not in known list):\n"
         + "\n".join(f"  {v}" for v in sorted(new_violations))
         + "\n\nFix the coupling, or add to KNOWN_CROSS_INFRA_VIOLATIONS with a comment."
+    )
+
+
+# ── Test 5: API routes must not import repos directly ─────────────────────────────────────
+
+
+def test_api_layer_does_not_import_repos():
+    """API route files must delegate to the application layer, never import repos."""
+    violations = []
+    for py_file in _all_backend_py_files():
+        rel = py_file.relative_to(BACKEND)
+        parts = rel.parts
+        if len(parts) < 2 or parts[1] != "api" or parts[0] not in BOUNDED_CONTEXTS:
+            continue
+        for module in _from_imports(py_file):
+            seg = module.split(".")
+            if len(seg) >= 2 and seg[-1].endswith("_repo") and "infrastructure" in seg:
+                violations.append(f"  {rel}: from {module}")
+    assert not violations, (
+        "API files import repos directly (should go through application layer):\n"
+        + "\n".join(violations)
+    )
+
+
+# ── Test 6: cross-context domain imports ──────────────────────────────────────────────────
+
+
+def test_no_cross_context_domain_imports():
+    """Contexts must not import another context's domain layer directly.
+
+    Cross-context data should flow through application-layer facades and typed DTOs.
+    """
+    violations = []
+    for py_file in _all_backend_py_files(skip_roots=True):
+        rel = py_file.relative_to(BACKEND)
+        home_ctx = _get_context(py_file)
+        if home_ctx is None:
+            continue
+        layer = rel.parts[1] if len(rel.parts) >= 2 else None
+        if layer == "domain":
+            continue
+        for module in _from_imports(py_file):
+            seg = module.split(".")
+            if (
+                len(seg) >= 2
+                and seg[0] in BOUNDED_CONTEXTS
+                and seg[1] == "domain"
+                and seg[0] != home_ctx
+            ):
+                violations.append(f"  {rel}: from {module}")
+    assert not violations, (
+        "Cross-context domain imports (use application facades instead):\n" + "\n".join(violations)
     )

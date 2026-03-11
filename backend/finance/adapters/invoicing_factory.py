@@ -1,10 +1,10 @@
 """Factory for invoicing gateway. Returns real adapter when connected, stub otherwise."""
 
 from finance.adapters.stub_xero import StubXeroAdapter
-from identity.domain.org_settings import OrgSettings
+from finance.domain.xero_settings import XeroSettings
 
 
-def get_invoicing_gateway(settings: OrgSettings):
+def get_invoicing_gateway(settings: XeroSettings):
     """Return XeroAdapter if org has active Xero tokens, otherwise StubXeroAdapter."""
     if settings.xero_access_token and settings.xero_tenant_id:
         try:

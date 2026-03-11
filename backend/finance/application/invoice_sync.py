@@ -4,6 +4,7 @@ import logging
 
 from finance.adapters.invoicing_factory import get_invoicing_gateway
 from finance.domain.invoice import InvoiceWithDetails
+from finance.domain.xero_settings import XeroSettings
 from finance.infrastructure.invoice_repo import (
     invoice_repo as _default_invoice_repo,
 )
@@ -47,11 +48,12 @@ async def sync_invoice(
 
     await invoice_repo.set_xero_sync_status(inv_id, "syncing")
 
-    settings = await get_org_settings(org_id)
-    gateway = get_invoicing_gateway(settings)
+    org_settings = await get_org_settings(org_id)
+    xero_settings = XeroSettings.model_validate(org_settings.model_dump())
+    gateway = get_invoicing_gateway(xero_settings)
 
     try:
-        result = await gateway.sync_invoice(inv, settings)
+        result = await gateway.sync_invoice(inv, xero_settings)
     except (RuntimeError, OSError, ValueError) as e:
         await invoice_repo.set_xero_sync_status(inv_id, "failed")
         return {
@@ -86,9 +88,10 @@ async def _gateway_fetch_existing(
     invoice_repo: InvoiceRepoPort,
 ) -> dict | None:
     """Check Xero for an existing invoice matching our number (idempotency guard)."""
-    settings = await get_org_settings(org_id)
-    gateway = get_invoicing_gateway(settings)
-    existing = await gateway.fetch_invoice_by_number(inv.invoice_number, settings)
+    org_settings = await get_org_settings(org_id)
+    xero_settings = XeroSettings.model_validate(org_settings.model_dump())
+    gateway = get_invoicing_gateway(xero_settings)
+    existing = await gateway.fetch_invoice_by_number(inv.invoice_number, xero_settings)
     if existing:
         xero_id = existing["InvoiceID"]
         await invoice_repo.set_xero_invoice_id(inv.id, xero_id)
@@ -113,12 +116,13 @@ async def repost_cogs_for_invoice(
     if not inv.xero_invoice_id:
         return {"invoice_id": inv_id, "error": "Invoice not yet synced to Xero", "success": False}
 
-    settings = await get_org_settings(org_id)
-    gateway = get_invoicing_gateway(settings)
+    org_settings = await get_org_settings(org_id)
+    xero_settings = XeroSettings.model_validate(org_settings.model_dump())
+    gateway = get_invoicing_gateway(xero_settings)
 
     try:
         new_journal_id = await gateway.repost_cogs_journal(
-            inv, settings, old_journal_id=inv.xero_cogs_journal_id
+            inv, xero_settings, old_journal_id=inv.xero_cogs_journal_id
         )
         await invoice_repo.set_xero_invoice_id(
             inv_id,

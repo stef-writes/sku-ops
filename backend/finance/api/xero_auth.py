@@ -10,6 +10,7 @@ from fastapi.responses import RedirectResponse
 
 from finance.adapters.invoicing_factory import get_invoicing_gateway
 from finance.adapters.xero_adapter import XeroAdapter
+from finance.domain.xero_settings import XeroSettings
 from identity.application.org_service import (
     clear_xero_tokens,
     get_org_settings,
@@ -152,9 +153,10 @@ async def list_tracking_categories(current_user: AdminDep):
     if not settings.xero_access_token:
         raise HTTPException(status_code=400, detail="Xero not connected for this org")
 
-    gateway = get_invoicing_gateway(settings)
+    xero_settings = XeroSettings.model_validate(settings.model_dump())
+    gateway = get_invoicing_gateway(xero_settings)
     try:
-        categories = await gateway.list_tracking_categories(settings)
+        categories = await gateway.list_tracking_categories(xero_settings)
         return {"tracking_categories": categories}
     except (httpx.HTTPError, RuntimeError, OSError) as e:
         raise HTTPException(
