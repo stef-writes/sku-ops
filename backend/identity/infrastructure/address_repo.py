@@ -1,8 +1,5 @@
 """Address repository — persistence for the address book."""
 
-from datetime import UTC, datetime
-from uuid import uuid4
-
 from shared.infrastructure.database import get_connection
 
 
@@ -94,31 +91,11 @@ async def search(query: str, organization_id: str, limit: int = 20) -> list:
     return [_row_to_dict(r) for r in await cursor.fetchall()]
 
 
-async def ensure_address(display_text: str, organization_id: str) -> dict:
-    """Get or create an address from a freeform string. Best-effort parsing."""
-    if not display_text or not display_text.strip():
-        return {}
-    text = display_text.strip()
-    existing = await search(text, organization_id, limit=1)
-    if existing and existing[0].get("line1", "").lower() == text.lower():
-        return existing[0]
-    address = {
-        "id": str(uuid4()),
-        "label": text[:80],
-        "line1": text,
-        "organization_id": organization_id,
-        "created_at": datetime.now(UTC).isoformat(),
-    }
-    await insert(address)
-    return address
-
-
 class AddressRepo:
     insert = staticmethod(insert)
     get_by_id = staticmethod(get_by_id)
     list_addresses = staticmethod(list_addresses)
     search = staticmethod(search)
-    ensure_address = staticmethod(ensure_address)
 
 
 address_repo = AddressRepo()

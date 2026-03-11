@@ -3,6 +3,7 @@
 Other bounded contexts import from here, never from purchasing.infrastructure directly.
 """
 
+from catalog.application.queries import get_product_by_id as _get_product
 from purchasing.infrastructure.po_repo import po_repo as _po_repo
 
 
@@ -40,4 +41,21 @@ async def get_po(po_id: str, org_id: str) -> dict | None:
 
 
 async def get_po_items(po_id: str) -> list:
-    return await _po_repo.get_po_items(po_id)
+    items = await _po_repo.get_po_items(po_id)
+    product_ids = [i["product_id"] for i in items if i.get("product_id")]
+    if not product_ids:
+        return items
+    products = {}
+    for pid in set(product_ids):
+        p = await _get_product(pid)
+        if p:
+            products[pid] = p
+    for item in items:
+        pid = item.get("product_id")
+        if pid and pid in products:
+            p = products[pid]
+            item["matched_sku"] = p.sku
+            item["matched_name"] = p.name
+            item["matched_quantity"] = p.quantity
+            item["matched_cost"] = p.cost
+    return items
