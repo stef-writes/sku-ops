@@ -2,11 +2,7 @@
 
 from fastapi import APIRouter, HTTPException, Request
 
-from finance.application.credit_note_service import insert_credit_note
-from finance.application.org_settings_service import get_org_settings
-from inventory.application.inventory_service import restock_as_return
 from operations.application.queries import get_return_by_id as _get_return_by_id
-from operations.application.queries import get_withdrawal_by_id
 from operations.application.queries import list_returns as _list_returns
 from operations.application.return_service import create_return
 from operations.domain.returns import ReturnCreate
@@ -25,16 +21,8 @@ async def create_material_return(
     current_user: AdminDep,
 ):
     """Process a return against a previous withdrawal. Restocks inventory and creates credit note."""
-    settings = await get_org_settings()
     try:
-        result = await create_return(
-            data,
-            current_user,
-            get_withdrawal=get_withdrawal_by_id,
-            restock=restock_as_return,
-            create_credit_note=insert_credit_note,
-            tax_rate=settings.default_tax_rate,
-        )
+        result = await create_return(data, current_user)
         await audit_log(
             user_id=current_user.id,
             action="return.create",

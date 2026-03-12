@@ -1,13 +1,17 @@
-"""Material request processing — converts a pending request into a withdrawal."""
+"""Material request service — creation, listing, and processing use cases."""
 
 from datetime import UTC, datetime
 
 from operations.application.contractor_service import get_contractor_by_id
 from operations.application.queries import (
     get_material_request_by_id,
+    insert_material_request,
+    list_material_requests_by_contractor,
+    list_pending_material_requests,
     mark_material_request_processed,
 )
 from operations.application.withdrawal_service import create_withdrawal_wired
+from operations.domain.material_request import MaterialRequest, MaterialRequestCreate
 from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
 from shared.infrastructure.database import get_org_id, transaction
 from shared.kernel.types import CurrentUser
@@ -18,6 +22,46 @@ class MaterialRequestError(Exception):
         self.detail = detail
         self.status_code = status_code
         super().__init__(detail)
+
+
+async def create_material_request(
+    data: MaterialRequestCreate,
+    current_user: CurrentUser,
+) -> MaterialRequest:
+    """Validate and persist a new material request from a contractor.
+
+    Raises MaterialRequestError on validation failure.
+    """
+    if current_user.role != "contractor":
+        raise MaterialRequestError("Only contractors can create material requests", 403)
+    if not data.items:
+        raise MaterialRequestError("At least one item is required", 400)
+
+    mat_request = MaterialRequest(
+        contractor_id=current_user.id,
+        contractor_name=current_user.name,
+        items=data.items,
+        job_id=data.job_id,
+        service_address=data.service_address,
+        notes=data.notes,
+        organization_id=current_user.organization_id,
+    )
+    await insert_material_request(mat_request)
+    fetched = await get_material_request_by_id(mat_request.id)
+    return fetched or mat_request
+
+
+async def list_material_requests(current_user: CurrentUser) -> list:
+    """Return material requests scoped to the caller's role.
+
+    Contractors see only their own requests; admins see all pending.
+    Raises MaterialRequestError(403) for unknown roles.
+    """
+    if current_user.role == "contractor":
+        return await list_material_requests_by_contractor(contractor_id=current_user.id)
+    if current_user.role == "admin":
+        return await list_pending_material_requests()
+    raise MaterialRequestError("Insufficient permissions", 403)
 
 
 async def process_material_request(

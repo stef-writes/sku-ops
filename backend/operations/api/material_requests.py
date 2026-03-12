@@ -1,24 +1,17 @@
-"""Material request routes - contractor pick list, staff processes into withdrawal."""
+"""Material request routes — contractor pick list, staff processes into withdrawal."""
 
 from fastapi import APIRouter, HTTPException
 
 from operations.application.material_request_service import (
     MaterialRequestError,
+    create_material_request,
+    list_material_requests,
 )
 from operations.application.material_request_service import (
     process_material_request as _process_request,
 )
-from operations.application.queries import (
-    get_material_request_by_id,
-    insert_material_request,
-    list_material_requests_by_contractor,
-    list_pending_material_requests,
-)
-from operations.domain.material_request import (
-    MaterialRequest,
-    MaterialRequestCreate,
-    MaterialRequestProcess,
-)
+from operations.application.queries import get_material_request_by_id
+from operations.domain.material_request import MaterialRequestCreate, MaterialRequestProcess
 from shared.api.deps import AdminDep, CurrentUserDep
 from shared.infrastructure import event_hub
 from shared.kernel import events
@@ -27,43 +20,27 @@ router = APIRouter(prefix="/material-requests", tags=["material-requests"])
 
 
 @router.post("")
-async def create_material_request(data: MaterialRequestCreate, current_user: CurrentUserDep):
+async def create_material_request_route(data: MaterialRequestCreate, current_user: CurrentUserDep):
     """Contractor creates a material request (pick list). Staff will process it into a withdrawal."""
-    if current_user.role != "contractor":
-        raise HTTPException(status_code=403, detail="Only contractors can create material requests")
-
-    if not data.items:
-        raise HTTPException(status_code=400, detail="At least one item is required")
-
-    mat_request = MaterialRequest(
-        contractor_id=current_user.id,
-        contractor_name=current_user.name,
-        items=data.items,
-        job_id=data.job_id,
-        service_address=data.service_address,
-        notes=data.notes,
-        organization_id=current_user.organization_id,
-    )
-    await insert_material_request(mat_request)
-    req = await get_material_request_by_id(mat_request.id)
+    try:
+        result = await create_material_request(data, current_user)
+    except MaterialRequestError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail) from e
     await event_hub.emit(
         events.MATERIAL_REQUEST_CREATED,
         org_id=current_user.organization_id,
-        id=mat_request.id,
+        id=result.id if hasattr(result, "id") else result.get("id"),
     )
-    return req or mat_request.model_dump()
+    return result
 
 
 @router.get("")
-async def list_material_requests(current_user: CurrentUserDep):
+async def list_material_requests_route(current_user: CurrentUserDep):
     """Contractors see own requests; admins see all pending."""
-    if current_user.role == "contractor":
-        return await list_material_requests_by_contractor(
-            contractor_id=current_user.id,
-        )
-    if current_user.role == "admin":
-        return await list_pending_material_requests()
-    raise HTTPException(status_code=403, detail="Insufficient permissions")
+    try:
+        return await list_material_requests(current_user)
+    except MaterialRequestError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail) from e
 
 
 @router.get("/{request_id}")
@@ -71,14 +48,13 @@ async def get_material_request(request_id: str, current_user: CurrentUserDep):
     req = await get_material_request_by_id(request_id)
     if not req:
         raise HTTPException(status_code=404, detail="Material request not found")
-
     if current_user.role == "contractor" and req.contractor_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
     return req
 
 
 @router.post("/{request_id}/process")
-async def process_material_request(
+async def process_material_request_route(
     request_id: str,
     data: MaterialRequestProcess,
     current_user: AdminDep,

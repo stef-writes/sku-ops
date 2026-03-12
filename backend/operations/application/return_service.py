@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
 from finance.application.credit_note_service import apply_credit_note as _apply_cn
+from finance.application.credit_note_service import insert_credit_note
 from finance.application.ledger_service import record_return as _record_ledger
+from finance.application.org_settings_service import get_org_settings
 from inventory.application import StockTransactionType
+from inventory.application.inventory_service import restock_as_return
+from operations.application.queries import get_withdrawal_by_id
 from operations.domain.returns import MaterialReturn, ReturnCreate, ReturnItem
-from operations.domain.withdrawal import MaterialWithdrawal
 from operations.infrastructure.return_repo import return_repo as _default_return_repo
 from shared.infrastructure.database import get_org_id, transaction
 from shared.kernel.errors import DomainError, ResourceNotFoundError
@@ -19,20 +21,12 @@ if TYPE_CHECKING:
     from operations.ports.return_repo_port import ReturnRepoPort
     from shared.kernel.types import CurrentUser
 
-GetWithdrawalFn = Callable[..., Awaitable[MaterialWithdrawal | None]]
-RestockFn = Callable[..., Awaitable[None]]
-CreateCreditNoteFn = Callable[..., Awaitable[object]] | None
-
 
 async def create_return(
     data: ReturnCreate,
     current_user: CurrentUser,
     *,
-    get_withdrawal: GetWithdrawalFn,
-    restock: RestockFn,
-    create_credit_note: CreateCreditNoteFn = None,
     return_repo: ReturnRepoPort = _default_return_repo,
-    tax_rate: float = 0.10,
 ) -> dict:
     """Process a return against a previous withdrawal.
 
@@ -41,7 +35,10 @@ async def create_return(
     3. Creates a credit note if an invoice exists
     """
     org_id = get_org_id()
-    withdrawal = await get_withdrawal(data.withdrawal_id)
+    settings = await get_org_settings()
+    tax_rate = settings.default_tax_rate
+
+    withdrawal = await get_withdrawal_by_id(data.withdrawal_id)
     if not withdrawal:
         raise ResourceNotFoundError("Withdrawal", data.withdrawal_id)
 
@@ -99,7 +96,7 @@ async def create_return(
 
     async with transaction():
         for item in enriched_items:
-            await restock(
+            await restock_as_return(
                 product_id=item.product_id,
                 sku=item.sku,
                 product_name=item.name,
@@ -139,10 +136,10 @@ async def create_return(
 
         result = ret.model_dump()
 
-        if create_credit_note and withdrawal.invoice_id:
+        if withdrawal.invoice_id:
             _log = logging.getLogger(__name__)
             try:
-                cn = await create_credit_note(
+                cn = await insert_credit_note(
                     return_id=ret.id,
                     invoice_id=withdrawal.invoice_id,
                     items=enriched_items,

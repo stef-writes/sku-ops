@@ -1,11 +1,11 @@
 """Tests for material request creation and processing with fallback logic."""
 
 import pytest
-from fastapi import HTTPException
 
 from catalog.application.product_lifecycle import create_product
 from inventory.application.inventory_service import process_import_stock_changes
-from operations.api.material_requests import (
+from operations.application.material_request_service import (
+    MaterialRequestError,
     create_material_request,
     list_material_requests,
     process_material_request,
@@ -13,7 +13,6 @@ from operations.api.material_requests import (
 from operations.domain.material_request import (
     MaterialRequest,
     MaterialRequestCreate,
-    MaterialRequestProcess,
 )
 from operations.domain.withdrawal import WithdrawalItem
 from operations.infrastructure.material_request_repo import material_request_repo
@@ -135,7 +134,7 @@ async def test_create_material_request_rejects_non_contractor(db):
     product = await _create_test_product()
     data = MaterialRequestCreate(items=[_item_from_product(product)])
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(MaterialRequestError) as exc:
         await create_material_request(data=data, current_user=_admin())
     assert exc.value.status_code == 403
 
@@ -145,7 +144,7 @@ async def test_create_material_request_rejects_empty_items(db):
     """Request with no items is rejected."""
     data = MaterialRequestCreate(items=[])
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(MaterialRequestError) as exc:
         await create_material_request(data=data, current_user=_contractor())
     assert exc.value.status_code == 400
     assert "item" in exc.value.detail.lower()
@@ -194,11 +193,14 @@ async def test_process_rejects_already_processed(db):
         processed_at="2025-01-01T00:00:00Z",
     )
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(MaterialRequestError) as exc:
         await process_material_request(
             request_id=req.id,
-            data=MaterialRequestProcess(job_id="J-1", service_address="1 Elm"),
-            current_user=_admin(),
+            job_id_override="J-1",
+            service_address_override="1 Elm",
+            notes=None,
+            current_user_id=_admin().id,
+            current_user_name=_admin().name,
         )
     assert exc.value.status_code == 400
     assert "already processed" in exc.value.detail.lower()
@@ -210,11 +212,14 @@ async def test_process_rejects_missing_job_id(db):
     product = await _create_test_product()
     req = await _create_request_in_db(product, job_id="", service_address="1 Oak")
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(MaterialRequestError) as exc:
         await process_material_request(
             request_id=req.id,
-            data=MaterialRequestProcess(service_address="1 Oak"),
-            current_user=_admin(),
+            job_id_override=None,
+            service_address_override="1 Oak",
+            notes=None,
+            current_user_id=_admin().id,
+            current_user_name=_admin().name,
         )
     assert exc.value.status_code == 400
     assert "job id" in exc.value.detail.lower()
@@ -226,11 +231,14 @@ async def test_process_rejects_missing_service_address(db):
     product = await _create_test_product()
     req = await _create_request_in_db(product, job_id="J-1", service_address="")
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(MaterialRequestError) as exc:
         await process_material_request(
             request_id=req.id,
-            data=MaterialRequestProcess(job_id="J-1"),
-            current_user=_admin(),
+            job_id_override="J-1",
+            service_address_override=None,
+            notes=None,
+            current_user_id=_admin().id,
+            current_user_name=_admin().name,
         )
     assert exc.value.status_code == 400
     assert "service address" in exc.value.detail.lower()
@@ -239,11 +247,14 @@ async def test_process_rejects_missing_service_address(db):
 @pytest.mark.asyncio
 async def test_process_not_found(db):
     """Processing a non-existent request returns 404."""
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(MaterialRequestError) as exc:
         await process_material_request(
             request_id="nonexistent-id",
-            data=MaterialRequestProcess(job_id="J-1", service_address="1 Elm"),
-            current_user=_admin(),
+            job_id_override="J-1",
+            service_address_override="1 Elm",
+            notes=None,
+            current_user_id=_admin().id,
+            current_user_name=_admin().name,
         )
     assert exc.value.status_code == 404
 
@@ -256,8 +267,11 @@ async def test_process_success_creates_withdrawal_and_updates_status(db):
 
     result = await process_material_request(
         request_id=req.id,
-        data=MaterialRequestProcess(job_id="J-SUCCESS", service_address="100 Success Rd"),
-        current_user=_admin(),
+        job_id_override="J-SUCCESS",
+        service_address_override="100 Success Rd",
+        notes=None,
+        current_user_id=_admin().id,
+        current_user_name=_admin().name,
     )
 
     assert "id" in result
