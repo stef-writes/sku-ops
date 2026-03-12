@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
+from assistant.application.llm import generate_text as _generate_text
 from catalog.api.schemas import BulkGroupAssign, SuggestUomRequest
 from catalog.application.product_lifecycle import (
     bulk_assign_product_group,
@@ -27,7 +28,6 @@ from catalog.application.queries import (
 )
 from catalog.domain.errors import DuplicateBarcodeError, InvalidBarcodeError
 from catalog.domain.product import ProductCreate, ProductUpdate
-from assistant.application.llm import generate_text as _generate_text
 from inventory.application.inventory_service import process_import_stock_changes
 from inventory.application.uom_classifier import classify_uom
 from shared.api.deps import AdminDep, CurrentUserDep

@@ -62,27 +62,21 @@ async def find_product_by_barcode(
     barcode: str,
     exclude_product_id: str | None = None,
 ) -> Product | None:
-    return await _prod_repo.find_by_barcode(
-        barcode, exclude_product_id=exclude_product_id
-    )
+    return await _prod_repo.find_by_barcode(barcode, exclude_product_id=exclude_product_id)
 
 
 async def find_product_by_original_sku_and_vendor(
     original_sku: str,
     vendor_id: str,
 ) -> Product | None:
-    return await _prod_repo.find_by_original_sku_and_vendor(
-        original_sku, vendor_id
-    )
+    return await _prod_repo.find_by_original_sku_and_vendor(original_sku, vendor_id)
 
 
 async def find_product_by_name_and_vendor(
     name: str,
     vendor_id: str,
 ) -> Product | None:
-    return await _prod_repo.find_by_name_and_vendor(
-        name, vendor_id
-    )
+    return await _prod_repo.find_by_name_and_vendor(name, vendor_id)
 
 
 async def list_products_by_vendor(vendor_id: str, limit: int = 200) -> list[Product]:

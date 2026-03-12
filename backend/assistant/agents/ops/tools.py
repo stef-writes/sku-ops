@@ -91,7 +91,9 @@ async def _list_recent_withdrawals(args: dict) -> str:
     days = min(int(args.get("days") or 7), 365)
     limit = min(int(args.get("limit") or 20), 100)
     since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
-    withdrawals = await list_withdrawals(start_date=since, limit=limit, organization_id=get_org_id())
+    withdrawals = await list_withdrawals(
+        start_date=since, limit=limit, organization_id=get_org_id()
+    )
     out = [
         {
             "date": (w.created_at or "")[:10],

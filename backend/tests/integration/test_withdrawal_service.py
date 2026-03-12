@@ -224,9 +224,7 @@ async def test_create_withdrawal_multi_item(db):
             subtotal=56.0,
         ),
     ]
-    data = MaterialWithdrawalCreate(
-        items=items, job_id="JOB-MULTI", service_address="Multi St"
-    )
+    data = MaterialWithdrawalCreate(items=items, job_id="JOB-MULTI", service_address="Multi St")
     contractor = {
         "id": "contractor-1",
         "name": "Contractor",
@@ -271,9 +269,7 @@ async def test_create_withdrawal_tax_computation(db):
             subtotal=100.0,
         )
     ]
-    data = MaterialWithdrawalCreate(
-        items=items, job_id="JOB-TAX", service_address="Tax St"
-    )
+    data = MaterialWithdrawalCreate(items=items, job_id="JOB-TAX", service_address="Tax St")
     contractor = {"id": "contractor-1", "name": "Contractor"}
     current_user = {"id": "user-1", "name": "Test"}
 
@@ -314,9 +310,7 @@ async def test_create_withdrawal_auto_invoice_failure_still_creates_withdrawal(d
             subtotal=20.0,
         )
     ]
-    data = MaterialWithdrawalCreate(
-        items=items, job_id="JOB-FAIL", service_address="Fail St"
-    )
+    data = MaterialWithdrawalCreate(items=items, job_id="JOB-FAIL", service_address="Fail St")
     contractor = {"id": "contractor-1", "name": "Contractor"}
     user = _test_user()
 

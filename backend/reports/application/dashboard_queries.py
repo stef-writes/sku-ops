@@ -16,7 +16,6 @@ from finance.application import ledger_queries as ledger_repo
 from identity.application.user_service import count_contractors
 from operations.application.queries import list_withdrawals
 from purchasing.application.queries import po_summary_by_status
-from shared.infrastructure.db import get_org_id
 from shared.kernel.types import round_money
 
 

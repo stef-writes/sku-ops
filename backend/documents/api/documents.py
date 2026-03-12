@@ -5,6 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
+from assistant.application.llm import generate_text as _generate_text
 from catalog.application.product_lifecycle import create_product as lifecycle_create
 from catalog.application.queries import (
     find_product_by_name_and_vendor,
@@ -27,7 +28,6 @@ from documents.domain.document import DocumentImportRequest
 from inventory.application.inventory_service import process_receiving_stock_changes
 from inventory.application.uom_classifier import classify_uom_batch as _classify_uom_batch
 from shared.api.deps import AdminDep
-from assistant.application.llm import generate_text as _generate_text
 from shared.infrastructure.config import LLM_AVAILABLE as _LLM_AVAILABLE
 from shared.kernel.barcode import validate_barcode
 

@@ -26,9 +26,7 @@ from inventory.application.inventory_service import (
 from inventory.domain.stock import StockDecrement
 
 
-async def _create_product(
-    name, quantity, base_unit="each", dept_id="dept-1", **kw
-):
+async def _create_product(name, quantity, base_unit="each", dept_id="dept-1", **kw):
     return await create_product(
         department_id=dept_id,
         department_name="Hardware",

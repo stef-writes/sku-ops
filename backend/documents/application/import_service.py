@@ -148,9 +148,7 @@ async def import_document(
                     str(item["original_sku"]).strip(), vendor_id
                 )
             if not existing and item.get("name") and vendor_id:
-                existing = await deps.find_product_by_name_and_vendor(
-                    item["name"], vendor_id
-                )
+                existing = await deps.find_product_by_name_and_vendor(item["name"], vendor_id)
 
             if existing:
                 await deps.process_receiving_stock_changes(

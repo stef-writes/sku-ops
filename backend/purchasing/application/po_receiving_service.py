@@ -246,9 +246,7 @@ async def _match_product(item: dict, vendor_id: str, deps: PurchasingDeps):
         if existing:
             return existing
     if item.get("name") and vendor_id:
-        existing = await deps.find_product_by_name_and_vendor(
-            item["name"], vendor_id
-        )
+        existing = await deps.find_product_by_name_and_vendor(item["name"], vendor_id)
         if existing:
             return existing
     return None

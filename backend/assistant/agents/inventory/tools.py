@@ -7,7 +7,6 @@ from datetime import UTC, datetime, timedelta
 
 from assistant.agents.tools.registry import register as _reg
 from assistant.agents.tools.search import get_index
-from shared.infrastructure.db import get_org_id
 from catalog.application.queries import (
     count_all_products as catalog_count_all,
 )
@@ -38,6 +37,7 @@ from catalog.application.queries import (
 from inventory.application.queries import withdrawal_velocity
 from operations.application.queries import list_withdrawals
 from shared.infrastructure.config import OPENAI_API_KEY
+from shared.infrastructure.db import get_org_id
 
 logger = logging.getLogger(__name__)
 
@@ -280,7 +280,9 @@ async def _get_top_products(args: dict) -> str:
         by = "revenue"
     limit = min(int(args.get("limit") or 10), 50)
     since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
-    withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=get_org_id())
+    withdrawals = await list_withdrawals(
+        start_date=since, limit=10000, organization_id=get_org_id()
+    )
     product_map: dict[str, dict] = {}
     for w in withdrawals:
         for item in w.items:

@@ -19,9 +19,7 @@ async def get_dashboard_stats(
     end_date: str | None = Query(None),
 ):
     if current_user.role == "contractor":
-        return await contractor_dashboard(
-            current_user.id, start_date=start_date, end_date=end_date
-        )
+        return await contractor_dashboard(current_user.id, start_date=start_date, end_date=end_date)
     return await admin_dashboard(start_date=start_date, end_date=end_date)
 
 

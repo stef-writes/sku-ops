@@ -13,6 +13,10 @@ from finance.domain.invoice import (
     InvoiceWithDetails,
     compute_due_date,
 )
+from finance.infrastructure._invoice_fetch import (
+    _row_to_model,
+    get_by_id,
+)
 
 # Re-export mutation functions so existing imports keep working
 from finance.infrastructure.invoice_mutations import (
@@ -36,13 +40,7 @@ from finance.infrastructure.invoice_xero_queries import (
     set_xero_invoice_id,
     set_xero_sync_status,
 )
-from finance.infrastructure._invoice_fetch import (
-    _build_invoice_with_details,
-    _row_to_model,
-    get_by_id,
-)
 from shared.infrastructure.database import get_connection, get_org_id
-
 
 # ---------------------------------------------------------------------------
 # Core CRUD

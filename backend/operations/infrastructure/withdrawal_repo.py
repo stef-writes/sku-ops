@@ -131,9 +131,7 @@ async def get_by_id(withdrawal_id: str) -> MaterialWithdrawal | None:
     return _row_to_model(row)
 
 
-async def mark_paid(
-    withdrawal_id: str, paid_at: str
-) -> MaterialWithdrawal | None:
+async def mark_paid(withdrawal_id: str, paid_at: str) -> MaterialWithdrawal | None:
     conn = get_connection()
     org_id = get_org_id()
     await conn.execute(
@@ -144,9 +142,7 @@ async def mark_paid(
     return await get_by_id(withdrawal_id)
 
 
-async def bulk_mark_paid(
-    withdrawal_ids: list, paid_at: str
-) -> int:
+async def bulk_mark_paid(withdrawal_ids: list, paid_at: str) -> int:
     if not withdrawal_ids:
         return 0
     conn = get_connection()

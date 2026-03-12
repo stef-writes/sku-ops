@@ -33,7 +33,14 @@ BOUNDED_CONTEXTS = frozenset(
 # identity.application auth functions into Annotated type aliases used across all routes.
 # It is a composition root by function even though it lives in shared/api/.
 COMPOSITION_ROOTS = frozenset(
-    {"server.py", "routes.py", "startup.py", "scheduler.py", "shared/infrastructure/full_schema.py", "shared/api/deps.py"}
+    {
+        "server.py",
+        "routes.py",
+        "startup.py",
+        "scheduler.py",
+        "shared/infrastructure/full_schema.py",
+        "shared/api/deps.py",
+    }
 )
 
 # ── Known cross-context infrastructure violations (pre-DDD coupling to clean up) ──────────
@@ -243,6 +250,5 @@ def test_no_cross_context_domain_imports():
             ):
                 violations.append(f"  {rel}: from {module}")
     assert not violations, (
-        "Cross-context domain imports (use application facades instead):\n"
-        + "\n".join(violations)
+        "Cross-context domain imports (use application facades instead):\n" + "\n".join(violations)
     )

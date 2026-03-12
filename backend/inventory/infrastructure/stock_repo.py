@@ -48,7 +48,8 @@ async def insert_transaction(transaction: StockTransaction | dict) -> None:
 
 
 async def list_by_product(
-    product_id: str, limit: int = 50,
+    product_id: str,
+    limit: int = 50,
 ) -> list[StockTransaction]:
     conn = get_connection()
     org_id = get_org_id()

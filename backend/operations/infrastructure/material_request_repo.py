@@ -72,9 +72,7 @@ async def list_pending(limit: int = 100) -> list[MaterialRequest]:
     return [_row_to_model(r) for r in rows]
 
 
-async def list_by_contractor(
-    contractor_id: str, limit: int = 100
-) -> list[MaterialRequest]:
+async def list_by_contractor(contractor_id: str, limit: int = 100) -> list[MaterialRequest]:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(

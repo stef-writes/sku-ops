@@ -104,9 +104,7 @@ async def delete(product_id: str) -> int:
     return cursor.rowcount
 
 
-async def atomic_decrement(
-    product_id: str, quantity: float, updated_at: str
-) -> Product | None:
+async def atomic_decrement(product_id: str, quantity: float, updated_at: str) -> Product | None:
     """Decrement quantity only if >= requested. Returns updated row or None if insufficient."""
     conn = get_connection()
     org_id = get_org_id()
@@ -122,9 +120,7 @@ async def atomic_decrement(
     return await get_by_id(product_id)
 
 
-async def increment_quantity(
-    product_id: str, quantity: float, updated_at: str
-) -> None:
+async def increment_quantity(product_id: str, quantity: float, updated_at: str) -> None:
     """Rollback: add quantity back."""
     conn = get_connection()
     org_id = get_org_id()
@@ -137,9 +133,7 @@ async def increment_quantity(
     await conn.commit()
 
 
-async def add_quantity(
-    product_id: str, quantity: float, updated_at: str
-) -> Product | None:
+async def add_quantity(product_id: str, quantity: float, updated_at: str) -> Product | None:
     """Add quantity (receiving) and return updated row."""
     conn = get_connection()
     org_id = get_org_id()

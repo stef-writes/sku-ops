@@ -8,13 +8,13 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from catalog.application.queries import list_products
+from finance.application.billing_entity_service import ensure_billing_entity
 from finance.application.invoice_service import (
     create_invoice_from_withdrawals,
     mark_paid_for_withdrawal,
 )
 from finance.application.ledger_service import record_payment as _record_payment
 from finance.application.ledger_service import record_withdrawal as _record_ledger
-from finance.application.billing_entity_service import ensure_billing_entity
 from finance.application.org_settings_service import get_org_settings
 from inventory.application.inventory_service import process_withdrawal_stock_changes
 from jobs.application.job_service import ensure_job as _ensure_job

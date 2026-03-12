@@ -37,7 +37,9 @@ async def update_department(dept_id: str, data: DepartmentCreate, current_user: 
     if not existing:
         raise HTTPException(status_code=404, detail="Department not found")
     result = await catalog_queries.update_department(
-        dept_id, data.name, data.description or "",
+        dept_id,
+        data.name,
+        data.description or "",
     )
     return result
 

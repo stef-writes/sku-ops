@@ -12,9 +12,8 @@ Categories:
 
 import pytest
 
-from catalog.domain.product import Product, ProductCreate, ProductUpdate
-from inventory.domain.errors import InsufficientStockError, NegativeStockError
-from inventory.domain.stock import StockDecrement, StockTransaction, StockTransactionType
+from inventory.domain.errors import InsufficientStockError
+from inventory.domain.stock import StockDecrement
 from operations.domain.withdrawal import MaterialWithdrawal, WithdrawalItem
 from shared.kernel.types import LineItem
 from shared.kernel.units import (

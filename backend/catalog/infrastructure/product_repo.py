@@ -142,9 +142,7 @@ async def find_by_barcode(
     return _row_to_product(row)
 
 
-async def find_by_original_sku_and_vendor(
-    original_sku: str, vendor_id: str
-) -> Product | None:
+async def find_by_original_sku_and_vendor(original_sku: str, vendor_id: str) -> Product | None:
     """Find existing product by vendor's SKU and vendor. For matching incoming orders to inventory."""
     if not original_sku or not str(original_sku).strip() or not vendor_id:
         return None
@@ -161,9 +159,7 @@ async def find_by_original_sku_and_vendor(
     return _row_to_product(row)
 
 
-async def find_by_name_and_vendor(
-    name: str, vendor_id: str
-) -> Product | None:
+async def find_by_name_and_vendor(name: str, vendor_id: str) -> Product | None:
     """Find existing product by exact name (case-insensitive) and vendor.
     Name-based fallback when original_sku is absent — prevents duplicate product creation."""
     if not name or not str(name).strip() or not vendor_id:

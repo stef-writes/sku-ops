@@ -262,9 +262,7 @@ async def apply_credit_note(credit_note_id: str) -> ApplyCreditNoteResult:
     return ApplyCreditNoteResult(credit_note=updated, auto_paid=auto_paid, invoice_id=inv_id)
 
 
-async def set_xero_credit_note_id(
-    credit_note_id: str, xero_credit_note_id: str
-) -> None:
+async def set_xero_credit_note_id(credit_note_id: str, xero_credit_note_id: str) -> None:
     """Store the Xero credit note ID and mark as synced after a successful sync."""
     conn = get_connection()
     org_id = get_org_id()

@@ -86,17 +86,13 @@ async def list_vendors(ctx: RunContext[AgentDeps]) -> str:
 @_agent.tool
 async def get_usage_velocity(ctx: RunContext[AgentDeps], sku: str, days: int = 30) -> str:
     """How fast a product moves: total and average daily withdrawals over the last N days."""
-    return budget_tool_result(
-        await _get_usage_velocity({"sku": sku, "days": days}), max_tokens=300
-    )
+    return budget_tool_result(await _get_usage_velocity({"sku": sku, "days": days}), max_tokens=300)
 
 
 @_agent.tool
 async def get_reorder_suggestions(ctx: RunContext[AgentDeps], limit: int = 20) -> str:
     """Priority reorder list: low-stock products ranked by urgency (days until stockout based on usage velocity)."""
-    return budget_tool_result(
-        await _get_reorder_suggestions({"limit": limit}), max_tokens=600
-    )
+    return budget_tool_result(await _get_reorder_suggestions({"limit": limit}), max_tokens=600)
 
 
 @_agent.tool
@@ -116,9 +112,7 @@ async def get_top_products(
     ctx: RunContext[AgentDeps], days: int = 30, by: str = "revenue", limit: int = 10
 ) -> str:
     """Top products ranked by units withdrawn or revenue generated over the last N days. by: 'volume' or 'revenue'."""
-    return budget_tool_result(
-        await _get_top_products({"days": days, "by": by, "limit": limit})
-    )
+    return budget_tool_result(await _get_top_products({"days": days, "by": by, "limit": limit}))
 
 
 @_agent.tool

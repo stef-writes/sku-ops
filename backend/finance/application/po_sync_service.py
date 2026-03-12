@@ -10,12 +10,12 @@ from datetime import UTC, datetime
 from finance.adapters.invoicing_factory import get_invoicing_gateway
 from finance.application.org_settings_service import get_org_settings
 from finance.domain.xero_settings import XeroSettings
-from shared.infrastructure.database import get_org_id
 from purchasing.application.queries import (
     get_po_with_cost,
     set_xero_bill_id,
     set_xero_sync_status,
 )
+from shared.infrastructure.database import get_org_id
 
 logger = logging.getLogger(__name__)
 

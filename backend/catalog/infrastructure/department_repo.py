@@ -74,9 +74,7 @@ async def insert(department: Department | dict) -> None:
     await conn.commit()
 
 
-async def update(
-    dept_id: str, name: str, description: str
-) -> Department | None:
+async def update(dept_id: str, name: str, description: str) -> Department | None:
     conn = get_connection()
     org_id = get_org_id()
     params: list = [name, description or "", dept_id]

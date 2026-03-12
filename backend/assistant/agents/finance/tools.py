@@ -68,7 +68,9 @@ async def _get_outstanding_balances(args: dict) -> str:
 async def _get_revenue_summary(args: dict) -> str:
     days = min(int(args.get("days") or 30), 365)
     since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
-    withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=get_org_id())
+    withdrawals = await list_withdrawals(
+        start_date=since, limit=10000, organization_id=get_org_id()
+    )
     total_revenue = sum(w.total for w in withdrawals)
     total_tax = sum(w.tax for w in withdrawals)
     paid = sum(w.total for w in withdrawals if w.payment_status == "paid")
@@ -91,7 +93,9 @@ async def _get_revenue_summary(args: dict) -> str:
 async def _get_pl_summary(args: dict) -> str:
     days = min(int(args.get("days") or 30), 365)
     since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
-    withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=get_org_id())
+    withdrawals = await list_withdrawals(
+        start_date=since, limit=10000, organization_id=get_org_id()
+    )
     total_revenue = sum(w.total for w in withdrawals)
     total_cost = sum(w.cost_total for w in withdrawals)
     gross_profit = total_revenue - total_cost
@@ -112,7 +116,9 @@ async def _get_top_products(args: dict) -> str:
     days = min(int(args.get("days") or 7), 365)
     limit = min(int(args.get("limit") or 10), 50)
     since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
-    withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=get_org_id())
+    withdrawals = await list_withdrawals(
+        start_date=since, limit=10000, organization_id=get_org_id()
+    )
     product_map: dict[str, dict] = {}
     for w in withdrawals:
         for item in w.items:
