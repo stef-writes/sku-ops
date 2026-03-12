@@ -1,125 +1,232 @@
-# Deployment Runbook — Railway + Vercel + Supabase
+# Deployment Playbook
 
-Follow these steps **in order**. Steps have dependencies on each other.
+## Architecture
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│   Vercel     │     │   Railway    │     │   Supabase   │
+│  (Frontend)  │────▶│  (Backend)   │────▶│  (Postgres)  │
+│  React SPA   │     │  FastAPI     │     │  Port 5432   │
+└──────────────┘     └──────────────┘     └──────────────┘
+  Deploys from:        Deploys from:        Managed DB
+  main branch          main branch
+  Root dir: frontend/  Dockerfile: backend/
+```
+
+- **Frontend** (Vercel) — static React SPA, talks directly to backend via `VITE_BACKEND_URL`
+- **Backend** (Railway) — FastAPI in Docker, connects to Supabase Postgres via `DATABASE_URL`
+- **Database** (Supabase) — Postgres 16. Use the **direct** connection (port 5432), NOT the pooler (port 6543). asyncpg uses prepared statements which are incompatible with pgbouncer.
+
+There is also a **self-hosted** path via `docker-compose.yml` (Postgres + Redis + backend + nginx + certbot) — this is an alternative to the Vercel/Railway/Supabase stack for VPS deployments.
 
 ---
 
-## Prerequisites
+## Environments
 
-- Railway account, project created, Postgres plugin added
-- Vercel account, project connected to this repo
-- Supabase project created (free tier is fine)
-- This repo pushed to GitHub and connected to both Railway and Vercel
+| Environment | `ENV` value | Where | Purpose |
+|---|---|---|---|
+| **Local dev** | `development` | Your machine | SQLite, no secrets needed, demo seed auto-loads |
+| **Staging** | `staging` | Railway + Vercel + Supabase | Real Postgres, demo auth enabled |
+| **Production** | `production` | Same stack, strict config | No demo auth, no reset endpoints, Supabase Auth required |
 
----
+### Staging vs Production differences
 
-## Step 1 — Supabase: collect your credentials
-
-Go to **Supabase Dashboard → Settings → API**.
-
-Copy these — you'll need them in every step below:
-
-| What | Where | Used by |
+| Behavior | `staging` | `production` |
 |---|---|---|
-| Project URL | `https://xxxx.supabase.co` | Vercel build env, frontend |
-| Anon (public) key | long `eyJ...` string | Vercel build env, frontend |
-| JWT Secret | under "JWT Settings" | Railway env var |
+| JWT_SECRET | Must be set, not default | Must be set, not default |
+| CORS_ORIGINS | Must be set, not `*` | Must be set, not `*` |
+| `ALLOW_PUBLIC_AUTH` | Can be `true` (local login/register) | Should be removed (Supabase Auth only) |
+| `ALLOW_RESET` | Can be `true` (seed endpoint) | Should be removed |
+| Demo user seed | Only if `DEMO_USER_EMAIL` set | Never — even if vars are set |
 
-> **The JWT Secret is not the anon key.** It's a separate secret. If you set the wrong value in Railway, every API request returns 401.
+### Promoting staging → production
 
----
-
-## Step 2 — Supabase: create your first user
-
-1. Go to **Authentication → Users → Invite user** (or Add user).
-2. Enter your email and password.
-3. Copy the UUID from the `id` column in the Users list — you'll need it in Step 4.
-
----
-
-## Step 3 — Railway: set environment variables
-
-In your Railway service, go to **Variables** and set all of the following.
-
-### Required (app won't start without these)
-
-```
-ENV=production
-DATABASE_URL=<see note below>
-JWT_SECRET=<Supabase JWT Secret from Step 1>
-CORS_ORIGINS=https://<your-vercel-app>.vercel.app
-```
-
-> **DATABASE_URL must use port 5432 (direct connection), not 6543 (pgbouncer).**
->
-> In Railway's Postgres plugin, go to **Connect → Available Variables** and copy
-> `DATABASE_URL` — this is the direct connection string. Do NOT use the pooler URL.
-> asyncpg uses prepared statements which are incompatible with pgbouncer.
-
-### Strongly recommended
-
-```
-FRONTEND_URL=https://<your-vercel-app>.vercel.app
-SENTRY_DSN=https://...@sentry.io/...
-```
-
-### AI features (set at least one to enable the assistant and OCR)
-
-```
-ANTHROPIC_API_KEY=sk-ant-...
-OPENROUTER_API_KEY=sk-or-...
-OPENAI_API_KEY=sk-...          # only needed for semantic product search embeddings
-```
-
-### Optional
-
-```
-WORKERS=1                      # increase to 2×CPU+1 if Railway plan supports it; requires REDIS_URL if >1
-REDIS_URL=redis://...          # required only if WORKERS > 1
-LOG_LEVEL=INFO
-SESSION_COST_CAP=2.00          # per-session AI spend cap in USD
-XERO_CLIENT_ID=
-XERO_CLIENT_SECRET=
-XERO_REDIRECT_URI=https://<your-railway-domain>/api/xero/callback
-```
-
-After setting all variables, **deploy**. Watch the startup logs. A healthy start looks like:
-
-```
-INFO  Database initialized
-INFO  LLM provider initialized
-INFO  WebSocket endpoints verified: ['/api/ws', '/api/ws/chat']
-INFO  Database connectivity verified
-INFO  Application ready — env=production, db=postgres, ...
-```
-
-If you see a `RuntimeError` on startup, the error message will tell you exactly which required variable is missing.
+1. Set `ENV=production` on Railway
+2. Remove `ALLOW_PUBLIC_AUTH` and `ALLOW_RESET`
+3. Set `JWT_SECRET` to your Supabase project's JWT secret (Dashboard > Settings > API)
+4. Set `app_metadata.role` on all Supabase users (see "Adding users" below)
+5. Update `CORS_ORIGINS` to production domain(s)
 
 ---
 
-## Step 4 — Provision your admin user in the database
+## Branching Strategy
 
-The backend needs a row in its local `users` table that matches your Supabase user's UUID. Run this from the project root:
+**Single-branch workflow:** `main` is the deploy branch for both Vercel and Railway.
+
+- All work goes through PRs into `main`
+- Vercel auto-deploys preview URLs for PRs, production on merge to `main`
+- Railway auto-deploys on push to `main`
+
+The `dev` branch exists but is currently unused (identical to `main`). If you want staging/prod split later, use `dev` → Railway staging, `main` → Railway production.
+
+---
+
+## Vercel (Frontend)
+
+**Project:** `frontend`
+**Root config:** `vercel.json` (repo root — controls monorepo build)
+**Framework:** Vite
+
+### How the build works
+
+Vercel uses the root `vercel.json`:
+```json
+{
+  "buildCommand": "cd frontend && npm ci && npm run build",
+  "outputDirectory": "frontend/dist",
+  "installCommand": "echo skip",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
+```
+
+The SPA rewrite ensures React Router works on hard refresh. No API proxy needed — the frontend talks directly to Railway via `VITE_BACKEND_URL`.
+
+### Environment variables (Vercel dashboard)
+
+| Variable | Value | Notes |
+|---|---|---|
+| `VITE_BACKEND_URL` | `https://your-app.up.railway.app` | No trailing slash. All API calls go here. |
+| `VITE_SUPABASE_URL` | `https://your-project.supabase.co` | Supabase Dashboard > Settings > API |
+| `VITE_SUPABASE_ANON_KEY` | `eyJ...` | Supabase Dashboard > Settings > API |
+
+These are **build-time** variables (baked into JS). Changing them requires a redeploy.
+
+### Production domains
+
+Stable domains (must be in Railway's `CORS_ORIGINS`):
+- `frontend-five-ecru-30.vercel.app` (custom alias)
+- `frontend-stefanos-projects-915294ee.vercel.app` (project domain)
+- `frontend-git-main-stefanos-projects-915294ee.vercel.app` (branch domain)
+
+Preview deployments get unique URLs — these are NOT in CORS_ORIGINS by default.
+
+---
+
+## Railway (Backend)
+
+**Config:** `railway.toml` (repo root)
+**Dockerfile:** `backend/Dockerfile`
+**Health check:** `GET /api/health`
+
+### Environment variables
+
+**Required (app won't start without these):**
+
+| Variable | Value | Notes |
+|---|---|---|
+| `ENV` | `staging` or `production` | Controls strictness |
+| `DATABASE_URL` | `postgresql://...@host:5432/db` | Port 5432 (direct), NOT 6543 (pooler) |
+| `JWT_SECRET` | Supabase JWT secret or random hex | Must match what signs tokens |
+| `CORS_ORIGINS` | Comma-separated Vercel URLs | Must include all stable frontend domains |
+
+**Optional:**
+
+| Variable | Value | Notes |
+|---|---|---|
+| `ALLOW_PUBLIC_AUTH` | `true` | Enables `/api/auth/login` and `/api/auth/register` |
+| `ALLOW_RESET` | `true` | Enables `/api/reset` seed endpoint |
+| `ANTHROPIC_API_KEY` | `sk-ant-...` | Enables AI assistant |
+| `REDIS_URL` | `redis://...` | Required if `WORKERS > 1` |
+| `WORKERS` | `1` | Uvicorn worker count |
+| `SENTRY_DSN` | `https://...@sentry.io/...` | Error tracking |
+| `FRONTEND_URL` | `https://your-app.vercel.app` | For OAuth callback redirects |
+
+### Updating env vars
 
 ```bash
-PYTHONPATH=backend:. uv run python backend/scripts/create_admin.py \
-    --id <supabase-user-uuid-from-step-2> \
-    --email you@example.com \
-    --name "Your Name"
+railway variables --set "CORS_ORIGINS=https://domain1.com,https://domain2.com"
 ```
+Railway auto-redeploys on variable change.
 
-> This connects to whatever `DATABASE_URL` is in `backend/.env`. For production, temporarily set `DATABASE_URL` to your Railway Postgres direct URL, run the script, then remove it.
->
-> Alternatively, run this inside a Railway shell (Railway CLI: `railway run python backend/scripts/create_admin.py ...`).
+### Manual redeploy
 
-The script will also print the SQL you need to run next.
+```bash
+railway up        # Deploy from local code
+# or just push to main — Railway auto-deploys
+```
 
 ---
 
-## Step 5 — Supabase: set the admin role on your user
+## Docker Compose (Self-Hosted Alternative)
 
-Run this in **Supabase Dashboard → SQL Editor**:
+For VPS deployments without Vercel/Railway/Supabase.
 
+```bash
+# Dev (local)
+docker compose up          # Uses docker-compose.override.yml automatically
+                           # Exposes Postgres:5433, backend:8000
+                           # Skips nginx/certbot
+
+# Production (VPS)
+cp .env.production.example .env    # Fill in secrets
+docker compose -f docker-compose.yml up -d    # Ignores override, runs full stack
+```
+
+---
+
+## Database
+
+### Local dev
+SQLite at `backend/data/sku_ops.db` — auto-created, auto-migrated, auto-seeded.
+
+### Staging/Production
+Supabase Postgres 16. Migrations run automatically on startup.
+
+### SQL compatibility rules
+
+The codebase supports both SQLite and Postgres:
+- All queries use `?` placeholders — auto-converted to `$N` for Postgres
+- `ROUND(SUM(...))` **must** use `CAST(... AS NUMERIC)` — Postgres rejects `round(real, integer)`
+- SQLite-specific functions (`julianday`, `datetime`) **must** use helpers from `shared/infrastructure/db/sql_compat.py`
+- `INSERT OR IGNORE` is auto-converted to `INSERT ... ON CONFLICT DO NOTHING`
+
+### Connection rules
+- Port **5432** (direct), NOT 6543 (Supabase pgbouncer)
+- Backend raises RuntimeError on startup if port 6543 detected in deployed environments
+
+---
+
+## CI/CD Pipeline
+
+**GitHub Actions:** `.github/workflows/ci.yml`
+
+| Job | What it does |
+|---|---|
+| `backend` | Lint (ruff) + format check + tests against **SQLite** |
+| `backend-postgres` | Same tests against **Postgres 16** (catches SQL dialect bugs) |
+| `frontend` | Lint (eslint) + format (prettier) + build + tests (vitest) |
+| `docker` | Builds the backend Docker image (build smoke test) |
+
+Runs on push to `main`/`dev` and on PRs targeting those branches.
+
+---
+
+## Initial Setup (First Deploy)
+
+### 1. Supabase — collect credentials
+
+From **Supabase Dashboard > Settings > API**:
+- Project URL (`https://xxxx.supabase.co`)
+- Anon key (`eyJ...`)
+- JWT Secret (under "JWT Settings" — **not** the anon key)
+
+### 2. Railway — set env vars
+
+Set all required variables (see table above). Deploy and check logs for:
+```
+INFO  Application ready — env=staging, db=postgres, ...
+```
+
+### 3. Vercel — set build-time env vars
+
+Set `VITE_BACKEND_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. Trigger redeploy.
+
+### 4. Provision admin user
+
+If using Supabase Auth:
+1. Create user in Supabase Dashboard > Authentication > Users
+2. Run `create_admin.py` with their UUID
+3. Set `app_metadata.role` in Supabase SQL Editor:
 ```sql
 UPDATE auth.users
 SET raw_app_meta_data = jsonb_set(
@@ -129,82 +236,44 @@ SET raw_app_meta_data = jsonb_set(
 WHERE email = 'you@example.com';
 ```
 
-> **This step is not optional.** Without it, `app_metadata.role` is empty and every API request returns 401, even with a valid session. The backend requires a role claim; it will never default to admin.
+If using local auth (`ALLOW_PUBLIC_AUTH=true`):
+- Hit `/api/reset` to seed demo data, or register via `/api/auth/register`
 
----
-
-## Step 6 — Verify the backend is healthy
+### 5. Smoke test
 
 ```bash
-curl https://<your-railway-domain>/api/health
-# → {"status":"ok","version":"0.1.0","env":"production","uptime_seconds":...}
-
-curl https://<your-railway-domain>/api/ready
-# → {"status":"ok","checks":{"database":{"status":"ok",...},...}}
+curl https://<railway-domain>/api/health   # → {"status":"ok",...}
+curl https://<railway-domain>/api/ready    # → {"status":"ok","checks":{...}}
 ```
 
-If `/api/ready` returns `503`, check the `checks` object — it will identify which subsystem is unhealthy.
+Open the Vercel URL, log in, check browser console for CORS errors.
 
 ---
 
-## Step 7 — Vercel: set build-time environment variables
+## Troubleshooting
 
-Go to **Vercel → Project → Settings → Environment Variables** and add:
+| Symptom | Cause | Fix |
+|---|---|---|
+| WebSocket 403 | `CORS_ORIGINS` missing frontend domain | Add Vercel URL to Railway `CORS_ORIGINS` |
+| Every API request 401 | JWT_SECRET mismatch, or `app_metadata.role` not set | Check JWT_SECRET matches token signer |
+| `round(real, integer)` error | Missing `CAST(... AS NUMERIC)` in SQL | Wrap: `ROUND(CAST(expr AS NUMERIC), 2)` |
+| `julianday` does not exist | SQLite function in Postgres query | Use `sql_compat.days_overdue_expr()` |
+| Frontend blank / can't reach backend | `VITE_BACKEND_URL` wrong or missing | Set in Vercel env vars, redeploy |
+| DB connection fails | Using port 6543 (pgbouncer) | Switch to port 5432 (direct) |
+| Backend crashes on startup | Missing required env var | Read the RuntimeError message |
 
+### Useful commands
+
+```bash
+# Check Railway env vars
+railway variables --json | python3 -c "import sys,json; [print(f'{k}={v}') for k,v in sorted(json.load(sys.stdin).items())]"
+
+# Check Railway logs
+railway logs
+
+# Verify backend health
+curl https://<railway-domain>/api/ready
+
+# Trigger Railway redeploy
+railway up
 ```
-VITE_SUPABASE_URL=https://xxxx.supabase.co          (from Step 1)
-VITE_SUPABASE_ANON_KEY=eyJ...                        (from Step 1)
-VITE_BACKEND_URL=https://<your-railway-domain>       (no trailing slash)
-```
-
-> These are baked into the JavaScript bundle at build time. Setting them after a
-> deploy has no effect — a new deploy is required.
-
----
-
-## Step 8 — Vercel: trigger a deployment
-
-Push a commit, or manually trigger a redeploy from the Vercel dashboard. Confirm the build picks up the env vars (check the build logs for `VITE_SUPABASE_URL` being used).
-
----
-
-## Step 9 — End-to-end smoke test
-
-1. Open the Vercel URL in an incognito window.
-2. Log in with the email/password from Step 2.
-3. Confirm you land on the dashboard (not a 401 or blank screen).
-4. Open the browser console — confirm no CORS errors and no failed API calls.
-5. Hit `https://<railway-domain>/api/ready` — confirm all checks pass.
-
----
-
-## Common failure modes
-
-| Symptom | Most likely cause |
-|---|---|
-| Backend crashes on startup | Missing required env var — read the `RuntimeError` message |
-| Every API request returns 401 | `JWT_SECRET` doesn't match Supabase JWT Secret, OR `app_metadata.role` not set (Step 5) |
-| Login succeeds but app is broken | `users` row not provisioned (Step 4) — `/api/auth/me` falls back to sparse claims |
-| Frontend can't reach backend | `VITE_BACKEND_URL` wrong or missing, or `CORS_ORIGINS` doesn't match Vercel URL |
-| DB connection fails | `DATABASE_URL` using port 6543 (pgbouncer) instead of 5432 (direct) |
-| WebSocket broken | `VITE_BACKEND_URL` not set — WS URLs fall back to relative path which doesn't work cross-origin |
-| AI assistant disabled | No `ANTHROPIC_API_KEY` or `OPENROUTER_API_KEY` set |
-
----
-
-## Re-deploying after config changes
-
-- **Railway env var change**: Railway auto-redeploys. No build needed.
-- **Vercel `VITE_*` change**: Must trigger a new Vercel build — env is baked at build time.
-- **Supabase JWT Secret rotation**: Update `JWT_SECRET` in Railway immediately. All existing sessions will be invalidated — users must log in again.
-
----
-
-## Adding more users (post-launch)
-
-1. Create user in Supabase Dashboard → Authentication → Users.
-2. Run `create_admin.py` with their Supabase UUID and desired role.
-3. Set `app_metadata.role` in Supabase SQL Editor.
-
-For non-admin roles, use `--role contractor` or `--role viewer` in Step 2,
-and set `'{role}', '"contractor"'` in the SQL in Step 3.
