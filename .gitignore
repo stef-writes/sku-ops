@@ -112,4 +112,6 @@ deploy/nginx/nginx.init-tls.conf
 test_temp.txt
 test_write.txt
 test_reports/
+test-results/
+e2e/test-results/
 backend/*.db

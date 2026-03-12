@@ -57,6 +57,22 @@ if [ ${#MISSING[@]} -gt 0 ]; then
   exit 1
 fi
 
+# Frontend vars are baked into the JS bundle at build time.
+# Without these, the frontend falls back to bridge auth (broken in production).
+FRONTEND_VARS=(VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY)
+FE_MISSING=()
+for var in "${FRONTEND_VARS[@]}"; do
+  if [ -z "${!var:-}" ]; then
+    FE_MISSING+=("$var")
+  fi
+done
+if [ ${#FE_MISSING[@]} -gt 0 ]; then
+  echo "ERROR: Missing frontend build variables: ${FE_MISSING[*]}"
+  echo "       These are baked into the JS at build time (cannot be changed after deploy)."
+  echo "       Get them from Supabase Dashboard > Settings > API."
+  exit 1
+fi
+
 echo "=== Deploying sku-ops to ${DOMAIN} ==="
 echo ""
 

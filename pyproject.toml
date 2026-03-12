@@ -118,6 +118,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "backend/tests/**" = ["N806", "PLR2004", "PLR0913", "PLR0915", "S108", "ARG001", "ARG002", "S105", "B017", "PT011", "PT017", "PT018", "INP001"]
 "devtools/**" = ["T201", "INP001", "ASYNC230", "ASYNC240"]
+"backend/scripts/**" = ["T201", "INP001"]
 "backend/server.py" = ["T201", "E402"]
 "backend/assistant/**" = ["ASYNC230", "ASYNC240", "E402", "RUF006", "PLW2901", "B019", "ARG001", "ARG002"]
 "backend/shared/infrastructure/db/**" = ["ASYNC240", "E402"]

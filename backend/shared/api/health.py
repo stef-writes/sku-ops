@@ -2,8 +2,9 @@
 
 import time
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from starlette.routing import WebSocketRoute
 
 from shared.infrastructure.config import (
     _ENV,
@@ -35,7 +36,7 @@ async def health():
 
 
 @router.get("/ready")
-async def ready():
+async def ready(request: Request):
     """Readiness probe — returns 200 only if DB and core services are reachable."""
     checks: dict = {}
     overall = "ok"
@@ -54,7 +55,14 @@ async def ready():
 
     ai_ok = ANTHROPIC_AVAILABLE or OPENROUTER_AVAILABLE
     checks["ai"] = {"status": "ok" if ai_ok else "unconfigured"}
-    checks["websocket"] = {"status": "ok", "endpoints": ["/api/ws", "/api/ws/chat"]}
+
+    expected_ws = {"/api/ws", "/api/ws/chat"}
+    mounted_ws = [r.path for r in request.app.routes if isinstance(r, WebSocketRoute)]
+    ws_ok = expected_ws.issubset(set(mounted_ws))
+    checks["websocket"] = {
+        "status": "ok" if ws_ok else "missing",
+        "endpoints": mounted_ws,
+    }
 
     status_code = 200 if overall == "ok" else 503
     return JSONResponse(

@@ -96,18 +96,22 @@ REFRESH_TOKEN_EXPIRATION_DAYS = int(os.environ.get("REFRESH_TOKEN_EXPIRATION_DAY
 
 # CORS — strict enforcement in deployed environments
 CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*")
-cors_is_permissive = CORS_ORIGINS == "*" or "*" in CORS_ORIGINS.split(",")
+cors_is_permissive = (
+    not CORS_ORIGINS.strip() or CORS_ORIGINS == "*" or "*" in CORS_ORIGINS.split(",")
+)
 cors_warn_in_deployed = is_deployed and cors_is_permissive
 
 
 def _enforce_cors() -> None:
     if is_production and cors_is_permissive:
         raise RuntimeError(
-            "CORS_ORIGINS must not be '*' in production. Set CORS_ORIGINS=https://your-domain.com"
+            "CORS_ORIGINS must not be '*' or empty in production. "
+            "Set CORS_ORIGINS=https://your-vercel-app.vercel.app"
         )
     if is_staging and cors_is_permissive:
         raise RuntimeError(
-            "CORS_ORIGINS must not be '*' in staging. Set CORS_ORIGINS to your staging domain(s)."
+            "CORS_ORIGINS must not be '*' or empty in staging. "
+            "Set CORS_ORIGINS to your staging domain(s)."
         )
 
 
@@ -144,9 +148,11 @@ seed_on_startup = (is_development or is_test) and bool(DEMO_USER_EMAIL)
 # Reset/seed endpoints: dev/test only. Cannot be enabled in production or staging.
 ALLOW_RESET = is_development or is_test
 
-# Public auth endpoints (login, register): dev/test only.
-# In production, Supabase owns the auth surface — these routes must not be reachable.
-ALLOW_PUBLIC_AUTH = is_development or is_test
+# Public auth endpoints (login, register): dev/test by default.
+# Set ALLOW_PUBLIC_AUTH=true to enable local auth in production (no Supabase).
+ALLOW_PUBLIC_AUTH = (
+    os.environ.get("ALLOW_PUBLIC_AUTH", "").lower() in ("1", "true") or is_development or is_test
+)
 
 # AI - Anthropic Claude. Set ANTHROPIC_API_KEY to enable.
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()

@@ -162,12 +162,17 @@ class PostgresBackend:
         self._acquire_timeout = float(os.environ.get("PG_ACQUIRE_TIMEOUT", "30"))
 
         if ":6543" in url:
-            logger.warning(
+            from shared.infrastructure.config import is_deployed
+
+            msg = (
                 "DATABASE_URL uses port 6543 (Supabase pgbouncer). "
                 "asyncpg uses prepared statements which are incompatible with "
                 "pgbouncer in transaction mode. Use the direct connection on "
                 "port 5432 instead."
             )
+            if is_deployed:
+                raise RuntimeError(msg)
+            logger.warning(msg)
 
         self._pool = await asyncpg.create_pool(
             url,
