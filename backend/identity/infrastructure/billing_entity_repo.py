@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 
 from identity.domain.billing_entity import BillingEntity
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 
 def _row_to_model(row) -> BillingEntity | None:
@@ -45,36 +45,38 @@ async def insert(entity: BillingEntity | dict) -> None:
     await conn.commit()
 
 
-async def get_by_id(entity_id: str, organization_id: str) -> BillingEntity | None:
+async def get_by_id(entity_id: str) -> BillingEntity | None:
     conn = get_connection()
+    org_id = get_org_id()
     sel_q = "SELECT "
     sel_q += _COLUMNS
     sel_q += " FROM billing_entities WHERE id = ? AND organization_id = ?"
-    cursor = await conn.execute(sel_q, (entity_id, organization_id))
+    cursor = await conn.execute(sel_q, (entity_id, org_id))
     return _row_to_model(await cursor.fetchone())
 
 
-async def get_by_name(name: str, organization_id: str) -> BillingEntity | None:
+async def get_by_name(name: str) -> BillingEntity | None:
     conn = get_connection()
+    org_id = get_org_id()
     sel_q = "SELECT "
     sel_q += _COLUMNS
     sel_q += " FROM billing_entities WHERE LOWER(TRIM(name)) = ? AND organization_id = ?"
-    cursor = await conn.execute(sel_q, (name.strip().lower(), organization_id))
+    cursor = await conn.execute(sel_q, (name.strip().lower(), org_id))
     return _row_to_model(await cursor.fetchone())
 
 
 async def list_billing_entities(
-    organization_id: str,
     is_active: bool | None = None,
     q: str | None = None,
     limit: int = 200,
     offset: int = 0,
 ) -> list:
     conn = get_connection()
+    org_id = get_org_id()
     sql = "SELECT "
     sql += _COLUMNS
     sql += " FROM billing_entities WHERE organization_id = ?"
-    params: list = [organization_id]
+    params: list = [org_id]
     if is_active is not None:
         sql += " AND is_active = ?"
         params.append(1 if is_active else 0)
@@ -88,8 +90,9 @@ async def list_billing_entities(
     return [e for r in await cursor.fetchall() if (e := _row_to_model(r)) is not None]
 
 
-async def update(entity_id: str, updates: dict, organization_id: str) -> BillingEntity | None:
+async def update(entity_id: str, updates: dict) -> BillingEntity | None:
     conn = get_connection()
+    org_id = get_org_id()
     set_clauses = []
     params = []
     for key in (
@@ -107,21 +110,22 @@ async def update(entity_id: str, updates: dict, organization_id: str) -> Billing
         set_clauses.append("is_active = ?")
         params.append(1 if updates["is_active"] else 0)
     if not set_clauses:
-        return await get_by_id(entity_id, organization_id)
+        return await get_by_id(entity_id)
     set_clauses.append("updated_at = ?")
     params.append(datetime.now(UTC).isoformat())
-    params.extend([entity_id, organization_id])
+    params.extend([entity_id, org_id])
     upd_q = "UPDATE billing_entities SET "
     upd_q += ", ".join(set_clauses)
     upd_q += " WHERE id = ? AND organization_id = ?"
     await conn.execute(upd_q, params)
     await conn.commit()
-    return await get_by_id(entity_id, organization_id)
+    return await get_by_id(entity_id)
 
 
-async def search(query: str, organization_id: str, limit: int = 20) -> list:
+async def search(query: str, limit: int = 20) -> list:
     """Fast prefix/substring search for autocomplete."""
     conn = get_connection()
+    org_id = get_org_id()
     like = f"%{query.lower()}%"
     sel_q = "SELECT "
     sel_q += _COLUMNS
@@ -131,18 +135,19 @@ async def search(query: str, organization_id: str, limit: int = 20) -> list:
         " AND (LOWER(name) LIKE ? OR LOWER(contact_name) LIKE ?)"
         " ORDER BY name LIMIT ?"
     )
-    cursor = await conn.execute(sel_q, (organization_id, like, like, limit))
+    cursor = await conn.execute(sel_q, (org_id, like, like, limit))
     return [e for r in await cursor.fetchall() if (e := _row_to_model(r)) is not None]
 
 
-async def ensure_billing_entity(name: str, organization_id: str) -> BillingEntity | None:
+async def ensure_billing_entity(name: str) -> BillingEntity | None:
     """Get existing entity by name, or auto-create a minimal one."""
     if not name or not name.strip():
         return None
-    existing = await get_by_name(name, organization_id)
+    existing = await get_by_name(name)
     if existing:
         return existing
-    entity = BillingEntity(name=name.strip(), organization_id=organization_id)
+    org_id = get_org_id()
+    entity = BillingEntity(name=name.strip(), organization_id=org_id)
     await insert(entity)
     return entity
 

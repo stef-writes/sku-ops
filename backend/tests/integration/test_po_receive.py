@@ -10,7 +10,6 @@ from inventory.application.inventory_service import (
     process_receiving_stock_changes,
 )
 from inventory.infrastructure.stock_repo import stock_repo
-from kernel.types import CurrentUser
 from purchasing.application.purchase_order_service import (
     PurchasingDeps,
     _resolve_po_item_cost,
@@ -24,6 +23,7 @@ from purchasing.domain.purchase_order import (
 )
 from purchasing.infrastructure.po_repo import po_repo
 from shared.infrastructure.database import get_connection
+from shared.kernel.types import CurrentUser
 
 
 def _user():

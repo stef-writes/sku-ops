@@ -1,10 +1,11 @@
 """Fiscal period repository — persistence for fiscal periods."""
 
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 
-async def get_period(period_id: str, org_id: str) -> dict | None:
+async def get_period(period_id: str) -> dict | None:
     conn = get_connection()
+    org_id = get_org_id()
     cursor = await conn.execute(
         "SELECT * FROM fiscal_periods WHERE id = ? AND organization_id = ?",
         (period_id, org_id),
@@ -13,8 +14,9 @@ async def get_period(period_id: str, org_id: str) -> dict | None:
     return dict(row) if row else None
 
 
-async def list_periods(org_id: str, status: str | None = None) -> list[dict]:
+async def list_periods(status: str | None = None) -> list[dict]:
     conn = get_connection()
+    org_id = get_org_id()
     query = "SELECT * FROM fiscal_periods WHERE organization_id = ?"
     params: list = [org_id]
     if status:
@@ -30,10 +32,10 @@ async def insert_period(
     name: str,
     start_date: str,
     end_date: str,
-    org_id: str,
     created_at: str,
 ) -> None:
     conn = get_connection()
+    org_id = get_org_id()
     await conn.execute(
         """INSERT INTO fiscal_periods (id, name, start_date, end_date, status, organization_id, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)""",
@@ -51,15 +53,16 @@ async def close_period(period_id: str, closed_by_id: str, closed_at: str) -> Non
     await conn.commit()
 
 
-async def find_closed_period_covering(entry_date: str, organization_id: str) -> dict | None:
+async def find_closed_period_covering(entry_date: str) -> dict | None:
     """Return a closed fiscal period that covers entry_date, or None."""
     conn = get_connection()
+    org_id = get_org_id()
     cursor = await conn.execute(
         """SELECT id, name FROM fiscal_periods
            WHERE organization_id = ? AND status = 'closed'
              AND ? >= start_date AND ? <= end_date
            LIMIT 1""",
-        (organization_id, entry_date[:10], entry_date[:10]),
+        (org_id, entry_date[:10], entry_date[:10]),
     )
     row = await cursor.fetchone()
     return dict(row) if row else None

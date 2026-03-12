@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 
 from jobs.domain.job import Job
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 
 def _row_to_model(row) -> Job | None:
@@ -42,36 +42,38 @@ async def insert(job: Job | dict) -> None:
     await conn.commit()
 
 
-async def get_by_id(job_id: str, organization_id: str) -> Job | None:
+async def get_by_id(job_id: str) -> Job | None:
     conn = get_connection()
+    org_id = get_org_id()
     sel_q = "SELECT "
     sel_q += _COLUMNS
     sel_q += " FROM jobs WHERE id = ? AND organization_id = ?"
-    cursor = await conn.execute(sel_q, (job_id, organization_id))
+    cursor = await conn.execute(sel_q, (job_id, org_id))
     return _row_to_model(await cursor.fetchone())
 
 
-async def get_by_code(code: str, organization_id: str) -> Job | None:
+async def get_by_code(code: str) -> Job | None:
     conn = get_connection()
+    org_id = get_org_id()
     sel_q = "SELECT "
     sel_q += _COLUMNS
     sel_q += " FROM jobs WHERE code = ? AND organization_id = ?"
-    cursor = await conn.execute(sel_q, (code, organization_id))
+    cursor = await conn.execute(sel_q, (code, org_id))
     return _row_to_model(await cursor.fetchone())
 
 
 async def list_jobs(
-    organization_id: str,
     status: str | None = None,
     q: str | None = None,
     limit: int = 200,
     offset: int = 0,
 ) -> list[Job]:
     conn = get_connection()
+    org_id = get_org_id()
     sql = "SELECT "
     sql += _COLUMNS
     sql += " FROM jobs WHERE organization_id = ?"
-    params: list = [organization_id]
+    params: list = [org_id]
     if status:
         sql += " AND status = ?"
         params.append(status)
@@ -85,8 +87,9 @@ async def list_jobs(
     return [_row_to_model(r) for r in await cursor.fetchall()]
 
 
-async def update(job_id: str, updates: dict, organization_id: str) -> Job | None:
+async def update(job_id: str, updates: dict) -> Job | None:
     conn = get_connection()
+    org_id = get_org_id()
     set_clauses = []
     params = []
     for key in ("name", "status", "billing_entity_id", "service_address", "notes"):
@@ -94,38 +97,40 @@ async def update(job_id: str, updates: dict, organization_id: str) -> Job | None
             set_clauses.append(f"{key} = ?")
             params.append(updates[key])
     if not set_clauses:
-        return await get_by_id(job_id, organization_id)
+        return await get_by_id(job_id)
     set_clauses.append("updated_at = ?")
     params.append(datetime.now(UTC).isoformat())
-    params.extend([job_id, organization_id])
+    params.extend([job_id, org_id])
     await conn.execute(
         "UPDATE jobs SET " + ", ".join(set_clauses) + " WHERE id = ? AND organization_id = ?",
         params,
     )
     await conn.commit()
-    return await get_by_id(job_id, organization_id)
+    return await get_by_id(job_id)
 
 
-async def search(query: str, organization_id: str, limit: int = 20) -> list[Job]:
+async def search(query: str, limit: int = 20) -> list[Job]:
     """Fast prefix/substring search for autocomplete."""
     conn = get_connection()
+    org_id = get_org_id()
     like = f"%{query.lower()}%"
     cursor = await conn.execute(
         "SELECT " + _COLUMNS + " FROM jobs"
         " WHERE organization_id = ? AND status = 'active'"
         " AND (LOWER(code) LIKE ? OR LOWER(name) LIKE ?)"
         " ORDER BY code LIMIT ?",
-        (organization_id, like, like, limit),
+        (org_id, like, like, limit),
     )
     return [_row_to_model(r) for r in await cursor.fetchall()]
 
 
-async def ensure_job(code: str, organization_id: str) -> Job:
+async def ensure_job(code: str) -> Job:
     """Get existing job by code, or auto-create a minimal one. Used by write paths."""
-    existing = await get_by_code(code, organization_id)
+    existing = await get_by_code(code)
     if existing:
         return existing
-    job = Job(code=code, name=code, organization_id=organization_id)
+    org_id = get_org_id()
+    job = Job(code=code, name=code, organization_id=org_id)
     await insert(job)
     return job
 

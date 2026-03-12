@@ -17,20 +17,20 @@ from identity.infrastructure.org_settings_repo import (
 )
 
 
-async def get_org_settings(org_id: str):
-    return await _get(org_id)
+async def get_org_settings():
+    return await _get()
 
 
 async def upsert_org_settings(settings):
     return await _upsert(settings)
 
 
-async def clear_xero_tokens(org_id: str) -> None:
-    await _clear(org_id)
+async def clear_xero_tokens() -> None:
+    await _clear()
 
 
-async def save_oauth_state(state: str, org_id: str) -> None:
-    await _save_state(state, org_id)
+async def save_oauth_state(state: str) -> None:
+    await _save_state(state)
 
 
 async def pop_oauth_state(state: str) -> str | None:

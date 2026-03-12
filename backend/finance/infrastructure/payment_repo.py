@@ -1,7 +1,7 @@
 """Payment repository — persistence for payment records."""
 
 from finance.domain.payment import Payment
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 
 def _row_to_model(row) -> Payment | None:
@@ -21,6 +21,7 @@ _COLUMNS = "id, invoice_id, billing_entity_id, amount, method, reference, paymen
 async def insert(payment: Payment | dict, withdrawal_ids: list[str] | None = None) -> None:
     d = payment if isinstance(payment, dict) else payment.model_dump()
     conn = get_connection()
+    org_id = get_org_id()
     ins_q = "INSERT INTO payments ("
     ins_q += _COLUMNS
     ins_q += ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -37,7 +38,7 @@ async def insert(payment: Payment | dict, withdrawal_ids: list[str] | None = Non
             d.get("notes"),
             d["recorded_by_id"],
             d.get("xero_payment_id"),
-            d["organization_id"],
+            org_id,
             d["created_at"],
             d["updated_at"],
         ),
@@ -50,12 +51,13 @@ async def insert(payment: Payment | dict, withdrawal_ids: list[str] | None = Non
     await conn.commit()
 
 
-async def get_by_id(payment_id: str, organization_id: str) -> Payment | None:
+async def get_by_id(payment_id: str) -> Payment | None:
     conn = get_connection()
+    org_id = get_org_id()
     sel_q = "SELECT "
     sel_q += _COLUMNS
     sel_q += " FROM payments WHERE id = ? AND organization_id = ?"
-    cursor = await conn.execute(sel_q, (payment_id, organization_id))
+    cursor = await conn.execute(sel_q, (payment_id, org_id))
     row = await cursor.fetchone()
     p = _row_to_model(row)
     if p:
@@ -71,7 +73,6 @@ async def get_by_id(payment_id: str, organization_id: str) -> Payment | None:
 
 
 async def list_payments(
-    organization_id: str,
     invoice_id: str | None = None,
     billing_entity_id: str | None = None,
     start_date: str | None = None,
@@ -80,10 +81,11 @@ async def list_payments(
     offset: int = 0,
 ) -> list[Payment]:
     conn = get_connection()
+    org_id = get_org_id()
     sql = "SELECT "
     sql += _COLUMNS
     sql += " FROM payments WHERE organization_id = ?"
-    params: list = [organization_id]
+    params: list = [org_id]
     if invoice_id:
         sql += " AND invoice_id = ?"
         params.append(invoice_id)
@@ -102,25 +104,27 @@ async def list_payments(
     return [_row_to_model(r) for r in await cursor.fetchall()]
 
 
-async def list_for_invoice(invoice_id: str, organization_id: str) -> list[Payment]:
+async def list_for_invoice(invoice_id: str) -> list[Payment]:
     conn = get_connection()
+    org_id = get_org_id()
     sel_q = "SELECT "
     sel_q += _COLUMNS
     sel_q += (
         " FROM payments WHERE invoice_id = ? AND organization_id = ? ORDER BY payment_date DESC"
     )
-    cursor = await conn.execute(sel_q, (invoice_id, organization_id))
+    cursor = await conn.execute(sel_q, (invoice_id, org_id))
     return [_row_to_model(r) for r in await cursor.fetchall()]
 
 
-async def list_for_withdrawal(withdrawal_id: str, organization_id: str) -> list[Payment]:
+async def list_for_withdrawal(withdrawal_id: str) -> list[Payment]:
     conn = get_connection()
+    org_id = get_org_id()
     cursor = await conn.execute(
         """SELECT p.* FROM payments p
            JOIN payment_withdrawals pw ON pw.payment_id = p.id
            WHERE pw.withdrawal_id = ? AND p.organization_id = ?
            ORDER BY p.payment_date DESC""",
-        (withdrawal_id, organization_id),
+        (withdrawal_id, org_id),
     )
     return [_row_to_model(r) for r in await cursor.fetchall()]
 

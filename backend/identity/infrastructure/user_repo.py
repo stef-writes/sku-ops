@@ -1,8 +1,7 @@
 """User repository."""
 
 from identity.domain.user import User
-from shared.infrastructure.config import DEFAULT_ORG_ID
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 
 def _row_to_model(row) -> User | None:
@@ -63,7 +62,7 @@ async def get_by_email(email: str) -> dict | None:
 
 async def insert(user_dict: dict) -> None:
     conn = get_connection()
-    org_id = user_dict.get("organization_id") or DEFAULT_ORG_ID
+    org_id = user_dict.get("organization_id") or get_org_id()
     cols = "id, email, password, name, role, company, billing_entity, phone, is_active, organization_id, created_at"
     ins_q = "INSERT INTO users ("
     ins_q += cols
@@ -87,8 +86,9 @@ async def insert(user_dict: dict) -> None:
     await conn.commit()
 
 
-async def update(user_id: str, updates: dict, organization_id: str | None = None) -> User | None:
+async def update(user_id: str, updates: dict) -> User | None:
     conn = get_connection()
+    org_id = get_org_id()
     set_clauses = []
     values = []
     if "name" in updates and updates["name"] is not None:
@@ -110,9 +110,8 @@ async def update(user_id: str, updates: dict, organization_id: str | None = None
         return await get_by_id(user_id)
     values.append(user_id)
     where = "WHERE id = ?"
-    if organization_id:
-        where += " AND organization_id = ?"
-        values.append(organization_id)
+    where += " AND organization_id = ?"
+    values.append(org_id)
     upd_q = "UPDATE users SET "
     upd_q += ", ".join(set_clauses)
     upd_q += " " + where
@@ -121,11 +120,9 @@ async def update(user_id: str, updates: dict, organization_id: str | None = None
     return await get_by_id(user_id)
 
 
-async def list_contractors(
-    organization_id: str | None = None, search: str | None = None
-) -> list[User]:
+async def list_contractors(search: str | None = None) -> list[User]:
     conn = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     base = """SELECT id, email, name, role, company, billing_entity, phone, is_active, organization_id, created_at
               FROM users WHERE role = 'contractor' AND (organization_id = ? OR organization_id IS NULL)"""
     params: list = [org_id]
@@ -139,9 +136,9 @@ async def list_contractors(
     return [u for r in rows if (u := _row_to_model(r)) is not None]
 
 
-async def count_contractors(organization_id: str | None = None) -> int:
+async def count_contractors() -> int:
     conn = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     cursor = await conn.execute(
         "SELECT COUNT(*) FROM users WHERE role = 'contractor' AND (organization_id = ? OR organization_id IS NULL)",
         (org_id,),
@@ -150,13 +147,13 @@ async def count_contractors(organization_id: str | None = None) -> int:
     return row[0] if row else 0
 
 
-async def delete_contractor(contractor_id: str, organization_id: str | None = None) -> int:
+async def delete_contractor(contractor_id: str) -> int:
     conn = get_connection()
+    org_id = get_org_id()
     where = "WHERE id = ? AND role = 'contractor'"
     params: list = [contractor_id]
-    if organization_id:
-        where += " AND organization_id = ?"
-        params.append(organization_id)
+    where += " AND organization_id = ?"
+    params.append(org_id)
     del_q = "DELETE FROM users "
     del_q += where
     cursor = await conn.execute(del_q, params)

@@ -2,8 +2,8 @@
 
 from pydantic import BaseModel
 
-from kernel.entity import Entity
-from kernel.types import LineItem, round_money
+from shared.kernel.entity import Entity
+from shared.kernel.types import LineItem, round_money
 
 
 class WithdrawalItem(LineItem):

@@ -28,7 +28,7 @@ import logging
 import uuid
 
 import jwt
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic_ai import AgentRunResultEvent
 from pydantic_ai.messages import (
     FinalResultEvent,
@@ -59,11 +59,14 @@ from shared.infrastructure.config import (
     OPENROUTER_AVAILABLE,
     SESSION_COST_CAP,
 )
+from shared.infrastructure.logging_config import org_id_var, user_id_var
 
 logger = logging.getLogger(__name__)
 
 HEARTBEAT_INTERVAL = 25
 _ALLOWED_ROLES = frozenset({"admin"})
+
+router = APIRouter()
 
 
 def _authenticate(token: str) -> dict | None:
@@ -82,119 +85,117 @@ async def _send(ws: WebSocket, msg: dict) -> bool:
         return False
 
 
-def mount_chat_websocket(app: FastAPI) -> None:
-    """Register the /api/ws/chat WebSocket endpoint."""
+@router.websocket("/ws/chat")
+async def ws_chat_endpoint(websocket: WebSocket):
+    token = websocket.query_params.get("token", "")
+    payload = _authenticate(token)
+    if not payload:
+        await websocket.close(code=4001, reason="Invalid or expired token")
+        return
 
-    @app.websocket("/api/ws/chat")
-    async def ws_chat_endpoint(websocket: WebSocket):
-        token = websocket.query_params.get("token", "")
-        payload = _authenticate(token)
-        if not payload:
-            await websocket.close(code=4001, reason="Invalid or expired token")
-            return
+    org_id = payload.get("organization_id", DEFAULT_ORG_ID)
+    user_id = payload.get("user_id", "")
+    user_name = payload.get("name", "")
+    role = payload.get("role", "")
 
-        org_id = payload.get("organization_id", DEFAULT_ORG_ID)
-        user_id = payload.get("user_id", "")
-        user_name = payload.get("name", "")
-        role = payload.get("role", "")
+    org_id_var.set(org_id)
+    user_id_var.set(user_id)
 
-        if role not in _ALLOWED_ROLES:
-            await websocket.close(code=4003, reason="Insufficient permissions")
-            return
+    if role not in _ALLOWED_ROLES:
+        await websocket.close(code=4003, reason="Insufficient permissions")
+        return
 
-        await websocket.accept()
-        logger.info("Chat WS connected: user=%s org=%s", user_id, org_id)
+    await websocket.accept()
+    logger.info("Chat WS connected: user=%s org=%s", user_id, org_id)
 
-        cancel_event: asyncio.Event | None = None
-        generation_task: asyncio.Task | None = None
+    cancel_event: asyncio.Event | None = None
+    generation_task: asyncio.Task | None = None
 
-        async def _heartbeat():
-            while True:
-                await asyncio.sleep(HEARTBEAT_INTERVAL)
-                if not await _send(ws, {"type": "ping"}):
-                    return
+    async def _heartbeat():
+        while True:
+            await asyncio.sleep(HEARTBEAT_INTERVAL)
+            if not await _send(ws, {"type": "ping"}):
+                return
 
-        async def _receiver():
-            """Listen for client messages — chat requests and cancellations."""
-            nonlocal cancel_event, generation_task
-            try:
-                while True:
-                    raw = await websocket.receive_text()
-                    try:
-                        msg = json.loads(raw)
-                    except (json.JSONDecodeError, TypeError):
-                        continue
-
-                    msg_type = msg.get("type")
-
-                    if msg_type == "pong":
-                        continue
-
-                    if msg_type == "cancel":
-                        logger.debug("Chat WS cancel from user=%s", user_id)
-                        if cancel_event:
-                            cancel_event.set()
-                        if generation_task and not generation_task.done():
-                            generation_task.cancel()
-                        continue
-
-                    if msg_type == "chat":
-                        if generation_task and not generation_task.done():
-                            await _send(
-                                ws,
-                                {
-                                    "type": "chat.error",
-                                    "detail": "Already generating a response. Send 'cancel' first.",
-                                },
-                            )
-                            continue
-
-                        cancel_event = asyncio.Event()
-                        generation_task = asyncio.create_task(
-                            _handle_chat(
-                                websocket,
-                                msg,
-                                org_id,
-                                user_id,
-                                user_name,
-                                cancel_event,
-                            )
-                        )
-
-            except WebSocketDisconnect:
-                logger.debug("Chat WS disconnected: user=%s", user_id)
-            except (RuntimeError, OSError, ValueError) as e:
-                logger.warning("Chat WS receiver error for user=%s: %s", user_id, e)
-            finally:
-                if generation_task and not generation_task.done():
-                    generation_task.cancel()
-                    try:
-                        await generation_task
-                    except asyncio.CancelledError:
-                        pass
-                    except Exception:
-                        logger.warning("Chat generation task raised on cancel", exc_info=True)
-
-        ws = websocket
-        tasks = [
-            asyncio.create_task(_heartbeat()),
-            asyncio.create_task(_receiver()),
-        ]
+    async def _receiver():
+        """Listen for client messages — chat requests and cancellations."""
+        nonlocal cancel_event, generation_task
         try:
-            _done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-            for t in pending:
-                t.cancel()
-        except (RuntimeError, OSError):
-            for t in tasks:
-                t.cancel()
+            while True:
+                raw = await websocket.receive_text()
+                try:
+                    msg = json.loads(raw)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+
+                msg_type = msg.get("type")
+
+                if msg_type == "pong":
+                    continue
+
+                if msg_type == "cancel":
+                    logger.debug("Chat WS cancel from user=%s", user_id)
+                    if cancel_event:
+                        cancel_event.set()
+                    if generation_task and not generation_task.done():
+                        generation_task.cancel()
+                    continue
+
+                if msg_type == "chat":
+                    if generation_task and not generation_task.done():
+                        await _send(
+                            ws,
+                            {
+                                "type": "chat.error",
+                                "detail": "Already generating a response. Send 'cancel' first.",
+                            },
+                        )
+                        continue
+
+                    cancel_event = asyncio.Event()
+                    generation_task = asyncio.create_task(
+                        _handle_chat(
+                            websocket,
+                            msg,
+                            user_id,
+                            user_name,
+                            cancel_event,
+                        )
+                    )
+
+        except WebSocketDisconnect:
+            logger.debug("Chat WS disconnected: user=%s", user_id)
+        except (RuntimeError, OSError, ValueError) as e:
+            logger.warning("Chat WS receiver error for user=%s: %s", user_id, e)
         finally:
-            logger.info("Chat WS closed: user=%s org=%s", user_id, org_id)
+            if generation_task and not generation_task.done():
+                generation_task.cancel()
+                try:
+                    await generation_task
+                except asyncio.CancelledError:
+                    pass
+                except Exception:
+                    logger.warning("Chat generation task raised on cancel", exc_info=True)
+
+    ws = websocket
+    tasks = [
+        asyncio.create_task(_heartbeat()),
+        asyncio.create_task(_receiver()),
+    ]
+    try:
+        _done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for t in pending:
+            t.cancel()
+    except (RuntimeError, OSError):
+        for t in tasks:
+            t.cancel()
+    finally:
+        logger.info("Chat WS closed: user=%s org=%s", user_id, org_id)
 
 
 async def _handle_chat(
     ws: WebSocket,
     msg: dict,
-    org_id: str,
     user_id: str,
     user_name: str,
     cancel_event: asyncio.Event,
@@ -233,7 +234,7 @@ async def _handle_chat(
     history = await session_store.get_or_create(session_id)
     if not history:
         try:
-            memory_ctx = await recall_memory(org_id=org_id, user_id=user_id)
+            memory_ctx = await recall_memory(user_id=user_id)
         except (ValueError, RuntimeError, OSError) as e:
             logger.warning("Memory recall failed for user=%s: %s", user_id, e)
             memory_ctx = ""
@@ -243,7 +244,7 @@ async def _handle_chat(
                 {"role": "assistant", "content": "Context noted from previous sessions."},
             ]
 
-    deps = AgentDeps(org_id=org_id, user_id=user_id, user_name=user_name)
+    deps = AgentDeps(user_id=user_id, user_name=user_name)
     msg_history = build_message_history(history)
 
     await _send(ws, {"type": "chat.status", "status": "thinking"})
@@ -316,7 +317,6 @@ async def _handle_chat(
 
                 if len(new_history) % 8 == 0:
                     schedule_memory_extraction(
-                        org_id=org_id,
                         user_id=user_id,
                         session_id=session_id,
                         history=new_history,

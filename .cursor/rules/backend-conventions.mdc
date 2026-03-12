@@ -52,6 +52,10 @@ No business logic, no multi-service orchestration, no raw SQL, no direct repo im
 
 The gold standard is `inventory/api/cycle_counts.py` — every route delegates entirely to application service functions.
 
+All context routers are aggregated in `routes.py` at the backend root and registered under the `/api` prefix. WebSocket routes (`/api/ws`, `/api/ws/chat`) are standard `APIRouter` instances included there too — no special mount helpers.
+
+Health and readiness endpoints (`/api/health`, `/api/ready`, `/api/health/ai`) live in `shared/api/health.py`, not inside any bounded context.
+
 ## Cross-context access
 
 Never import from another context's `infrastructure/` layer. Use the context's `application/` facade.

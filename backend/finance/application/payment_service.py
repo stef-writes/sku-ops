@@ -9,11 +9,11 @@ from finance.application.ledger_service import record_payment as _record_ledger_
 from finance.domain.payment import Payment, PaymentCreate
 from finance.infrastructure.payment_repo import payment_repo
 from operations.application.queries import get_withdrawal_by_id, mark_withdrawal_paid
+from shared.infrastructure.database import get_org_id
 
 
 async def create_payment_for_withdrawals(
     data: PaymentCreate,
-    org_id: str,
     recorded_by_id: str,
 ) -> Payment:
     """Aggregate withdrawal totals, create payment, mark each withdrawal paid + ledger entry.
@@ -31,7 +31,7 @@ async def create_payment_for_withdrawals(
     contractor_id = ""
 
     for wid in data.withdrawal_ids:
-        w = await get_withdrawal_by_id(wid, org_id)
+        w = await get_withdrawal_by_id(wid)
         if not w:
             raise ValueError(f"Withdrawal {wid} not found")
         total_amount += w.total
@@ -50,7 +50,7 @@ async def create_payment_for_withdrawals(
         payment_date=data.payment_date or now,
         notes=data.notes,
         recorded_by_id=recorded_by_id,
-        organization_id=org_id,
+        organization_id=get_org_id(),
     )
 
     await payment_repo.insert(payment, withdrawal_ids=data.withdrawal_ids)
@@ -59,14 +59,13 @@ async def create_payment_for_withdrawals(
     for wid in data.withdrawal_ids:
         await mark_withdrawal_paid(wid, paid_at)
         await mark_paid_for_withdrawal(wid)
-        w = await get_withdrawal_by_id(wid, org_id)
+        w = await get_withdrawal_by_id(wid)
         if w:
             await _record_ledger_payment(
                 withdrawal_id=wid,
                 amount=w.total,
                 billing_entity=w.billing_entity,
                 contractor_id=w.contractor_id,
-                organization_id=org_id,
                 performed_by_user_id=recorded_by_id,
             )
 

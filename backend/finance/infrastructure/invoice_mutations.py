@@ -6,7 +6,8 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from shared.infrastructure.database import get_connection
+from finance.infrastructure._invoice_fetch import get_by_id
+from shared.infrastructure.database import get_connection, get_org_id
 
 if TYPE_CHECKING:
     from finance.domain.invoice import InvoiceWithDetails
@@ -15,26 +16,23 @@ if TYPE_CHECKING:
 async def update_fields(
     invoice_id: str,
     updates: dict,
-    organization_id: str | None = None,
 ) -> InvoiceWithDetails | None:
     """Update arbitrary invoice columns from a pre-validated dict."""
-    from finance.infrastructure.invoice_repo import get_by_id
-
     if not updates:
-        return await get_by_id(invoice_id, organization_id=organization_id)
+        return await get_by_id(invoice_id)
     conn = get_connection()
+    org_id = get_org_id()
     now = datetime.now(UTC).isoformat()
     updates["updated_at"] = now
     set_clauses = [f"{k} = ?" for k in updates]
     params = list(updates.values())
     params.append(invoice_id)
     q = f"UPDATE invoices SET {', '.join(set_clauses)} WHERE id = ?"
-    if organization_id:
-        q += " AND organization_id = ?"
-        params.append(organization_id)
+    q += " AND organization_id = ?"
+    params.append(org_id)
     await conn.execute(q, params)
     await conn.commit()
-    return await get_by_id(invoice_id, organization_id=organization_id)
+    return await get_by_id(invoice_id)
 
 
 async def replace_line_items(invoice_id: str, line_items: list[dict]) -> float:
@@ -143,11 +141,11 @@ async def insert_invoice_row(
     tax_rate: float,
     payment_terms: str,
     due_date: str,
-    org_id: str,
     now: str,
 ) -> None:
     """Insert a bare invoice row (no line items)."""
     conn = get_connection()
+    org_id = get_org_id()
     await conn.execute(
         """INSERT INTO invoices (id, invoice_number, billing_entity, contact_name, contact_email,
            status, subtotal, tax, tax_rate, total, amount_credited, notes,
@@ -185,7 +183,7 @@ async def insert_invoice_row(
     await conn.commit()
 
 
-async def mark_paid_for_withdrawal(withdrawal_id: str, _organization_id: str | None = None) -> None:
+async def mark_paid_for_withdrawal(withdrawal_id: str) -> None:
     """When a withdrawal is marked paid, update its linked invoice to status 'paid'.
 
     Uses the finance-owned invoice_withdrawals bridge table to find the linked invoice.

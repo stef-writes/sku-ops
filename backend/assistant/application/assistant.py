@@ -25,7 +25,6 @@ from assistant.infrastructure.llm import get_model
 from assistant.infrastructure.llm.catalog import resolve_tier_model
 from shared.infrastructure.config import (
     ANTHROPIC_AVAILABLE,
-    DEFAULT_ORG_ID,
     LLM_SETUP_URL,
     OPENROUTER_AVAILABLE,
 )
@@ -58,7 +57,6 @@ async def chat(
 
     ctx = ctx or {}
     deps = AgentDeps(
-        org_id=ctx.get("org_id", DEFAULT_ORG_ID),
         user_id=ctx.get("user_id", ""),
         user_name=ctx.get("user_name", ""),
     )
@@ -84,7 +82,6 @@ async def _chat_multipath(
     """Original 4-path dispatch: trivial -> lookup -> DAG -> specialist agent. Not active."""
     ctx = ctx or {}
     deps = AgentDeps(
-        org_id=ctx.get("org_id", DEFAULT_ORG_ID),
         user_id=ctx.get("user_id", ""),
         user_name=ctx.get("user_name", ""),
     )
@@ -96,7 +93,7 @@ async def _chat_multipath(
     if is_trivial(user_message):
         return _trivial_response(user_message)
 
-    lookup_result = await try_lookup(user_message, deps.org_id)
+    lookup_result = await try_lookup(user_message)
     if lookup_result:
         result = AgentResult(agent="lookup", response=lookup_result)
         d = result.to_dict()
@@ -153,7 +150,7 @@ def _trivial_response(user_message: str) -> dict:
 
 async def _dag_dispatch(user_message: str, plan, deps: AgentDeps, _session_id: str) -> dict:
     """Execute a structured DAG plan — parallel tool calls, cheap LLM synthesis."""
-    dag_result = await execute_plan(plan, run_tool, deps.org_id)
+    dag_result = await execute_plan(plan, run_tool)
 
     synth_node = plan.synthesis_node
     if synth_node and synth_node.id in dag_result.node_results:
@@ -234,13 +231,12 @@ async def _run_agent(
 # ── Memory facade (keeps agent imports out of the API layer) ──────────────────
 
 
-async def recall_memory(org_id: str, user_id: str) -> str:
+async def recall_memory(user_id: str) -> str:
     """Return formatted memory context for session injection. Empty string if none."""
-    return await recall(org_id=org_id, user_id=user_id)
+    return await recall(user_id=user_id)
 
 
 def schedule_memory_extraction(
-    org_id: str,
     user_id: str,
     session_id: str,
     history: list[dict],
@@ -248,7 +244,6 @@ def schedule_memory_extraction(
     """Fire-and-forget background task to extract memory artifacts from conversation."""
     asyncio.create_task(
         extract_and_save(
-            org_id=org_id,
             user_id=user_id,
             session_id=session_id,
             history=history,

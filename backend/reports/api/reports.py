@@ -33,7 +33,6 @@ async def get_sales_report(
     billing_entity: str | None = None,
 ):
     return await sales_report(
-        current_user.organization_id,
         start_date=start_date,
         end_date=end_date,
         job_id=job_id,
@@ -44,7 +43,7 @@ async def get_sales_report(
 
 @router.get("/inventory")
 async def get_inventory_report(current_user: AdminDep):
-    return await inventory_report(current_user.organization_id)
+    return await inventory_report()
 
 
 @router.get("/trends")
@@ -59,7 +58,6 @@ async def get_trends_report(
 ):
     """Revenue/cost/profit trends from the ledger."""
     return await trends_report(
-        current_user.organization_id,
         start_date=start_date,
         end_date=end_date,
         group_by=group_by,
@@ -80,7 +78,6 @@ async def get_product_margins(
     billing_entity: str | None = None,
 ):
     return await product_margins_report(
-        current_user.organization_id,
         start_date=start_date,
         end_date=end_date,
         limit=limit,
@@ -101,7 +98,6 @@ async def get_job_pl(
 ):
     """Per-job P&L from the ledger."""
     return await job_pl_report(
-        current_user.organization_id,
         start_date=start_date,
         end_date=end_date,
         limit=limit,
@@ -125,7 +121,6 @@ async def get_pl(
 ):
     """Unified P&L endpoint. group_by: overall | job | contractor | department | entity | product."""
     return await pl_report(
-        current_user.organization_id,
         group_by=group_by,
         start_date=start_date,
         end_date=end_date,
@@ -145,9 +140,7 @@ async def get_ar_aging(
     end_date: str | None = None,
 ):
     """Accounts receivable aging buckets by billing entity."""
-    return await ar_aging_report(
-        current_user.organization_id, start_date=start_date, end_date=end_date
-    )
+    return await ar_aging_report(start_date=start_date, end_date=end_date)
 
 
 @router.get("/kpis")
@@ -160,7 +153,6 @@ async def get_kpis(
     billing_entity: str | None = None,
 ):
     return await kpi_report(
-        current_user.organization_id,
         start_date=start_date,
         end_date=end_date,
         job_id=job_id,
@@ -177,7 +169,6 @@ async def get_product_performance(
     limit: int = 200,
 ):
     return await product_performance_report(
-        current_user.organization_id,
         start_date=start_date,
         end_date=end_date,
         limit=limit,
@@ -191,7 +182,7 @@ async def get_reorder_urgency(
     limit: int = 50,
 ):
     """Products ranked by days-until-stockout using withdrawal velocity."""
-    return await reorder_urgency_report(current_user.organization_id, days=days, limit=limit)
+    return await reorder_urgency_report(days=days, limit=limit)
 
 
 @router.get("/product-activity")
@@ -201,6 +192,4 @@ async def get_product_activity(
     days: int = 365,
 ):
     """Daily withdrawal activity heatmap data. Optional product_id filter."""
-    return await product_activity_report(
-        current_user.organization_id, product_id=product_id, days=days
-    )
+    return await product_activity_report(product_id=product_id, days=days)

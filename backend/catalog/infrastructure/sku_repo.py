@@ -1,20 +1,19 @@
 """SKU counter repository."""
 
-from shared.infrastructure.config import DEFAULT_ORG_ID
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 
-def _counter_key(organization_id: str | None, department_code: str) -> str:
-    """Composite key for org-scoped SKU counters. Backward compat: use plain code if no org."""
-    org = organization_id or DEFAULT_ORG_ID
+def _counter_key(department_code: str) -> str:
+    """Composite key for org-scoped SKU counters."""
+    org = get_org_id()
     code = (department_code or "").strip().upper()
     return f"{org}|{code}"
 
 
-async def get_next_number(department_code: str, organization_id: str | None = None) -> int:
+async def get_next_number(department_code: str) -> int:
     """Return the next counter value without incrementing (for preview)."""
     conn = get_connection()
-    key = _counter_key(organization_id, department_code)
+    key = _counter_key(department_code)
     cursor = await conn.execute(
         "SELECT counter FROM sku_counters WHERE department_code = ?",
         (key,),
@@ -23,22 +22,22 @@ async def get_next_number(department_code: str, organization_id: str | None = No
     return (row[0] + 1) if row else 1
 
 
-async def get_all_counters(organization_id: str | None = None) -> dict:
+async def get_all_counters() -> dict:
     """Return {department_code: counter} for org's departments with counters."""
     conn = get_connection()
-    prefix = f"{organization_id or 'default'}|"
+    org_id = get_org_id()
+    prefix = f"{org_id}|"
     cursor = await conn.execute(
         "SELECT department_code, counter FROM sku_counters WHERE department_code LIKE ?",
         (f"{prefix}%",),
     )
     rows = await cursor.fetchall()
-    # Strip org prefix for backward compat
     return {row[0].split("|", 1)[-1]: row[1] for row in rows} if rows else {}
 
 
-async def increment_and_get(department_code: str, organization_id: str | None = None) -> int:
+async def increment_and_get(department_code: str) -> int:
     code = (department_code or "").strip().upper()
-    key = _counter_key(organization_id, code)
+    key = _counter_key(code)
     conn = get_connection()
     await conn.execute(
         """INSERT INTO sku_counters (department_code, counter) VALUES (?, 1)

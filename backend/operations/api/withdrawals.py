@@ -7,7 +7,6 @@ from typing import Annotated
 from fastapi import APIRouter, Body, HTTPException, Request
 
 from identity.application.user_service import get_user_by_id
-from kernel import events
 from operations.application.queries import get_withdrawal_by_id, list_withdrawals
 from operations.application.withdrawal_service import (
     bulk_mark_withdrawals_paid,
@@ -18,6 +17,7 @@ from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalC
 from shared.api.deps import AdminDep, CurrentUserDep
 from shared.infrastructure import event_hub
 from shared.infrastructure.middleware.audit import audit_log
+from shared.kernel import events
 
 router = APIRouter(prefix="/withdrawals", tags=["withdrawals"])
 
@@ -53,11 +53,10 @@ async def create_withdrawal_for_contractor(
     current_user: AdminDep,
 ):
     """Admin creates withdrawal on behalf of a contractor."""
-    org_id = current_user.organization_id
     contractor = await get_user_by_id(contractor_id)
     if not contractor or contractor.role != "contractor":
         raise HTTPException(status_code=404, detail="Contractor not found")
-    if contractor.organization_id and contractor.organization_id != org_id:
+    if contractor.organization_id and contractor.organization_id != current_user.organization_id:
         raise HTTPException(status_code=403, detail="Contractor belongs to different organization")
     result = await create_withdrawal_wired(data, contractor.model_dump(), current_user)
     await audit_log(
@@ -67,10 +66,14 @@ async def create_withdrawal_for_contractor(
         resource_id=result.get("id"),
         details={"contractor_id": contractor_id, "total": result.get("total")},
         request=request,
-        org_id=org_id,
+        org_id=current_user.organization_id,
     )
-    await event_hub.emit(events.WITHDRAWAL_CREATED, org_id=org_id, id=result.get("id"))
-    await event_hub.emit(events.INVENTORY_UPDATED, org_id=org_id)
+    await event_hub.emit(
+        events.WITHDRAWAL_CREATED,
+        org_id=current_user.organization_id,
+        id=result.get("id"),
+    )
+    await event_hub.emit(events.INVENTORY_UPDATED, org_id=current_user.organization_id)
     return result
 
 
@@ -83,7 +86,6 @@ async def get_withdrawals(
     start_date: str | None = None,
     end_date: str | None = None,
 ):
-    org_id = current_user.organization_id
     cid = current_user.id if current_user.role == "contractor" else contractor_id
     return await list_withdrawals(
         contractor_id=cid,
@@ -92,14 +94,12 @@ async def get_withdrawals(
         start_date=start_date,
         end_date=end_date,
         limit=1000,
-        organization_id=org_id,
     )
 
 
 @router.get("/{withdrawal_id}")
 async def get_withdrawal(withdrawal_id: str, current_user: CurrentUserDep):
-    org_id = current_user.organization_id
-    withdrawal = await get_withdrawal_by_id(withdrawal_id, organization_id=org_id)
+    withdrawal = await get_withdrawal_by_id(withdrawal_id)
     if not withdrawal:
         raise HTTPException(status_code=404, detail="Withdrawal not found")
 
@@ -111,11 +111,9 @@ async def get_withdrawal(withdrawal_id: str, current_user: CurrentUserDep):
 
 @router.put("/{withdrawal_id}/mark-paid")
 async def mark_withdrawal_paid(withdrawal_id: str, request: Request, current_user: AdminDep):
-    org_id = current_user.organization_id
     try:
         result = await mark_single_withdrawal_paid(
             withdrawal_id=withdrawal_id,
-            org_id=org_id,
             performed_by_user_id=current_user.id,
         )
     except ValueError as e:
@@ -127,9 +125,11 @@ async def mark_withdrawal_paid(withdrawal_id: str, request: Request, current_use
         resource_id=withdrawal_id,
         details={},
         request=request,
-        org_id=org_id,
+        org_id=current_user.organization_id,
     )
-    await event_hub.emit(events.WITHDRAWAL_UPDATED, org_id=org_id, id=withdrawal_id)
+    await event_hub.emit(
+        events.WITHDRAWAL_UPDATED, org_id=current_user.organization_id, id=withdrawal_id
+    )
     return result.model_dump()
 
 
@@ -137,11 +137,9 @@ async def mark_withdrawal_paid(withdrawal_id: str, request: Request, current_use
 async def bulk_mark_paid(
     request: Request, withdrawal_ids: Annotated[list[str], Body(...)], current_user: AdminDep
 ):
-    org_id = current_user.organization_id
     try:
         updated = await bulk_mark_withdrawals_paid(
             withdrawal_ids=withdrawal_ids,
-            org_id=org_id,
             performed_by_user_id=current_user.id,
         )
     except ValueError as e:
@@ -153,7 +151,9 @@ async def bulk_mark_paid(
         resource_id=None,
         details={"withdrawal_ids": withdrawal_ids, "count": len(withdrawal_ids)},
         request=request,
-        org_id=org_id,
+        org_id=current_user.organization_id,
     )
-    await event_hub.emit(events.WITHDRAWAL_UPDATED, org_id=org_id, ids=withdrawal_ids)
+    await event_hub.emit(
+        events.WITHDRAWAL_UPDATED, org_id=current_user.organization_id, ids=withdrawal_ids
+    )
     return {"updated": updated}

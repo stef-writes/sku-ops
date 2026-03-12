@@ -10,7 +10,6 @@ from uuid import uuid4
 
 from finance.domain.invoice import (
     Invoice,
-    InvoiceLineItem,
     InvoiceWithDetails,
     compute_due_date,
 )
@@ -37,41 +36,12 @@ from finance.infrastructure.invoice_xero_queries import (
     set_xero_invoice_id,
     set_xero_sync_status,
 )
-from shared.infrastructure.config import DEFAULT_ORG_ID
-from shared.infrastructure.database import get_connection
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _row_to_model(row) -> Invoice | None:
-    if row is None:
-        return None
-    d = dict(row) if hasattr(row, "keys") else {}
-    if not d:
-        return None
-    if d.get("organization_id") is None:
-        d.pop("organization_id", None)
-    return Invoice.model_validate(d)
-
-
-def _build_invoice_with_details(
-    inv_row,
-    line_item_rows,
-    withdrawal_ids: list[str],
-) -> InvoiceWithDetails:
-    d = dict(inv_row)
-    items = []
-    for r in line_item_rows:
-        li = dict(r)
-        for col in ("quantity", "unit_price", "amount", "cost", "sell_cost"):
-            if col in li and li[col] is not None:
-                li[col] = float(li[col])
-        items.append(InvoiceLineItem.model_validate(li))
-    d["line_items"] = items
-    d["withdrawal_ids"] = withdrawal_ids
-    return InvoiceWithDetails.model_validate(d)
+from finance.infrastructure._invoice_fetch import (
+    _build_invoice_with_details,
+    _row_to_model,
+    get_by_id,
+)
+from shared.infrastructure.database import get_connection, get_org_id
 
 
 # ---------------------------------------------------------------------------
@@ -79,10 +49,10 @@ def _build_invoice_with_details(
 # ---------------------------------------------------------------------------
 
 
-async def next_invoice_number(organization_id: str | None = None) -> str:
+async def next_invoice_number() -> str:
     """Generate next invoice number: INV-00001, INV-00002, etc. Org-scoped counter."""
     conn = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     key = f"{org_id}|inv"
     await conn.execute(
         """INSERT INTO invoice_counters (key, counter) VALUES (?, 1)
@@ -102,9 +72,9 @@ async def next_invoice_number(organization_id: str | None = None) -> str:
 async def insert(invoice: Invoice | dict) -> InvoiceWithDetails | None:
     invoice_dict = invoice if isinstance(invoice, dict) else invoice.model_dump()
     conn = get_connection()
-    org_id = invoice_dict.get("organization_id") or DEFAULT_ORG_ID
+    org_id = get_org_id()
     invoice_id = invoice_dict.get("id") or str(uuid4())
-    invoice_number = invoice_dict.get("invoice_number") or await next_invoice_number(org_id)
+    invoice_number = invoice_dict.get("invoice_number") or await next_invoice_number()
     now = datetime.now(UTC).isoformat()
     inv_date = invoice_dict.get("invoice_date") or now
     payment_terms = invoice_dict.get("payment_terms") or "net_30"
@@ -147,50 +117,15 @@ async def insert(invoice: Invoice | dict) -> InvoiceWithDetails | None:
     return await get_by_id(invoice_id)
 
 
-async def get_by_id(
-    invoice_id: str, organization_id: str | None = None
-) -> InvoiceWithDetails | None:
-    conn = get_connection()
-    if organization_id:
-        cursor = await conn.execute(
-            "SELECT * FROM invoices WHERE id = ? AND (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL",
-            (invoice_id, organization_id),
-        )
-    else:
-        cursor = await conn.execute(
-            "SELECT * FROM invoices WHERE id = ? AND deleted_at IS NULL",
-            (invoice_id,),
-        )
-    row = await cursor.fetchone()
-    if not row:
-        return None
-
-    cursor = await conn.execute(
-        "SELECT * FROM invoice_line_items WHERE invoice_id = ? ORDER BY id",
-        (invoice_id,),
-    )
-    li_rows = await cursor.fetchall()
-
-    cursor = await conn.execute(
-        "SELECT withdrawal_id FROM invoice_withdrawals WHERE invoice_id = ?",
-        (invoice_id,),
-    )
-    w_rows = await cursor.fetchall()
-    withdrawal_ids = [r[0] for r in w_rows]
-
-    return _build_invoice_with_details(row, li_rows, withdrawal_ids)
-
-
 async def list_invoices(
     status: str | None = None,
     billing_entity: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
     limit: int = 1000,
-    organization_id: str | None = None,
 ) -> list:
     conn = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     query = "SELECT * FROM invoices WHERE (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL"
     params: list = [org_id]
     if status:

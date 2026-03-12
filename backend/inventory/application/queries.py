@@ -3,13 +3,12 @@
 Exposes stock transaction analytics without leaking infrastructure details.
 """
 
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 
 async def withdrawal_velocity(
     product_ids: list[str],
     since: str,
-    _org_id: str | None = None,
 ) -> dict[str, float]:
     """Total units withdrawn per product since a date. Keyed by product_id."""
     if not product_ids:
@@ -29,12 +28,12 @@ async def withdrawal_velocity(
 
 
 async def daily_withdrawal_activity(
-    org_id: str,
     since: str,
     product_id: str | None = None,
 ) -> list[dict]:
     """Daily withdrawal activity: transaction_count + units_moved per day."""
     conn = get_connection()
+    org_id = get_org_id()
     params: list = [org_id, since]
     product_filter = ""
     if product_id:

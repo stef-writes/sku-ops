@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel
 
-from kernel.entity import Entity
+from shared.kernel.entity import Entity
 
 
 class VendorCreate(BaseModel):

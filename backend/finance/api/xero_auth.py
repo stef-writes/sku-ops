@@ -25,6 +25,7 @@ from shared.infrastructure.config import (
     XERO_CLIENT_SECRET,
     XERO_REDIRECT_URI,
 )
+from shared.infrastructure.logging_config import org_id_var
 
 router = APIRouter(prefix="/xero", tags=["xero"])
 
@@ -45,9 +46,8 @@ def _require_xero_configured():
 async def xero_connect(current_user: AdminDep):
     """Initiate Xero OAuth 2.0 Authorization Code flow. Redirects to Xero consent page."""
     _require_xero_configured()
-    org_id = current_user.organization_id
     state = secrets.token_urlsafe(32)
-    await save_oauth_state(state, org_id)
+    await save_oauth_state(state)
 
     params = {
         "response_type": "code",
@@ -70,6 +70,7 @@ async def xero_callback(code: str = "", state: str = "", error: str = ""):
     org_id = await pop_oauth_state(state)
     if not org_id:
         raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
+    org_id_var.set(org_id)
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
@@ -90,7 +91,7 @@ async def xero_callback(code: str = "", state: str = "", error: str = ""):
     expiry_ts = datetime.now(UTC).timestamp() + token_data.get("expires_in", 1800)
     expiry_iso = datetime.fromtimestamp(expiry_ts, tz=UTC).isoformat()
 
-    settings = await get_org_settings(org_id)
+    settings = await get_org_settings()
     updated = settings.model_copy(
         update={
             "xero_access_token": token_data["access_token"],
@@ -109,8 +110,7 @@ async def xero_callback(code: str = "", state: str = "", error: str = ""):
 @router.get("/tenants")
 async def list_xero_tenants(current_user: AdminDep):
     """List Xero organisations the connected token can access. Use to select tenant_id."""
-    org_id = current_user.organization_id
-    settings = await get_org_settings(org_id)
+    settings = await get_org_settings()
     if not settings.xero_access_token:
         raise HTTPException(status_code=400, detail="Xero not connected for this org")
 
@@ -128,8 +128,7 @@ async def select_xero_tenant(
     current_user: AdminDep,
 ):
     """Save the chosen Xero tenant (organisation) ID for this org."""
-    org_id = current_user.organization_id
-    settings = await get_org_settings(org_id)
+    settings = await get_org_settings()
     if not settings.xero_access_token:
         raise HTTPException(status_code=400, detail="Xero not connected for this org")
     updated = settings.model_copy(update={"xero_tenant_id": tenant_id})
@@ -140,16 +139,14 @@ async def select_xero_tenant(
 @router.post("/disconnect")
 async def xero_disconnect(current_user: AdminDep):
     """Remove Xero OAuth tokens for this org."""
-    org_id = current_user.organization_id
-    await clear_xero_tokens(org_id)
+    await clear_xero_tokens()
     return {"disconnected": True}
 
 
 @router.get("/tracking-categories")
 async def list_tracking_categories(current_user: AdminDep):
     """List Xero tracking categories for the connected org."""
-    org_id = current_user.organization_id
-    settings = await get_org_settings(org_id)
+    settings = await get_org_settings()
     if not settings.xero_access_token:
         raise HTTPException(status_code=400, detail="Xero not connected for this org")
 
@@ -170,8 +167,7 @@ async def select_tracking_category(
     current_user: AdminDep,
 ):
     """Save the chosen Xero tracking category ID for job_id tagging on invoice lines."""
-    org_id = current_user.organization_id
-    settings = await get_org_settings(org_id)
+    settings = await get_org_settings()
     updated = settings.model_copy(update={"xero_tracking_category_id": tracking_category_id})
     saved = await upsert_org_settings(updated)
     return {"xero_tracking_category_id": saved.xero_tracking_category_id}

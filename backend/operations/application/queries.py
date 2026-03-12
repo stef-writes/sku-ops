@@ -20,7 +20,6 @@ async def list_withdrawals(
     end_date: str | None = None,
     limit: int = 10000,
     offset: int = 0,
-    organization_id: str | None = None,
 ) -> list[MaterialWithdrawal]:
     return await _wd_repo.list_withdrawals(
         contractor_id=contractor_id,
@@ -30,14 +29,13 @@ async def list_withdrawals(
         end_date=end_date,
         limit=limit,
         offset=offset,
-        organization_id=organization_id,
     )
 
 
 async def get_withdrawal_by_id(
-    withdrawal_id: str, organization_id: str | None = None
+    withdrawal_id: str,
 ) -> MaterialWithdrawal | None:
-    return await _wd_repo.get_by_id(withdrawal_id, organization_id=organization_id)
+    return await _wd_repo.get_by_id(withdrawal_id)
 
 
 async def mark_withdrawal_paid(withdrawal_id: str, paid_at: str) -> MaterialWithdrawal | None:
@@ -50,7 +48,6 @@ async def list_returns(
     start_date: str | None = None,
     end_date: str | None = None,
     limit: int = 500,
-    organization_id: str | None = None,
 ) -> list[MaterialReturn]:
     return await _ret_repo.list_returns(
         contractor_id=contractor_id,
@@ -58,14 +55,13 @@ async def list_returns(
         start_date=start_date,
         end_date=end_date,
         limit=limit,
-        organization_id=organization_id,
     )
 
 
 async def get_return_by_id(
-    return_id: str, organization_id: str | None = None
+    return_id: str,
 ) -> MaterialReturn | None:
-    return await _ret_repo.get_by_id(return_id, organization_id=organization_id)
+    return await _ret_repo.get_by_id(return_id)
 
 
 async def link_withdrawal_to_invoice(withdrawal_id: str, invoice_id: str) -> None:
@@ -89,19 +85,17 @@ async def link_credit_note_to_return(return_id: str, credit_note_id: str) -> Non
 
 
 async def units_sold_by_product(
-    org_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> dict[str, float]:
-    return await _wd_repo.units_sold_by_product(org_id, start_date, end_date)
+    return await _wd_repo.units_sold_by_product(start_date, end_date)
 
 
 async def payment_status_breakdown(
-    org_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> dict[str, float]:
-    return await _wd_repo.payment_status_breakdown(org_id, start_date, end_date)
+    return await _wd_repo.payment_status_breakdown(start_date, end_date)
 
 
 # --- Material request re-exports ---
@@ -112,29 +106,25 @@ async def insert_material_request(request: MaterialRequest | dict) -> None:
 
 
 async def get_material_request_by_id(
-    request_id: str, organization_id: str | None = None
+    request_id: str,
 ) -> MaterialRequest | None:
-    return await _mr_repo.get_by_id(request_id, organization_id=organization_id)
+    return await _mr_repo.get_by_id(request_id)
 
 
 async def list_material_requests_by_contractor(
     contractor_id: str,
-    organization_id: str | None = None,
     limit: int = 100,
 ) -> list[MaterialRequest]:
     return await _mr_repo.list_by_contractor(
         contractor_id=contractor_id,
-        organization_id=organization_id,
         limit=limit,
     )
 
 
 async def list_pending_material_requests(
-    organization_id: str | None = None,
     limit: int = 100,
 ) -> list[MaterialRequest]:
     return await _mr_repo.list_pending(
-        organization_id=organization_id,
         limit=limit,
     )
 

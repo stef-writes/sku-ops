@@ -9,8 +9,9 @@ from typing import Any
 from documents.application.enrichment_service import enrich_for_import
 from documents.application.import_parser import infer_uom, resolve_uom, suggest_department
 from documents.domain.document import DocumentLineItem
-from kernel.errors import ResourceNotFoundError
-from kernel.types import CurrentUser
+from shared.infrastructure.db import get_org_id
+from shared.kernel.errors import ResourceNotFoundError
+from shared.kernel.types import CurrentUser
 from shared.kernel.units import ALLOWED_BASE_UNITS
 
 
@@ -46,9 +47,9 @@ async def import_document(
     if not vendor_name:
         raise ValueError("Vendor name is required")
 
-    org_id = current_user.organization_id
+    org_id = get_org_id()
 
-    vendor = await deps.find_vendor_by_name(vendor_name, org_id)
+    vendor = await deps.find_vendor_by_name(vendor_name)
     if not vendor:
         if not create_vendor_if_missing:
             raise ResourceNotFoundError("Vendor", vendor_name)
@@ -73,8 +74,8 @@ async def import_document(
         vendor_name = vendor.name
         vendor_created = False
 
-    departments = await deps.list_departments(organization_id=org_id)
-    default_dept = await deps.get_department_by_code("HDW", organization_id=org_id) or (
+    departments = await deps.list_departments()
+    default_dept = await deps.get_department_by_code("HDW") or (
         departments[0] if departments else None
     )
     dept_by_id = {d.id: d for d in departments}
@@ -141,14 +142,14 @@ async def import_document(
 
             existing = None
             if item.get("product_id"):
-                existing = await deps.get_product_by_id(item["product_id"], organization_id=org_id)
+                existing = await deps.get_product_by_id(item["product_id"])
             if not existing and item.get("original_sku") and vendor_id:
                 existing = await deps.find_product_by_sku_and_vendor(
-                    str(item["original_sku"]).strip(), vendor_id, organization_id=org_id
+                    str(item["original_sku"]).strip(), vendor_id
                 )
             if not existing and item.get("name") and vendor_id:
                 existing = await deps.find_product_by_name_and_vendor(
-                    item["name"], vendor_id, organization_id=org_id
+                    item["name"], vendor_id
                 )
 
             if existing:
@@ -160,7 +161,6 @@ async def import_document(
                     user_id=current_user.id,
                     user_name=current_user.name,
                     reference_id=None,
-                    organization_id=org_id,
                 )
                 if item.get("original_sku") and not existing.original_sku:
                     await deps.update_product(existing.id, {"original_sku": item["original_sku"]})
@@ -218,7 +218,6 @@ async def import_document(
                 pack_qty=pq,
                 user_id=current_user.id,
                 user_name=current_user.name,
-                organization_id=org_id,
             )
             imported.append(product)
         except (ValueError, RuntimeError, OSError, KeyError) as e:

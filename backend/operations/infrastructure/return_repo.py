@@ -4,8 +4,7 @@ import json
 from uuid import uuid4
 
 from operations.domain.returns import MaterialReturn
-from shared.infrastructure.config import DEFAULT_ORG_ID
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 
 def _row_to_model(row) -> MaterialReturn | None:
@@ -22,7 +21,7 @@ def _row_to_model(row) -> MaterialReturn | None:
 async def insert(ret: MaterialReturn | dict) -> None:
     ret_dict = ret if isinstance(ret, dict) else ret.model_dump()
     conn = get_connection()
-    org_id = ret_dict.get("organization_id") or DEFAULT_ORG_ID
+    org_id = ret_dict.get("organization_id") or get_org_id()
     items_json = json.dumps(
         [i if isinstance(i, dict) else i.model_dump() for i in ret_dict["items"]]
     )
@@ -86,15 +85,13 @@ async def insert(ret: MaterialReturn | dict) -> None:
     await conn.commit()
 
 
-async def get_by_id(return_id: str, organization_id: str | None = None) -> MaterialReturn | None:
+async def get_by_id(return_id: str) -> MaterialReturn | None:
     conn = get_connection()
-    if organization_id:
-        cursor = await conn.execute(
-            "SELECT * FROM returns WHERE id = ? AND (organization_id = ? OR organization_id IS NULL)",
-            (return_id, organization_id),
-        )
-    else:
-        cursor = await conn.execute("SELECT * FROM returns WHERE id = ?", (return_id,))
+    org_id = get_org_id()
+    cursor = await conn.execute(
+        "SELECT * FROM returns WHERE id = ? AND (organization_id = ? OR organization_id IS NULL)",
+        (return_id, org_id),
+    )
     row = await cursor.fetchone()
     return _row_to_model(row)
 
@@ -105,10 +102,9 @@ async def list_returns(
     start_date: str | None = None,
     end_date: str | None = None,
     limit: int = 500,
-    organization_id: str | None = None,
 ) -> list[MaterialReturn]:
     conn = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     query = "SELECT * FROM returns WHERE (organization_id = ? OR organization_id IS NULL)"
     params: list = [org_id]
     if contractor_id:
@@ -130,18 +126,12 @@ async def list_returns(
     return [_row_to_model(r) for r in rows]
 
 
-async def list_by_withdrawal(
-    withdrawal_id: str, organization_id: str | None = None
-) -> list[MaterialReturn]:
+async def list_by_withdrawal(withdrawal_id: str) -> list[MaterialReturn]:
     conn = get_connection()
-    params: list = [withdrawal_id]
-    where = "WHERE withdrawal_id = ?"
-    if organization_id:
-        where += " AND (organization_id = ? OR organization_id IS NULL)"
-        params.append(organization_id)
+    org_id = get_org_id()
     cursor = await conn.execute(
-        "SELECT * FROM returns " + where + " ORDER BY created_at DESC",
-        params,
+        "SELECT * FROM returns WHERE withdrawal_id = ? AND (organization_id = ? OR organization_id IS NULL) ORDER BY created_at DESC",
+        (withdrawal_id, org_id),
     )
     rows = await cursor.fetchall()
     return [_row_to_model(r) for r in rows]

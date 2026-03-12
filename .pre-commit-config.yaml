@@ -6,10 +6,10 @@ repos:
       - id: ruff
         name: ruff lint
         args: [--fix]
-        files: ^backend/
+        files: ^(backend|devtools)/
       - id: ruff-format
         name: ruff format
-        files: ^backend/
+        files: ^(backend|devtools)/
 
   # ── JavaScript/JSX (frontend) ─────────────────────────────────────────────
   - repo: local

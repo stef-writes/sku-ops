@@ -6,8 +6,8 @@ import os
 
 import pytest
 
-from kernel.events import SHUTDOWN, Event, is_shutdown
 from shared.infrastructure.event_hub import _deserialize, _Hub, _serialize
+from shared.kernel.events import SHUTDOWN, Event, is_shutdown
 
 _REDIS_URL = os.environ.get("REDIS_URL", "")
 

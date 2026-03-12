@@ -1,10 +1,12 @@
 """Database package — drop-in replacement for the old database.py module.
 
-Public API (unchanged from the original):
+Public API:
     init_db()        — call once at startup
     get_connection() — returns a Connection (protocol)
     transaction()    — async context manager yielding a Connection
     close_db()       — call once at shutdown
+    get_org_id()     — ambient org_id for current request / job
+    get_user_id()    — ambient user_id for current request / job
 
 The backend (SQLite vs PostgreSQL) is selected automatically from DATABASE_URL.
 
@@ -12,6 +14,10 @@ Unit of Work: a contextvar stores the ambient transactional connection.
 get_connection() returns it when inside a transaction() block, so repos
 that call get_connection() automatically participate in the ambient
 transaction without explicit conn threading.
+
+Request context: org_id_var / user_id_var are set by auth middleware and
+read by get_org_id() / get_user_id().  Repos call these instead of
+accepting organization_id parameters.
 """
 
 from __future__ import annotations
@@ -21,6 +27,8 @@ from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
 from shared.infrastructure.config import DATABASE_URL
+from shared.infrastructure.logging_config import org_id_var, user_id_var
+from shared.kernel.constants import DEFAULT_ORG_ID
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Sequence
@@ -80,6 +88,16 @@ async def init_db() -> None:
     from shared.infrastructure.migrations.runner import run_migrations
 
     await run_migrations(_state["backend"])
+
+
+def get_org_id() -> str:
+    """Return the ambient org_id for the current request or job context."""
+    return org_id_var.get(DEFAULT_ORG_ID)
+
+
+def get_user_id() -> str:
+    """Return the ambient user_id for the current request or job context."""
+    return user_id_var.get("")
 
 
 def get_connection() -> Connection:

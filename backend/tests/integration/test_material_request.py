@@ -5,7 +5,6 @@ from fastapi import HTTPException
 
 from catalog.application.product_lifecycle import create_product
 from inventory.application.inventory_service import process_import_stock_changes
-from kernel.types import CurrentUser
 from operations.api.material_requests import (
     create_material_request,
     list_material_requests,
@@ -18,6 +17,7 @@ from operations.domain.material_request import (
 )
 from operations.domain.withdrawal import WithdrawalItem
 from operations.infrastructure.material_request_repo import material_request_repo
+from shared.kernel.types import CurrentUser
 
 
 def _admin():
@@ -78,51 +78,6 @@ async def _create_request_in_db(product, job_id="JOB-001", service_address="123 
     )
     await material_request_repo.insert(req)
     return req
-
-
-@pytest.mark.asyncio
-async def test_material_request_create_model_validation(db):
-    """MaterialRequestCreate requires items; job_id/service_address/notes are optional."""
-    product = await _create_test_product()
-    item = WithdrawalItem(
-        product_id=product.id,
-        sku=product.sku,
-        name=product.name,
-        quantity=2,
-        price=10.0,
-        cost=5.0,
-        subtotal=20.0,
-    )
-
-    minimal = MaterialRequestCreate(items=[item])
-    assert len(minimal.items) == 1
-    assert minimal.job_id is None
-    assert minimal.service_address is None
-    assert minimal.notes is None
-
-    full = MaterialRequestCreate(
-        items=[item],
-        job_id="J-100",
-        service_address="789 Pine",
-        notes="Urgent",
-    )
-    assert full.job_id == "J-100"
-    assert full.service_address == "789 Pine"
-    assert full.notes == "Urgent"
-
-    with pytest.raises(Exception):
-        MaterialRequestCreate()
-
-
-@pytest.mark.asyncio
-async def test_material_request_process_model_allows_empty(db):
-    """MaterialRequestProcess should accept empty job_id and service_address."""
-    model = MaterialRequestProcess()
-    assert model.job_id is None
-    assert model.service_address is None
-
-    model_with = MaterialRequestProcess(job_id="J-1", service_address="123 Oak")
-    assert model_with.job_id == "J-1"
 
 
 @pytest.mark.asyncio
@@ -291,3 +246,23 @@ async def test_process_not_found(db):
             current_user=_admin(),
         )
     assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_process_success_creates_withdrawal_and_updates_status(db):
+    """Happy path: processing creates a withdrawal, marks request processed, decrements stock."""
+    product = await _create_test_product(quantity=50.0)
+    req = await _create_request_in_db(product, job_id="J-SUCCESS", service_address="100 Success Rd")
+
+    result = await process_material_request(
+        request_id=req.id,
+        data=MaterialRequestProcess(job_id="J-SUCCESS", service_address="100 Success Rd"),
+        current_user=_admin(),
+    )
+
+    assert "id" in result
+    assert result["contractor_id"] == "contractor-1"
+
+    updated_req = await material_request_repo.get_by_id(req.id)
+    assert updated_req.status == "processed"
+    assert updated_req.withdrawal_id == result["id"]

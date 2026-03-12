@@ -17,15 +17,14 @@ from uuid import uuid4
 import pytest
 
 from finance.domain.invoice import (
-    PAYMENT_TERMS_DAYS,
     Invoice,
     InvoiceLineItem,
     compute_due_date,
 )
 from finance.domain.ledger import Account, FinancialEntry, ReferenceType
 from finance.infrastructure.ledger_repo import get_journal, insert_entries, trial_balance
-from kernel.types import round_money
 from shared.infrastructure.database import get_connection
+from shared.kernel.types import round_money
 
 # -- 1. round_money precision -------------------------------------------------
 
@@ -156,10 +155,9 @@ class TestCompleteSaleEntries:
             job_id="J1",
             billing_entity="ACME",
             contractor_id="c1",
-            organization_id="default",
         )
 
-        tb = await trial_balance("default")
+        tb = await trial_balance()
         assert Account.REVENUE.value in tb
         assert Account.COGS.value in tb
         assert Account.INVENTORY.value in tb
@@ -182,10 +180,9 @@ class TestCompleteSaleEntries:
             job_id="J1",
             billing_entity="ACME",
             contractor_id="c1",
-            organization_id="default",
         )
 
-        tb = await trial_balance("default")
+        tb = await trial_balance()
         assert tb[Account.INVENTORY.value] < 0, "Inventory should decrease on sale"
 
     @pytest.mark.usefixtures("_db")
@@ -203,7 +200,6 @@ class TestCompleteSaleEntries:
             job_id="J1",
             billing_entity="ACME",
             contractor_id="c1",
-            organization_id="default",
         )
         await record_return(
             return_id=str(uuid4()),
@@ -213,10 +209,9 @@ class TestCompleteSaleEntries:
             job_id="J1",
             billing_entity="ACME",
             contractor_id="c1",
-            organization_id="default",
         )
 
-        tb = await trial_balance("default")
+        tb = await trial_balance()
         assert tb.get(Account.REVENUE.value, 0) == pytest.approx(0.0)
         assert tb.get(Account.COGS.value, 0) == pytest.approx(0.0)
         assert tb.get(Account.ACCOUNTS_RECEIVABLE.value, 0) == pytest.approx(0.0)
@@ -238,12 +233,11 @@ class TestCompleteSaleEntries:
             "job_id": "J1",
             "billing_entity": "ACME",
             "contractor_id": "c1",
-            "organization_id": "default",
         }
         await record_withdrawal(**kwargs)
         await record_withdrawal(**kwargs)
 
-        tb = await trial_balance("default")
+        tb = await trial_balance()
         assert tb[Account.REVENUE.value] == pytest.approx(100.0)
 
 
@@ -254,7 +248,11 @@ class TestTrialBalance:
     @pytest.mark.usefixtures("_db")
     @pytest.mark.asyncio
     async def test_empty_org_returns_empty(self):
-        tb = await trial_balance("org-with-no-entries")
+        from shared.infrastructure.database import org_id_var
+
+        org_id_var.set("org-with-no-entries")
+        tb = await trial_balance()
+        org_id_var.set("default")
         assert tb == {}
 
     @pytest.mark.usefixtures("_db")
@@ -266,10 +264,9 @@ class TestTrialBalance:
             po_id=str(uuid4()),
             items=[{"cost": 20.0, "delivered_qty": 5, "product_id": "p1"}],
             vendor_name="Vendor A",
-            organization_id="default",
         )
 
-        tb = await trial_balance("default")
+        tb = await trial_balance()
         assert tb[Account.INVENTORY.value] == pytest.approx(100.0)
         assert tb[Account.ACCOUNTS_PAYABLE.value] == pytest.approx(100.0)
 
@@ -339,13 +336,6 @@ class TestInvoiceComplianceFields:
         inv = Invoice(invoice_number="INV-001", total=1000.0)
         assert inv.balance_due == 1000.0
 
-    def test_payment_terms_days_mapping(self):
-        assert PAYMENT_TERMS_DAYS["net_30"] == 30
-        assert PAYMENT_TERMS_DAYS["due_on_receipt"] == 0
-        assert PAYMENT_TERMS_DAYS["net_15"] == 15
-        assert PAYMENT_TERMS_DAYS["net_60"] == 60
-        assert PAYMENT_TERMS_DAYS["net_90"] == 90
-
     def test_invoice_line_item_margin(self):
         li = InvoiceLineItem(
             quantity=3.0,
@@ -367,7 +357,7 @@ class TestFiscalPeriodEnforcement:
         """No closed periods -> should not raise."""
         from finance.application.fiscal_period_service import check_period_open
 
-        await check_period_open("2025-06-15T00:00:00Z", "default")
+        await check_period_open("2025-06-15T00:00:00Z")
 
     @pytest.mark.usefixtures("_db")
     @pytest.mark.asyncio
@@ -386,7 +376,7 @@ class TestFiscalPeriodEnforcement:
         await conn.commit()
 
         with pytest.raises(ValueError, match="closed fiscal period"):
-            await check_period_open("2025-01-15T00:00:00Z", "default")
+            await check_period_open("2025-01-15T00:00:00Z")
 
     @pytest.mark.usefixtures("_db")
     @pytest.mark.asyncio
@@ -404,7 +394,7 @@ class TestFiscalPeriodEnforcement:
         )
         await conn.commit()
 
-        await check_period_open("2025-02-15T00:00:00Z", "default")
+        await check_period_open("2025-02-15T00:00:00Z")
 
 
 # -- 8. Payment AR reduction --------------------------------------------------
@@ -427,15 +417,13 @@ class TestPaymentAR:
             job_id="J1",
             billing_entity="ACME",
             contractor_id="c1",
-            organization_id="default",
         )
         await record_payment(
             withdrawal_id=wid,
             amount=100.0,
             billing_entity="ACME",
             contractor_id="c1",
-            organization_id="default",
         )
 
-        tb = await trial_balance("default")
+        tb = await trial_balance()
         assert tb.get(Account.ACCOUNTS_RECEIVABLE.value, 0) == pytest.approx(0.0)

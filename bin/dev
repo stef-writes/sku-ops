@@ -4,51 +4,77 @@ cd "$(dirname "$0")/.."
 
 case "${1:-help}" in
   test)
-    echo "🧪 Running tests..."
-    uv run --directory backend pytest "${@:2}"
+    echo "Running all tests..."
+    uv run pytest "${@:2}"
+    npm run test:run --prefix frontend
+    ;;
+  test:be)
+    echo "Running backend tests..."
+    uv run pytest "${@:2}"
+    ;;
+  test:fe)
+    echo "Running frontend tests..."
+    npm run test:run --prefix frontend
+    ;;
+  test:e2e)
+    echo "Running e2e tests..."
+    npx --prefix e2e playwright test "${@:2}"
     ;;
   fmt)
-    echo "✨ Formatting code..."
-    uv run --directory backend ruff format .
+    echo "Formatting code..."
+    uv run ruff format .
     ;;
   lint)
-    echo "🔍 Linting backend..."
-    uv run --directory backend ruff check .
+    echo "Linting..."
+    uv run ruff check .
     ;;
   lint:fe)
-    echo "🔍 Linting frontend..."
+    echo "Linting frontend..."
     npm run lint --prefix frontend
     ;;
   fmt:fe)
-    echo "✨ Formatting frontend..."
+    echo "Formatting frontend..."
     npm run format --prefix frontend
     ;;
   commit)
-    echo "📝 Commitizen commit..."
-    uv run --directory backend cz commit
+    echo "Commitizen commit..."
+    uv run cz commit
     ;;
   container)
-    echo "🐳 Starting devcontainer..."
+    echo "Starting devcontainer..."
     cd .devcontainer && docker-compose up -d
     ;;
   server)
-    echo "🚀 Starting backend dev server..."
-    uv run --directory backend uvicorn server:app --reload --host 0.0.0.0 --port 8000
+    echo "Starting backend dev server..."
+    PYTHONPATH=backend:. uv run uvicorn server:app --reload --host 0.0.0.0 --port 8000 --app-dir backend
     ;;
   ui)
-    echo "🎨 Starting frontend dev server..."
+    echo "Starting frontend dev server..."
     npm run dev --prefix frontend
+    ;;
+  seed)
+    echo "Running seed script..."
+    PYTHONPATH=backend:. uv run python -m devtools.scripts.seed_realistic "${@:2}"
+    ;;
+  eval)
+    echo "Running evals..."
+    PYTHONPATH=backend:. uv run python -m devtools.evals "${@:2}"
     ;;
   help|*)
     echo "sku-ops Dev Commands:"
-    echo "  ./bin/dev test [args]    - Run pytest"
-    echo "  ./bin/dev fmt            - Format backend with ruff"
-    echo "  ./bin/dev lint           - Lint backend with ruff"
-    echo "  ./bin/dev lint:fe        - Lint frontend with ESLint"
-    echo "  ./bin/dev fmt:fe         - Format frontend with Prettier"
-    echo "  ./bin/dev commit         - Commitizen commit"
-    echo "  ./bin/dev server         - Start backend dev server"
-    echo "  ./bin/dev ui             - Start frontend dev server"
-    echo "  ./bin/dev container      - Start devcontainer"
+    echo "  ./bin/dev test [args]      - Run all tests (backend + frontend)"
+    echo "  ./bin/dev test:be [args]   - Run backend tests only"
+    echo "  ./bin/dev test:fe          - Run frontend tests only"
+    echo "  ./bin/dev test:e2e [args]  - Run Playwright e2e tests"
+    echo "  ./bin/dev fmt              - Format all Python code with ruff"
+    echo "  ./bin/dev lint             - Lint all Python code with ruff"
+    echo "  ./bin/dev lint:fe          - Lint frontend with ESLint"
+    echo "  ./bin/dev fmt:fe           - Format frontend with Prettier"
+    echo "  ./bin/dev commit           - Commitizen commit"
+    echo "  ./bin/dev server           - Start backend dev server"
+    echo "  ./bin/dev ui               - Start frontend dev server"
+    echo "  ./bin/dev seed [args]      - Run seed_realistic"
+    echo "  ./bin/dev eval [args]      - Run LLM evals"
+    echo "  ./bin/dev container        - Start devcontainer"
     ;;
 esac

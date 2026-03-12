@@ -63,16 +63,16 @@ def names_for_domain(domain: str) -> set[str]:
     return {e.name for e in _TOOLS.values() if e.domain == domain}
 
 
-async def run_tool(name: str, args: dict, org_id: str) -> str:
+async def run_tool(name: str, args: dict) -> str:
     """Execute a tool by canonical name. Used by DAG executor and assistant."""
     entry = _TOOLS.get(name)
     if not entry:
         return f'{{"error": "unknown tool: {name}"}}'
     try:
         if entry.takes_args:
-            result = await entry.fn(args, org_id)
+            result = await entry.fn(args)
         else:
-            result = await entry.fn(org_id)
+            result = await entry.fn()
         return result if isinstance(result, str) else str(result)
     except (ValueError, RuntimeError, OSError, KeyError) as e:
         logger.warning("Tool %s failed: %s", name, e)

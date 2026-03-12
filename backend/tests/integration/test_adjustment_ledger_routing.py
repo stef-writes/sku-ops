@@ -48,7 +48,6 @@ class TestAdjustmentAccountRouting:
             product_cost=10.0,
             quantity_delta=-3.0,
             department="Hardware",
-            organization_id="default",
             reason="damage",
         )
         entries = await _get_entries_for_ref(ref)
@@ -68,7 +67,6 @@ class TestAdjustmentAccountRouting:
             product_cost=10.0,
             quantity_delta=-2.0,
             department="Hardware",
-            organization_id="default",
             reason=reason,
         )
         entries = await _get_entries_for_ref(ref)
@@ -86,10 +84,9 @@ class TestAdjustmentAccountRouting:
             product_cost=5.0,
             quantity_delta=-4.0,
             department="Hardware",
-            organization_id="default",
             reason="damage",
         )
-        tb = await trial_balance("default")
+        tb = await trial_balance()
         assert Account.DAMAGE.value in tb, "'damage' account must appear in trial balance"
 
     @pytest.mark.usefixtures("_db")
@@ -101,10 +98,9 @@ class TestAdjustmentAccountRouting:
             product_cost=5.0,
             quantity_delta=-2.0,
             department="Hardware",
-            organization_id="default",
             reason="theft",
         )
-        tb = await trial_balance("default")
+        tb = await trial_balance()
         assert Account.SHRINKAGE.value in tb
 
 
@@ -124,7 +120,6 @@ class TestAdjustmentDoubleEntry:
             product_cost=cost,
             quantity_delta=-qty,
             department="Hardware",
-            organization_id="default",
             reason="damage",
         )
         entries = await _get_entries_for_ref(ref)
@@ -149,7 +144,6 @@ class TestAdjustmentDoubleEntry:
             product_cost=cost,
             quantity_delta=qty,
             department="Hardware",
-            organization_id="default",
             reason="damage",
         )
         entries = await _get_entries_for_ref(ref)
@@ -171,7 +165,6 @@ class TestAdjustmentDoubleEntry:
             product_cost=10.0,
             quantity_delta=-1.0,
             department="Hardware",
-            organization_id="default",
             reason="damage",
         )
         await record_adjustment(
@@ -180,7 +173,6 @@ class TestAdjustmentDoubleEntry:
             product_cost=10.0,
             quantity_delta=-1.0,
             department="Hardware",
-            organization_id="default",
             reason="theft",
         )
 
@@ -206,7 +198,6 @@ class TestAdjustmentDoubleEntry:
             product_cost=0.0,
             quantity_delta=-5.0,
             department="Hardware",
-            organization_id="default",
             reason="damage",
         )
         entries = await _get_entries_for_ref(ref)
@@ -223,7 +214,6 @@ class TestAdjustmentDoubleEntry:
             "product_cost": 10.0,
             "quantity_delta": -2.0,
             "department": "Hardware",
-            "organization_id": "default",
             "reason": "damage",
         }
         await record_adjustment(**kwargs)

@@ -9,6 +9,7 @@ import logging
 from datetime import UTC, datetime
 
 from identity.application.org_service import get_org_settings
+from shared.infrastructure.database import get_org_id
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +28,13 @@ def _is_token_expired(token_expiry: str) -> bool:
         return True
 
 
-async def check_xero_configuration(org_id: str) -> list[str]:
+async def check_xero_configuration() -> list[str]:
     """Return a list of warning strings. Empty list means configuration is clean."""
     warnings: list[str] = []
     try:
-        settings = await get_org_settings(org_id)
+        settings = await get_org_settings()
     except (RuntimeError, OSError, ValueError) as e:
-        warnings.append(f"XERO: Could not load org settings for {org_id}: {e}")
+        warnings.append(f"XERO: Could not load org settings for {get_org_id()}: {e}")
         return warnings
 
     if not settings.xero_access_token:
@@ -67,11 +68,11 @@ async def check_xero_configuration(org_id: str) -> list[str]:
     return warnings
 
 
-async def run_startup_check(org_id: str) -> None:
+async def run_startup_check() -> None:
     """Run the check and emit all warnings to the logger. Called from lifespan."""
-    warnings = await check_xero_configuration(org_id)
+    warnings = await check_xero_configuration()
     if not warnings:
-        logger.info("Xero configuration OK for org %s", org_id)
+        logger.info("Xero configuration OK for org %s", get_org_id())
     else:
         for w in warnings:
             logger.warning(w)

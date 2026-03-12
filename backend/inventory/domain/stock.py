@@ -2,7 +2,7 @@
 
 from enum import StrEnum
 
-from kernel.entity import Entity
+from shared.kernel.entity import Entity
 from shared.kernel.stock import StockDecrement
 
 __all__ = ["StockDecrement", "StockTransaction", "StockTransactionType"]

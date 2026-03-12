@@ -1,83 +1,96 @@
 """End-to-end workflow tests — create entities via HTTP, verify side effects.
 
-Each test exercises a full business workflow through the API layer.
+Each test exercises a full business workflow through the API layer,
+including negative cases and invariant checks.
 """
+
 
 from tests.helpers.auth import admin_headers, contractor_headers
 
 
-class TestProductWorkflow:
-    """Create a product and verify it appears in listings."""
-
-    async def test_create_and_list_product(self, db, client):
-        headers = admin_headers()
-
-        product_data = {
-            "name": "Test Bolt 10mm",
-            "description": "Galvanized steel bolt",
-            "price": 2.50,
-            "cost": 1.00,
-            "quantity": 100,
-            "min_stock": 10,
-            "department_id": "dept-1",
-            "base_unit": "each",
-            "sell_uom": "each",
-            "pack_qty": 1,
-        }
-
-        resp = client.post("/api/products", json=product_data, headers=headers)
-        assert resp.status_code == 200, f"Product create failed: {resp.text}"
-        product = resp.json()
-        product_id = product["id"]
-        assert product["name"] == "Test Bolt 10mm"
-
-        resp = client.get(f"/api/products/{product_id}", headers=headers)
-        assert resp.status_code == 200
-        assert resp.json()["id"] == product_id
+def _create_product(client, headers, **overrides):
+    """Helper — create a product and return its JSON, or raise on failure."""
+    data = {
+        "name": "Workflow Test Item",
+        "price": 10.00,
+        "cost": 4.00,
+        "quantity": 100,
+        "department_id": "dept-1",
+        **overrides,
+    }
+    resp = client.post("/api/products", json=data, headers=headers)
+    assert resp.status_code == 200, f"Product create failed: {resp.text}"
+    return resp.json()
 
 
 class TestWithdrawalWorkflow:
-    """Create a product, withdraw stock, verify inventory decrements."""
+    """Withdrawal must decrement stock and produce an invoice."""
 
     async def test_withdrawal_decrements_stock(self, db, client):
         headers = admin_headers()
+        product = _create_product(client, headers, quantity=50, name="WD-Decrement")
 
-        product_data = {
-            "name": "Withdrawal Test Item",
-            "price": 5.00,
-            "cost": 2.00,
-            "quantity": 50,
-            "department_id": "dept-1",
-        }
-        resp = client.post("/api/products", json=product_data, headers=headers)
+        resp = client.post(
+            "/api/withdrawals",
+            json={
+                "items": [
+                    {
+                        "product_id": product["id"],
+                        "sku": product["sku"],
+                        "name": product["name"],
+                        "quantity": 5,
+                        "unit_price": 10.00,
+                        "cost": 4.00,
+                    }
+                ],
+                "job_id": "JOB-001",
+                "service_address": "123 Test St",
+            },
+            headers=headers,
+        )
         assert resp.status_code == 200
-        product = resp.json()
-        pid = product["id"]
-        sku = product["sku"]
-
-        withdrawal_data = {
-            "items": [
-                {
-                    "product_id": pid,
-                    "sku": sku,
-                    "name": "Withdrawal Test Item",
-                    "quantity": 5,
-                    "unit_price": 5.00,
-                    "cost": 2.00,
-                }
-            ],
-            "job_id": "JOB-001",
-            "service_address": "123 Test St",
-        }
-        resp = client.post("/api/withdrawals", json=withdrawal_data, headers=headers)
-        assert resp.status_code == 200, f"Withdrawal create failed: {resp.text}"
         withdrawal = resp.json()
         assert withdrawal["total"] > 0
 
-        resp = client.get(f"/api/products/{pid}", headers=headers)
-        assert resp.status_code == 200
-        updated_qty = resp.json()["quantity"]
-        assert updated_qty == 45, f"Expected 45 after withdrawing 5 from 50, got {updated_qty}"
+        resp = client.get(f"/api/products/{product['id']}", headers=headers)
+        assert resp.json()["quantity"] == 45
+
+    async def test_withdrawal_with_insufficient_stock_fails(self, db, client):
+        headers = admin_headers()
+        product = _create_product(client, headers, quantity=3, name="WD-Insufficient")
+
+        resp = client.post(
+            "/api/withdrawals",
+            json={
+                "items": [
+                    {
+                        "product_id": product["id"],
+                        "sku": product["sku"],
+                        "name": product["name"],
+                        "quantity": 10,
+                        "unit_price": 10.00,
+                        "cost": 4.00,
+                    }
+                ],
+                "job_id": "JOB-002",
+                "service_address": "456 Fail St",
+            },
+            headers=headers,
+        )
+        assert resp.status_code in (400, 422), f"Expected rejection, got {resp.status_code}"
+
+        resp = client.get(f"/api/products/{product['id']}", headers=headers)
+        assert resp.json()["quantity"] == 3, "Stock should be unchanged after failed withdrawal"
+
+    async def test_withdrawal_requires_items(self, db, client):
+        headers = admin_headers()
+
+        resp = client.post(
+            "/api/withdrawals",
+            json={"items": [], "job_id": "JOB-003", "service_address": "789 Empty St"},
+            headers=headers,
+        )
+        assert resp.status_code in (400, 422)
 
 
 class TestMaterialRequestWorkflow:
@@ -86,84 +99,89 @@ class TestMaterialRequestWorkflow:
     async def test_contractor_request_to_withdrawal(self, db, client):
         admin_h = admin_headers()
         contractor_h = contractor_headers()
-
-        product_data = {
-            "name": "Mat Request Test Item",
-            "price": 10.00,
-            "cost": 4.00,
-            "quantity": 100,
-            "department_id": "dept-1",
-        }
-        resp = client.post("/api/products", json=product_data, headers=admin_h)
-        assert resp.status_code == 200
-        product = resp.json()
-
-        request_data = {
-            "items": [
-                {
-                    "product_id": product["id"],
-                    "sku": product["sku"],
-                    "name": "Mat Request Test Item",
-                    "quantity": 3,
-                    "unit_price": 10.00,
-                    "cost": 4.00,
-                }
-            ],
-            "notes": "Need for site work",
-        }
-        resp = client.post("/api/material-requests", json=request_data, headers=contractor_h)
-        assert resp.status_code == 200, f"Material request create failed: {resp.text}"
-        mat_req = resp.json()
-        assert mat_req["status"] == "pending"
-        req_id = mat_req["id"]
+        product = _create_product(client, admin_h, name="MR-Workflow")
 
         resp = client.post(
-            f"/api/material-requests/{req_id}/process",
-            json={"job_id": "JOB-002", "service_address": "456 Site Rd"},
+            "/api/material-requests",
+            json={
+                "items": [
+                    {
+                        "product_id": product["id"],
+                        "sku": product["sku"],
+                        "name": product["name"],
+                        "quantity": 3,
+                        "unit_price": 10.00,
+                        "cost": 4.00,
+                    }
+                ],
+                "notes": "Need for site work",
+            },
+            headers=contractor_h,
+        )
+        assert resp.status_code == 200
+        mat_req = resp.json()
+        assert mat_req["status"] == "pending"
+
+        resp = client.post(
+            f"/api/material-requests/{mat_req['id']}/process",
+            json={"job_id": "JOB-004", "service_address": "456 Site Rd"},
             headers=admin_h,
         )
-        assert resp.status_code == 200, f"Process request failed: {resp.text}"
+        assert resp.status_code == 200
         result = resp.json()
-        assert result.get("id"), (
-            f"Expected processed withdrawal to have an id, got keys: {list(result.keys())}"
+        assert result.get("id"), "Processed result should have a withdrawal id"
+
+    async def test_admin_cannot_create_material_request(self, db, client):
+        admin_h = admin_headers()
+        product = _create_product(client, admin_h, name="MR-AdminReject")
+
+        resp = client.post(
+            "/api/material-requests",
+            json={
+                "items": [
+                    {
+                        "product_id": product["id"],
+                        "sku": product["sku"],
+                        "name": product["name"],
+                        "quantity": 1,
+                        "unit_price": 10.00,
+                        "cost": 4.00,
+                    }
+                ],
+            },
+            headers=admin_h,
         )
+        assert resp.status_code == 403
 
 
-class TestInvoiceWorkflow:
-    """Create a withdrawal, then verify invoice listing includes it."""
+class TestProductWorkflow:
+    """Product CRUD through the API layer."""
 
-    async def test_withdrawal_appears_in_invoices(self, db, client):
+    async def test_create_and_retrieve_product(self, db, client):
+        headers = admin_headers()
+        product = _create_product(client, headers, name="PW-Create")
+
+        resp = client.get(f"/api/products/{product['id']}", headers=headers)
+        assert resp.status_code == 200
+        assert resp.json()["name"] == "PW-Create"
+
+    async def test_create_product_missing_required_fields(self, db, client):
         headers = admin_headers()
 
-        product_data = {
-            "name": "Invoice Test Item",
-            "price": 20.00,
-            "cost": 8.00,
-            "quantity": 50,
-            "department_id": "dept-1",
-        }
-        resp = client.post("/api/products", json=product_data, headers=headers)
-        assert resp.status_code == 200
-        product = resp.json()
+        resp = client.post("/api/products", json={"name": "Incomplete"}, headers=headers)
+        assert resp.status_code == 422
 
-        withdrawal_data = {
-            "items": [
-                {
-                    "product_id": product["id"],
-                    "sku": product["sku"],
-                    "name": "Invoice Test Item",
-                    "quantity": 2,
-                    "unit_price": 20.00,
-                    "cost": 8.00,
-                }
-            ],
-            "job_id": "JOB-003",
-            "service_address": "789 Invoice St",
-        }
-        resp = client.post("/api/withdrawals", json=withdrawal_data, headers=headers)
-        assert resp.status_code == 200
+    async def test_create_product_invalid_department(self, db, client):
+        headers = admin_headers()
 
-        resp = client.get("/api/withdrawals", headers=headers)
-        assert resp.status_code == 200
-        withdrawals = resp.json()
-        assert isinstance(withdrawals, list | dict)
+        resp = client.post(
+            "/api/products",
+            json={
+                "name": "Bad Dept",
+                "price": 10.00,
+                "quantity": 1,
+                "department_id": "nonexistent-dept",
+            },
+            headers=headers,
+        )
+        assert resp.status_code in (400, 404, 422)

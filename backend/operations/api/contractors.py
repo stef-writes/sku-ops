@@ -29,8 +29,7 @@ async def get_contractors(
         None, description="Search by name, email, company, billing entity, or phone"
     ),
 ):
-    org_id = current_user.organization_id
-    return await list_contractors(org_id, search=search)
+    return await list_contractors(search=search)
 
 
 @router.post("")
@@ -40,7 +39,7 @@ async def create_contractor(data: UserCreate, current_user: AdminDep):
         raise HTTPException(status_code=400, detail="Email already registered")
 
     billing_name = data.billing_entity or data.company or "Independent"
-    be = await ensure_billing_entity(billing_name, current_user.organization_id)
+    be = await ensure_billing_entity(billing_name)
 
     contractor = User(
         email=data.email,
@@ -62,28 +61,26 @@ async def create_contractor(data: UserCreate, current_user: AdminDep):
 
 @router.put("/{contractor_id}")
 async def update_contractor(contractor_id: str, data: UserUpdate, current_user: AdminDep):
-    org_id = current_user.organization_id
     contractor = await get_user_by_id(contractor_id)
     if not contractor or contractor.role != "contractor":
         raise HTTPException(status_code=404, detail="Contractor not found")
-    if contractor.organization_id != org_id:
+    if contractor.organization_id != current_user.organization_id:
         raise HTTPException(status_code=404, detail="Contractor not found")
 
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
-    result = await update_user(contractor_id, update_data, organization_id=org_id)
+    result = await update_user(contractor_id, update_data)
     return result.model_dump(exclude={"password"}) if result else {}
 
 
 @router.delete("/{contractor_id}")
 async def delete_contractor(contractor_id: str, current_user: AdminDep):
-    org_id = current_user.organization_id
     contractor = await get_user_by_id(contractor_id)
     if not contractor or contractor.role != "contractor":
         raise HTTPException(status_code=404, detail="Contractor not found")
-    if contractor.organization_id != org_id:
+    if contractor.organization_id != current_user.organization_id:
         raise HTTPException(status_code=404, detail="Contractor not found")
 
-    deleted = await do_delete_contractor(contractor_id, organization_id=org_id)
+    deleted = await do_delete_contractor(contractor_id)
     if deleted == 0:
         raise HTTPException(status_code=404, detail="Contractor not found")
     return {"message": "Contractor deleted"}

@@ -4,8 +4,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
 
-from kernel.entity import AuditedEntity
-from kernel.types import round_money
+from shared.kernel.entity import AuditedEntity
+from shared.kernel.types import round_money
 
 
 class ReturnReason(StrEnum):

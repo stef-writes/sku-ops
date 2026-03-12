@@ -4,14 +4,13 @@ from datetime import UTC, datetime
 
 from catalog.domain.product import Product
 from catalog.infrastructure.product_repo import get_by_id
-from shared.infrastructure.config import DEFAULT_ORG_ID
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 
 async def insert(product: Product | dict) -> None:
     product_dict = product if isinstance(product, dict) else product.model_dump()
     conn = get_connection()
-    org_id = product_dict.get("organization_id") or DEFAULT_ORG_ID
+    org_id = product_dict.get("organization_id") or get_org_id()
     await conn.execute(
         """INSERT INTO products (id, sku, name, description, price, cost, quantity, min_stock,
            department_id, department_name, vendor_id, vendor_name, original_sku, barcode, vendor_barcode,
@@ -45,10 +44,9 @@ async def insert(product: Product | dict) -> None:
     await conn.commit()
 
 
-async def update(
-    product_id: str, updates: dict, organization_id: str | None = None
-) -> Product | None:
+async def update(product_id: str, updates: dict) -> Product | None:
     conn = get_connection()
+    org_id = get_org_id()
     set_parts = ["updated_at = ?"]
     values = [updates.get("updated_at", "")]
     for key in (
@@ -82,10 +80,8 @@ async def update(
     if len(set_parts) <= 1:
         return await get_by_id(product_id)
     values.append(product_id)
-    where = "WHERE id = ?"
-    if organization_id:
-        where += " AND organization_id = ?"
-        values.append(organization_id)
+    where = "WHERE id = ? AND organization_id = ?"
+    values.append(org_id)
     query = "UPDATE products SET "
     query += ", ".join(set_parts)
     query += " " + where
@@ -94,14 +90,13 @@ async def update(
     return await get_by_id(product_id)
 
 
-async def delete(product_id: str, organization_id: str | None = None) -> int:
+async def delete(product_id: str) -> int:
     conn = get_connection()
+    org_id = get_org_id()
     now = datetime.now(UTC).isoformat()
     params: list = [now, product_id]
-    where = "WHERE id = ? AND deleted_at IS NULL"
-    if organization_id:
-        where += " AND organization_id = ?"
-        params.append(organization_id)
+    where = "WHERE id = ? AND deleted_at IS NULL AND organization_id = ?"
+    params.append(org_id)
     query = "UPDATE products SET deleted_at = ? "
     query += where
     cursor = await conn.execute(query, params)
@@ -110,15 +105,14 @@ async def delete(product_id: str, organization_id: str | None = None) -> int:
 
 
 async def atomic_decrement(
-    product_id: str, quantity: float, updated_at: str, organization_id: str | None = None
+    product_id: str, quantity: float, updated_at: str
 ) -> Product | None:
     """Decrement quantity only if >= requested. Returns updated row or None if insufficient."""
     conn = get_connection()
+    org_id = get_org_id()
     params: list = [quantity, updated_at, product_id, quantity]
-    where = "WHERE id = ? AND quantity >= ?"
-    if organization_id:
-        where += " AND organization_id = ?"
-        params.append(organization_id)
+    where = "WHERE id = ? AND quantity >= ? AND organization_id = ?"
+    params.append(org_id)
     query = "UPDATE products SET quantity = quantity - ?, updated_at = ? "
     query += where
     cursor = await conn.execute(query, params)
@@ -129,15 +123,14 @@ async def atomic_decrement(
 
 
 async def increment_quantity(
-    product_id: str, quantity: float, updated_at: str, organization_id: str | None = None
+    product_id: str, quantity: float, updated_at: str
 ) -> None:
     """Rollback: add quantity back."""
     conn = get_connection()
+    org_id = get_org_id()
     params: list = [quantity, updated_at, product_id]
-    where = "WHERE id = ?"
-    if organization_id:
-        where += " AND organization_id = ?"
-        params.append(organization_id)
+    where = "WHERE id = ? AND organization_id = ?"
+    params.append(org_id)
     query = "UPDATE products SET quantity = quantity + ?, updated_at = ? "
     query += where
     await conn.execute(query, params)
@@ -145,15 +138,14 @@ async def increment_quantity(
 
 
 async def add_quantity(
-    product_id: str, quantity: float, updated_at: str, organization_id: str | None = None
+    product_id: str, quantity: float, updated_at: str
 ) -> Product | None:
     """Add quantity (receiving) and return updated row."""
     conn = get_connection()
+    org_id = get_org_id()
     params: list = [quantity, updated_at, product_id]
-    where = "WHERE id = ?"
-    if organization_id:
-        where += " AND organization_id = ?"
-        params.append(organization_id)
+    where = "WHERE id = ? AND organization_id = ?"
+    params.append(org_id)
     query = "UPDATE products SET quantity = quantity + ?, updated_at = ? "
     query += where
     await conn.execute(query, params)
@@ -165,17 +157,15 @@ async def atomic_adjust(
     product_id: str,
     quantity_delta: float,
     updated_at: str,
-    organization_id: str | None = None,
 ) -> Product | None:
     """Atomically adjust quantity by delta (+ or -).
     Returns updated row or None if adjustment would result in negative stock.
     """
     conn = get_connection()
+    org_id = get_org_id()
     params: list = [quantity_delta, updated_at, product_id, quantity_delta]
-    where = "WHERE id = ? AND quantity + ? >= 0"
-    if organization_id:
-        where += " AND organization_id = ?"
-        params.append(organization_id)
+    where = "WHERE id = ? AND quantity + ? >= 0 AND organization_id = ?"
+    params.append(org_id)
     query = "UPDATE products SET quantity = quantity + ?, updated_at = ? "
     query += where
     cursor = await conn.execute(query, params)

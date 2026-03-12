@@ -8,8 +8,9 @@ import logging
 from datetime import UTC, datetime
 
 from finance.adapters.invoicing_factory import get_invoicing_gateway
+from finance.application.org_settings_service import get_org_settings
 from finance.domain.xero_settings import XeroSettings
-from identity.application.org_service import get_org_settings
+from shared.infrastructure.database import get_org_id
 from purchasing.application.queries import (
     get_po_with_cost,
     set_xero_bill_id,
@@ -25,9 +26,9 @@ async def queue_po_for_sync(po_id: str) -> None:
     await set_xero_sync_status(po_id, "pending", now)
 
 
-async def sync_po_bill(po_id: str, org_id: str, cost_total: float | None = None) -> dict:
+async def sync_po_bill(po_id: str, cost_total: float | None = None) -> dict:
     """Sync a single PO to Xero as a Bill. Returns a result dict."""
-    po = await get_po_with_cost(po_id, org_id)
+    po = await get_po_with_cost(po_id)
     if not po:
         return {"po_id": po_id, "success": False, "error": "PO not found"}
 
@@ -39,7 +40,7 @@ async def sync_po_bill(po_id: str, org_id: str, cost_total: float | None = None)
         await set_xero_sync_status(po_id, "skipped", now)
         return {"po_id": po_id, "success": True, "skipped": True, "reason": "zero cost"}
 
-    org_settings = await get_org_settings(org_id)
+    org_settings = await get_org_settings(get_org_id())
     xero_settings = XeroSettings.model_validate(org_settings.model_dump())
     gateway = get_invoicing_gateway(xero_settings)
 

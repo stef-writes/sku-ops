@@ -8,10 +8,12 @@ from typing import TYPE_CHECKING
 
 from finance.application.credit_note_service import apply_credit_note as _apply_cn
 from finance.application.ledger_service import record_return as _record_ledger
+from finance.domain.credit_note import CreditNote
+from inventory.domain.stock import StockTransactionType
 from operations.domain.returns import MaterialReturn, ReturnCreate, ReturnItem
 from operations.domain.withdrawal import MaterialWithdrawal
 from operations.infrastructure.return_repo import return_repo as _default_return_repo
-from shared.infrastructure.database import transaction
+from shared.infrastructure.database import get_org_id, transaction
 from shared.kernel.errors import DomainError, ResourceNotFoundError
 
 if TYPE_CHECKING:
@@ -39,8 +41,8 @@ async def create_return(
     2. Restocks inventory (RETURN transaction type)
     3. Creates a credit note if an invoice exists
     """
-    org_id = current_user.organization_id
-    withdrawal = await get_withdrawal(data.withdrawal_id, organization_id=org_id)
+    org_id = get_org_id()
+    withdrawal = await get_withdrawal(data.withdrawal_id)
     if not withdrawal:
         raise ResourceNotFoundError("Withdrawal", data.withdrawal_id)
 
@@ -107,7 +109,7 @@ async def create_return(
                 user_name=current_user.name,
                 reference_id=ret.id,
                 unit=item.unit,
-                organization_id=org_id,
+                transaction_type=StockTransactionType.RETURN,
             )
 
         await return_repo.insert(ret)
@@ -133,7 +135,6 @@ async def create_return(
             job_id=ret.job_id,
             billing_entity=ret.billing_entity,
             contractor_id=ret.contractor_id,
-            organization_id=org_id,
             performed_by_user_id=current_user.id,
         )
 
@@ -149,14 +150,12 @@ async def create_return(
                     subtotal=ret.subtotal,
                     tax=ret.tax,
                     total=ret.total,
-                    organization_id=org_id,
                 )
                 result["credit_note_id"] = cn.id
 
                 try:
                     await _apply_cn(
                         credit_note_id=cn.id,
-                        organization_id=org_id,
                         performed_by_user_id=current_user.id,
                     )
                 except Exception:

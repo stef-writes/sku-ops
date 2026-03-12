@@ -1,5 +1,5 @@
 ---
-description: Local dev workflow — how to run, seed, and verify the stack
+description: Local dev workflow — how to run, seed, test, and verify the stack
 alwaysApply: true
 ---
 
@@ -20,7 +20,7 @@ npm run dev          # from project root — starts backend + frontend together
 - Seed realistic data (run once after first start):
 
 ```bash
-uv run --directory backend python -m devtools.scripts.seed_realistic
+./bin/dev seed
 ```
 
 ### Mode 2: Production verification (before deploy)
@@ -33,9 +33,10 @@ docker compose up --build    # nginx/certbot excluded via override profile
 - Backend: http://localhost:8000 (Postgres, Redis connected)
 - No hot-reload. Rebuild with `docker compose up --build` after code changes.
 - `devtools/` scripts are intentionally excluded from the Docker image — run seeds in Mode 1.
+- Docker build context is the workspace root: `docker build -f backend/Dockerfile .`
 
 ## Why not Docker for daily dev?
-- `devtools/` (seed scripts) are excluded from the Docker image on purpose — they're not production code.
+- `devtools/` (seed scripts) live at the workspace root, outside the Docker build context.
 - SQLite in Mode 1 is fine pre-launch. The schema is identical; only the driver differs.
 - Hot-reload and fast iteration only work natively.
 
@@ -51,17 +52,37 @@ docker compose up --build    # nginx/certbot excluded via override profile
 All commands run from the project root via `./bin/dev`:
 
 ```bash
-./bin/dev test [args]    # run pytest (uses uv)
-./bin/dev lint           # ruff lint backend
-./bin/dev fmt            # ruff format backend
-./bin/dev lint:fe        # ESLint frontend
-./bin/dev fmt:fe         # Prettier frontend
-./bin/dev commit         # commitizen conventional commit
-./bin/dev server         # backend only (no frontend)
-./bin/dev ui             # frontend only (no backend)
+./bin/dev test [args]      # run all tests (backend + frontend)
+./bin/dev test:be [args]   # backend tests only (pytest)
+./bin/dev test:fe          # frontend tests only (vitest)
+./bin/dev test:e2e [args]  # Playwright e2e tests
+./bin/dev lint             # ruff lint all Python
+./bin/dev fmt              # ruff format all Python
+./bin/dev lint:fe          # ESLint frontend
+./bin/dev fmt:fe           # Prettier frontend
+./bin/dev commit           # commitizen conventional commit
+./bin/dev server           # backend only (no frontend)
+./bin/dev ui               # frontend only (no backend)
+./bin/dev seed [args]      # run seed_realistic
+./bin/dev eval [args]      # run LLM evals
 ```
 
-Never suggest `pip`, `python -m pytest`, or `ruff` directly. All backend execution goes through `uv` (via `./bin/dev` or `uv run --directory backend <cmd>`). The project uses `uv` as its Python package manager — not pip, not virtualenv.
+Never suggest `pip`, `python -m pytest`, or `ruff` directly. All Python execution goes through `uv` (via `./bin/dev`). The project uses `uv` workspaces — the root `pyproject.toml` manages dev deps, `backend/pyproject.toml` has production deps only.
+
+## Monorepo layout
+
+```
+sku-ops/
+├── backend/          # deployable app + its tests
+│   └── tests/        # backend unit/integration/api tests
+├── frontend/         # React SPA (co-located unit tests in src/__tests__/)
+├── tests/e2e/        # cross-stack Playwright tests
+├── devtools/         # seeds, evals, scripts — not deployed
+├── bin/dev           # unified CLI
+└── pyproject.toml    # uv workspace root (dev deps, ruff, pytest, commitizen)
+```
+
+Each deployable owns its tests. Devtools live at the workspace root. The Docker image contains zero test or devtools code — `backend/tests/` is excluded via `.dockerignore`, devtools is structurally outside the `COPY backend/` layer, and `uv sync --no-dev` skips test deps.
 
 ## Frontend always proxies /api → localhost:8000
 Configured in `frontend/vite.config.js`. Works with both modes as long as backend is on :8000.

@@ -285,7 +285,7 @@ _LOOKUP_PATTERNS: list[tuple[re.Pattern, str, str, Callable, Callable]] = [
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
-async def try_lookup(message: str, org_id: str) -> str | None:
+async def try_lookup(message: str) -> str | None:
     """Try to answer the message with a single tool call + template.
 
     Returns a formatted markdown string if a pattern matches, else None.
@@ -300,9 +300,9 @@ async def try_lookup(message: str, org_id: str) -> str | None:
                 continue
             args = arg_extractor(m, message)
             if entry.takes_args:
-                raw = await entry.fn(args, org_id)
+                raw = await entry.fn(args)
             else:
-                raw = await entry.fn(org_id)
+                raw = await entry.fn()
             data = json.loads(raw)
             return formatter(data)
         except (json.JSONDecodeError, ValueError, RuntimeError, OSError, KeyError) as e:

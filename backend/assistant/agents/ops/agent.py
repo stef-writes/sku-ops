@@ -34,15 +34,13 @@ _agent = Agent(
 @_agent.tool
 async def get_contractor_history(ctx: RunContext[AgentDeps], name: str, limit: int = 20) -> str:
     """Withdrawal history for a contractor (by name). Shows jobs, materials pulled, amounts."""
-    return budget_tool_result(
-        await _get_contractor_history({"name": name, "limit": limit}, ctx.deps.org_id)
-    )
+    return budget_tool_result(await _get_contractor_history({"name": name, "limit": limit}))
 
 
 @_agent.tool
 async def get_job_materials(ctx: RunContext[AgentDeps], job_id: str) -> str:
     """All materials pulled for a specific job ID. Shows each item, quantity, cost."""
-    return budget_tool_result(await _get_job_materials({"job_id": job_id}, ctx.deps.org_id))
+    return budget_tool_result(await _get_job_materials({"job_id": job_id}))
 
 
 @_agent.tool
@@ -50,17 +48,13 @@ async def list_recent_withdrawals(
     ctx: RunContext[AgentDeps], days: int = 7, limit: int = 20
 ) -> str:
     """Recent material withdrawals across all jobs. Filter by last N days."""
-    return budget_tool_result(
-        await _list_recent_withdrawals({"days": days, "limit": limit}, ctx.deps.org_id)
-    )
+    return budget_tool_result(await _list_recent_withdrawals({"days": days, "limit": limit}))
 
 
 @_agent.tool
 async def list_pending_material_requests(ctx: RunContext[AgentDeps], limit: int = 20) -> str:
     """Material requests from contractors that are awaiting approval."""
-    return budget_tool_result(
-        await _list_pending_material_requests({"limit": limit}, ctx.deps.org_id)
-    )
+    return budget_tool_result(await _list_pending_material_requests({"limit": limit}))
 
 
 async def run(

@@ -7,8 +7,8 @@ from catalog.domain.errors import DuplicateBarcodeError, InvalidBarcodeError
 from catalog.infrastructure.department_repo import department_repo
 from catalog.infrastructure.product_repo import product_repo
 from inventory.application.inventory_service import process_import_stock_changes
-from kernel.errors import ResourceNotFoundError
 from shared.infrastructure.database import get_connection
+from shared.kernel.errors import ResourceNotFoundError
 
 
 @pytest.mark.asyncio

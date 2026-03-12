@@ -79,18 +79,18 @@ async def _make_withdrawal(billing_entity="On Point LLC") -> str:
 
 async def _make_approved_invoice(billing_entity="On Point LLC"):
     wid = await _make_withdrawal(billing_entity)
-    inv = await create_invoice_from_withdrawals([wid], organization_id="default")
+    inv = await create_invoice_from_withdrawals([wid])
     return await update_invoice(inv.id, status="approved")
 
 
-async def _run_sync_with_stub(org_id="default"):
+async def _run_sync_with_stub():
     """Run the sync job with StubXeroAdapter injected at every call site."""
     from finance.adapters.stub_xero import StubXeroAdapter
     from finance.application.xero_sync_job import run_sync
     from identity.domain.org_settings import OrgSettings
 
     stub_settings = OrgSettings(
-        organization_id=org_id,
+        organization_id="default",
         xero_access_token=_STUB_XERO_TOKEN,
         xero_tenant_id="stub-tenant",
     )
@@ -110,7 +110,7 @@ async def _run_sync_with_stub(org_id="default"):
         ),
         patch("finance.application.invoice_sync.get_invoicing_gateway", return_value=stub_gateway),
     ):
-        return await run_sync(org_id, reconcile=False)
+        return await run_sync(reconcile=False)
 
 
 # ── 1. Idempotency ────────────────────────────────────────────────────────────
@@ -181,8 +181,8 @@ class TestSyncJobIdempotency:
                 return_value=stub_gateway,
             ),
         ):
-            await run_sync("default", reconcile=False)
-            await run_sync("default", reconcile=False)
+            await run_sync(reconcile=False)
+            await run_sync(reconcile=False)
 
         assert call_count == 1, (
             f"sync_invoice called {call_count} times — should be called exactly once. "
@@ -207,7 +207,7 @@ class TestSyncStatusGating:
     async def test_draft_invoice_is_not_synced(self):
         """A draft invoice must never be pushed to Xero."""
         wid = await _make_withdrawal()
-        inv = await create_invoice_from_withdrawals([wid], organization_id="default")
+        inv = await create_invoice_from_withdrawals([wid])
         assert inv.status == "draft"
 
         await _run_sync_with_stub()
@@ -274,7 +274,7 @@ class TestSyncStatusGating:
                 return_value=stub_gateway,
             ),
         ):
-            await run_sync("default", reconcile=False)
+            await run_sync(reconcile=False)
 
         assert call_count == 0, "Already-synced invoice must not trigger another sync call"
 
@@ -425,7 +425,7 @@ class TestReconciliationMismatch:
                 return_value=stub_gateway,
             ),
         ):
-            await run_sync("default", reconcile=False)
+            await run_sync(reconcile=False)
 
         inv_synced = await invoice_repo.get_by_id(inv_id)
         assert inv_synced.xero_invoice_id is not None
@@ -450,7 +450,7 @@ class TestReconciliationMismatch:
                 return_value=mismatch_gateway,
             ),
         ):
-            await run_sync("default", reconcile=True)
+            await run_sync(reconcile=True)
 
         inv_after = await invoice_repo.get_by_id(inv_id)
         assert inv_after.xero_sync_status == "mismatch", (
@@ -490,7 +490,7 @@ class TestReconciliationMismatch:
                 return_value=stub_gateway,
             ),
         ):
-            await run_sync("default", reconcile=False)
+            await run_sync(reconcile=False)
 
         inv_synced = await invoice_repo.get_by_id(inv_id)
         local_total = inv_synced.total
@@ -516,7 +516,7 @@ class TestReconciliationMismatch:
                 return_value=matching_gateway,
             ),
         ):
-            await run_sync("default", reconcile=True)
+            await run_sync(reconcile=True)
 
         inv_final = await invoice_repo.get_by_id(inv_id)
         assert inv_final.xero_sync_status == "synced"
@@ -608,7 +608,7 @@ class TestPOQueuing:
 
         await queue_po_for_sync(po.id)
 
-        po_after = await po_repo.get_po(po.id, "default")
+        po_after = await po_repo.get_po(po.id)
         assert po_after["xero_sync_status"] == "pending"
 
     @pytest.mark.usefixtures("_db")
@@ -667,10 +667,10 @@ class TestPOQueuing:
                 return_value=stub_gateway,
             ),
         ):
-            result = await sync_po_bill(po.id, "default")
+            result = await sync_po_bill(po.id)
 
         assert result["success"] is True
-        po_after = await po_repo.get_po(po.id, "default")
+        po_after = await po_repo.get_po(po.id)
         assert po_after["xero_bill_id"] is not None
         assert po_after["xero_sync_status"] == "synced"
 
@@ -729,10 +729,10 @@ class TestPOQueuing:
                 return_value=stub_gateway,
             ),
         ):
-            r1 = await sync_po_bill(po.id, "default")
-            r2 = await sync_po_bill(po.id, "default")
+            r1 = await sync_po_bill(po.id)
+            r2 = await sync_po_bill(po.id)
 
-        po_after = await po_repo.get_po(po.id, "default")
+        po_after = await po_repo.get_po(po.id)
         assert r1["xero_bill_id"] == r2["xero_bill_id"] == po_after["xero_bill_id"]
 
 
@@ -788,7 +788,7 @@ class TestSyncSummaryCounts:
                 return_value=failing_gateway,
             ),
         ):
-            summary = await run_sync("default", reconcile=False)
+            summary = await run_sync(reconcile=False)
 
         assert summary["invoices_failed"] == 1
         inv_after = await invoice_repo.get_by_id(inv.id)
@@ -845,7 +845,7 @@ class TestCogsRepost:
     async def test_editing_line_items_on_unsynced_invoice_does_not_set_cogs_stale(self):
         """Editing a draft/unsynced invoice must NOT set cogs_stale — it was never in Xero."""
         wid = await _make_withdrawal()
-        inv = await create_invoice_from_withdrawals([wid], organization_id="default")
+        inv = await create_invoice_from_withdrawals([wid])
         assert inv.xero_invoice_id is None
 
         new_items = [
@@ -931,7 +931,7 @@ class TestCogsRepost:
                 return_value=stub_gateway,
             ),
         ):
-            summary = await run_sync("default", reconcile=False)
+            summary = await run_sync(reconcile=False)
 
         assert inv_id in repost_called, "repost_cogs_journal must be called for the stale invoice"
         assert summary["cogs_reposted"] == 1
@@ -1006,7 +1006,7 @@ class TestCogsRepost:
                 return_value=failing_gateway,
             ),
         ):
-            summary = await run_sync("default", reconcile=False)
+            summary = await run_sync(reconcile=False)
 
         assert summary["cogs_repost_failed"] == 1
         assert summary["cogs_reposted"] == 0

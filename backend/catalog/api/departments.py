@@ -12,14 +12,12 @@ router = APIRouter(prefix="/departments", tags=["departments"])
 
 @router.get("", response_model=list[Department])
 async def get_departments(current_user: CurrentUserDep):
-    org_id = current_user.organization_id
-    return await catalog_queries.list_departments(organization_id=org_id)
+    return await catalog_queries.list_departments()
 
 
 @router.post("", response_model=Department)
 async def create_department(data: DepartmentCreate, current_user: AdminDep):
-    org_id = current_user.organization_id
-    existing = await catalog_queries.get_department_by_code(data.code, organization_id=org_id)
+    existing = await catalog_queries.get_department_by_code(data.code)
     if existing:
         raise HTTPException(status_code=400, detail="Department code already exists")
 
@@ -27,7 +25,7 @@ async def create_department(data: DepartmentCreate, current_user: AdminDep):
         name=data.name,
         code=data.code.upper(),
         description=data.description or "",
-        organization_id=org_id,
+        organization_id=current_user.organization_id,
     )
     await catalog_queries.insert_department(dept)
     return dept
@@ -35,29 +33,25 @@ async def create_department(data: DepartmentCreate, current_user: AdminDep):
 
 @router.put("/{dept_id}", response_model=Department)
 async def update_department(dept_id: str, data: DepartmentCreate, current_user: AdminDep):
-    org_id = current_user.organization_id
-    existing = await catalog_queries.get_department_by_id(dept_id, organization_id=org_id)
+    existing = await catalog_queries.get_department_by_id(dept_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Department not found")
     result = await catalog_queries.update_department(
-        dept_id, data.name, data.description or "", organization_id=org_id
+        dept_id, data.name, data.description or "",
     )
     return result
 
 
 @router.delete("/{dept_id}")
 async def delete_department(dept_id: str, request: Request, current_user: AdminDep):
-    org_id = current_user.organization_id
-    existing = await catalog_queries.get_department_by_id(dept_id, organization_id=org_id)
+    existing = await catalog_queries.get_department_by_id(dept_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Department not found")
-    product_count = await catalog_queries.count_products_by_department(
-        dept_id, organization_id=org_id
-    )
+    product_count = await catalog_queries.count_products_by_department(dept_id)
     if product_count > 0:
         raise HTTPException(status_code=400, detail="Cannot delete department with products")
 
-    deleted = await catalog_queries.delete_department(dept_id, organization_id=org_id)
+    deleted = await catalog_queries.delete_department(dept_id)
     if deleted == 0:
         raise HTTPException(status_code=404, detail="Department not found")
     await audit_log(
@@ -67,6 +61,6 @@ async def delete_department(dept_id: str, request: Request, current_user: AdminD
         resource_id=dept_id,
         details={"name": existing.get("name"), "code": existing.get("code")},
         request=request,
-        org_id=org_id,
+        org_id=current_user.organization_id,
     )
     return {"message": "Department deleted"}

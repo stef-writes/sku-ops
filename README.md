@@ -87,7 +87,10 @@ Configuration is environment-aware (`ENV=development|staging|production|test`). 
 
 ```
 backend/
-├── api/              # Top-level router aggregation
+├── server.py         # App composition root (middleware, exception handlers)
+├── routes.py         # Router aggregation — all context routers wired here
+├── startup.py        # Lifespan: init, warm-up, seeding, shutdown
+├── scheduler.py      # Background jobs (Xero nightly sync)
 ├── identity/         # Auth, users, organizations
 ├── catalog/          # Products, departments, vendors, SKUs
 ├── inventory/        # Stock transactions, cycle counts, UOM
@@ -98,8 +101,8 @@ backend/
 ├── assistant/        # AI chat agents, LLM infrastructure
 ├── reports/          # Dashboard analytics, P&L, trends
 ├── jobs/             # Job definitions
-├── shared/           # Config, DB, logging, metrics, middleware, WebSocket
-├── devtools/         # Seed data, evals, dev-only endpoints
+├── shared/           # Config, DB, logging, metrics, middleware, health, WebSocket
+├── devtools/         # Seed data, evals, dev-only endpoints (excluded from Docker)
 └── kernel/           # Shared types, errors
 
 frontend/

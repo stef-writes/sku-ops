@@ -7,6 +7,7 @@ Anthropic SDK construction for backward compatibility.
 import base64
 import logging
 
+from assistant.infrastructure.llm import get_provider
 from shared.infrastructure.config import (
     ANTHROPIC_API_KEY,
     ANTHROPIC_AVAILABLE,
@@ -20,8 +21,6 @@ logger = logging.getLogger(__name__)
 def _get_client():
     """Return configured Anthropic client, preferring the infrastructure adapter."""
     try:
-        from assistant.infrastructure.llm import get_provider
-
         provider = get_provider()
         client = provider.get_raw_client()
         if client is not None:

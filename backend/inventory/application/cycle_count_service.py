@@ -17,12 +17,11 @@ from catalog.application.queries import list_products
 from inventory.application.inventory_service import process_adjustment_stock_changes
 from inventory.domain.cycle_count import CycleCount, CycleCountItem, CycleCountStatus
 from inventory.infrastructure import cycle_count_repo
-from kernel.errors import ResourceNotFoundError
-from shared.infrastructure.database import transaction
+from shared.infrastructure.database import get_org_id, transaction
+from shared.kernel.errors import ResourceNotFoundError
 
 
 async def open_cycle_count(
-    organization_id: str,
     created_by_id: str,
     created_by_name: str,
     scope: str | None = None,
@@ -33,7 +32,7 @@ async def open_cycle_count(
     scope=None counts everything; scope=<department_name> limits to that dept.
     Returns the serialized CycleCount.
     """
-    products = await list_products(organization_id=organization_id)
+    products = await list_products()
     if scope:
         products = [p for p in products if p.department_name == scope]
 
@@ -44,7 +43,7 @@ async def open_cycle_count(
         )
 
     count = CycleCount(
-        organization_id=organization_id,
+        organization_id=get_org_id(),
         scope=scope,
         created_by_id=created_by_id,
         created_by_name=created_by_name,
@@ -70,14 +69,13 @@ async def update_counted_qty(
     item_id: str,
     counted_qty: float,
     notes: str | None,
-    organization_id: str,
 ) -> dict:
     """Record the physical count for one line item.
 
     Computes variance = counted_qty - snapshot_qty inline.
     The count must still be open.
     """
-    count = await cycle_count_repo.get_count(count_id, organization_id)
+    count = await cycle_count_repo.get_count(count_id)
     if not count:
         raise ResourceNotFoundError("CycleCount", count_id)
     if count["status"] != CycleCountStatus.OPEN:
@@ -99,9 +97,9 @@ async def update_counted_qty(
     return updated
 
 
-async def get_count_detail(count_id: str, organization_id: str) -> dict:
+async def get_count_detail(count_id: str) -> dict:
     """Return the count header plus all line items with their current variance."""
-    count = await cycle_count_repo.get_count(count_id, organization_id)
+    count = await cycle_count_repo.get_count(count_id)
     if not count:
         raise ResourceNotFoundError("CycleCount", count_id)
 
@@ -111,7 +109,6 @@ async def get_count_detail(count_id: str, organization_id: str) -> dict:
 
 async def commit_cycle_count(
     count_id: str,
-    organization_id: str,
     committed_by_id: str,
     committed_by_name: str,
 ) -> dict:
@@ -124,7 +121,7 @@ async def commit_cycle_count(
     Items without a counted_qty are skipped (uncounted = no adjustment).
     Items with variance == 0 are skipped (no change needed).
     """
-    count = await cycle_count_repo.get_count(count_id, organization_id)
+    count = await cycle_count_repo.get_count(count_id)
     if not count:
         raise ResourceNotFoundError("CycleCount", count_id)
     if count["status"] != CycleCountStatus.OPEN:
@@ -161,5 +158,5 @@ async def commit_cycle_count(
     return count
 
 
-async def list_cycle_counts(organization_id: str, status: str | None = None) -> list:
-    return await cycle_count_repo.list_counts(organization_id, status=status)
+async def list_cycle_counts(status: str | None = None) -> list:
+    return await cycle_count_repo.list_counts(status=status)

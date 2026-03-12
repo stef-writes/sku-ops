@@ -66,17 +66,16 @@ def _evaluate_condition(condition: str, results: dict[str, str]) -> bool:
 
 # ── Executor ──────────────────────────────────────────────────────────────────
 
-ToolRunner = Callable[[str, dict, str], Awaitable[str]]
+ToolRunner = Callable[[str, dict], Awaitable[str]]
 
 
 async def execute_plan(
     plan: ExecutionPlan,
     tool_runner: ToolRunner,
-    org_id: str,
 ) -> DAGResult:
     """Execute all nodes in the DAG, respecting dependencies and parallelism.
 
-    *tool_runner* is a callable (tool_name, args, org_id) -> str that maps
+    *tool_runner* is a callable (tool_name, args) -> str that maps
     to the actual DB query functions.
     """
     completed: set[str] = set()
@@ -112,7 +111,7 @@ async def execute_plan(
 
         async def _run_one(node: DAGNode) -> tuple[str, str]:
             try:
-                raw = await tool_runner(node.tool or "", node.args, org_id)
+                raw = await tool_runner(node.tool or "", node.args)
                 trimmed = budget_tool_result(raw, max_tokens=node.token_budget)
                 return node.id, trimmed
             except (ValueError, RuntimeError, OSError, KeyError) as e:

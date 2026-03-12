@@ -9,6 +9,7 @@ import json
 import logging
 import re
 
+from assistant.application.llm import generate_text
 from shared.infrastructure.config import LLM_AVAILABLE
 from shared.infrastructure.prompt_loader import load_prompt
 from shared.kernel.units import ALLOWED_BASE_UNITS
@@ -70,11 +71,6 @@ async def enrich_for_import(
     dept_codes: valid department codes.
     """
     if not LLM_AVAILABLE or not items:
-        return items
-
-    try:
-        from assistant.application.llm import generate_text
-    except ImportError:
         return items
 
     vendor_str = "\n".join(

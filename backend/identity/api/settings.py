@@ -25,8 +25,7 @@ def _mask(settings: OrgSettings) -> dict:
 @router.get("/xero")
 async def get_xero_settings(current_user: AdminDep):
     """Return Xero config for the org. Secrets are masked in the response."""
-    org_id = current_user.organization_id
-    settings = await get_org_settings(org_id)
+    settings = await get_org_settings()
     return _mask(settings)
 
 
@@ -36,8 +35,7 @@ async def update_xero_settings(
     current_user: AdminDep,
 ):
     """Update Xero account codes and/or API credentials."""
-    org_id = current_user.organization_id
-    settings = await get_org_settings(org_id)
+    settings = await get_org_settings()
 
     update = data.model_dump(exclude_none=True)
     merged = settings.model_copy(update=update)

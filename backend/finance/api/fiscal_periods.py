@@ -19,7 +19,7 @@ async def list_periods(
     current_user: AdminDep,
     status: str | None = None,
 ):
-    return await list_fiscal_periods(current_user.organization_id, status=status)
+    return await list_fiscal_periods(status=status)
 
 
 @router.post("")
@@ -27,7 +27,7 @@ async def create_period(
     body: FiscalPeriodCreate,
     current_user: AdminDep,
 ):
-    return await create_fiscal_period(body, current_user.organization_id)
+    return await create_fiscal_period(body)
 
 
 @router.post("/{period_id}/close")
@@ -37,9 +37,8 @@ async def close_period(
     current_user: AdminDep,
 ):
     """Close a fiscal period — prevents new ledger entries in this date range."""
-    org_id = current_user.organization_id
     try:
-        result = await close_fiscal_period(period_id, org_id, current_user.id)
+        result = await close_fiscal_period(period_id, current_user.id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -54,6 +53,6 @@ async def close_period(
             "end_date": result.get("end_date"),
         },
         request=request,
-        org_id=org_id,
+        org_id=current_user.organization_id,
     )
     return result

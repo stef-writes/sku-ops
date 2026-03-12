@@ -3,24 +3,24 @@
 import logging
 
 from finance.adapters.invoicing_factory import get_invoicing_gateway
+from finance.application.org_settings_service import get_org_settings
 from finance.domain.invoice import InvoiceWithDetails
 from finance.domain.xero_settings import XeroSettings
 from finance.infrastructure.invoice_repo import (
     invoice_repo as _default_invoice_repo,
 )
 from finance.ports.invoice_repo_port import InvoiceRepoPort
-from identity.application.org_service import get_org_settings
+from shared.infrastructure.database import get_org_id
 
 logger = logging.getLogger(__name__)
 
 
 async def _get_invoice(
     invoice_id: str,
-    org_id: str | None = None,
     invoice_repo: InvoiceRepoPort = _default_invoice_repo,
 ) -> InvoiceWithDetails | None:
     """Fetch an invoice by ID. Returns None if not found."""
-    return await invoice_repo.get_by_id(invoice_id, org_id)
+    return await invoice_repo.get_by_id(invoice_id)
 
 
 # ---------------------------------------------------------------------------
@@ -30,17 +30,16 @@ async def _get_invoice(
 
 async def sync_invoice(
     inv_id: str,
-    org_id: str,
     invoice_repo: InvoiceRepoPort = _default_invoice_repo,
 ) -> dict:
     """Sync a single invoice to Xero. Returns a result dict."""
-    inv = await _get_invoice(inv_id, org_id, invoice_repo)
+    inv = await _get_invoice(inv_id, invoice_repo)
     if not inv:
         return {"invoice_id": inv_id, "error": "Invoice not found", "success": False}
 
     if inv.xero_sync_status == "syncing":
         try:
-            existing = await _gateway_fetch_existing(inv, org_id, invoice_repo)
+            existing = await _gateway_fetch_existing(inv, invoice_repo)
             if existing:
                 return existing
         except (RuntimeError, OSError, ValueError) as e:
@@ -48,7 +47,7 @@ async def sync_invoice(
 
     await invoice_repo.set_xero_sync_status(inv_id, "syncing")
 
-    org_settings = await get_org_settings(org_id)
+    org_settings = await get_org_settings(get_org_id())
     xero_settings = XeroSettings.model_validate(org_settings.model_dump())
     gateway = get_invoicing_gateway(xero_settings)
 
@@ -84,11 +83,10 @@ async def sync_invoice(
 
 async def _gateway_fetch_existing(
     inv: InvoiceWithDetails,
-    org_id: str,
     invoice_repo: InvoiceRepoPort,
 ) -> dict | None:
     """Check Xero for an existing invoice matching our number (idempotency guard)."""
-    org_settings = await get_org_settings(org_id)
+    org_settings = await get_org_settings(get_org_id())
     xero_settings = XeroSettings.model_validate(org_settings.model_dump())
     gateway = get_invoicing_gateway(xero_settings)
     existing = await gateway.fetch_invoice_by_number(inv.invoice_number, xero_settings)
@@ -106,17 +104,16 @@ async def _gateway_fetch_existing(
 
 async def repost_cogs_for_invoice(
     inv_id: str,
-    org_id: str,
     invoice_repo: InvoiceRepoPort = _default_invoice_repo,
 ) -> dict:
     """Re-post the COGS manual journal for an invoice whose line items changed after sync."""
-    inv = await _get_invoice(inv_id, org_id, invoice_repo)
+    inv = await _get_invoice(inv_id, invoice_repo)
     if not inv:
         return {"invoice_id": inv_id, "error": "Invoice not found", "success": False}
     if not inv.xero_invoice_id:
         return {"invoice_id": inv_id, "error": "Invoice not yet synced to Xero", "success": False}
 
-    org_settings = await get_org_settings(org_id)
+    org_settings = await get_org_settings(get_org_id())
     xero_settings = XeroSettings.model_validate(org_settings.model_dump())
     gateway = get_invoicing_gateway(xero_settings)
 

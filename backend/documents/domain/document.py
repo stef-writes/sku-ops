@@ -4,7 +4,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel
 
-from kernel.entity import AuditedEntity
+from shared.kernel.entity import AuditedEntity
 
 
 class DocumentLineItem(BaseModel):

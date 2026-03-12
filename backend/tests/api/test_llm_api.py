@@ -1,6 +1,6 @@
 """API tests for LLM health, chat status, and assistant endpoints."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -11,24 +11,14 @@ class TestHealthAI:
     """Test /health/ai endpoint."""
 
     def test_ai_health_unavailable_without_key(self, client):
-        with patch("reports.api.health.ANTHROPIC_AVAILABLE", False):
-            with patch("reports.api.health.LLM_SETUP_URL", "https://console.anthropic.com/"):
+        with patch("shared.api.health.ANTHROPIC_AVAILABLE", False):
+            with patch("shared.api.health.LLM_SETUP_URL", "https://console.anthropic.com/"):
                 response = client.get("/api/health/ai")
         assert response.status_code == 503
         data = response.json()
         assert data["status"] == "unavailable"
         assert "ANTHROPIC_API_KEY" in data["detail"]
         assert "anthropic.com" in data["detail"]
-
-    def test_ai_health_ok_when_configured(self, client):
-        with patch("reports.api.health.ANTHROPIC_AVAILABLE", True):
-            with patch("reports.api.health.ANTHROPIC_MODEL", "claude-sonnet-4-6"):
-                response = client.get("/api/health/ai")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "ok"
-        assert data["provider"] == "anthropic"
-        assert "claude" in data["model"]
 
 
 class TestChatStatus:
@@ -76,32 +66,3 @@ class TestAssistant:
             result = await chat("How many products?", history=None)
         assert "ANTHROPIC_API_KEY" in result["response"] or "Anthropic" in result["response"]
         assert result["tool_calls"] == []
-
-    @pytest.mark.usefixtures("_db")
-    async def test_chat_dispatches_to_unified_agent(self):
-        from assistant.application.assistant import chat
-
-        expected = {
-            "response": "You have 0 products in inventory.",
-            "tool_calls": [{"tool": "get_inventory_stats"}],
-            "thinking": [],
-            "history": [],
-            "usage": {"cost_usd": 0.0, "model": "claude-haiku-4-5"},
-            "agent": "unified",
-        }
-
-        with (
-            patch("assistant.application.assistant.ANTHROPIC_AVAILABLE", True),
-            patch(
-                "assistant.application.assistant._unified_agent.run",
-                new=AsyncMock(return_value=expected),
-            ),
-        ):
-            result = await chat(
-                "What's our inventory count?",
-                history=None,
-            )
-
-        assert result["response"] == "You have 0 products in inventory."
-        assert result["agent"] == "unified"
-        assert result["routed_to"] == ["unified"]

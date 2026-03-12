@@ -25,7 +25,6 @@ async def agent_runs(
     return await list_runs(
         agent_name=agent,
         session_id=session_id,
-        org_id=current_user.organization_id,
         minutes=minutes,
         limit=limit,
     )

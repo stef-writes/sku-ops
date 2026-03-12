@@ -14,19 +14,19 @@ from finance.application.invoice_service import (
 )
 from finance.application.ledger_service import record_payment as _record_payment
 from finance.application.ledger_service import record_withdrawal as _record_ledger
-from identity.application.billing_entity_service import ensure_billing_entity
-from identity.application.org_service import get_org_settings
+from finance.application.billing_entity_service import ensure_billing_entity
+from finance.application.org_settings_service import get_org_settings
 from inventory.application.inventory_service import process_withdrawal_stock_changes
 from jobs.application.job_service import ensure_job as _ensure_job
 from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalCreate
 from operations.infrastructure.withdrawal_repo import withdrawal_repo as _default_withdrawal_repo
-from shared.infrastructure.database import transaction
+from shared.infrastructure.database import get_org_id, transaction
 from shared.kernel.stock import StockDecrement
 from shared.kernel.units import are_compatible, convert_quantity, cost_per_sell_unit
 
 if TYPE_CHECKING:
-    from kernel.types import CurrentUser
     from operations.ports.withdrawal_repo_port import WithdrawalRepoPort
+    from shared.kernel.types import CurrentUser
 
 CreateInvoiceFn = Callable[..., Awaitable] | None
 ListProductsFn = Callable[..., Awaitable[list]]
@@ -68,10 +68,10 @@ async def create_withdrawal(
 
     Returns withdrawal dict with optional invoice_id.
     """
-    org_id = current_user.organization_id
+    org_id = get_org_id()
     if data.job_id:
-        await _ensure_job(data.job_id, org_id)
-    products = await list_products(organization_id=org_id)
+        await _ensure_job(data.job_id)
+    products = await list_products()
     product_map = {p.id: p for p in products}
     dept_map = {p.id: p.department_name for p in products}
     enriched_items = []
@@ -110,7 +110,7 @@ async def create_withdrawal(
     billing_entity_name = contractor.get("billing_entity", "")
     billing_entity_id = contractor.get("billing_entity_id")
     if billing_entity_name and not billing_entity_id:
-        be = await ensure_billing_entity(billing_entity_name, org_id)
+        be = await ensure_billing_entity(billing_entity_name)
         billing_entity_id = be.id if be else None
 
     withdrawal = MaterialWithdrawal(
@@ -149,7 +149,6 @@ async def create_withdrawal(
             withdrawal_id=withdrawal.id,
             user_id=current_user.id,
             user_name=current_user.name,
-            organization_id=org_id,
         )
 
         withdrawal.organization_id = org_id
@@ -176,7 +175,6 @@ async def create_withdrawal(
             job_id=withdrawal.job_id,
             billing_entity=withdrawal.billing_entity,
             contractor_id=withdrawal.contractor_id,
-            organization_id=org_id,
             performed_by_user_id=current_user.id,
         )
 
@@ -205,7 +203,7 @@ async def create_withdrawal_wired(
     Eliminates the duplicate do_create_withdrawal helpers in withdrawals.py and
     material_requests.py.
     """
-    settings = await get_org_settings(current_user.organization_id)
+    settings = await get_org_settings()
     return await create_withdrawal(
         data,
         contractor,
@@ -219,12 +217,11 @@ async def create_withdrawal_wired(
 
 async def mark_single_withdrawal_paid(
     withdrawal_id: str,
-    org_id: str,
     performed_by_user_id: str,
     withdrawal_repo: WithdrawalRepoPort = _default_withdrawal_repo,
 ) -> MaterialWithdrawal:
     """Mark a withdrawal as paid: update status, mark invoice paid, record ledger payment."""
-    withdrawal = await withdrawal_repo.get_by_id(withdrawal_id, org_id)
+    withdrawal = await withdrawal_repo.get_by_id(withdrawal_id)
     if not withdrawal:
         raise ValueError(f"Withdrawal {withdrawal_id} not found")
     paid_at = datetime.now(UTC).isoformat()
@@ -237,7 +234,6 @@ async def mark_single_withdrawal_paid(
         amount=withdrawal.total,
         billing_entity=withdrawal.billing_entity,
         contractor_id=withdrawal.contractor_id,
-        organization_id=org_id,
         performed_by_user_id=performed_by_user_id,
     )
     return result
@@ -245,7 +241,6 @@ async def mark_single_withdrawal_paid(
 
 async def bulk_mark_withdrawals_paid(
     withdrawal_ids: list[str],
-    org_id: str,
     performed_by_user_id: str,
     withdrawal_repo: WithdrawalRepoPort = _default_withdrawal_repo,
 ) -> int:
@@ -257,17 +252,16 @@ async def bulk_mark_withdrawals_paid(
         raise ValueError("Cannot mark more than 200 withdrawals at once")
 
     paid_at = datetime.now(UTC).isoformat()
-    updated = await withdrawal_repo.bulk_mark_paid(withdrawal_ids, paid_at, organization_id=org_id)
+    updated = await withdrawal_repo.bulk_mark_paid(withdrawal_ids, paid_at)
     for wid in withdrawal_ids:
         await mark_paid_for_withdrawal(wid)
-        w = await withdrawal_repo.get_by_id(wid, org_id)
+        w = await withdrawal_repo.get_by_id(wid)
         if w:
             await _record_payment(
                 withdrawal_id=wid,
                 amount=w.total,
                 billing_entity=w.billing_entity,
                 contractor_id=w.contractor_id,
-                organization_id=org_id,
                 performed_by_user_id=performed_by_user_id,
             )
     return updated

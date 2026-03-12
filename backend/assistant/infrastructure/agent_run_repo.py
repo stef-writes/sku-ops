@@ -4,14 +4,13 @@ import json
 import uuid
 from datetime import UTC, datetime
 
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 from shared.infrastructure.db.sql_compat import date_extract, time_ago_expr
 
 
 async def log_agent_run(
     *,
     session_id: str,
-    org_id: str,
     user_id: str = "",
     agent_name: str,
     model: str,
@@ -32,6 +31,7 @@ async def log_agent_run(
     run_id = str(uuid.uuid4())
     now = datetime.now(UTC).isoformat()
     conn = get_connection()
+    org_id = get_org_id()
     await conn.execute(
         """INSERT INTO agent_runs
            (id, session_id, org_id, user_id, agent_name, model, mode,

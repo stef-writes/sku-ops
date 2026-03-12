@@ -1,6 +1,6 @@
 """Catalog-specific domain errors."""
 
-from kernel.errors import DomainError
+from shared.kernel.errors import DomainError
 
 
 class DuplicateBarcodeError(DomainError):

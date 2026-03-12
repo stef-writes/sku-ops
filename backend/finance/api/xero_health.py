@@ -30,7 +30,6 @@ async def get_xero_health(
     current_user: AdminDep,
 ):
     """Return a snapshot of all Xero sync exceptions for the sync health dashboard."""
-    org_id = current_user.organization_id
     (
         unsynced_invoices,
         unsynced_credits,
@@ -41,14 +40,14 @@ async def get_xero_health(
         failed_credits,
         failed_pos,
     ) = (
-        await finance_queries.list_unsynced_invoices(org_id),
-        await finance_queries.list_unsynced_credit_notes(org_id),
-        await list_unsynced_po_bills(org_id),
-        await finance_queries.list_mismatch_invoices(org_id),
-        await finance_queries.list_mismatch_credit_notes(org_id),
-        await finance_queries.list_failed_invoices(org_id),
-        await finance_queries.list_failed_credit_notes(org_id),
-        await list_failed_po_bills(org_id),
+        await finance_queries.list_unsynced_invoices(),
+        await finance_queries.list_unsynced_credit_notes(),
+        await list_unsynced_po_bills(),
+        await finance_queries.list_mismatch_invoices(),
+        await finance_queries.list_mismatch_credit_notes(),
+        await finance_queries.list_failed_invoices(),
+        await finance_queries.list_failed_credit_notes(),
+        await list_failed_po_bills(),
     )
     return {
         "unsynced_invoices": unsynced_invoices,
@@ -83,7 +82,7 @@ async def trigger_sync(current_user: AdminDep):
 
         async def _run():
             try:
-                return await run_sync(org_id)
+                return await run_sync()
             except Exception:
                 logger.exception("Xero sync failed for org %s", org_id)
             finally:
@@ -98,7 +97,7 @@ async def trigger_sync(current_user: AdminDep):
 
     async def _run():
         try:
-            return await run_sync(org_id)
+            return await run_sync()
         except Exception:
             logger.exception("Xero sync failed for org %s", org_id)
         finally:
@@ -120,6 +119,4 @@ async def get_sync_status(current_user: AdminDep):
         return {"status": "in_progress" if exists else "idle"}
 
     task = _sync_tasks.get(org_id)
-    if task and not task.done():
-        return {"status": "in_progress"}
-    return {"status": "idle"}
+    return {"status": "in_progress" if task and not task.done() else "idle"}

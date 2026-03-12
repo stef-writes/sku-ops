@@ -14,9 +14,10 @@ from catalog.application.queries import (
 )
 from finance.application import ledger_queries as ledger_repo
 from identity.application.user_service import count_contractors
-from kernel.types import round_money
 from operations.application.queries import list_withdrawals
 from purchasing.application.queries import po_summary_by_status
+from shared.infrastructure.db import get_org_id
+from shared.kernel.types import round_money
 
 
 def _parse_date_range(start_date: str | None, end_date: str | None):
@@ -53,7 +54,6 @@ def _build_daily_chart(withdrawals: list, start: datetime, end: datetime) -> lis
 
 
 async def contractor_dashboard(
-    org_id: str,
     contractor_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
@@ -64,7 +64,6 @@ async def contractor_dashboard(
         start_date=sd,
         end_date=ed,
         limit=1000,
-        organization_id=org_id,
     )
     total_spent = sum(w.total for w in my_withdrawals)
     unpaid = sum(w.total for w in my_withdrawals if w.payment_status == "unpaid")
@@ -77,7 +76,6 @@ async def contractor_dashboard(
 
 
 async def admin_dashboard(
-    org_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> dict:
@@ -95,17 +93,15 @@ async def admin_dashboard(
         low_stock_items,
         by_department,
     ) = await asyncio.gather(
-        list_withdrawals(start_date=sd, end_date=ed, limit=10000, organization_id=org_id),
-        list_withdrawals(
-            payment_status="unpaid", start_date=sd, end_date=ed, limit=10000, organization_id=org_id
-        ),
-        list_products(organization_id=org_id),
-        count_all_products(org_id),
-        count_low_stock(org_id),
-        count_vendors(org_id),
-        count_contractors(org_id),
-        list_low_stock(10, org_id),
-        ledger_repo.summary_by_department(org_id, start_date=sd, end_date=ed),
+        list_withdrawals(start_date=sd, end_date=ed, limit=10000),
+        list_withdrawals(payment_status="unpaid", start_date=sd, end_date=ed, limit=10000),
+        list_products(),
+        count_all_products(),
+        count_low_stock(),
+        count_vendors(),
+        count_contractors(),
+        list_low_stock(10),
+        ledger_repo.summary_by_department(start_date=sd, end_date=ed),
     )
 
     range_revenue = sum(w.total for w in range_withdrawals)
@@ -130,7 +126,7 @@ async def admin_dashboard(
         )
     dept_margins.sort(key=lambda x: x["revenue"], reverse=True)
 
-    raw_po = await po_summary_by_status(org_id)
+    raw_po = await po_summary_by_status()
     po_summary = {
         status: {"count": v["count"], "total": round_money(v["total"])}
         for status, v in raw_po.items()
@@ -169,7 +165,6 @@ async def admin_dashboard(
 
 
 async def dashboard_transactions(
-    org_id: str,
     *,
     limit: int = 20,
     offset: int = 0,
@@ -187,7 +182,6 @@ async def dashboard_transactions(
         payment_status=payment_status or None,
         limit=fetch_limit,
         offset=offset,
-        organization_id=org_id,
     )
     has_more = len(rows) > limit
     withdrawals = [w.model_dump() for w in rows[:limit]]

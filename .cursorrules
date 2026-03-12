@@ -11,10 +11,10 @@ Read `.cursor/rules/architecture-audit-status.mdc` before any structural backend
 ### Layer dependencies (strict, not aspirational)
 
 ```
-kernel/                     → zero deps (pure domain primitives)
-shared/infrastructure/      → kernel only
-{context}/domain/           → kernel + stdlib + pydantic only
-{context}/ports/            → domain + kernel only
+shared/kernel/              → zero deps (pure domain primitives)
+shared/infrastructure/      → shared/kernel only
+{context}/domain/           → shared/kernel + stdlib + pydantic only
+{context}/ports/            → domain + shared/kernel only
 {context}/infrastructure/   → domain + shared/infrastructure
 {context}/application/      → own domain + own infra + other contexts' application facades
 {context}/api/              → own application + shared/api only

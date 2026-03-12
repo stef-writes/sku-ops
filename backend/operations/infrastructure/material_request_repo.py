@@ -2,10 +2,9 @@
 
 import json
 
-from kernel.errors import InvalidTransitionError
 from operations.domain.material_request import MaterialRequest
-from shared.infrastructure.config import DEFAULT_ORG_ID
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
+from shared.kernel.errors import InvalidTransitionError
 
 
 def _row_to_model(row) -> MaterialRequest | None:
@@ -24,7 +23,7 @@ def _row_to_model(row) -> MaterialRequest | None:
 async def insert(request: MaterialRequest | dict) -> None:
     request_dict = request if isinstance(request, dict) else request.model_dump()
     conn = get_connection()
-    org_id = request_dict.get("organization_id") or DEFAULT_ORG_ID
+    org_id = request_dict.get("organization_id") or get_org_id()
     items_json = json.dumps(
         [i if isinstance(i, dict) else i.model_dump() for i in request_dict["items"]]
     )
@@ -51,9 +50,9 @@ async def insert(request: MaterialRequest | dict) -> None:
     await conn.commit()
 
 
-async def get_by_id(request_id: str, organization_id: str | None = None) -> MaterialRequest | None:
+async def get_by_id(request_id: str) -> MaterialRequest | None:
     conn = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     cursor = await conn.execute(
         "SELECT * FROM material_requests WHERE id = ? AND (organization_id = ? OR organization_id IS NULL)",
         (request_id, org_id),
@@ -62,11 +61,9 @@ async def get_by_id(request_id: str, organization_id: str | None = None) -> Mate
     return _row_to_model(row)
 
 
-async def list_pending(
-    organization_id: str | None = None, limit: int = 100
-) -> list[MaterialRequest]:
+async def list_pending(limit: int = 100) -> list[MaterialRequest]:
     conn = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     cursor = await conn.execute(
         "SELECT * FROM material_requests WHERE status = 'pending' AND (organization_id = ? OR organization_id IS NULL) ORDER BY created_at DESC LIMIT ?",
         (org_id, limit),
@@ -76,10 +73,10 @@ async def list_pending(
 
 
 async def list_by_contractor(
-    contractor_id: str, organization_id: str | None = None, limit: int = 100
+    contractor_id: str, limit: int = 100
 ) -> list[MaterialRequest]:
     conn = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     cursor = await conn.execute(
         "SELECT * FROM material_requests WHERE contractor_id = ? AND (organization_id = ? OR organization_id IS NULL) ORDER BY created_at DESC LIMIT ?",
         (contractor_id, org_id, limit),

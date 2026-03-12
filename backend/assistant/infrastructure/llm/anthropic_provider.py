@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from assistant.infrastructure.llm.catalog import get_model_pricing
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,8 +35,6 @@ class AnthropicProvider:
         input_tokens: int,
         output_tokens: int,
     ) -> float:
-        from assistant.infrastructure.llm.catalog import get_model_pricing
-
         pricing = get_model_pricing(model_id)
         if not pricing:
             return 0.0

@@ -11,7 +11,6 @@ if TYPE_CHECKING:
 
 @dataclass
 class AgentDeps:
-    org_id: str
     user_id: str
     user_name: str
     config: AgentConfig | None = None

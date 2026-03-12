@@ -188,7 +188,6 @@ async def run_agent(
                 agent_name=agent_name,
                 agent_label=agent_label,
                 session_id=session_id,
-                org_id=getattr(deps, "org_id", ""),
                 user_id=getattr(deps, "user_id", ""),
                 duration_ms=duration_ms,
                 attempts=attempts,
@@ -214,7 +213,6 @@ async def run_agent(
                 agent_name=agent_name,
                 agent_label=agent_label,
                 session_id=session_id,
-                org_id=getattr(deps, "org_id", ""),
                 user_id=getattr(deps, "user_id", ""),
                 duration_ms=int((time.monotonic() - t0) * 1000),
                 attempts=attempts,
@@ -257,7 +255,6 @@ async def run_agent(
         agent_name=agent_name,
         agent_label=agent_label,
         session_id=session_id,
-        org_id=getattr(deps, "org_id", ""),
         user_id=getattr(deps, "user_id", ""),
         duration_ms=int((time.monotonic() - t0) * 1000),
         attempts=attempts,
@@ -277,7 +274,6 @@ def _log_success(
     agent_name,
     agent_label="",
     session_id,
-    org_id,
     user_id,
     duration_ms,
     attempts,
@@ -295,7 +291,6 @@ def _log_success(
         try:
             await log_agent_run(
                 session_id=session_id,
-                org_id=org_id,
                 user_id=user_id,
                 agent_name=agent_name,
                 model=model_name,
@@ -321,7 +316,6 @@ def _log_failure(
     agent_name,
     agent_label="",
     session_id,
-    org_id,
     user_id,
     duration_ms,
     attempts,
@@ -337,7 +331,6 @@ def _log_failure(
         try:
             await log_agent_run(
                 session_id=session_id,
-                org_id=org_id,
                 user_id=user_id,
                 agent_name=agent_name,
                 model=model_name,

@@ -21,8 +21,6 @@ from documents.application.import_parser import infer_uom, suggest_department
 from finance.application.po_sync_service import queue_po_for_sync
 from inventory.application.inventory_service import process_receiving_stock_changes
 from inventory.application.uom_classifier import classify_uom_batch as _classify_uom_batch
-from kernel import events
-from kernel.errors import ResourceNotFoundError
 from purchasing.application.purchase_order_service import (
     PurchasingDeps,
     create_purchase_order,
@@ -39,6 +37,8 @@ from shared.api.deps import AdminDep
 from shared.infrastructure import event_hub
 from shared.infrastructure.config import LLM_AVAILABLE as _LLM_AVAILABLE
 from shared.infrastructure.middleware.audit import audit_log
+from shared.kernel import events
+from shared.kernel.errors import ResourceNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -112,8 +112,7 @@ async def list_purchase_orders(
     status: str | None = None,
 ):
     """List purchase orders, optionally filtered by status (ordered/received)."""
-    org_id = current_user.organization_id
-    pos = await list_pos(org_id, status=status)
+    pos = await list_pos(status=status)
     for po in pos:
         items = await get_po_items(po["id"])
         po["item_count"] = len(items)
@@ -129,8 +128,7 @@ async def get_purchase_order(
     current_user: AdminDep,
 ):
     """Get a purchase order with all its items."""
-    org_id = current_user.organization_id
-    po = await get_po(po_id, org_id)
+    po = await get_po(po_id)
     if not po:
         raise ResourceNotFoundError("PurchaseOrder", po_id)
     items = await get_po_items(po_id)
@@ -165,7 +163,6 @@ async def receive_items(
         deps=_build_deps(),
         current_user=current_user,
     )
-    org_id = current_user.organization_id
     await audit_log(
         user_id=current_user.id,
         action="po.receive",
@@ -177,12 +174,12 @@ async def receive_items(
             "cost_total": result.get("cost_total", 0),
         },
         request=request,
-        org_id=org_id,
+        org_id=current_user.organization_id,
     )
     if result.get("cost_total", 0) > 0:
         try:
             await queue_po_for_sync(po_id)
         except (RuntimeError, OSError, ValueError) as e:
             logger.warning("Failed to queue PO %s for Xero sync: %s", po_id, e)
-    await event_hub.emit(events.INVENTORY_UPDATED, org_id=org_id)
+    await event_hub.emit(events.INVENTORY_UPDATED, org_id=current_user.organization_id)
     return result

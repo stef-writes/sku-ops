@@ -57,7 +57,7 @@ is_test = _is("test")
 is_deployed = is_staging or is_production
 
 # Re-export from kernel so infra/app layers can import from here too
-from kernel.constants import DEFAULT_ORG_ID  # noqa: F401, E402
+from shared.kernel.constants import DEFAULT_ORG_ID  # noqa: F401, E402
 
 # Database
 DATABASE_URL = os.environ.get("DATABASE_URL") or (

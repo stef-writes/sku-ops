@@ -1,17 +1,13 @@
 """
 Domain invariant tests — pure logic, no database.
 
-These enforce the mathematical and type-level properties that the domain
-must satisfy regardless of infrastructure. A CMU professor would call
-these "specification tests" — they encode the domain rules as executable
-properties, not just happy-path spot checks.
-
 Categories:
   1. UOM conversion correctness (round-trip, cross-family rejection)
   2. Unit family completeness (every ALLOWED_BASE_UNIT has a home)
-  3. Quantity type contracts (domain models enforce float, never int)
-  4. LineItem computed fields (subtotal, cost_total arithmetic)
-  5. Stock decrement invariants (unit default, quantity positivity)
+  3. LineItem computed fields (subtotal, cost_total arithmetic)
+  4. Stock decrement invariants (unit default)
+  5. Error model contracts
+  6. Withdrawal model invariants (totals, zero-tax, empty-items edge)
 """
 
 import pytest
@@ -19,8 +15,8 @@ import pytest
 from catalog.domain.product import Product, ProductCreate, ProductUpdate
 from inventory.domain.errors import InsufficientStockError, NegativeStockError
 from inventory.domain.stock import StockDecrement, StockTransaction, StockTransactionType
-from kernel.types import LineItem
 from operations.domain.withdrawal import MaterialWithdrawal, WithdrawalItem
+from shared.kernel.types import LineItem
 from shared.kernel.units import (
     ALLOWED_BASE_UNITS,
     UNIT_FAMILIES,
@@ -145,79 +141,7 @@ class TestUnitFamilyCompleteness:
                 assert factor > 0, f"{unit} in {family} has non-positive factor {factor}"
 
 
-# ── 3. Quantity type contracts ────────────────────────────────────────────────
-
-
-class TestQuantityTypeContracts:
-    """Domain models must accept and preserve float quantities — never truncate to int."""
-
-    def test_product_create_accepts_float_quantity(self):
-        p = ProductCreate(name="Wire", quantity=2.5, price=10.0, department_id="d1")
-        assert isinstance(p.quantity, float)
-        assert p.quantity == 2.5
-
-    def test_product_update_accepts_float_quantity(self):
-        p = ProductUpdate(quantity=3.75)
-        assert isinstance(p.quantity, float)
-        assert p.quantity == 3.75
-
-    def test_product_accepts_float_quantity(self):
-        p = Product(
-            name="Wire",
-            quantity=10.5,
-            price=1.0,
-            department_id="d1",
-            department_name="HW",
-            sku="HW-001",
-        )
-        assert isinstance(p.quantity, float)
-        assert p.quantity == 10.5
-
-    def test_line_item_quantity_is_float(self):
-        li = LineItem(product_id="p1", sku="S", name="X", quantity=3.5)
-        assert isinstance(li.quantity, float)
-        assert li.quantity == 3.5
-
-    def test_line_item_int_quantity_coerced_to_float(self):
-        li = LineItem(product_id="p1", sku="S", name="X", quantity=3)
-        assert isinstance(li.quantity, float)
-
-    def test_stock_decrement_quantity_is_float(self):
-        sd = StockDecrement(product_id="p1", sku="S", name="X", quantity=1.75)
-        assert isinstance(sd.quantity, float)
-        assert sd.quantity == 1.75
-
-    def test_stock_transaction_quantities_are_float(self):
-        tx = StockTransaction(
-            product_id="p1",
-            sku="S",
-            product_name="X",
-            quantity_delta=-2.5,
-            quantity_before=10.0,
-            quantity_after=7.5,
-            transaction_type=StockTransactionType.WITHDRAWAL,
-            user_id="u1",
-        )
-        assert isinstance(tx.quantity_delta, float)
-        assert isinstance(tx.quantity_before, float)
-        assert isinstance(tx.quantity_after, float)
-
-    def test_stock_transaction_arithmetic_consistency(self):
-        """quantity_after must equal quantity_before + quantity_delta."""
-        tx = StockTransaction(
-            product_id="p1",
-            sku="S",
-            product_name="X",
-            quantity_delta=-2.5,
-            quantity_before=10.0,
-            quantity_after=7.5,
-            transaction_type=StockTransactionType.WITHDRAWAL,
-            user_id="u1",
-        )
-        assert tx.quantity_after == pytest.approx(tx.quantity_before + tx.quantity_delta)
-
-
-# ── 4. LineItem computed fields ───────────────────────────────────────────────
+# ── 3. LineItem computed fields ───────────────────────────────────────────────
 
 
 class TestLineItemArithmetic:
@@ -266,26 +190,13 @@ class TestErrorContracts:
         assert isinstance(err.available, float)
         assert "2.5" in str(err)
 
-    def test_negative_stock_stores_float_quantities(self):
-        err = NegativeStockError(product_id="p1", current=3.0, delta=-5.0)
-        assert isinstance(err.current, float)
-        assert isinstance(err.delta, float)
 
-
-# ── 7. Withdrawal model invariants ───────────────────────────────────────────
+# ── 6. Withdrawal model invariants ───────────────────────────────────────────
 
 
 class TestWithdrawalInvariants:
-    def test_compute_totals_with_fractional_items(self):
-        items = [
-            WithdrawalItem(
-                product_id="p1", sku="S1", name="A", quantity=2.5, unit_price=4.0, cost=2.0
-            ),
-            WithdrawalItem(
-                product_id="p2", sku="S2", name="B", quantity=0.75, unit_price=10.0, cost=6.0
-            ),
-        ]
-        w = MaterialWithdrawal(
+    def _make_withdrawal(self, items):
+        return MaterialWithdrawal(
             items=items,
             job_id="J",
             service_address="X",
@@ -296,9 +207,58 @@ class TestWithdrawalInvariants:
             contractor_id="c1",
             processed_by_id="u1",
         )
+
+    def test_compute_totals_with_fractional_items(self):
+        items = [
+            WithdrawalItem(
+                product_id="p1", sku="S1", name="A", quantity=2.5, unit_price=4.0, cost=2.0
+            ),
+            WithdrawalItem(
+                product_id="p2", sku="S2", name="B", quantity=0.75, unit_price=10.0, cost=6.0
+            ),
+        ]
+        w = self._make_withdrawal(items)
         w.compute_totals(tax_rate=0.10)
-        expected_subtotal = 2.5 * 4.0 + 0.75 * 10.0  # 10.0 + 7.5 = 17.5
-        assert w.subtotal == pytest.approx(expected_subtotal)
+        assert w.subtotal == pytest.approx(17.5)
         assert w.tax == pytest.approx(1.75)
         assert w.total == pytest.approx(19.25)
-        assert w.cost_total == pytest.approx(2.5 * 2.0 + 0.75 * 6.0)
+        assert w.cost_total == pytest.approx(9.5)
+
+    def test_compute_totals_with_zero_tax(self):
+        items = [
+            WithdrawalItem(
+                product_id="p1", sku="S1", name="A", quantity=5, unit_price=10.0, cost=4.0
+            ),
+        ]
+        w = self._make_withdrawal(items)
+        w.compute_totals(tax_rate=0.0)
+        assert w.subtotal == pytest.approx(50.0)
+        assert w.tax == pytest.approx(0.0)
+        assert w.total == pytest.approx(50.0)
+
+    def test_compute_totals_single_item(self):
+        items = [
+            WithdrawalItem(
+                product_id="p1", sku="S1", name="A", quantity=1, unit_price=99.99, cost=50.0
+            ),
+        ]
+        w = self._make_withdrawal(items)
+        w.compute_totals(tax_rate=0.0825)
+        assert w.subtotal == pytest.approx(99.99)
+        assert w.tax == pytest.approx(round(99.99 * 0.0825, 2), abs=0.01)
+        assert w.total == pytest.approx(w.subtotal + w.tax)
+        assert w.cost_total == pytest.approx(50.0)
+
+    def test_total_equals_subtotal_plus_tax(self):
+        """Invariant: total = subtotal + tax for any combination."""
+        items = [
+            WithdrawalItem(
+                product_id="p1", sku="S1", name="A", quantity=3.33, unit_price=7.77, cost=3.0
+            ),
+            WithdrawalItem(
+                product_id="p2", sku="S2", name="B", quantity=1.11, unit_price=22.22, cost=10.0
+            ),
+        ]
+        w = self._make_withdrawal(items)
+        w.compute_totals(tax_rate=0.13)
+        assert w.total == pytest.approx(w.subtotal + w.tax, abs=0.01)

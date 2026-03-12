@@ -27,6 +27,7 @@ from documents.domain.document import DocumentImportRequest
 from inventory.application.inventory_service import process_receiving_stock_changes
 from inventory.application.uom_classifier import classify_uom_batch as _classify_uom_batch
 from shared.api.deps import AdminDep
+from assistant.application.llm import generate_text as _generate_text
 from shared.infrastructure.config import LLM_AVAILABLE as _LLM_AVAILABLE
 from shared.kernel.barcode import validate_barcode
 
@@ -77,7 +78,6 @@ async def list_documents(
 ):
     """List uploaded/parsed documents."""
     return await query_list_documents(
-        organization_id=current_user.organization_id,
         status=status,
         vendor_name=vendor_name,
         po_id=po_id,
@@ -88,7 +88,7 @@ async def list_documents(
 
 @router.get("/{doc_id}")
 async def get_document(doc_id: str, current_user: AdminDep):
-    doc = await get_document_by_id(doc_id, current_user.organization_id)
+    doc = await get_document_by_id(doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return doc
@@ -96,11 +96,7 @@ async def get_document(doc_id: str, current_user: AdminDep):
 
 async def _wired_classify_uom_batch(products):
     """Wire LLM + rule-based deps into the UOM classifier."""
-    gen_text = None
-    if _LLM_AVAILABLE:
-        from assistant.application.llm import generate_text
-
-        gen_text = generate_text
+    gen_text = _generate_text if _LLM_AVAILABLE else None
     return await _classify_uom_batch(products, generate_text=gen_text, rule_infer=rule_infer_uom)
 
 

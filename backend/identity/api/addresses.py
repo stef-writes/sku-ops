@@ -34,7 +34,6 @@ async def list_addresses(
     offset: int = 0,
 ):
     return await address_repo.list_addresses(
-        organization_id=current_user.organization_id,
         billing_entity_id=billing_entity_id,
         job_id=job_id,
         q=q,
@@ -52,15 +51,14 @@ async def search_addresses(
     """Autocomplete endpoint for address pickers."""
     if not q.strip():
         return await address_repo.list_addresses(
-            organization_id=current_user.organization_id,
             limit=limit,
         )
-    return await address_repo.search(q, current_user.organization_id, limit=limit)
+    return await address_repo.search(q, limit=limit)
 
 
 @router.get("/{address_id}")
 async def get_address(address_id: str, current_user: AdminDep):
-    addr = await address_repo.get_by_id(address_id, current_user.organization_id)
+    addr = await address_repo.get_by_id(address_id)
     if not addr:
         raise HTTPException(status_code=404, detail="Address not found")
     return addr

@@ -2,9 +2,9 @@
 
 from pydantic import BaseModel
 
-from kernel.constants import DEFAULT_ORG_ID
-from kernel.entity import Entity
 from operations.domain.withdrawal import WithdrawalItem
+from shared.kernel.constants import DEFAULT_ORG_ID
+from shared.kernel.entity import Entity
 
 
 class MaterialRequestCreate(BaseModel):

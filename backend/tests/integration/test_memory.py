@@ -15,7 +15,7 @@ class TestMemoryStore:
         """No artifacts → recall returns ''."""
         from assistant.agents.memory.store import recall
 
-        result = await recall(org_id="default", user_id="user-1")
+        result = await recall(user_id="user-1")
         assert result == ""
 
     @pytest.mark.usefixtures("_db")
@@ -37,9 +37,9 @@ class TestMemoryStore:
                 "tags": ["pref"],
             },
         ]
-        await save("default", "user-1", "sess-1", artifacts)
+        await save("user-1", "sess-1", artifacts)
 
-        result = await recall("default", "user-1")
+        result = await recall("user-1")
         assert result != ""
         assert "Memory from previous sessions" in result
         assert "contractor:john" in result
@@ -50,9 +50,10 @@ class TestMemoryStore:
     async def test_recall_respects_org_and_user_isolation(self):
         """Artifacts saved for one user/org are not visible to another."""
         from assistant.agents.memory.store import recall, save
+        from shared.infrastructure.database import org_id_var
 
+        org_id_var.set("org-A")
         await save(
-            "org-A",
             "user-A",
             "sess-A",
             [
@@ -66,16 +67,19 @@ class TestMemoryStore:
         )
 
         # Different user, same org
-        result_other_user = await recall("org-A", "user-B")
+        result_other_user = await recall("user-B")
         assert result_other_user == ""
 
         # Different org, same user id
-        result_other_org = await recall("org-B", "user-A")
+        org_id_var.set("org-B")
+        result_other_org = await recall("user-A")
         assert result_other_org == ""
 
         # Correct user/org
-        result = await recall("org-A", "user-A")
+        org_id_var.set("org-A")
+        result = await recall("user-A")
         assert "Product X is discontinued" in result
+        org_id_var.set("default")
 
     @pytest.mark.usefixtures("_db")
     async def test_save_skips_artifacts_without_content(self):
@@ -91,10 +95,10 @@ class TestMemoryStore:
             },  # whitespace-only still has a string
         ]
         # content="" → skipped (falsy check in save)
-        await save("default", "user-1", "sess-skip", artifacts)
+        await save("user-1", "sess-skip", artifacts)
         # Should only save the whitespace one (it has a non-empty string even if whitespace)
         # Actually our filter is `if a.get("content")` so both "" and "  " — "  " is truthy
-        result = await recall("default", "user-1")
+        result = await recall("user-1")
         # At minimum: no crash. Empty content artifact not saved.
         assert isinstance(result, str)
 
@@ -113,9 +117,9 @@ class TestMemoryStore:
             }
             for i in range(10)
         ]
-        await save("default", "user-1", "sess-limit", artifacts)
+        await save("user-1", "sess-limit", artifacts)
 
-        result = await recall("default", "user-1", limit=3)
+        result = await recall("user-1", limit=3)
         # Should only have 3 facts in the output
         lines = [line for line in result.split("\n") if line.startswith("- [")]
         assert len(lines) == 3
@@ -125,8 +129,8 @@ class TestMemoryStore:
         """save([]) should not crash and recall still returns ''."""
         from assistant.agents.memory.store import recall, save
 
-        await save("default", "user-1", "sess-noop", [])
-        result = await recall("default", "user-1")
+        await save("user-1", "sess-noop", [])
+        result = await recall("user-1")
         assert result == ""
 
 
@@ -151,7 +155,7 @@ class TestMemoryExtract:
         )
         from assistant.agents.memory.store import recall
 
-        assert await recall("default", "user-1") == ""
+        assert await recall("user-1") == ""
 
     @pytest.mark.usefixtures("_db")
     async def test_skips_when_no_api_key(self):
@@ -163,11 +167,11 @@ class TestMemoryExtract:
         ]
         with patch("assistant.agents.memory.extract.ANTHROPIC_API_KEY", "", create=True):
             with patch("shared.infrastructure.config.ANTHROPIC_API_KEY", ""):
-                await extract_and_save("default", "user-1", "sess-nokey", history)
+                await extract_and_save("user-1", "sess-nokey", history)
         # No crash, no artifacts
         from assistant.agents.memory.store import recall
 
-        assert await recall("default", "user-1") == ""
+        assert await recall("user-1") == ""
 
     @pytest.mark.usefixtures("_db")
     async def test_saves_artifacts_from_llm_response(self):
@@ -202,11 +206,11 @@ class TestMemoryExtract:
             patch("shared.infrastructure.config.ANTHROPIC_MODEL", "claude-sonnet-4-6"),
             patch("anthropic.AsyncAnthropic", return_value=mock_client),
         ):
-            await extract_and_save("default", "user-1", "sess-ok", history)
+            await extract_and_save("user-1", "sess-ok", history)
 
         from assistant.agents.memory.store import recall
 
-        result = await recall("default", "user-1")
+        result = await recall("user-1")
         assert "contractor:alice" in result
         assert "Alice owes $200" in result
 
@@ -244,11 +248,11 @@ class TestMemoryExtract:
             patch("shared.infrastructure.config.ANTHROPIC_MODEL", "claude-sonnet-4-6"),
             patch("anthropic.AsyncAnthropic", return_value=mock_client),
         ):
-            await extract_and_save("default", "user-1", "sess-fence", history)
+            await extract_and_save("user-1", "sess-fence", history)
 
         from assistant.agents.memory.store import recall
 
-        result = await recall("default", "user-1")
+        result = await recall("user-1")
         assert "pending requests" in result
 
     @pytest.mark.usefixtures("_db")
@@ -269,7 +273,7 @@ class TestMemoryExtract:
             patch("anthropic.AsyncAnthropic", return_value=mock_client),
         ):
             # Must not raise
-            await extract_and_save("default", "user-1", "sess-err", history)
+            await extract_and_save("user-1", "sess-err", history)
 
     @pytest.mark.usefixtures("_db")
     async def test_swallows_json_parse_error(self):
@@ -290,4 +294,4 @@ class TestMemoryExtract:
             patch("shared.infrastructure.config.ANTHROPIC_MODEL", "claude-sonnet-4-6"),
             patch("anthropic.AsyncAnthropic", return_value=mock_client),
         ):
-            await extract_and_save("default", "user-1", "sess-bad-json", history)
+            await extract_and_save("user-1", "sess-bad-json", history)

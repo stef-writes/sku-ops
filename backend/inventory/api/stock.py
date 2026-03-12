@@ -8,10 +8,10 @@ from inventory.application.inventory_service import (
     get_stock_history,
     process_adjustment_stock_changes,
 )
-from kernel import events
 from shared.api.deps import AdminDep
 from shared.infrastructure import event_hub
 from shared.infrastructure.middleware.audit import audit_log
+from shared.kernel import events
 
 router = APIRouter(prefix="/stock", tags=["stock"])
 
@@ -27,8 +27,7 @@ async def get_product_stock_history(
     current_user: AdminDep,
     limit: int = Query(50, ge=1, le=500),
 ):
-    org_id = current_user.organization_id
-    product = await get_product_by_id(product_id, organization_id=org_id)
+    product = await get_product_by_id(product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     history = await get_stock_history(product_id=product_id, limit=limit)

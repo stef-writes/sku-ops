@@ -6,14 +6,15 @@ from datetime import UTC, datetime, timedelta
 
 from assistant.agents.tools.registry import register as _reg
 from operations.application.queries import list_pending_material_requests, list_withdrawals
+from shared.infrastructure.db import get_org_id
 
 logger = logging.getLogger(__name__)
 
 
-async def _get_contractor_history(args: dict, org_id: str) -> str:
+async def _get_contractor_history(args: dict) -> str:
     name = (args.get("name") or "").strip()
     limit = min(int(args.get("limit") or 20), 100)
-    all_withdrawals = await list_withdrawals(limit=500, organization_id=org_id)
+    all_withdrawals = await list_withdrawals(limit=500, organization_id=get_org_id())
     name_lower = name.lower()
     matched = [
         w
@@ -48,9 +49,9 @@ async def _get_contractor_history(args: dict, org_id: str) -> str:
     )
 
 
-async def _get_job_materials(args: dict, org_id: str) -> str:
+async def _get_job_materials(args: dict) -> str:
     job_id = (args.get("job_id") or "").strip()
-    all_withdrawals = await list_withdrawals(limit=1000, organization_id=org_id)
+    all_withdrawals = await list_withdrawals(limit=1000, organization_id=get_org_id())
     job_withdrawals = [w for w in all_withdrawals if (w.job_id or "").lower() == job_id.lower()]
     if not job_withdrawals:
         job_withdrawals = [w for w in all_withdrawals if job_id.lower() in (w.job_id or "").lower()]
@@ -86,11 +87,11 @@ async def _get_job_materials(args: dict, org_id: str) -> str:
     )
 
 
-async def _list_recent_withdrawals(args: dict, org_id: str) -> str:
+async def _list_recent_withdrawals(args: dict) -> str:
     days = min(int(args.get("days") or 7), 365)
     limit = min(int(args.get("limit") or 20), 100)
     since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
-    withdrawals = await list_withdrawals(start_date=since, limit=limit, organization_id=org_id)
+    withdrawals = await list_withdrawals(start_date=since, limit=limit, organization_id=get_org_id())
     out = [
         {
             "date": (w.created_at or "")[:10],
@@ -114,9 +115,9 @@ async def _list_recent_withdrawals(args: dict, org_id: str) -> str:
     )
 
 
-async def _list_pending_material_requests(args: dict, org_id: str) -> str:
+async def _list_pending_material_requests(args: dict) -> str:
     limit = min(int(args.get("limit") or 20), 100)
-    rows = await list_pending_material_requests(organization_id=org_id, limit=limit)
+    rows = await list_pending_material_requests(organization_id=get_org_id(), limit=limit)
     out = []
     for r in rows:
         out.append(

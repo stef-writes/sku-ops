@@ -2,13 +2,10 @@
   "name": "sku-ops",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:backend": "cd backend && ENV=development uv run uvicorn server:app --reload --host 0.0.0.0 --port 8000",
-    "dev:frontend": "cd frontend && npm run dev",
-    "test:backend": "cd backend && uv run pytest tests/ -x -q",
-    "test:frontend": "cd frontend && npm run test",
-    "install:backend": "cd backend && uv sync --dev",
-    "install:frontend": "cd frontend && npm install"
+    "dev": "concurrently \"./bin/dev server\" \"./bin/dev ui\"",
+    "test": "./bin/dev test",
+    "test:backend": "./bin/dev test:be",
+    "test:frontend": "./bin/dev test:fe"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

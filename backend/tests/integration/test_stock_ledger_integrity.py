@@ -27,7 +27,7 @@ from inventory.domain.stock import StockDecrement
 
 
 async def _create_product(
-    name, quantity, base_unit="each", org_id="default", dept_id="dept-1", **kw
+    name, quantity, base_unit="each", dept_id="dept-1", **kw
 ):
     return await create_product(
         department_id=dept_id,
@@ -39,7 +39,6 @@ async def _create_product(
         base_unit=base_unit,
         user_id="user-1",
         user_name="Test",
-        organization_id=org_id,
         on_stock_import=process_import_stock_changes,
     )
 
@@ -263,11 +262,18 @@ class TestOrganizationIsolation:
             )
         await conn.commit()
 
-        p1 = await _create_product("Org A Widget", 10.0, org_id="org-a", dept_id="dept-1-org-a")
-        await _create_product("Org B Widget", 20.0, org_id="org-b", dept_id="dept-1-org-b")
+        from shared.infrastructure.database import org_id_var
 
-        from_a = await product_repo.get_by_id(p1.id, organization_id="org-a")
-        from_b = await product_repo.get_by_id(p1.id, organization_id="org-b")
+        org_id_var.set("org-a")
+        p1 = await _create_product("Org A Widget", 10.0, dept_id="dept-1-org-a")
+        org_id_var.set("org-b")
+        await _create_product("Org B Widget", 20.0, dept_id="dept-1-org-b")
+
+        org_id_var.set("org-a")
+        from_a = await product_repo.get_by_id(p1.id)
+        org_id_var.set("org-b")
+        from_b = await product_repo.get_by_id(p1.id)
+        org_id_var.set("default")
 
         assert from_a is not None, "Org A should see its own product"
         assert from_b is None, "Org B should NOT see Org A's product"

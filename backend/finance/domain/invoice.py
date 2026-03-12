@@ -6,8 +6,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from kernel.entity import AuditedEntity
-from kernel.types import LineItem, round_money
+from shared.kernel.entity import AuditedEntity
+from shared.kernel.types import LineItem, round_money
 
 PAYMENT_TERMS_DAYS: dict[str, int] = {
     "due_on_receipt": 0,

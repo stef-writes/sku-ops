@@ -35,37 +35,31 @@ _agent = Agent(
 @_agent.tool
 async def get_invoice_summary(ctx: RunContext[AgentDeps]) -> str:
     """Invoice counts and totals grouped by status (draft, sent, paid)."""
-    return budget_tool_result(await _get_invoice_summary(ctx.deps.org_id), max_tokens=300)
+    return budget_tool_result(await _get_invoice_summary(), max_tokens=300)
 
 
 @_agent.tool
 async def get_outstanding_balances(ctx: RunContext[AgentDeps], limit: int = 20) -> str:
     """Unpaid withdrawal balances grouped by billing entity/contractor. Shows who owes money."""
-    return budget_tool_result(await _get_outstanding_balances({"limit": limit}, ctx.deps.org_id))
+    return budget_tool_result(await _get_outstanding_balances({"limit": limit}))
 
 
 @_agent.tool
 async def get_revenue_summary(ctx: RunContext[AgentDeps], days: int = 30) -> str:
     """Revenue summary for the last N days: total revenue, tax collected, transaction count."""
-    return budget_tool_result(
-        await _get_revenue_summary({"days": days}, ctx.deps.org_id), max_tokens=300
-    )
+    return budget_tool_result(await _get_revenue_summary({"days": days}), max_tokens=300)
 
 
 @_agent.tool
 async def get_pl_summary(ctx: RunContext[AgentDeps], days: int = 30) -> str:
     """Profit & loss for the last N days: revenue, cost of goods sold, gross profit and margin."""
-    return budget_tool_result(
-        await _get_pl_summary({"days": days}, ctx.deps.org_id), max_tokens=300
-    )
+    return budget_tool_result(await _get_pl_summary({"days": days}), max_tokens=300)
 
 
 @_agent.tool
 async def get_top_products(ctx: RunContext[AgentDeps], days: int = 7, limit: int = 10) -> str:
     """Top products ranked by revenue over the last N days. Use for weekly/periodic sales reports."""
-    return budget_tool_result(
-        await _get_top_products({"days": days, "limit": limit}, ctx.deps.org_id)
-    )
+    return budget_tool_result(await _get_top_products({"days": days, "limit": limit}))
 
 
 async def run(

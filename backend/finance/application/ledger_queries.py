@@ -26,11 +26,10 @@ from operations.application.queries import (
 from operations.application.queries import (
     units_sold_by_product as _ops_units_sold,
 )
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 
 async def summary_by_account(
-    org_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
     *,
@@ -40,7 +39,7 @@ async def summary_by_account(
 ) -> dict[str, float]:
     """P&L summary: {account_name: total_amount}."""
     conn = get_connection()
-    params: list = [org_id]
+    params: list = [get_org_id()]
     date_filter = ""
     if start_date:
         date_filter += " AND created_at >= ?"
@@ -64,13 +63,12 @@ async def summary_by_account(
 
 
 async def summary_by_department(
-    org_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> list[dict]:
     """Per-department revenue, cogs, shrinkage."""
     conn = get_connection()
-    params: list = [org_id]
+    params: list = [get_org_id()]
     date_filter = ""
     if start_date:
         date_filter += " AND created_at >= ?"
@@ -113,7 +111,6 @@ async def summary_by_department(
 
 
 async def summary_by_job(
-    org_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
     limit: int = 100,
@@ -122,7 +119,7 @@ async def summary_by_job(
 ) -> dict:
     """Per-job P&L with pagination and search. Returns {rows, total}."""
     conn = get_connection()
-    params: list = [org_id]
+    params: list = [get_org_id()]
     date_filter = ""
     if start_date:
         date_filter += " AND created_at >= ?"
@@ -184,13 +181,12 @@ async def summary_by_job(
 
 
 async def summary_by_billing_entity(
-    org_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> list[dict]:
     """Per-entity AR balances and revenue."""
     conn = get_connection()
-    params: list = [org_id]
+    params: list = [get_org_id()]
     date_filter = ""
     if start_date:
         date_filter += " AND created_at >= ?"
@@ -233,13 +229,12 @@ async def summary_by_billing_entity(
 
 
 async def summary_by_contractor(
-    org_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> list[dict]:
     """Per-contractor spend totals."""
     conn = get_connection()
-    params: list = [org_id]
+    params: list = [get_org_id()]
     date_filter = ""
     if start_date:
         date_filter += " AND fl.created_at >= ?"
@@ -274,18 +269,16 @@ async def summary_by_contractor(
 
 
 async def units_sold_by_product(
-    org_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> dict[str, float]:
     """Delegate to operations context (owns withdrawal data)."""
-    return await _ops_units_sold(org_id, start_date, end_date)
+    return await _ops_units_sold(start_date, end_date)
 
 
 async def payment_status_breakdown(
-    org_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> dict[str, float]:
     """Delegate to operations context (owns withdrawal data)."""
-    return await _ops_pmt_status(org_id, start_date, end_date)
+    return await _ops_pmt_status(start_date, end_date)

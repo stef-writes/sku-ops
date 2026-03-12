@@ -16,7 +16,7 @@ import json
 import logging
 from typing import Any
 
-from kernel.events import SHUTDOWN, Event, is_shutdown
+from shared.kernel.events import SHUTDOWN, Event, is_shutdown
 
 logger = logging.getLogger(__name__)
 

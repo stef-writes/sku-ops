@@ -11,7 +11,11 @@ import re
 import numpy as np
 
 from catalog.application.queries import list_products
-from shared.infrastructure.config import DEFAULT_ORG_ID, OPENAI_API_KEY
+from shared.infrastructure import event_hub
+from shared.infrastructure.config import OPENAI_API_KEY
+from shared.infrastructure.db import get_org_id
+from shared.infrastructure.logging_config import org_id_var
+from shared.kernel.events import CATALOG_UPDATED, INVENTORY_UPDATED, is_shutdown
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +50,8 @@ class ProductSearchIndex:
         # Keyword fallback (BM25)
         self._bm25 = None
 
-    async def rebuild(self, org_id: str = DEFAULT_ORG_ID) -> None:
-        products = await list_products(limit=10000, organization_id=org_id)
+    async def rebuild(self) -> None:
+        products = await list_products(limit=10000)
         if not products:
             self._products = []
             self._embeddings = None
@@ -142,32 +146,29 @@ class ProductSearchIndex:
         return bool(self._products)
 
 
-async def get_index(org_id: str = DEFAULT_ORG_ID) -> ProductSearchIndex:
+async def get_index() -> ProductSearchIndex:
+    org_id = get_org_id()
     if org_id not in _indexes:
         index = ProductSearchIndex()
         _indexes[org_id] = index
-        await index.rebuild(org_id)
+        await index.rebuild()
     return _indexes[org_id]
 
 
-async def refresh_index(org_id: str = DEFAULT_ORG_ID) -> None:
-    index = _indexes.get(org_id)
+async def refresh_index(org_id: str | None = None) -> None:
+    oid = org_id or get_org_id()
+    index = _indexes.get(oid)
     if index is None:
         index = ProductSearchIndex()
-        _indexes[org_id] = index
-    await index.rebuild(org_id)
+        _indexes[oid] = index
+    await index.rebuild()
 
-
-from kernel.events import CATALOG_UPDATED, INVENTORY_UPDATED
 
 _INVALIDATION_EVENTS = frozenset({INVENTORY_UPDATED, CATALOG_UPDATED})
 
 
 async def _index_invalidation_listener() -> None:
     """Subscribe to the event hub and rebuild the search index on catalog/inventory changes."""
-    from kernel.events import is_shutdown
-    from shared.infrastructure import event_hub
-
     queue = event_hub.subscribe()
     try:
         while True:
@@ -176,6 +177,7 @@ async def _index_invalidation_listener() -> None:
                 return
             if ev.type in _INVALIDATION_EVENTS:
                 try:
+                    org_id_var.set(ev.org_id)
                     await refresh_index(ev.org_id)
                     logger.info("Search index rebuilt for org=%s after %s", ev.org_id, ev.type)
                 except (RuntimeError, OSError, ValueError) as exc:

@@ -53,19 +53,17 @@ __all__ = [
 
 
 async def list_invoices(
-    organization_id: str,
     invoice_repo: InvoiceRepoPort = _default_invoice_repo,
     **kwargs,
 ):
-    return await invoice_repo.list_invoices(organization_id=organization_id, **kwargs)
+    return await invoice_repo.list_invoices(**kwargs)
 
 
 async def get_invoice(
     invoice_id: str,
-    org_id: str,
     invoice_repo: InvoiceRepoPort = _default_invoice_repo,
 ):
-    return await invoice_repo.get_by_id(invoice_id, org_id)
+    return await invoice_repo.get_by_id(invoice_id)
 
 
 async def mark_paid_for_withdrawal(
@@ -82,7 +80,6 @@ async def mark_paid_for_withdrawal(
 
 async def _validate_withdrawals_for_invoice(
     withdrawal_ids: list[str],
-    org_id: str,
 ):
     """Fetch and validate withdrawals. Returns (withdrawals, billing_entity, contact_name)."""
     billing_entity: str | None = None
@@ -90,7 +87,7 @@ async def _validate_withdrawals_for_invoice(
     withdrawals: list = []
 
     for wid in withdrawal_ids:
-        w = await get_withdrawal_by_id(wid, organization_id=org_id)
+        w = await get_withdrawal_by_id(wid)
         if not w:
             raise ValueError(f"Withdrawal {wid} not found")
         if w.payment_status != "unpaid":
@@ -129,15 +126,13 @@ def _build_line_items_from_withdrawal(w, inv_id: str) -> list[dict]:
 
 async def create_invoice_from_withdrawals(
     withdrawal_ids: list,
-    organization_id: str | None = None,
 ) -> InvoiceWithDetails:
     """Create new invoice from unpaid withdrawals. All must share same billing_entity."""
     if not withdrawal_ids:
         raise ValueError("At least one withdrawal required")
 
-    org_id = organization_id or "default"
     withdrawals, billing_entity, contact_name = await _validate_withdrawals_for_invoice(
-        withdrawal_ids, org_id
+        withdrawal_ids
     )
 
     inv_id = str(uuid4())
@@ -147,7 +142,7 @@ async def create_invoice_from_withdrawals(
     first_tax_rate = withdrawals[0].tax_rate if withdrawals else 0
 
     async with transaction() as conn:
-        invoice_number = await next_invoice_number(org_id)
+        invoice_number = await next_invoice_number()
 
         await insert_invoice_row(
             inv_id=inv_id,
@@ -158,7 +153,6 @@ async def create_invoice_from_withdrawals(
             tax_rate=first_tax_rate,
             payment_terms=payment_terms,
             due_date=due_date,
-            org_id=org_id,
             now=now,
         )
 
@@ -186,15 +180,13 @@ async def create_invoice_from_withdrawals(
 async def add_withdrawals_to_invoice(
     invoice_id: str,
     withdrawal_ids: list,
-    organization_id: str | None = None,
 ) -> InvoiceWithDetails | None:
     """Link additional withdrawals to an existing invoice."""
     if not withdrawal_ids:
         return await _default_invoice_repo.get_by_id(invoice_id)
-    org_id = organization_id or "default"
 
     withdrawals, billing_entity, contact_name = await _validate_withdrawals_for_invoice(
-        withdrawal_ids, org_id
+        withdrawal_ids
     )
 
     inv = await _default_invoice_repo.get_by_id(invoice_id)
@@ -252,10 +244,9 @@ async def update_invoice(
     billing_address: str | None = None,
     po_reference: str | None = None,
     line_items: list | None = None,
-    organization_id: str | None = None,
 ) -> InvoiceWithDetails | None:
     """Update invoice fields and/or replace line items."""
-    inv = await _default_invoice_repo.get_by_id(invoice_id, organization_id)
+    inv = await _default_invoice_repo.get_by_id(invoice_id)
     if not inv:
         return None
 
@@ -346,10 +337,9 @@ async def approve_invoice(invoice_id: str, approved_by_id: str) -> InvoiceWithDe
 
 async def delete_draft_invoice(
     invoice_id: str,
-    organization_id: str | None = None,
 ) -> bool:
     """Soft-delete draft invoice and unlink withdrawals."""
-    inv = await _default_invoice_repo.get_by_id(invoice_id, organization_id)
+    inv = await _default_invoice_repo.get_by_id(invoice_id)
     if not inv:
         return False
     if inv.status != "draft":

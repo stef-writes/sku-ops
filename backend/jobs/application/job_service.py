@@ -6,6 +6,6 @@ Other bounded contexts import from here, never from jobs.infrastructure directly
 from jobs.infrastructure.job_repo import job_repo
 
 
-async def ensure_job(code: str, organization_id: str) -> dict:
+async def ensure_job(code: str) -> dict:
     """Get existing job by code, or auto-create a minimal one."""
-    return await job_repo.ensure_job(code, organization_id)
+    return await job_repo.ensure_job(code)

@@ -19,9 +19,7 @@ async def list_credit_notes(
     start_date: str | None = None,
     end_date: str | None = None,
 ):
-    org_id = current_user.organization_id
     return await finance_queries.list_credit_notes(
-        organization_id=org_id,
         invoice_id=invoice_id,
         billing_entity=billing_entity,
         status=status,
@@ -35,8 +33,7 @@ async def get_credit_note(
     credit_note_id: str,
     current_user: AdminDep,
 ):
-    org_id = current_user.organization_id
-    cn = await finance_queries.get_credit_note_by_id(credit_note_id, org_id)
+    cn = await finance_queries.get_credit_note_by_id(credit_note_id)
     if not cn:
         raise HTTPException(status_code=404, detail="Credit note not found")
     return cn
@@ -49,11 +46,9 @@ async def apply_credit_note_to_invoice(
     current_user: AdminDep,
 ):
     """Apply a credit note against its linked invoice, reducing the balance due."""
-    org_id = current_user.organization_id
     try:
         cn = await apply_credit_note(
             credit_note_id=credit_note_id,
-            organization_id=org_id,
             performed_by_user_id=current_user.id,
         )
         await audit_log(
@@ -63,7 +58,7 @@ async def apply_credit_note_to_invoice(
             resource_id=credit_note_id,
             details={"invoice_id": cn.invoice_id, "total": cn.total},
             request=request,
-            org_id=org_id,
+            org_id=current_user.organization_id,
         )
         return cn
     except ValueError as e:

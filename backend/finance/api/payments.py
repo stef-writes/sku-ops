@@ -5,9 +5,9 @@ from fastapi import APIRouter, HTTPException
 from finance.application import queries as finance_queries
 from finance.application.payment_service import create_payment_for_withdrawals
 from finance.domain.payment import PaymentCreate
-from kernel import events
 from shared.api.deps import AdminDep
 from shared.infrastructure import event_hub
+from shared.kernel import events
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -21,7 +21,6 @@ async def create_payment(
     try:
         payment = await create_payment_for_withdrawals(
             data=data,
-            org_id=current_user.organization_id,
             recorded_by_id=current_user.id,
         )
     except ValueError as e:
@@ -43,7 +42,6 @@ async def list_payments(
     offset: int = 0,
 ):
     return await finance_queries.list_payments(
-        organization_id=current_user.organization_id,
         invoice_id=invoice_id,
         billing_entity_id=billing_entity_id,
         start_date=start_date,
@@ -55,7 +53,7 @@ async def list_payments(
 
 @router.get("/{payment_id}")
 async def get_payment(payment_id: str, current_user: AdminDep):
-    p = await finance_queries.get_payment_by_id(payment_id, current_user.organization_id)
+    p = await finance_queries.get_payment_by_id(payment_id)
     if not p:
         raise HTTPException(status_code=404, detail="Payment not found")
     return p

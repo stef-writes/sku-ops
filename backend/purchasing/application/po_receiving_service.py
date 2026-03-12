@@ -6,12 +6,13 @@ Split from purchase_order_service to keep each module under 300 lines.
 from datetime import UTC, datetime
 
 from finance.application.ledger_service import record_po_receipt as _record_ledger
-from kernel.errors import ResourceNotFoundError
-from kernel.types import CurrentUser
 from purchasing.application.purchase_order_service import PurchasingDeps, _resolve_po_item_cost
 from purchasing.domain.purchase_order import POItemStatus, POStatus
 from purchasing.infrastructure.po_repo import po_repo as _default_repo
 from purchasing.ports.po_repo_port import PORepoPort
+from shared.infrastructure.db import get_org_id
+from shared.kernel.errors import ResourceNotFoundError
+from shared.kernel.types import CurrentUser
 
 
 async def mark_delivery_received(
@@ -24,8 +25,7 @@ async def mark_delivery_received(
 
     Does NOT update inventory — that happens on receive_po_items().
     """
-    org_id = current_user.organization_id
-    po = await repo.get_po(po_id, org_id)
+    po = await repo.get_po(po_id)
     if not po:
         raise ResourceNotFoundError("PurchaseOrder", po_id)
 
@@ -55,14 +55,13 @@ async def receive_po_items(
     New products are created for unmatched items; existing products get a
     RECEIVING transaction.
     """
-    org_id = current_user.organization_id
-    po = await repo.get_po(po_id, org_id)
+    po = await repo.get_po(po_id)
     if not po:
         raise ResourceNotFoundError("PurchaseOrder", po_id)
 
     vendor_id: str = po.get("vendor_id") or ""
-    departments = await deps.list_departments(organization_id=org_id)
-    default_dept = await deps.get_department_by_code("HDW", organization_id=org_id) or (
+    departments = await deps.list_departments()
+    default_dept = await deps.get_department_by_code("HDW") or (
         departments[0] if departments else None
     )
     dept_by_code = {d.code.upper(): d for d in departments}
@@ -103,7 +102,7 @@ async def receive_po_items(
             if update.get("product_id"):
                 item["product_id"] = update["product_id"]
 
-            existing = await _match_product(item, vendor_id, org_id, deps)
+            existing = await _match_product(item, vendor_id, deps)
 
             resolved_pid = None
             if existing:
@@ -116,7 +115,6 @@ async def receive_po_items(
                     user_id=current_user.id,
                     user_name=current_user.name,
                     reference_id=po_id,
-                    organization_id=org_id,
                 )
                 product_updates: dict = {}
                 if item.get("original_sku") and not existing.original_sku:
@@ -169,7 +167,6 @@ async def receive_po_items(
                     pack_qty=int(item.get("pack_qty") or 1),
                     user_id=current_user.id,
                     user_name=current_user.name,
-                    organization_id=org_id,
                 )
                 resolved_pid = product.id
                 await repo.update_po_item(
@@ -198,7 +195,7 @@ async def receive_po_items(
             po_id=po_id,
             items=ledger_items,
             vendor_name=po.get("vendor_name", ""),
-            organization_id=org_id,
+            organization_id=get_org_id(),
             performed_by_user_id=current_user.id,
         )
 
@@ -236,21 +233,21 @@ def _apply_overrides(item: dict, update: dict) -> None:
             item[field] = val
 
 
-async def _match_product(item: dict, vendor_id: str, org_id: str, deps: PurchasingDeps):
+async def _match_product(item: dict, vendor_id: str, deps: PurchasingDeps):
     """3-tier matching: explicit product_id -> vendor SKU -> name."""
     if item.get("product_id"):
-        existing = await deps.get_product_by_id(item["product_id"], organization_id=org_id)
+        existing = await deps.get_product_by_id(item["product_id"])
         if existing:
             return existing
     if item.get("original_sku") and vendor_id:
         existing = await deps.find_product_by_sku_and_vendor(
-            str(item["original_sku"]).strip(), vendor_id, organization_id=org_id
+            str(item["original_sku"]).strip(), vendor_id
         )
         if existing:
             return existing
     if item.get("name") and vendor_id:
         existing = await deps.find_product_by_name_and_vendor(
-            item["name"], vendor_id, organization_id=org_id
+            item["name"], vendor_id
         )
         if existing:
             return existing

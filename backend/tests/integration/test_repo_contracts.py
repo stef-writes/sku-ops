@@ -226,7 +226,6 @@ class TestCreditNoteRepoContract:
             subtotal=25.0,
             tax=2.50,
             total=27.50,
-            organization_id="default",
         )
         assert cn is not None
 
@@ -280,7 +279,7 @@ class TestInvoiceRepoContract:
         )
         await conn.commit()
 
-        inv = await create_invoice_from_withdrawals(["w-inv-test"], "default")
+        inv = await create_invoice_from_withdrawals(["w-inv-test"])
         assert inv is not None
         assert len(inv.line_items) >= 1
 

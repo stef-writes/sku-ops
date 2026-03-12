@@ -9,7 +9,6 @@ from operations.application.queries import (
     link_credit_note_to_return,
     mark_withdrawals_paid_by_invoice,
 )
-from shared.infrastructure.config import DEFAULT_ORG_ID
 
 
 async def insert_credit_note(
@@ -19,7 +18,6 @@ async def insert_credit_note(
     subtotal: float = 0,
     tax: float = 0,
     total: float = 0,
-    organization_id: str | None = None,
 ) -> CreditNote:
     """Create a credit note and link it to the return (operations-owned mutation)."""
     cn = await _repo.insert_credit_note(
@@ -29,7 +27,6 @@ async def insert_credit_note(
         subtotal=subtotal,
         tax=tax,
         total=total,
-        organization_id=organization_id,
     )
     await link_credit_note_to_return(return_id, cn.id)
     return cn
@@ -37,7 +34,6 @@ async def insert_credit_note(
 
 async def apply_credit_note(
     credit_note_id: str,
-    organization_id: str | None = None,
     performed_by_user_id: str | None = None,
 ) -> CreditNote:
     """Apply a credit note to its linked invoice and write AR ledger entry.
@@ -45,7 +41,7 @@ async def apply_credit_note(
     If the invoice balance reaches zero, marks linked withdrawals as paid
     via the operations facade.
     """
-    result = await _repo.apply_credit_note(credit_note_id, organization_id)
+    result = await _repo.apply_credit_note(credit_note_id)
 
     if result.auto_paid and result.invoice_id:
         now = datetime.now(UTC).isoformat()
@@ -56,7 +52,6 @@ async def apply_credit_note(
         amount=float(result.credit_note.total),
         billing_entity=result.credit_note.billing_entity,
         contractor_id="",
-        organization_id=organization_id or DEFAULT_ORG_ID,
         performed_by_user_id=performed_by_user_id,
     )
 
@@ -68,18 +63,16 @@ async def list_credit_notes(
     billing_entity: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
-    organization_id: str | None = None,
 ) -> list[CreditNote]:
     return await _repo.list_credit_notes(
         invoice_id=invoice_id,
         billing_entity=billing_entity,
         start_date=start_date,
         end_date=end_date,
-        organization_id=organization_id,
     )
 
 
 async def get_credit_note_by_id(
-    credit_note_id: str, organization_id: str | None = None
+    credit_note_id: str,
 ) -> CreditNote | None:
-    return await _repo.get_by_id(credit_note_id, organization_id=organization_id)
+    return await _repo.get_by_id(credit_note_id)

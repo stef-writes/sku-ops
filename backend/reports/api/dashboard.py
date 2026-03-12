@@ -18,12 +18,11 @@ async def get_dashboard_stats(
     start_date: str | None = Query(None),
     end_date: str | None = Query(None),
 ):
-    org_id = current_user.organization_id
     if current_user.role == "contractor":
         return await contractor_dashboard(
-            org_id, current_user.id, start_date=start_date, end_date=end_date
+            current_user.id, start_date=start_date, end_date=end_date
         )
-    return await admin_dashboard(org_id, start_date=start_date, end_date=end_date)
+    return await admin_dashboard(start_date=start_date, end_date=end_date)
 
 
 @router.get("/transactions")
@@ -38,7 +37,6 @@ async def get_dashboard_transactions(
 ):
     """Paginated transactions for the dashboard. Supports date range + filters."""
     return await dashboard_transactions(
-        current_user.organization_id,
         limit=limit,
         offset=offset,
         start_date=start_date,

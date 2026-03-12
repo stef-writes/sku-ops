@@ -7,6 +7,15 @@ alwaysApply: true
 
 Launch-focused modular monolith. Nine bounded contexts with hexagonal aspirations. Pre-production.
 
+## Backend root modules
+
+| File | Role |
+|------|------|
+| `server.py` | App composition root — creates FastAPI app, mounts middleware and exception handlers |
+| `routes.py` | Router aggregation — imports all context routers and registers them under `/api` |
+| `startup.py` | Lifespan context manager — DB/Redis init, warm-up, demo seeding, shutdown |
+| `scheduler.py` | Background scheduled tasks — Xero nightly sync loop; add new recurring jobs here |
+
 ## Bounded contexts
 
 `identity`, `operations`, `finance`, `catalog`, `purchasing`, `jobs`, `documents`, `reports`, `assistant`
@@ -16,14 +25,16 @@ Each context owns: `domain/`, `application/`, `infrastructure/`, `api/`, and opt
 ## Layer dependency rules (strict)
 
 ```
-kernel/                     ← pure domain primitives, zero infra deps
+shared/kernel/              ← pure domain primitives, zero infra deps
 shared/infrastructure/      ← cross-cutting infra (db, redis, config, middleware)
-{context}/domain/           ← imports only kernel + stdlib + pydantic
-{context}/ports/            ← imports only domain + kernel
+{context}/domain/           ← imports only shared/kernel + stdlib + pydantic
+{context}/ports/            ← imports only domain + shared/kernel
 {context}/infrastructure/   ← implements ports, imports domain + shared/infrastructure
 {context}/application/      ← orchestrates domain + infra, imports other contexts' application facades
 {context}/api/              ← thin HTTP transport, imports only own application layer + shared/api
 ```
+
+Composition roots (`server.py`, `routes.py`, `startup.py`, `scheduler.py`) are exempt from cross-context import rules — their purpose is to wire the whole system together.
 
 ### What each layer may contain
 
@@ -66,18 +77,39 @@ The DB layer uses a contextvar-based Unit of Work (once implemented):
 
 Until the Unit of Work is implemented, `conn` threading is tolerated but must not appear in port signatures.
 
-## Shared infrastructure
+## Shared package
 
-`shared/infrastructure/` contains: config, db, redis, event_hub, logging, metrics, middleware. These import nothing from any bounded context.
+`shared/kernel/` contains: Entity, AuditedEntity, CurrentUser, LineItem, Address, DomainError, Event, round_money. Pure domain primitives with zero infrastructure deps.
+
+`shared/infrastructure/` contains: config, db, redis, event_hub, logging, metrics, middleware. These import only from `shared/kernel/` and nothing from any bounded context.
+
+`shared/api/` contains: `deps.py` (auth DI), `websocket.py` (domain event WebSocket router), `health.py` (liveness/readiness probes). These are cross-cutting transport concerns, not owned by any single bounded context.
 
 ## File size
 
 Keep files under 300 lines. Split by responsibility (not by endpoint or alphabetical grouping).
 
+## Monorepo layout
+
+```
+sku-ops/
+├── backend/          # deployable app + its tests
+│   └── tests/        # backend unit/integration/api tests
+├── frontend/         # React SPA (co-located unit tests in src/__tests__/)
+├── tests/e2e/        # cross-stack Playwright tests
+├── devtools/         # seeds, evals, scripts — not deployed
+├── bin/dev           # unified CLI
+└── pyproject.toml    # uv workspace root (dev deps, ruff, pytest, commitizen)
+```
+
+Each deployable owns its tests. Devtools live at the workspace root. `backend/pyproject.toml` has production deps only; the root `pyproject.toml` manages dev deps via a uv workspace. The Docker image excludes `backend/tests/` via `.dockerignore` and skips dev deps via `uv sync --no-dev`.
+
 ## Dependency hygiene
 
 - Never install packages speculatively. Only add what the current feature requires.
 - Before creating anything, check what already exists.
+- Python deps go in `backend/pyproject.toml` (production) or root `pyproject.toml` dev group (tooling).
+- Never add test or dev deps to `backend/pyproject.toml`.
 
 ## Commit conventions
 

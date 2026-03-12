@@ -12,10 +12,11 @@ RUN apt-get update && \
 
 RUN pip install uv
 
-COPY pyproject.toml uv.lock ./
+COPY uv.lock ./
+COPY backend/pyproject.toml ./pyproject.toml
 RUN uv sync --frozen --no-dev --no-editable
 
-COPY . .
+COPY backend/ .
 
 EXPOSE 8000
 

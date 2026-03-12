@@ -21,6 +21,7 @@ from shared.infrastructure.config import (
     JWT_ALGORITHM,
     JWT_SECRET,
 )
+from shared.infrastructure.db import get_org_id
 
 
 def hash_password(password: str) -> str:
@@ -31,12 +32,12 @@ def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
 
 
-def create_token(user_id: str, email: str, role: str, organization_id: str = DEFAULT_ORG_ID) -> str:
+def create_token(user_id: str, email: str, role: str, organization_id: str = "") -> str:
     payload = {
         "user_id": user_id,
         "email": email,
         "role": role,
-        "organization_id": organization_id or DEFAULT_ORG_ID,
+        "organization_id": organization_id or get_org_id(),
         "exp": datetime.now(UTC) + timedelta(minutes=JWT_ACCESS_EXPIRATION_MINUTES),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
@@ -83,7 +84,7 @@ async def register_user(data: UserCreate) -> dict:
     }
 
 
-async def admin_create_user(data: AdminUserCreate, org_id: str) -> dict:
+async def admin_create_user(data: AdminUserCreate) -> dict:
     """Admin creates a user in their organization.
 
     Returns user dict (without password). Raises ValueError if email is taken.
@@ -102,7 +103,7 @@ async def admin_create_user(data: AdminUserCreate, org_id: str) -> dict:
     )
     user_dict = user.model_dump()
     user_dict["password"] = hash_password(data.password)
-    user_dict["organization_id"] = org_id
+    user_dict["organization_id"] = get_org_id()
 
     await user_repo.insert(user_dict)
 

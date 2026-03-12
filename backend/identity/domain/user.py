@@ -4,7 +4,7 @@ import re
 
 from pydantic import BaseModel, field_validator
 
-from kernel.entity import Entity
+from shared.kernel.entity import Entity
 
 ROLES = ["admin", "contractor"]
 

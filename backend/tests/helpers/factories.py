@@ -2,7 +2,7 @@
 
 from catalog.application.product_lifecycle import create_product
 from inventory.application.inventory_service import process_import_stock_changes
-from kernel.types import CurrentUser
+from shared.kernel.types import CurrentUser
 
 
 async def make_product(

@@ -2,11 +2,12 @@
 
 from datetime import UTC, datetime
 
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 
-async def save_oauth_state(state: str, org_id: str) -> None:
+async def save_oauth_state(state: str) -> None:
     conn = get_connection()
+    org_id = get_org_id()
     now = datetime.now(UTC).isoformat()
     await conn.execute(
         """INSERT INTO oauth_states (state, org_id, created_at) VALUES (?, ?, ?)

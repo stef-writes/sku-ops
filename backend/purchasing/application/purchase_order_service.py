@@ -9,9 +9,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
+from uuid import uuid4
 
-from kernel.errors import ResourceNotFoundError
-from kernel.types import CurrentUser
 from purchasing.domain.purchase_order import (
     POItemCreate,
     POItemStatus,
@@ -21,6 +20,9 @@ from purchasing.domain.purchase_order import (
 )
 from purchasing.infrastructure.po_repo import po_repo as _default_repo
 from purchasing.ports.po_repo_port import PORepoPort
+from shared.infrastructure.db import get_org_id
+from shared.kernel.errors import ResourceNotFoundError
+from shared.kernel.types import CurrentUser
 from shared.kernel.units import ALLOWED_BASE_UNITS
 
 
@@ -89,14 +91,12 @@ async def create_purchase_order(
     if not vendor_name:
         raise ValueError("Vendor name is required")
 
-    org_id = current_user.organization_id
+    org_id = get_org_id()
 
-    vendor = await deps.find_vendor_by_name(vendor_name, org_id)
+    vendor = await deps.find_vendor_by_name(vendor_name)
     if not vendor:
         if not create_vendor_if_missing:
             raise ResourceNotFoundError("Vendor", vendor_name)
-        from uuid import uuid4
-
         vendor_id = uuid4().hex
         vendor_dict = _resolve_vendor_dict(vendor_name, vendor_id)
         vendor_dict["organization_id"] = org_id
@@ -107,7 +107,7 @@ async def create_purchase_order(
         vendor_name = vendor.name
         vendor_created = False
 
-    departments = await deps.list_departments(organization_id=org_id)
+    departments = await deps.list_departments()
     dept_by_id = {d.id: d for d in departments}
     dept_by_code = {d.code.upper(): d for d in departments}
     dept_codes = list(dept_by_code.keys())

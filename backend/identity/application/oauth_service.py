@@ -11,8 +11,8 @@ from identity.infrastructure.oauth_state_repo import (
 )
 
 
-async def save_oauth_state(state: str, org_id: str) -> None:
-    await _save(state, org_id)
+async def save_oauth_state(state: str) -> None:
+    await _save(state)
 
 
 async def pop_oauth_state(state: str) -> str | None:

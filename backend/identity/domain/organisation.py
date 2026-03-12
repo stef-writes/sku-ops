@@ -1,6 +1,6 @@
 """Organization (tenant) model."""
 
-from kernel.entity import Entity
+from shared.kernel.entity import Entity
 
 
 class Organization(Entity):

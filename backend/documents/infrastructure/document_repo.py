@@ -5,7 +5,7 @@ import json
 from datetime import UTC, datetime
 
 from documents.domain.document import Document
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 
 def _row_to_model(row) -> Document | None:
@@ -54,17 +54,17 @@ async def insert(doc: Document | dict) -> None:
     await conn.commit()
 
 
-async def get_by_id(doc_id: str, organization_id: str) -> Document | None:
+async def get_by_id(doc_id: str) -> Document | None:
     conn = get_connection()
+    org_id = get_org_id()
     cursor = await conn.execute(
         "SELECT " + _COLUMNS + " FROM documents WHERE id = ? AND organization_id = ?",
-        (doc_id, organization_id),
+        (doc_id, org_id),
     )
     return _row_to_model(await cursor.fetchone())
 
 
 async def list_documents(
-    organization_id: str,
     status: str | None = None,
     vendor_name: str | None = None,
     po_id: str | None = None,
@@ -72,8 +72,9 @@ async def list_documents(
     offset: int = 0,
 ) -> list[Document]:
     conn = get_connection()
+    org_id = get_org_id()
     sql = "SELECT " + _COLUMNS + " FROM documents WHERE organization_id = ?"
-    params: list = [organization_id]
+    params: list = [org_id]
     if status:
         sql += " AND status = ?"
         params.append(status)

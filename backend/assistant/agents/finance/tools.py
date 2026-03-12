@@ -7,12 +7,13 @@ from datetime import UTC, datetime, timedelta
 from assistant.agents.tools.registry import register as _reg
 from finance.application.invoice_service import list_invoices
 from operations.application.queries import list_withdrawals
+from shared.infrastructure.db import get_org_id
 
 logger = logging.getLogger(__name__)
 
 
-async def _get_invoice_summary(org_id: str) -> str:
-    invoices = await list_invoices(limit=10000, organization_id=org_id)
+async def _get_invoice_summary() -> str:
+    invoices = await list_invoices(limit=10000, organization_id=get_org_id())
     summary: dict[str, dict] = {}
     for inv in invoices:
         status = inv.status or "unknown"
@@ -28,10 +29,10 @@ async def _get_invoice_summary(org_id: str) -> str:
     )
 
 
-async def _get_outstanding_balances(args: dict, org_id: str) -> str:
+async def _get_outstanding_balances(args: dict) -> str:
     limit = min(int(args.get("limit") or 20), 100)
     withdrawals = await list_withdrawals(
-        payment_status="unpaid", limit=10000, organization_id=org_id
+        payment_status="unpaid", limit=10000, organization_id=get_org_id()
     )
     entity_map: dict[str, dict] = {}
     for w in withdrawals:
@@ -64,10 +65,10 @@ async def _get_outstanding_balances(args: dict, org_id: str) -> str:
     )
 
 
-async def _get_revenue_summary(args: dict, org_id: str) -> str:
+async def _get_revenue_summary(args: dict) -> str:
     days = min(int(args.get("days") or 30), 365)
     since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
-    withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
+    withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=get_org_id())
     total_revenue = sum(w.total for w in withdrawals)
     total_tax = sum(w.tax for w in withdrawals)
     paid = sum(w.total for w in withdrawals if w.payment_status == "paid")
@@ -87,10 +88,10 @@ async def _get_revenue_summary(args: dict, org_id: str) -> str:
     )
 
 
-async def _get_pl_summary(args: dict, org_id: str) -> str:
+async def _get_pl_summary(args: dict) -> str:
     days = min(int(args.get("days") or 30), 365)
     since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
-    withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
+    withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=get_org_id())
     total_revenue = sum(w.total for w in withdrawals)
     total_cost = sum(w.cost_total for w in withdrawals)
     gross_profit = total_revenue - total_cost
@@ -107,11 +108,11 @@ async def _get_pl_summary(args: dict, org_id: str) -> str:
     )
 
 
-async def _get_top_products(args: dict, org_id: str) -> str:
+async def _get_top_products(args: dict) -> str:
     days = min(int(args.get("days") or 7), 365)
     limit = min(int(args.get("limit") or 10), 50)
     since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
-    withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
+    withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=get_org_id())
     product_map: dict[str, dict] = {}
     for w in withdrawals:
         for item in w.items:

@@ -21,8 +21,8 @@ from inventory.domain.errors import InsufficientStockError, NegativeStockError
 from inventory.domain.stock import StockDecrement, StockTransaction, StockTransactionType
 from inventory.infrastructure.stock_repo import stock_repo as _default_stock_repo
 from inventory.ports.stock_repo_port import StockRepoPort
-from kernel.errors import ResourceNotFoundError
-from shared.infrastructure.config import DEFAULT_ORG_ID
+from shared.infrastructure.database import get_org_id
+from shared.kernel.errors import ResourceNotFoundError
 from shared.kernel.units import are_compatible, convert_quantity
 
 
@@ -38,7 +38,6 @@ async def _record_stock_transaction(
     reference_id: str | None = None,
     reason: str | None = None,
     unit: str = "each",
-    organization_id: str | None = None,
     repo: StockRepoPort = _default_stock_repo,
 ) -> None:
     """Append an immutable transaction to the stock ledger."""
@@ -58,7 +57,7 @@ async def _record_stock_transaction(
         user_id=user_id,
         user_name=user_name,
     )
-    tx.organization_id = organization_id or DEFAULT_ORG_ID
+    tx.organization_id = get_org_id()
     await repo.insert_transaction(tx)
 
 
@@ -67,7 +66,6 @@ async def process_withdrawal_stock_changes(
     withdrawal_id: str,
     user_id: str,
     user_name: str,
-    organization_id: str | None = None,
 ) -> None:
     """
     Atomically decrement product quantities for a withdrawal.
@@ -109,7 +107,6 @@ async def process_withdrawal_stock_changes(
                 user_name=user_name,
                 reference_id=withdrawal_id,
                 unit=base_unit,
-                organization_id=organization_id,
             )
             completed.append((item.product_id, canonical_qty))
 
@@ -128,7 +125,6 @@ async def process_receiving_stock_changes(
     user_name: str,
     reference_id: str | None = None,
     unit: str = "each",
-    organization_id: str | None = None,
     transaction_type: StockTransactionType = StockTransactionType.RECEIVING,
 ) -> None:
     """Add stock (receiving, import, return) and record transaction.
@@ -161,7 +157,6 @@ async def process_receiving_stock_changes(
         user_name=user_name,
         reference_id=reference_id,
         unit=base_unit,
-        organization_id=organization_id,
     )
 
 
@@ -173,7 +168,6 @@ async def process_import_stock_changes(
     user_id: str,
     user_name: str,
     unit: str = "each",
-    organization_id: str | None = None,
 ) -> None:
     """Record stock added via bulk import (new product creation - no delta from existing)."""
     await _record_stock_transaction(
@@ -186,7 +180,6 @@ async def process_import_stock_changes(
         user_id=user_id,
         user_name=user_name,
         unit=unit or "each",
-        organization_id=organization_id,
     )
 
 

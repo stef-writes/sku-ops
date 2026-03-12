@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, field_validator
 
-from kernel.entity import AuditedEntity
+from shared.kernel.entity import AuditedEntity
 from shared.kernel.units import ALLOWED_BASE_UNITS
 
 

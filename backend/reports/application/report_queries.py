@@ -12,7 +12,6 @@ from datetime import datetime
 
 from catalog.application.queries import list_products
 from finance.application import ledger_queries as ledger_repo
-from kernel.types import round_money
 from reports.application.financial_reports import (  # noqa: F401
     ar_aging_report,
     job_pl_report,
@@ -27,10 +26,11 @@ from reports.application.inventory_reports import (  # noqa: F401
     product_performance_report,
     reorder_urgency_report,
 )
+from shared.infrastructure.db import get_org_id
+from shared.kernel.types import round_money
 
 
 async def kpi_report(
-    org_id: str,
     *,
     start_date: str | None = None,
     end_date: str | None = None,
@@ -38,16 +38,16 @@ async def kpi_report(
     department: str | None = None,
     billing_entity: str | None = None,
 ) -> dict:
+    org_id = get_org_id()
     accounts, products_data, units_sold_map = await asyncio.gather(
         ledger_repo.summary_by_account(
-            org_id=org_id,
             start_date=start_date,
             end_date=end_date,
             job_id=job_id,
             department=department,
             billing_entity=billing_entity,
         ),
-        list_products(organization_id=org_id),
+        list_products(),
         ledger_repo.units_sold_by_product(org_id=org_id, start_date=start_date, end_date=end_date),
     )
 

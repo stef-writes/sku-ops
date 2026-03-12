@@ -4,7 +4,7 @@ Split from ledger_queries.py for file-size discipline. All functions are
 re-exported from ledger_queries so existing callers are unaffected.
 """
 
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 from shared.infrastructure.db.sql_compat import date_group_expr
 
 
@@ -31,7 +31,6 @@ def _build_dimension_filter(
 
 
 async def trend_series(
-    org_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
     group_by: str = "day",
@@ -43,7 +42,7 @@ async def trend_series(
     """Time-series of revenue, cost, profit."""
     conn = get_connection()
     period_expr = date_group_expr("created_at", group_by)
-    params: list = [org_id]
+    params: list = [get_org_id()]
     date_filter = ""
     if start_date:
         date_filter += " AND created_at >= ?"
@@ -91,13 +90,12 @@ async def trend_series(
 
 
 async def ar_aging(
-    org_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> list[dict]:
     """AR aging buckets by billing entity based on invoice due_date."""
     conn = get_connection()
-    params: list = [org_id]
+    params: list = [get_org_id()]
     date_filter = ""
     if start_date:
         date_filter += " AND fl.created_at >= ?"
@@ -131,7 +129,6 @@ async def ar_aging(
 
 
 async def product_margins(
-    org_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
     limit: int = 50,
@@ -142,7 +139,7 @@ async def product_margins(
 ) -> list[dict]:
     """Per-product revenue, COGS, profit, margin."""
     conn = get_connection()
-    params: list = [org_id]
+    params: list = [get_org_id()]
     date_filter = ""
     if start_date:
         date_filter += " AND created_at >= ?"
@@ -186,13 +183,12 @@ async def product_margins(
 
 
 async def purchase_spend(
-    org_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> float:
     """Total inventory additions from PO receipts in the period."""
     conn = get_connection()
-    params: list = [org_id]
+    params: list = [get_org_id()]
     date_filter = ""
     if start_date:
         date_filter += " AND created_at >= ?"
@@ -215,13 +211,12 @@ async def purchase_spend(
 
 
 async def reference_counts(
-    org_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> dict[str, int]:
     """Count distinct references by type (withdrawal, return, etc.)."""
     conn = get_connection()
-    params: list = [org_id]
+    params: list = [get_org_id()]
     date_filter = ""
     if start_date:
         date_filter += " AND created_at >= ?"

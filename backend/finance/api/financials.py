@@ -13,9 +13,9 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from finance.application import ledger_queries as ledger_repo
-from kernel.types import round_money
 from operations.application.queries import list_withdrawals
 from shared.api.deps import AdminDep
+from shared.kernel.types import round_money
 
 router = APIRouter(prefix="/financials", tags=["financials"])
 
@@ -27,8 +27,6 @@ async def get_financial_summary(
     end_date: str | None = None,
 ):
     """P&L summary sourced from the financial ledger."""
-    org_id = current_user.organization_id
-
     (
         accounts,
         by_department,
@@ -36,11 +34,11 @@ async def get_financial_summary(
         by_contractor_rows,
         counts,
     ) = await asyncio.gather(
-        ledger_repo.summary_by_account(org_id, start_date=start_date, end_date=end_date),
-        ledger_repo.summary_by_department(org_id, start_date=start_date, end_date=end_date),
-        ledger_repo.summary_by_billing_entity(org_id, start_date=start_date, end_date=end_date),
-        ledger_repo.summary_by_contractor(org_id, start_date=start_date, end_date=end_date),
-        ledger_repo.reference_counts(org_id, start_date=start_date, end_date=end_date),
+        ledger_repo.summary_by_account(start_date=start_date, end_date=end_date),
+        ledger_repo.summary_by_department(start_date=start_date, end_date=end_date),
+        ledger_repo.summary_by_billing_entity(start_date=start_date, end_date=end_date),
+        ledger_repo.summary_by_contractor(start_date=start_date, end_date=end_date),
+        ledger_repo.reference_counts(start_date=start_date, end_date=end_date),
     )
 
     revenue = accounts.get("revenue", 0)
@@ -98,14 +96,12 @@ async def export_financials(
     end_date: str | None = None,
 ):
     """Export financial data as CSV (line-level, from operational tables)."""
-    org_id = current_user.organization_id
     withdrawals = await list_withdrawals(
         payment_status=payment_status,
         billing_entity=billing_entity,
         start_date=start_date,
         end_date=end_date,
         limit=10000,
-        organization_id=org_id,
     )
 
     output = io.StringIO()

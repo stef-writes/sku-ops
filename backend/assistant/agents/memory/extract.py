@@ -19,7 +19,6 @@ _EXTRACT_SYSTEM = load_prompt(__file__, "prompt.md")
 
 
 async def extract_and_save(
-    org_id: str,
     user_id: str,
     session_id: str,
     history: list[dict],
@@ -58,7 +57,7 @@ async def extract_and_save(
 
         artifacts = json.loads(raw)
         if isinstance(artifacts, list) and artifacts:
-            await save(org_id, user_id, session_id, artifacts)
+            await save(user_id, session_id, artifacts)
 
     except (json.JSONDecodeError, ValueError, TypeError, RuntimeError, OSError) as e:
         logger.warning("Memory extraction failed (non-critical): %s", e)

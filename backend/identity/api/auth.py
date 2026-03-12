@@ -52,9 +52,8 @@ async def admin_create_user_route(
     current_user: AdminDep,
 ):
     """Admin-only: create a user with explicit role in the admin's organization."""
-    org_id = current_user.organization_id
     try:
-        user_dict = await _admin_create_user(data, org_id)
+        user_dict = await _admin_create_user(data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     await audit_log(
@@ -63,7 +62,7 @@ async def admin_create_user_route(
         resource_type="user",
         resource_id=user_dict.get("id"),
         request=request,
-        org_id=org_id,
+        org_id=current_user.organization_id,
     )
     return user_dict
 

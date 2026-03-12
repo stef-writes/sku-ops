@@ -11,7 +11,7 @@ import pytest
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from kernel import events
+from shared.kernel import events
 from tests.helpers.auth import make_token as _make_token
 
 

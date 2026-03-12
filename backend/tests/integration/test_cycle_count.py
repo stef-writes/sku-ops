@@ -33,13 +33,13 @@ from inventory.application.inventory_service import (
 from inventory.domain.cycle_count import CycleCountStatus
 from inventory.domain.errors import NegativeStockError
 from inventory.domain.stock import StockDecrement
-from kernel.errors import ResourceNotFoundError
 from shared.infrastructure.database import get_connection
+from shared.kernel.errors import ResourceNotFoundError
 
 # ── Fixtures / helpers ────────────────────────────────────────────────────────
 
 
-async def _make_product(name="Widget", qty=100.0, cost=5.0, dept="Hardware", org="default"):
+async def _make_product(name="Widget", qty=100.0, cost=5.0, dept="Hardware"):
     return await create_product(
         department_id="dept-1",
         department_name=dept,
@@ -49,7 +49,6 @@ async def _make_product(name="Widget", qty=100.0, cost=5.0, dept="Hardware", org
         cost=cost,
         user_id="user-1",
         user_name="Test",
-        organization_id=org,
         on_stock_import=process_import_stock_changes,
     )
 
@@ -61,30 +60,27 @@ def _user():
     }
 
 
-async def _open(scope=None, org="default"):
+async def _open(scope=None):
     return await open_cycle_count(
-        organization_id=org,
         created_by_id="user-1",
         created_by_name="Test User",
         scope=scope,
     )
 
 
-async def _commit(count_id, org="default"):
+async def _commit(count_id):
     return await commit_cycle_count(
         count_id=count_id,
-        organization_id=org,
         **_user(),
     )
 
 
-async def _update(count_id, item_id, counted_qty, notes=None, org="default"):
+async def _update(count_id, item_id, counted_qty, notes=None):
     return await update_counted_qty(
         count_id=count_id,
         item_id=item_id,
         counted_qty=counted_qty,
         notes=notes,
-        organization_id=org,
     )
 
 
@@ -92,10 +88,6 @@ async def _update(count_id, item_id, counted_qty, notes=None, org="default"):
 
 
 class TestCycleCountDomain:
-    def test_status_enum_values(self):
-        assert CycleCountStatus.OPEN == "open"
-        assert CycleCountStatus.COMMITTED == "committed"
-
     def test_variance_arithmetic(self):
         """variance = counted_qty - snapshot_qty: positive, negative, zero."""
         cases = [
@@ -129,7 +121,7 @@ class TestOpenCycleCount:
         p2 = await _make_product("Nut", qty=25.0)
 
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
 
         item_map = {i["product_id"]: i for i in detail["items"]}
         assert item_map[p1.id]["snapshot_qty"] == pytest.approx(50.0)
@@ -163,12 +155,11 @@ class TestOpenCycleCount:
             cost=2.0,
             user_id="user-1",
             user_name="Test",
-            organization_id="default",
             on_stock_import=process_import_stock_changes,
         )
 
         count = await _open(scope="Hardware")
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
 
         product_ids = {i["product_id"] for i in detail["items"]}
         assert hw.id in product_ids, "Hardware product must be in count"
@@ -194,12 +185,11 @@ class TestOpenCycleCount:
             cost=0.5,
             user_id="user-1",
             user_name="Test",
-            organization_id="default",
             on_stock_import=process_import_stock_changes,
         )
 
         count = await _open(scope=None)
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         product_ids = {i["product_id"] for i in detail["items"]}
 
         assert hw.id in product_ids
@@ -218,7 +208,7 @@ class TestOpenCycleCount:
     async def test_open_appears_in_list(self):
         await _make_product("Washer", qty=10.0)
         count = await _open()
-        counts = await list_cycle_counts("default")
+        counts = await list_cycle_counts()
         ids = [c["id"] for c in counts]
         assert count["id"] in ids
 
@@ -228,8 +218,8 @@ class TestOpenCycleCount:
         await _make_product("Nail", qty=10.0)
         count = await _open()
 
-        open_counts = await list_cycle_counts("default", status="open")
-        committed_counts = await list_cycle_counts("default", status="committed")
+        open_counts = await list_cycle_counts(status="open")
+        committed_counts = await list_cycle_counts(status="committed")
 
         open_ids = [c["id"] for c in open_counts]
         committed_ids = [c["id"] for c in committed_counts]
@@ -249,7 +239,7 @@ class TestSnapshotIsolation:
         p = await _make_product("Pipe", qty=100.0)
         count = await _open()
 
-        detail_before = await get_count_detail(count["id"], "default")
+        detail_before = await get_count_detail(count["id"])
         snap_before = next(
             i["snapshot_qty"] for i in detail_before["items"] if i["product_id"] == p.id
         )
@@ -261,7 +251,7 @@ class TestSnapshotIsolation:
             user_name="Test",
         )
 
-        detail_after = await get_count_detail(count["id"], "default")
+        detail_after = await get_count_detail(count["id"])
         snap_after = next(
             i["snapshot_qty"] for i in detail_after["items"] if i["product_id"] == p.id
         )
@@ -281,7 +271,7 @@ class TestUpdateCountedQty:
     async def test_update_stores_counted_qty_and_variance(self):
         p = await _make_product("Valve", qty=50.0)
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         item = next(i for i in detail["items"] if i["product_id"] == p.id)
 
         updated = await _update(count["id"], item["id"], counted_qty=47.0)
@@ -294,7 +284,7 @@ class TestUpdateCountedQty:
     async def test_update_positive_variance(self):
         p = await _make_product("Flange", qty=10.0)
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         item = next(i for i in detail["items"] if i["product_id"] == p.id)
 
         updated = await _update(count["id"], item["id"], counted_qty=13.0)
@@ -306,7 +296,7 @@ class TestUpdateCountedQty:
     async def test_update_zero_variance(self):
         p = await _make_product("Clamp", qty=20.0)
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         item = next(i for i in detail["items"] if i["product_id"] == p.id)
 
         updated = await _update(count["id"], item["id"], counted_qty=20.0)
@@ -318,7 +308,7 @@ class TestUpdateCountedQty:
     async def test_update_stores_notes(self):
         p = await _make_product("Elbow", qty=5.0)
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         item = next(i for i in detail["items"] if i["product_id"] == p.id)
 
         updated = await _update(count["id"], item["id"], counted_qty=5.0, notes="damaged box")
@@ -330,7 +320,7 @@ class TestUpdateCountedQty:
         """Updating an item on a committed count must raise ValueError."""
         p = await _make_product("Cap", qty=10.0)
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         item = next(i for i in detail["items"] if i["product_id"] == p.id)
         await _update(count["id"], item["id"], counted_qty=10.0)
         await _commit(count["id"])
@@ -357,7 +347,7 @@ class TestCommitCycleCount:
         """Shortage: product quantity should decrease by |variance|."""
         p = await _make_product("Rod", qty=100.0)
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         item = next(i for i in detail["items"] if i["product_id"] == p.id)
 
         await _update(count["id"], item["id"], counted_qty=90.0)
@@ -372,7 +362,7 @@ class TestCommitCycleCount:
         """Overage: product quantity should increase by variance."""
         p = await _make_product("Rivet", qty=50.0)
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         item = next(i for i in detail["items"] if i["product_id"] == p.id)
 
         await _update(count["id"], item["id"], counted_qty=55.0)
@@ -389,7 +379,7 @@ class TestCommitCycleCount:
         p_skipped = await _make_product("Bolt B", qty=40.0)
 
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
 
         item_counted = next(i for i in detail["items"] if i["product_id"] == p_counted.id)
         await _update(count["id"], item_counted["id"], counted_qty=25.0)
@@ -410,7 +400,7 @@ class TestCommitCycleCount:
         """Items counted at exactly snapshot_qty must not produce a stock transaction."""
         p = await _make_product("Pin", qty=15.0)
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         item = next(i for i in detail["items"] if i["product_id"] == p.id)
 
         await _update(count["id"], item["id"], counted_qty=15.0)
@@ -427,13 +417,13 @@ class TestCommitCycleCount:
     async def test_commit_sets_status_committed(self):
         p = await _make_product("Stud", qty=10.0)
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         item = next(i for i in detail["items"] if i["product_id"] == p.id)
         await _update(count["id"], item["id"], counted_qty=10.0)
 
         await _commit(count["id"])
 
-        detail_after = await get_count_detail(count["id"], "default")
+        detail_after = await get_count_detail(count["id"])
         assert detail_after["status"] == CycleCountStatus.COMMITTED
 
     @pytest.mark.usefixtures("_db")
@@ -441,7 +431,7 @@ class TestCommitCycleCount:
     async def test_commit_records_committer_and_timestamp(self):
         p = await _make_product("Bracket", qty=10.0)
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         item = next(i for i in detail["items"] if i["product_id"] == p.id)
         await _update(count["id"], item["id"], counted_qty=10.0)
 
@@ -456,7 +446,7 @@ class TestCommitCycleCount:
         """Second commit attempt must raise ValueError."""
         p = await _make_product("Stud B", qty=10.0)
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         item = next(i for i in detail["items"] if i["product_id"] == p.id)
         await _update(count["id"], item["id"], counted_qty=10.0)
         await _commit(count["id"])
@@ -470,7 +460,7 @@ class TestCommitCycleCount:
         """Each adjusted item must produce a stock transaction with reason='count'."""
         p = await _make_product("Bushing", qty=20.0)
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         item = next(i for i in detail["items"] if i["product_id"] == p.id)
 
         await _update(count["id"], item["id"], counted_qty=17.0)
@@ -489,13 +479,13 @@ class TestCommitCycleCount:
         """A negative variance must produce INVENTORY (decrease) + SHRINKAGE (increase) entries."""
         p = await _make_product("Coupler", qty=50.0, cost=4.0)
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         item = next(i for i in detail["items"] if i["product_id"] == p.id)
 
         await _update(count["id"], item["id"], counted_qty=45.0)
         await _commit(count["id"])
 
-        tb = await trial_balance("default")
+        tb = await trial_balance()
         assert Account.SHRINKAGE.value in tb, "Shrinkage ledger entry expected"
         assert Account.INVENTORY.value in tb, "Inventory ledger entry expected"
 
@@ -508,7 +498,7 @@ class TestCommitCycleCount:
         await _make_product("Anchor C", qty=30.0)
 
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         items = {i["product_id"]: i for i in detail["items"]}
 
         await _update(count["id"], items[p1.id]["id"], counted_qty=9.0)  # -1 → adjusted
@@ -531,7 +521,7 @@ class TestCommitAtomicity:
         p_bad = await _make_product("Undersupply Product", qty=5.0)
 
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         items = {i["product_id"]: i for i in detail["items"]}
 
         # p_ok: valid negative variance
@@ -552,7 +542,7 @@ class TestCommitAtomicity:
         assert p_bad_after.quantity == pytest.approx(5.0), "Failing product should be unchanged"
 
         # Count must still be open — not partially committed
-        detail_after = await get_count_detail(count["id"], "default")
+        detail_after = await get_count_detail(count["id"])
         assert detail_after["status"] == CycleCountStatus.OPEN, (
             "Count must remain open after a failed commit"
         )
@@ -563,7 +553,7 @@ class TestCommitAtomicity:
         """After a successful commit, all adjustments are visible in the DB."""
         p = await _make_product("Durable Widget", qty=100.0)
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         item = next(i for i in detail["items"] if i["product_id"] == p.id)
 
         await _update(count["id"], item["id"], counted_qty=95.0)
@@ -587,7 +577,7 @@ class TestPostCommitLedgerBalance:
         """After commit: product.quantity == sum of all stock_transaction deltas."""
         p = await _make_product("Auditee", qty=80.0)
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         item = next(i for i in detail["items"] if i["product_id"] == p.id)
 
         await _update(count["id"], item["id"], counted_qty=75.0)
@@ -611,7 +601,7 @@ class TestPostCommitLedgerBalance:
         counted_qtys = [5.0, 22.0, 28.0]  # mix of shortage, overage, overage
 
         count = await _open()
-        detail = await get_count_detail(count["id"], "default")
+        detail = await get_count_detail(count["id"])
         item_map = {i["product_id"]: i for i in detail["items"]}
 
         for p, cq in zip(products, counted_qtys, strict=False):

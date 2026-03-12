@@ -3,10 +3,6 @@
 Clients connect with their JWT token and receive domain events scoped to
 their organization. Contractor connections are filtered to only receive
 events relevant to their role.
-
-The endpoint is mounted directly on the FastAPI app (not behind the /api
-router) because FastAPI WebSocket routes are registered differently from
-HTTP routes. The ``mount_websocket`` helper wires it up in server.py.
 """
 
 from __future__ import annotations
@@ -16,15 +12,17 @@ import json
 import logging
 
 import jwt
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from kernel.events import CONTRACTOR_VISIBLE_EVENTS, Event
 from shared.infrastructure import event_hub
 from shared.infrastructure.config import DEFAULT_ORG_ID, JWT_ALGORITHM, JWT_SECRET
+from shared.kernel.events import CONTRACTOR_VISIBLE_EVENTS, Event
 
 logger = logging.getLogger(__name__)
 
 HEARTBEAT_INTERVAL = 30
+
+router = APIRouter()
 
 
 def _authenticate(token: str) -> dict | None:
@@ -43,27 +41,24 @@ def _should_deliver(event: Event, org_id: str, role: str, user_id: str) -> bool:
     return not (role == "contractor" and event.type not in CONTRACTOR_VISIBLE_EVENTS)
 
 
-def mount_websocket(app: FastAPI) -> None:
-    """Register the /api/ws WebSocket endpoint on the given app."""
+@router.websocket("/ws")
+async def ws_endpoint(websocket: WebSocket):
+    token = websocket.query_params.get("token", "")
+    payload = _authenticate(token)
+    if not payload:
+        await websocket.close(code=4001, reason="Invalid or expired token")
+        return
 
-    @app.websocket("/api/ws")
-    async def ws_endpoint(websocket: WebSocket):
-        token = websocket.query_params.get("token", "")
-        payload = _authenticate(token)
-        if not payload:
-            await websocket.close(code=4001, reason="Invalid or expired token")
-            return
+    org_id = payload.get("organization_id", DEFAULT_ORG_ID)
+    role = payload.get("role", "")
+    user_id = payload.get("user_id", "")
+    await websocket.accept()
 
-        org_id = payload.get("organization_id", DEFAULT_ORG_ID)
-        role = payload.get("role", "")
-        user_id = payload.get("user_id", "")
-        await websocket.accept()
-
-        queue = event_hub.subscribe()
-        try:
-            await _relay_loop(websocket, queue, org_id, role, user_id)
-        finally:
-            event_hub.unsubscribe(queue)
+    queue = event_hub.subscribe()
+    try:
+        await _relay_loop(websocket, queue, org_id, role, user_id)
+    finally:
+        event_hub.unsubscribe(queue)
 
 
 async def _relay_loop(

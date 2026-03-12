@@ -1,7 +1,7 @@
 """Cycle count repository — persistence for cycle_counts and cycle_count_items."""
 
 from inventory.domain.cycle_count import CycleCount, CycleCountItem
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 
 def _row(row) -> dict | None:
@@ -92,26 +92,28 @@ async def commit_count(
     await conn.commit()
 
 
-async def get_count(count_id: str, organization_id: str) -> dict | None:
+async def get_count(count_id: str) -> dict | None:
     conn = get_connection()
+    org_id = get_org_id()
     cursor = await conn.execute(
         "SELECT * FROM cycle_counts WHERE id = ? AND organization_id = ?",
-        (count_id, organization_id),
+        (count_id, org_id),
     )
     return _row(await cursor.fetchone())
 
 
-async def list_counts(organization_id: str, status: str | None = None) -> list:
+async def list_counts(status: str | None = None) -> list:
     conn = get_connection()
+    org_id = get_org_id()
     if status:
         cursor = await conn.execute(
             "SELECT * FROM cycle_counts WHERE organization_id = ? AND status = ? ORDER BY created_at DESC",
-            (organization_id, status),
+            (org_id, status),
         )
     else:
         cursor = await conn.execute(
             "SELECT * FROM cycle_counts WHERE organization_id = ? ORDER BY created_at DESC",
-            (organization_id,),
+            (org_id,),
         )
     rows = await cursor.fetchall()
     return [_row(r) for r in rows]

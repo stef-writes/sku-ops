@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel
 
-from kernel.entity import AuditedEntity
+from shared.kernel.entity import AuditedEntity
 
 
 class BillingEntity(AuditedEntity):

@@ -9,11 +9,11 @@ import asyncio
 
 from catalog.application.queries import list_products
 from finance.application import ledger_queries as ledger_repo
-from kernel.types import round_money
+from shared.infrastructure.db import get_org_id
+from shared.kernel.types import round_money
 
 
 async def sales_report(
-    org_id: str,
     *,
     start_date: str | None = None,
     end_date: str | None = None,
@@ -21,15 +21,16 @@ async def sales_report(
     department: str | None = None,
     billing_entity: str | None = None,
 ) -> dict:
+    org_id = get_org_id()
     dim_kw = {"job_id": job_id, "department": department, "billing_entity": billing_entity}
 
     accounts, top_products, counts, catalog, payment_status = await asyncio.gather(
-        ledger_repo.summary_by_account(org_id, start_date=start_date, end_date=end_date, **dim_kw),
+        ledger_repo.summary_by_account(start_date=start_date, end_date=end_date, **dim_kw),
         ledger_repo.product_margins(
             org_id, start_date=start_date, end_date=end_date, limit=10, **dim_kw
         ),
         ledger_repo.reference_counts(org_id, start_date=start_date, end_date=end_date),
-        list_products(organization_id=org_id),
+        list_products(),
         ledger_repo.payment_status_breakdown(org_id, start_date=start_date, end_date=end_date),
     )
     product_map = {p.id: p for p in catalog}
@@ -63,7 +64,6 @@ async def sales_report(
 
 
 async def trends_report(
-    org_id: str,
     *,
     start_date: str | None = None,
     end_date: str | None = None,
@@ -72,6 +72,7 @@ async def trends_report(
     department: str | None = None,
     billing_entity: str | None = None,
 ) -> dict:
+    org_id = get_org_id()
     series = await ledger_repo.trend_series(
         org_id=org_id,
         start_date=start_date,
@@ -90,7 +91,6 @@ async def trends_report(
 
 
 async def product_margins_report(
-    org_id: str,
     *,
     start_date: str | None = None,
     end_date: str | None = None,
@@ -99,6 +99,7 @@ async def product_margins_report(
     department: str | None = None,
     billing_entity: str | None = None,
 ) -> dict:
+    org_id = get_org_id()
     margin_data, catalog = await asyncio.gather(
         ledger_repo.product_margins(
             org_id=org_id,
@@ -109,7 +110,7 @@ async def product_margins_report(
             department=department,
             billing_entity=billing_entity,
         ),
-        list_products(organization_id=org_id),
+        list_products(),
     )
     product_map = {p.id: p for p in catalog}
     for m in margin_data:
@@ -120,7 +121,6 @@ async def product_margins_report(
 
 
 async def job_pl_report(
-    org_id: str,
     *,
     start_date: str | None = None,
     end_date: str | None = None,
@@ -129,7 +129,6 @@ async def job_pl_report(
     search: str | None = None,
 ) -> dict:
     result = await ledger_repo.summary_by_job(
-        org_id=org_id,
         start_date=start_date,
         end_date=end_date,
         limit=limit,
@@ -154,7 +153,6 @@ async def job_pl_report(
 
 
 async def pl_report(
-    org_id: str,
     *,
     group_by: str = "overall",
     start_date: str | None = None,
@@ -166,12 +164,13 @@ async def pl_report(
     department: str | None = None,
     billing_entity: str | None = None,
 ) -> dict:
+    org_id = get_org_id()
     date_kw = {"start_date": start_date, "end_date": end_date}
     dim_kw = {"job_id": job_id, "department": department, "billing_entity": billing_entity}
     total_rows = None
 
     if group_by == "overall":
-        accounts = await ledger_repo.summary_by_account(org_id, **date_kw, **dim_kw)
+        accounts = await ledger_repo.summary_by_account(**date_kw, **dim_kw)
         revenue = accounts.get("revenue", 0)
         cogs = accounts.get("cogs", 0)
         tax = accounts.get("tax_collected", 0)
@@ -195,7 +194,6 @@ async def pl_report(
 
     if group_by == "job":
         result = await ledger_repo.summary_by_job(
-            org_id,
             **date_kw,
             limit=limit,
             offset=offset,
@@ -210,7 +208,7 @@ async def pl_report(
         rows = await ledger_repo.summary_by_contractor(org_id, **date_kw)
         label_key = "contractor_id"
     elif group_by == "department":
-        rows = await ledger_repo.summary_by_department(org_id, **date_kw)
+        rows = await ledger_repo.summary_by_department(**date_kw)
         label_key = "department"
     elif group_by == "entity":
         rows = await ledger_repo.summary_by_billing_entity(org_id, **date_kw)
@@ -218,7 +216,7 @@ async def pl_report(
     elif group_by == "product":
         rows, catalog = await asyncio.gather(
             ledger_repo.product_margins(org_id, **date_kw, limit=limit),
-            list_products(organization_id=org_id),
+            list_products(),
         )
         pmap = {p.id: p for p in catalog}
         for m in rows:
@@ -256,9 +254,9 @@ async def pl_report(
 
 
 async def ar_aging_report(
-    org_id: str,
     *,
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> list:
+    org_id = get_org_id()
     return await ledger_repo.ar_aging(org_id, start_date=start_date, end_date=end_date)

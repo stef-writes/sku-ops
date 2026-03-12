@@ -4,8 +4,7 @@ import json
 from uuid import uuid4
 
 from operations.domain.withdrawal import MaterialWithdrawal
-from shared.infrastructure.config import DEFAULT_ORG_ID
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 
 def _row_to_model(row) -> MaterialWithdrawal | None:
@@ -20,7 +19,7 @@ def _row_to_model(row) -> MaterialWithdrawal | None:
 async def insert(withdrawal: MaterialWithdrawal | dict) -> None:
     withdrawal_dict = withdrawal if isinstance(withdrawal, dict) else withdrawal.model_dump()
     conn = get_connection()
-    org_id = withdrawal_dict.get("organization_id") or DEFAULT_ORG_ID
+    org_id = withdrawal_dict.get("organization_id") or get_org_id()
     items_json = json.dumps(
         [i if isinstance(i, dict) else i.model_dump() for i in withdrawal_dict["items"]]
     )
@@ -94,10 +93,9 @@ async def list_withdrawals(
     end_date: str | None = None,
     limit: int = 10000,
     offset: int = 0,
-    organization_id: str | None = None,
 ) -> list[MaterialWithdrawal]:
     conn = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     query = "SELECT * FROM withdrawals WHERE (organization_id = ? OR organization_id IS NULL)"
     params: list = [org_id]
     if contractor_id:
@@ -122,48 +120,37 @@ async def list_withdrawals(
     return [_row_to_model(r) for r in rows]
 
 
-async def get_by_id(
-    withdrawal_id: str, organization_id: str | None = None
-) -> MaterialWithdrawal | None:
+async def get_by_id(withdrawal_id: str) -> MaterialWithdrawal | None:
     conn = get_connection()
-    if organization_id:
-        cursor = await conn.execute(
-            "SELECT * FROM withdrawals WHERE id = ? AND (organization_id = ? OR organization_id IS NULL)",
-            (withdrawal_id, organization_id),
-        )
-    else:
-        cursor = await conn.execute(
-            "SELECT * FROM withdrawals WHERE id = ?",
-            (withdrawal_id,),
-        )
+    org_id = get_org_id()
+    cursor = await conn.execute(
+        "SELECT * FROM withdrawals WHERE id = ? AND (organization_id = ? OR organization_id IS NULL)",
+        (withdrawal_id, org_id),
+    )
     row = await cursor.fetchone()
     return _row_to_model(row)
 
 
 async def mark_paid(
-    withdrawal_id: str, paid_at: str, organization_id: str | None = None
+    withdrawal_id: str, paid_at: str
 ) -> MaterialWithdrawal | None:
     conn = get_connection()
-    params: list = [paid_at, withdrawal_id]
-    where = "WHERE id = ?"
-    if organization_id:
-        where += " AND organization_id = ?"
-        params.append(organization_id)
+    org_id = get_org_id()
     await conn.execute(
-        "UPDATE withdrawals SET payment_status = 'paid', paid_at = ? " + where,
-        params,
+        "UPDATE withdrawals SET payment_status = 'paid', paid_at = ? WHERE id = ? AND organization_id = ?",
+        (paid_at, withdrawal_id, org_id),
     )
     await conn.commit()
     return await get_by_id(withdrawal_id)
 
 
 async def bulk_mark_paid(
-    withdrawal_ids: list, paid_at: str, organization_id: str | None = None
+    withdrawal_ids: list, paid_at: str
 ) -> int:
     if not withdrawal_ids:
         return 0
     conn = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     placeholders = ",".join("?" * len(withdrawal_ids))
     cursor = await conn.execute(
         "UPDATE withdrawals SET payment_status = 'paid', paid_at = ? WHERE id IN ("
@@ -209,12 +196,12 @@ async def mark_paid_by_invoice(invoice_id: str, paid_at: str) -> None:
 
 
 async def units_sold_by_product(
-    org_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> dict[str, float]:
     """Sum of quantities sold per product_id from withdrawal_items."""
     conn = get_connection()
+    org_id = get_org_id()
     params: list = [org_id]
     date_filter = ""
     if start_date:
@@ -236,12 +223,12 @@ async def units_sold_by_product(
 
 
 async def payment_status_breakdown(
-    org_id: str,
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> dict[str, float]:
     """Revenue breakdown by payment status: {Paid: X, Invoiced: Y, Unpaid: Z}."""
     conn = get_connection()
+    org_id = get_org_id()
     params: list = [org_id]
     date_filter = ""
     if start_date:

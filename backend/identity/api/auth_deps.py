@@ -9,13 +9,13 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from identity.application.queries import user_repo
-from kernel.types import CurrentUser
 from shared.infrastructure.config import (
     DEFAULT_ORG_ID,
     JWT_ALGORITHM,
     JWT_SECRET,
 )
 from shared.infrastructure.logging_config import org_id_var, user_id_var
+from shared.kernel.types import CurrentUser
 
 security = HTTPBearer()
 

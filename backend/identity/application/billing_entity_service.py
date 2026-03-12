@@ -6,6 +6,6 @@ Other bounded contexts import from here, never from identity.infrastructure dire
 from identity.infrastructure.billing_entity_repo import billing_entity_repo
 
 
-async def ensure_billing_entity(name: str, organization_id: str) -> dict:
+async def ensure_billing_entity(name: str) -> dict:
     """Get existing billing entity by name, or auto-create a minimal one."""
-    return await billing_entity_repo.ensure_billing_entity(name, organization_id)
+    return await billing_entity_repo.ensure_billing_entity(name)

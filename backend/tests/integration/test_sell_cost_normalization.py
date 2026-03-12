@@ -18,9 +18,9 @@ from inventory.application.inventory_service import (
     process_import_stock_changes,
     process_withdrawal_stock_changes,
 )
-from kernel.types import CurrentUser
 from operations.application.withdrawal_service import create_withdrawal
 from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
+from shared.kernel.types import CurrentUser
 
 
 @pytest.mark.asyncio
@@ -284,8 +284,8 @@ async def test_invoice_line_items_carry_sell_cost(db):
         process_stock_changes=process_withdrawal_stock_changes,
     )
 
-    inv = await create_invoice_from_withdrawals([withdrawal["id"]], organization_id="default")
-    full_inv = await get_invoice(inv.id, "default")
+    inv = await create_invoice_from_withdrawals([withdrawal["id"]])
+    full_inv = await get_invoice(inv.id)
 
     line_items = full_inv.line_items
     assert len(line_items) == 1

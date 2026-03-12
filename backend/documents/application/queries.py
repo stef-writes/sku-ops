@@ -9,7 +9,6 @@ from documents.infrastructure.document_repo import document_repo as _doc_repo
 
 
 async def list_documents(
-    organization_id: str,
     status: str | None = None,
     vendor_name: str | None = None,
     po_id: str | None = None,
@@ -17,7 +16,6 @@ async def list_documents(
     offset: int = 0,
 ) -> list[Document]:
     return await _doc_repo.list_documents(
-        organization_id=organization_id,
         status=status,
         vendor_name=vendor_name,
         po_id=po_id,
@@ -26,5 +24,5 @@ async def list_documents(
     )
 
 
-async def get_document_by_id(doc_id: str, organization_id: str) -> Document | None:
-    return await _doc_repo.get_by_id(doc_id, organization_id)
+async def get_document_by_id(doc_id: str) -> Document | None:
+    return await _doc_repo.get_by_id(doc_id)

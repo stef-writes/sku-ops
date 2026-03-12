@@ -4,6 +4,20 @@ All existing imports like ``from shared.infrastructure.database import get_conne
 continue to work unchanged.
 """
 
-from shared.infrastructure.db import close_db, get_connection, init_db, transaction
+from shared.infrastructure.db import (
+    close_db,
+    get_connection,
+    get_org_id,
+    get_user_id,
+    init_db,
+    transaction,
+)
 
-__all__ = ["close_db", "get_connection", "init_db", "transaction"]
+__all__ = [
+    "close_db",
+    "get_connection",
+    "get_org_id",
+    "get_user_id",
+    "init_db",
+    "transaction",
+]

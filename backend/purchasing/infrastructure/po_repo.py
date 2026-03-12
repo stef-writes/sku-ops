@@ -2,7 +2,7 @@
 
 from purchasing.domain.purchase_order import POItemStatus, PurchaseOrder, PurchaseOrderItem
 from purchasing.ports.po_repo_port import PORepoPort
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 
 def _row(row) -> dict | None:
@@ -68,8 +68,9 @@ class PgPORepo(PORepoPort):
             )
         await conn.commit()
 
-    async def list_pos(self, org_id: str, status: str | None = None) -> list[dict]:
+    async def list_pos(self, status: str | None = None) -> list[dict]:
         conn = get_connection()
+        org_id = get_org_id()
         if status:
             cursor = await conn.execute(
                 "SELECT * FROM purchase_orders WHERE organization_id = ? AND status = ? ORDER BY created_at DESC",
@@ -83,8 +84,9 @@ class PgPORepo(PORepoPort):
         rows = await cursor.fetchall()
         return [dict(r) for r in rows]
 
-    async def get_po(self, po_id: str, org_id: str) -> dict | None:
+    async def get_po(self, po_id: str) -> dict | None:
         conn = get_connection()
+        org_id = get_org_id()
         cursor = await conn.execute(
             "SELECT * FROM purchase_orders WHERE id = ? AND organization_id = ?",
             (po_id, org_id),
@@ -138,9 +140,10 @@ class PgPORepo(PORepoPort):
         )
         await conn.commit()
 
-    async def list_unsynced_po_bills(self, org_id: str) -> list[dict]:
+    async def list_unsynced_po_bills(self) -> list[dict]:
         """Return received POs with pending Xero sync."""
         conn = get_connection()
+        org_id = get_org_id()
         cursor = await conn.execute(
             """SELECT id, vendor_name, total, document_date, created_at
                FROM purchase_orders
@@ -154,8 +157,9 @@ class PgPORepo(PORepoPort):
         rows = await cursor.fetchall()
         return [dict(r) for r in rows]
 
-    async def list_failed_po_bills(self, org_id: str) -> list[dict]:
+    async def list_failed_po_bills(self) -> list[dict]:
         conn = get_connection()
+        org_id = get_org_id()
         cursor = await conn.execute(
             """SELECT id, vendor_name, total, document_date, created_at
                FROM purchase_orders
@@ -167,9 +171,10 @@ class PgPORepo(PORepoPort):
         rows = await cursor.fetchall()
         return [dict(r) for r in rows]
 
-    async def get_po_with_cost(self, po_id: str, org_id: str) -> dict | None:
+    async def get_po_with_cost(self, po_id: str) -> dict | None:
         """Get PO with computed cost_total and items for Xero sync."""
         conn = get_connection()
+        org_id = get_org_id()
         cursor = await conn.execute(
             "SELECT * FROM purchase_orders WHERE id = ? AND organization_id = ?",
             (po_id, org_id),
@@ -201,9 +206,10 @@ class PgPORepo(PORepoPort):
         )
         await conn.commit()
 
-    async def summary_by_status(self, org_id: str) -> dict[str, dict]:
+    async def summary_by_status(self) -> dict[str, dict]:
         """Return {status: {count, total}} for all POs in the org."""
         conn = get_connection()
+        org_id = get_org_id()
         cursor = await conn.execute(
             """SELECT status, COUNT(*) as cnt, COALESCE(SUM(total), 0) as total
                FROM purchase_orders WHERE organization_id = ?

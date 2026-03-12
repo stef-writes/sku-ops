@@ -11,18 +11,19 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_TTL_DAYS = 90
 
 
-async def save(org_id: str, user_id: str, session_id: str, artifacts: list[dict]) -> None:
+async def save(user_id: str, session_id: str, artifacts: list[dict]) -> None:
     """Persist a list of extracted artifacts to the DB."""
     if not artifacts:
         return
     conn = get_connection()
+    org_id = get_org_id()
     now = datetime.now(UTC).isoformat()
     expires_at = (datetime.now(UTC) + timedelta(days=_DEFAULT_TTL_DAYS)).isoformat()
     rows: list[tuple[Any, ...]] = [
@@ -53,12 +54,13 @@ async def save(org_id: str, user_id: str, session_id: str, artifacts: list[dict]
     logger.info("Memory: saved %d artifacts for user=%s", len(rows), user_id)
 
 
-async def recall(org_id: str, user_id: str, limit: int = 15) -> str:
+async def recall(user_id: str, limit: int = 15) -> str:
     """Return a formatted context string of recent artifacts for session injection.
 
     Returns empty string if no artifacts exist (avoids any overhead on first session).
     """
     conn = get_connection()
+    org_id = get_org_id()
     now = datetime.now(UTC).isoformat()
     cur = await conn.execute(
         """SELECT type, subject, content, created_at

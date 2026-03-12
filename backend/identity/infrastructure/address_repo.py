@@ -1,6 +1,6 @@
 """Address repository — persistence for the address book."""
 
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 
 def _row_to_dict(row) -> dict | None:
@@ -37,17 +37,17 @@ async def insert(address: dict) -> None:
     await conn.commit()
 
 
-async def get_by_id(address_id: str, organization_id: str) -> dict | None:
+async def get_by_id(address_id: str) -> dict | None:
     conn = get_connection()
+    org_id = get_org_id()
     sel_q = "SELECT "
     sel_q += _COLUMNS
     sel_q += " FROM addresses WHERE id = ? AND organization_id = ?"
-    cursor = await conn.execute(sel_q, (address_id, organization_id))
+    cursor = await conn.execute(sel_q, (address_id, org_id))
     return _row_to_dict(await cursor.fetchone())
 
 
 async def list_addresses(
-    organization_id: str,
     billing_entity_id: str | None = None,
     job_id: str | None = None,
     q: str | None = None,
@@ -55,10 +55,11 @@ async def list_addresses(
     offset: int = 0,
 ) -> list:
     conn = get_connection()
+    org_id = get_org_id()
     sql = "SELECT "
     sql += _COLUMNS
     sql += " FROM addresses WHERE organization_id = ?"
-    params: list = [organization_id]
+    params: list = [org_id]
     if billing_entity_id:
         sql += " AND billing_entity_id = ?"
         params.append(billing_entity_id)
@@ -75,9 +76,10 @@ async def list_addresses(
     return [_row_to_dict(r) for r in await cursor.fetchall()]
 
 
-async def search(query: str, organization_id: str, limit: int = 20) -> list:
+async def search(query: str, limit: int = 20) -> list:
     """Fast prefix/substring search for autocomplete."""
     conn = get_connection()
+    org_id = get_org_id()
     like = f"%{query.lower()}%"
     sel_q = "SELECT "
     sel_q += _COLUMNS
@@ -87,7 +89,7 @@ async def search(query: str, organization_id: str, limit: int = 20) -> list:
         " AND (LOWER(label) LIKE ? OR LOWER(line1) LIKE ? OR LOWER(city) LIKE ?)"
         " ORDER BY label, line1 LIMIT ?"
     )
-    cursor = await conn.execute(sel_q, (organization_id, like, like, like, limit))
+    cursor = await conn.execute(sel_q, (org_id, like, like, like, limit))
     return [_row_to_dict(r) for r in await cursor.fetchall()]
 
 

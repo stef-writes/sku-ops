@@ -31,7 +31,6 @@ async def list_jobs(
     offset: int = 0,
 ):
     return await query_list_jobs(
-        organization_id=current_user.organization_id,
         status=status,
         q=q,
         limit=limit,
@@ -48,19 +47,17 @@ async def search_jobs(
     """Autocomplete endpoint for job pickers (all authenticated users including contractors)."""
     if not q.strip():
         return await query_list_jobs(
-            organization_id=current_user.organization_id,
             status="active",
             limit=limit,
         )
-    return await query_search_jobs(q, current_user.organization_id, limit=limit)
+    return await query_search_jobs(q, limit=limit)
 
 
 @router.get("/{job_id}")
 async def get_job(job_id: str, current_user: CurrentUserDep):
-    org_id = current_user.organization_id
-    job = await get_job_by_id(job_id, org_id)
+    job = await get_job_by_id(job_id)
     if not job:
-        job = await get_job_by_code(job_id, org_id)
+        job = await get_job_by_code(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
@@ -71,12 +68,11 @@ async def create_job(
     data: JobCreate,
     current_user: AdminDep,
 ):
-    org_id = current_user.organization_id
     code = data.code.strip()
     if not code:
         raise HTTPException(status_code=400, detail="Job code is required")
 
-    existing = await get_job_by_code(code, org_id)
+    existing = await get_job_by_code(code)
     if existing:
         raise HTTPException(status_code=409, detail=f"Job with code '{code}' already exists")
 
@@ -85,7 +81,7 @@ async def create_job(
         name=data.name or code,
         service_address=data.service_address,
         notes=data.notes,
-        organization_id=org_id,
+        organization_id=current_user.organization_id,
     )
     await insert_job(job)
     return job.model_dump()
@@ -97,8 +93,7 @@ async def update_job(
     data: JobUpdate,
     current_user: AdminDep,
 ):
-    org_id = current_user.organization_id
-    existing = await get_job_by_id(job_id, org_id)
+    existing = await get_job_by_id(job_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -110,5 +105,5 @@ async def update_job(
                 status_code=400, detail=f"Invalid status. Must be one of: {', '.join(valid)}"
             )
 
-    result = await query_update_job(job_id, updates, org_id)
+    result = await query_update_job(job_id, updates)
     return result

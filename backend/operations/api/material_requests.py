@@ -2,7 +2,6 @@
 
 from fastapi import APIRouter, HTTPException
 
-from kernel import events
 from operations.application.material_request_service import (
     MaterialRequestError,
 )
@@ -22,6 +21,7 @@ from operations.domain.material_request import (
 )
 from shared.api.deps import AdminDep, CurrentUserDep
 from shared.infrastructure import event_hub
+from shared.kernel import events
 
 router = APIRouter(prefix="/material-requests", tags=["material-requests"])
 
@@ -35,7 +35,6 @@ async def create_material_request(data: MaterialRequestCreate, current_user: Cur
     if not data.items:
         raise HTTPException(status_code=400, detail="At least one item is required")
 
-    org_id = current_user.organization_id
     mat_request = MaterialRequest(
         contractor_id=current_user.id,
         contractor_name=current_user.name,
@@ -43,33 +42,33 @@ async def create_material_request(data: MaterialRequestCreate, current_user: Cur
         job_id=data.job_id,
         service_address=data.service_address,
         notes=data.notes,
-        organization_id=org_id,
+        organization_id=current_user.organization_id,
     )
     await insert_material_request(mat_request)
-    req = await get_material_request_by_id(mat_request.id, organization_id=org_id)
-    await event_hub.emit(events.MATERIAL_REQUEST_CREATED, org_id=org_id, id=mat_request.id)
+    req = await get_material_request_by_id(mat_request.id)
+    await event_hub.emit(
+        events.MATERIAL_REQUEST_CREATED,
+        org_id=current_user.organization_id,
+        id=mat_request.id,
+    )
     return req or mat_request.model_dump()
 
 
 @router.get("")
 async def list_material_requests(current_user: CurrentUserDep):
     """Contractors see own requests; admins see all pending."""
-    org_id = current_user.organization_id
-    role = current_user.role
-
-    if role == "contractor":
+    if current_user.role == "contractor":
         return await list_material_requests_by_contractor(
-            contractor_id=current_user.id, organization_id=org_id
+            contractor_id=current_user.id,
         )
-    if role == "admin":
-        return await list_pending_material_requests(organization_id=org_id)
+    if current_user.role == "admin":
+        return await list_pending_material_requests()
     raise HTTPException(status_code=403, detail="Insufficient permissions")
 
 
 @router.get("/{request_id}")
 async def get_material_request(request_id: str, current_user: CurrentUserDep):
-    org_id = current_user.organization_id
-    req = await get_material_request_by_id(request_id, organization_id=org_id)
+    req = await get_material_request_by_id(request_id)
     if not req:
         raise HTTPException(status_code=404, detail="Material request not found")
 
@@ -85,14 +84,12 @@ async def process_material_request(
     current_user: AdminDep,
 ):
     """Convert a pending material request into a withdrawal. Staff supplies job_id and service_address."""
-    org_id = current_user.organization_id
     try:
         withdrawal = await _process_request(
             request_id=request_id,
             job_id_override=data.job_id,
             service_address_override=data.service_address,
             notes=data.notes,
-            org_id=org_id,
             current_user_id=current_user.id,
             current_user_name=current_user.name,
         )
@@ -101,10 +98,14 @@ async def process_material_request(
 
     await event_hub.emit(
         events.MATERIAL_REQUEST_PROCESSED,
-        org_id=org_id,
+        org_id=current_user.organization_id,
         id=request_id,
         withdrawal_id=withdrawal["id"],
     )
-    await event_hub.emit(events.WITHDRAWAL_CREATED, org_id=org_id, id=withdrawal["id"])
-    await event_hub.emit(events.INVENTORY_UPDATED, org_id=org_id)
+    await event_hub.emit(
+        events.WITHDRAWAL_CREATED,
+        org_id=current_user.organization_id,
+        id=withdrawal["id"],
+    )
+    await event_hub.emit(events.INVENTORY_UPDATED, org_id=current_user.organization_id)
     return withdrawal

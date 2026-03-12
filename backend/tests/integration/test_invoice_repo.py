@@ -191,3 +191,92 @@ async def test_update_invoice(db):
     assert updated.billing_entity == "Updated Corp"
     assert updated.contact_name == "Jane Doe"
     assert updated.contact_email == "jane@test.com"
+
+
+@pytest.mark.asyncio
+async def test_delete_non_draft_invoice_raises(db):
+    """Deleting an approved invoice must raise — only drafts are deletable."""
+    wid = await _create_withdrawal_with_items(
+        contractor_id="contractor-1",
+        billing_entity="ACME Inc",
+        items=[
+            {
+                "product_id": "p1",
+                "sku": "X",
+                "name": "A",
+                "quantity": 1,
+                "price": 10.0,
+                "subtotal": 10.0,
+            }
+        ],
+    )
+    inv = await create_invoice_from_withdrawals([wid])
+
+    await invoice_repo.update_status(inv.id, "approved")
+
+    with pytest.raises(ValueError, match="draft"):
+        await delete_draft_invoice(inv.id)
+
+
+@pytest.mark.asyncio
+async def test_get_nonexistent_invoice_returns_none(db):
+    """get_by_id for a nonexistent ID returns None, not an error."""
+    result = await invoice_repo.get_by_id("nonexistent-invoice-id")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_invoice_total_matches_withdrawal_totals(db):
+    """Invoice total must equal the sum of its withdrawal totals."""
+    wid = await _create_withdrawal_with_items(
+        contractor_id="contractor-1",
+        billing_entity="ACME Inc",
+        items=[
+            {
+                "product_id": "p1",
+                "sku": "HDW-001",
+                "name": "Widget",
+                "quantity": 5,
+                "price": 20.0,
+                "cost": 10.0,
+                "subtotal": 100.0,
+            },
+            {
+                "product_id": "p2",
+                "sku": "HDW-002",
+                "name": "Gadget",
+                "quantity": 3,
+                "price": 15.0,
+                "cost": 7.0,
+                "subtotal": 45.0,
+            },
+        ],
+    )
+    inv = await create_invoice_from_withdrawals([wid])
+
+    line_total = sum(li.amount for li in inv.line_items)
+    assert line_total == pytest.approx(145.0)
+
+
+@pytest.mark.asyncio
+async def test_create_invoice_from_already_invoiced_withdrawal_raises(db):
+    """A withdrawal already linked to an invoice cannot be re-invoiced."""
+    wid = await _create_withdrawal_with_items(
+        contractor_id="contractor-1",
+        billing_entity="ACME Inc",
+        items=[
+            {
+                "product_id": "p1",
+                "sku": "X",
+                "name": "A",
+                "quantity": 1,
+                "price": 10.0,
+                "subtotal": 10.0,
+            }
+        ],
+    )
+
+    await create_invoice_from_withdrawals([wid])
+
+    with pytest.raises((ValueError, Exception)):
+        await create_invoice_from_withdrawals([wid])

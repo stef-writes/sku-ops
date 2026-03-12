@@ -8,7 +8,7 @@ recompute from operational data.
 
 from enum import StrEnum
 
-from kernel.entity import Entity
+from shared.kernel.entity import Entity
 
 
 class Account(StrEnum):

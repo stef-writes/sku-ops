@@ -91,7 +91,22 @@ Two pairs of duplicate dependency wiring code in operations and documents/purcha
 Once Unit of Work is in place, remove `conn` parameter from all 20+ port methods and repo implementations.
 
 ### P6: Delete/wire unused ports
-`identity/ports/user_repo_port.py` (unused), `finance/ports/xero_port.py` (re-export shim).
+`finance/ports/xero_port.py` (re-export shim — still exists, candidate for removal).
+
+**Partially done:** `catalog/ports/`, `identity/ports/`, `jobs/ports/` (all empty) were deleted. `identity/ports/user_repo_port.py` was deleted in the prior remediation pass.
+
+## Backend structural cleanup (completed)
+
+These structural issues were identified and fixed separately from the DDD remediation above:
+
+| Change | Status | Notes |
+|--------|--------|-------|
+| `api/` package → `routes.py` | Done | `api/__init__.py` was a fake top-level package; replaced with flat `routes.py` |
+| `server.py` split | Done | Lifespan → `startup.py`, scheduler → `scheduler.py`; `server.py` is now a clean ~96-line composition root |
+| WebSocket mounts → routers | Done | `mount_websocket(app)` / `mount_chat_websocket(app)` → `APIRouter` instances included via `routes.py` |
+| Health checks relocated | Done | `reports/api/health.py` → `shared/api/health.py`; health is operational infra, not a reports concern |
+| Empty `ports/` deleted | Done | `catalog/ports/`, `identity/ports/`, `jobs/ports/` — all contained only empty `__init__.py` |
+| `.benchmarks/` deleted | Done | Local pytest-benchmark artifact directory |
 
 ## Known good patterns to preserve
 

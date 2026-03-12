@@ -1,8 +1,7 @@
 """Product repository — read queries and class wrapper."""
 
 from catalog.domain.product import Product
-from shared.infrastructure.config import DEFAULT_ORG_ID
-from shared.infrastructure.database import get_connection
+from shared.infrastructure.database import get_connection, get_org_id
 
 
 def _row_to_product(row) -> Product | None:
@@ -26,11 +25,10 @@ async def list_products(
     low_stock: bool = False,
     limit: int | None = None,
     offset: int = 0,
-    organization_id: str | None = None,
     product_group: str | None = None,
 ) -> list[Product]:
     conn = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     base = "SELECT * FROM products WHERE (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL"
     params: list = [org_id]
     if department_id:
@@ -58,11 +56,10 @@ async def count_products(
     department_id: str | None = None,
     search: str | None = None,
     low_stock: bool = False,
-    organization_id: str | None = None,
     product_group: str | None = None,
 ) -> int:
     conn = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     query = "SELECT COUNT(*) FROM products WHERE (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL"
     params: list = [org_id]
     if department_id:
@@ -82,51 +79,37 @@ async def count_products(
     return row[0] if row else 0
 
 
-async def get_by_id(
-    product_id: str, _columns: str | None = "*", organization_id: str | None = None
-) -> Product | None:
+async def get_by_id(product_id: str) -> Product | None:
     conn = get_connection()
-    if organization_id:
-        cursor = await conn.execute(
-            "SELECT * FROM products WHERE id = ? AND (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL",
-            (product_id, organization_id),
-        )
-    else:
-        cursor = await conn.execute(
-            "SELECT * FROM products WHERE id = ? AND deleted_at IS NULL",
-            (product_id,),
-        )
+    org_id = get_org_id()
+    cursor = await conn.execute(
+        "SELECT * FROM products WHERE id = ? AND (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL",
+        (product_id, org_id),
+    )
     row = await cursor.fetchone()
     return _row_to_product(row)
 
 
-async def list_by_vendor(
-    vendor_id: str, limit: int = 200, organization_id: str | None = None
-) -> list[Product]:
+async def list_by_vendor(vendor_id: str, limit: int = 200) -> list[Product]:
     if not vendor_id:
         return []
     conn = get_connection()
-    if organization_id:
-        cursor = await conn.execute(
-            "SELECT * FROM products WHERE vendor_id = ? AND (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL ORDER BY name LIMIT ?",
-            (vendor_id, organization_id, limit),
-        )
-    else:
-        cursor = await conn.execute(
-            "SELECT * FROM products WHERE vendor_id = ? AND deleted_at IS NULL ORDER BY name LIMIT ?",
-            (vendor_id, limit),
-        )
+    org_id = get_org_id()
+    cursor = await conn.execute(
+        "SELECT * FROM products WHERE vendor_id = ? AND (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL ORDER BY name LIMIT ?",
+        (vendor_id, org_id, limit),
+    )
     rows = await cursor.fetchall()
     return [p for r in rows if (p := _row_to_product(r)) is not None]
 
 
-async def find_by_sku(sku: str, organization_id: str | None = None) -> Product | None:
+async def find_by_sku(sku: str) -> Product | None:
     """Exact case-insensitive SKU lookup."""
     s = sku.strip().upper() if sku else ""
     if not s:
         return None
     conn = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     cursor = await conn.execute(
         "SELECT * FROM products WHERE UPPER(sku) = ? AND (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL",
         (s, org_id),
@@ -138,14 +121,13 @@ async def find_by_sku(sku: str, organization_id: str | None = None) -> Product |
 async def find_by_barcode(
     barcode: str,
     exclude_product_id: str | None = None,
-    organization_id: str | None = None,
 ) -> Product | None:
     """Find product by barcode. Optionally exclude a product (for update uniqueness check)."""
     b = barcode.strip() if barcode else ""
     if not b:
         return None
     c = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     if exclude_product_id:
         cursor = await c.execute(
             "SELECT * FROM products WHERE (barcode = ? OR sku = ? OR vendor_barcode = ?) AND id != ? AND (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL",
@@ -161,13 +143,13 @@ async def find_by_barcode(
 
 
 async def find_by_original_sku_and_vendor(
-    original_sku: str, vendor_id: str, organization_id: str | None = None
+    original_sku: str, vendor_id: str
 ) -> Product | None:
     """Find existing product by vendor's SKU and vendor. For matching incoming orders to inventory."""
     if not original_sku or not str(original_sku).strip() or not vendor_id:
         return None
     norm = str(original_sku).strip().lower()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     conn = get_connection()
     cursor = await conn.execute(
         """SELECT * FROM products
@@ -180,14 +162,14 @@ async def find_by_original_sku_and_vendor(
 
 
 async def find_by_name_and_vendor(
-    name: str, vendor_id: str, organization_id: str | None = None
+    name: str, vendor_id: str
 ) -> Product | None:
     """Find existing product by exact name (case-insensitive) and vendor.
     Name-based fallback when original_sku is absent — prevents duplicate product creation."""
     if not name or not str(name).strip() or not vendor_id:
         return None
     norm = str(name).strip().lower()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     conn = get_connection()
     cursor = await conn.execute(
         """SELECT * FROM products
@@ -199,9 +181,9 @@ async def find_by_name_and_vendor(
     return _row_to_product(row)
 
 
-async def count_all(organization_id: str | None = None) -> int:
+async def count_all() -> int:
     conn = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     cursor = await conn.execute(
         "SELECT COUNT(*) FROM products WHERE (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL",
         (org_id,),
@@ -210,9 +192,9 @@ async def count_all(organization_id: str | None = None) -> int:
     return row[0] if row else 0
 
 
-async def count_low_stock(organization_id: str | None = None) -> int:
+async def count_low_stock() -> int:
     conn = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     cursor = await conn.execute(
         "SELECT COUNT(*) FROM products WHERE quantity <= min_stock AND (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL",
         (org_id,),
@@ -221,9 +203,9 @@ async def count_low_stock(organization_id: str | None = None) -> int:
     return row[0] if row else 0
 
 
-async def list_low_stock(limit: int = 10, organization_id: str | None = None) -> list[Product]:
+async def list_low_stock(limit: int = 10) -> list[Product]:
     conn = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     cursor = await conn.execute(
         "SELECT * FROM products WHERE quantity <= min_stock AND (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL ORDER BY quantity LIMIT ?",
         (org_id, limit),
@@ -232,10 +214,10 @@ async def list_low_stock(limit: int = 10, organization_id: str | None = None) ->
     return [p for r in rows if (p := _row_to_product(r)) is not None]
 
 
-async def list_product_groups(organization_id: str | None = None) -> list[dict]:
+async def list_product_groups() -> list[dict]:
     """Return distinct product groups with their product count."""
     conn = get_connection()
-    org_id = organization_id or DEFAULT_ORG_ID
+    org_id = get_org_id()
     cursor = await conn.execute(
         """SELECT product_group, COUNT(*) as product_count,
                   SUM(quantity) as total_quantity

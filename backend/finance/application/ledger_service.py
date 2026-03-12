@@ -14,13 +14,14 @@ from uuid import uuid4
 from finance.application.fiscal_period_service import check_period_open
 from finance.domain.ledger import Account, FinancialEntry, ReferenceType
 from finance.infrastructure.ledger_repo import entries_exist, insert_entries
-from kernel.types import round_money
+from shared.infrastructure.database import get_org_id
+from shared.kernel.types import round_money
 
 
-async def _check_fiscal_period(organization_id: str) -> None:
+async def _check_fiscal_period() -> None:
     """Check that the current date is not in a closed fiscal period."""
     now = datetime.now(UTC).isoformat()
-    await check_period_open(now, organization_id)
+    await check_period_open(now)
 
 
 def _extract_item(item) -> tuple:
@@ -50,7 +51,6 @@ async def _record_sale_event(
     job_id: str,
     billing_entity: str,
     contractor_id: str,
-    organization_id: str,
     performed_by_user_id: str | None = None,
     created_at: str | None = None,
 ) -> None:
@@ -62,7 +62,7 @@ async def _record_sale_event(
     """
     if await entries_exist(reference_type.value, reference_id):
         return
-    await _check_fiscal_period(organization_id)
+    await _check_fiscal_period()
     journal_id = str(uuid4())
     common = {
         "journal_id": journal_id,
@@ -72,7 +72,7 @@ async def _record_sale_event(
         "performed_by_user_id": performed_by_user_id,
         "reference_type": reference_type,
         "reference_id": reference_id,
-        "organization_id": organization_id,
+        "organization_id": get_org_id(),
     }
     entries: list[FinancialEntry] = []
 
@@ -145,7 +145,6 @@ async def record_withdrawal(
     job_id: str,
     billing_entity: str,
     contractor_id: str,
-    organization_id: str,
     performed_by_user_id: str | None = None,
     created_at: str | None = None,
 ) -> None:
@@ -160,7 +159,6 @@ async def record_withdrawal(
         job_id=job_id,
         billing_entity=billing_entity,
         contractor_id=contractor_id,
-        organization_id=organization_id,
         performed_by_user_id=performed_by_user_id,
         created_at=created_at,
     )
@@ -174,7 +172,6 @@ async def record_return(
     job_id: str,
     billing_entity: str,
     contractor_id: str,
-    organization_id: str,
     performed_by_user_id: str | None = None,
     created_at: str | None = None,
 ) -> None:
@@ -189,7 +186,6 @@ async def record_return(
         job_id=job_id,
         billing_entity=billing_entity,
         contractor_id=contractor_id,
-        organization_id=organization_id,
         performed_by_user_id=performed_by_user_id,
         created_at=created_at,
     )
@@ -199,15 +195,15 @@ async def record_po_receipt(
     po_id: str,
     items: list,
     vendor_name: str,
-    organization_id: str,
     performed_by_user_id: str | None = None,
     created_at: str | None = None,
 ) -> None:
     """Write inventory + AP entries for each received PO line item."""
     if await entries_exist(ReferenceType.PO_RECEIPT.value, po_id):
         return
-    await _check_fiscal_period(organization_id)
+    await _check_fiscal_period()
     journal_id = str(uuid4())
+    org_id = get_org_id()
     entries: list[FinancialEntry] = []
 
     for item in items:
@@ -234,7 +230,7 @@ async def record_po_receipt(
                 performed_by_user_id=performed_by_user_id,
                 reference_type=ReferenceType.PO_RECEIPT,
                 reference_id=po_id,
-                organization_id=organization_id,
+                organization_id=org_id,
             )
         )
         entries.append(
@@ -251,7 +247,7 @@ async def record_po_receipt(
                 performed_by_user_id=performed_by_user_id,
                 reference_type=ReferenceType.PO_RECEIPT,
                 reference_id=po_id,
-                organization_id=organization_id,
+                organization_id=org_id,
             )
         )
 
@@ -279,7 +275,6 @@ async def record_adjustment(
     product_cost: float,
     quantity_delta: float,
     department: str | None,
-    organization_id: str,
     reason: str | None = None,
     performed_by_user_id: str | None = None,
     created_at: str | None = None,
@@ -292,11 +287,12 @@ async def record_adjustment(
     """
     if await entries_exist(ReferenceType.ADJUSTMENT.value, adjustment_ref_id):
         return
-    await _check_fiscal_period(organization_id)
+    await _check_fiscal_period()
     amount = round_money(abs(quantity_delta) * product_cost)
     if amount == 0:
         return
 
+    org_id = get_org_id()
     journal_id = str(uuid4())
     sign = -1 if quantity_delta < 0 else 1
     offset_account = _offset_account_for_reason(reason)
@@ -310,7 +306,7 @@ async def record_adjustment(
             performed_by_user_id=performed_by_user_id,
             reference_type=ReferenceType.ADJUSTMENT,
             reference_id=adjustment_ref_id,
-            organization_id=organization_id,
+            organization_id=org_id,
         ),
         FinancialEntry(
             account=offset_account,
@@ -321,7 +317,7 @@ async def record_adjustment(
             performed_by_user_id=performed_by_user_id,
             reference_type=ReferenceType.ADJUSTMENT,
             reference_id=adjustment_ref_id,
-            organization_id=organization_id,
+            organization_id=org_id,
         ),
     ]
     if created_at:
@@ -335,7 +331,6 @@ async def record_payment(
     amount: float,
     billing_entity: str,
     contractor_id: str,
-    organization_id: str,
     performed_by_user_id: str | None = None,
     created_at: str | None = None,
 ) -> None:
@@ -352,7 +347,7 @@ async def record_payment(
         performed_by_user_id=performed_by_user_id,
         reference_type=ReferenceType.PAYMENT,
         reference_id=withdrawal_id,
-        organization_id=organization_id,
+        organization_id=get_org_id(),
     )
     if created_at:
         entry.created_at = created_at
@@ -364,7 +359,6 @@ async def record_credit_note_application(
     amount: float,
     billing_entity: str,
     contractor_id: str,
-    organization_id: str,
     performed_by_user_id: str | None = None,
 ) -> None:
     """Write AR reduction when a credit note is applied to an invoice."""
@@ -382,7 +376,7 @@ async def record_credit_note_application(
                 performed_by_user_id=performed_by_user_id,
                 reference_type=ReferenceType.CREDIT_NOTE,
                 reference_id=credit_note_id,
-                organization_id=organization_id,
+                organization_id=get_org_id(),
             ),
         ],
     )

@@ -45,7 +45,6 @@ async def clear_session(session_id: str, current_user: AdminDep):
     history = await session_store.get_or_create(session_id)
     if len(history) >= 4:
         schedule_memory_extraction(
-            org_id=current_user.organization_id,
             user_id=current_user.id,
             session_id=session_id,
             history=history,
@@ -60,8 +59,8 @@ async def chat_assistant(
 ):
     """Chat with AI assistant. Routes to specialist agents: inventory, ops, finance."""
     session_id = data.session_id or str(uuid.uuid4())
-    org_id = current_user.organization_id
     user_id = current_user.id
+    org_id = current_user.organization_id
     history = await session_store.get_or_create(session_id)
 
     if SESSION_COST_CAP > 0 and await session_store.get_cost(session_id) >= SESSION_COST_CAP:
@@ -77,9 +76,8 @@ async def chat_assistant(
             "usage": {"cost_usd": 0, "capped": True},
         }
 
-    # Inject memory context at the start of fresh sessions only
     if not history:
-        memory_ctx = await recall_memory(org_id=org_id, user_id=user_id)
+        memory_ctx = await recall_memory(user_id=user_id)
         if memory_ctx:
             history = [
                 {"role": "user", "content": memory_ctx},
@@ -131,7 +129,6 @@ async def chat_assistant(
     # Background memory extraction every 4 turns (8 messages = 4 user+assistant pairs)
     if len(new_history) % 8 == 0:
         schedule_memory_extraction(
-            org_id=org_id,
             user_id=user_id,
             session_id=session_id,
             history=new_history,

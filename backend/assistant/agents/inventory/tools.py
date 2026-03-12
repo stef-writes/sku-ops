@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 from assistant.agents.tools.registry import register as _reg
 from assistant.agents.tools.search import get_index
+from shared.infrastructure.db import get_org_id
 from catalog.application.queries import (
     count_all_products as catalog_count_all,
 )
@@ -41,10 +42,10 @@ from shared.infrastructure.config import OPENAI_API_KEY
 logger = logging.getLogger(__name__)
 
 
-async def _search_products(args: dict, org_id: str) -> str:
+async def _search_products(args: dict) -> str:
     query = (args.get("query") or "").strip()
     limit = min(int(args.get("limit") or 20), 50)
-    items = await catalog_list_products(search=query, limit=limit, organization_id=org_id)
+    items = await catalog_list_products(search=query, limit=limit, organization_id=get_org_id())
     out = [
         {
             "sku": p.sku,
@@ -59,10 +60,10 @@ async def _search_products(args: dict, org_id: str) -> str:
     return json.dumps({"count": len(out), "products": out})
 
 
-async def _search_semantic(args: dict, org_id: str) -> str:
+async def _search_semantic(args: dict) -> str:
     query = (args.get("query") or "").strip()
     limit = min(int(args.get("limit") or 10), 30)
-    index = await get_index(org_id)
+    index = await get_index()
     if OPENAI_API_KEY and index._embeddings is not None:
         results = await index.search_semantic(query, limit=limit, api_key=OPENAI_API_KEY)
         method = "embedding"
@@ -83,9 +84,9 @@ async def _search_semantic(args: dict, org_id: str) -> str:
     return json.dumps({"count": len(out), "products": out, "method": method})
 
 
-async def _get_product_details(args: dict, org_id: str) -> str:
+async def _get_product_details(args: dict) -> str:
     sku = (args.get("sku") or "").strip().upper()
-    p = await catalog_find_by_sku(sku, organization_id=org_id)
+    p = await catalog_find_by_sku(sku, organization_id=get_org_id())
     if not p:
         return json.dumps({"error": f"Product with SKU '{sku}' not found"})
     return json.dumps(
@@ -108,10 +109,10 @@ async def _get_product_details(args: dict, org_id: str) -> str:
     )
 
 
-async def _get_inventory_stats(org_id: str) -> str:
-    total_skus = await catalog_count_all(organization_id=org_id)
-    low_count = await catalog_count_low_stock(organization_id=org_id)
-    products = await catalog_list_products(organization_id=org_id)
+async def _get_inventory_stats() -> str:
+    total_skus = await catalog_count_all()
+    low_count = await catalog_count_low_stock()
+    products = await catalog_list_products()
     total_value = round(sum(p.quantity * p.cost for p in products), 2)
     out_of_stock = sum(1 for p in products if p.quantity == 0)
     return json.dumps(
@@ -125,9 +126,9 @@ async def _get_inventory_stats(org_id: str) -> str:
     )
 
 
-async def _list_low_stock(args: dict, org_id: str) -> str:
+async def _list_low_stock(args: dict) -> str:
     limit = min(int(args.get("limit") or 20), 50)
-    items = await catalog_list_low_stock(limit=limit, organization_id=org_id)
+    items = await catalog_list_low_stock(limit=limit, organization_id=get_org_id())
     out = [
         {
             "sku": p.sku,
@@ -142,8 +143,8 @@ async def _list_low_stock(args: dict, org_id: str) -> str:
     return json.dumps({"count": len(out), "products": out})
 
 
-async def _list_departments(org_id: str) -> str:
-    depts = await catalog_list_departments(organization_id=org_id)
+async def _list_departments() -> str:
+    depts = await catalog_list_departments(organization_id=get_org_id())
     counters = await get_sku_counters()
     out = []
     for d in depts:
@@ -161,17 +162,17 @@ async def _list_departments(org_id: str) -> str:
     return json.dumps({"departments": out})
 
 
-async def _list_vendors(org_id: str) -> str:
-    vendors = await catalog_list_vendors(organization_id=org_id)
+async def _list_vendors() -> str:
+    vendors = await catalog_list_vendors(organization_id=get_org_id())
     out = [{"name": v.name, "product_count": v.product_count} for v in vendors]
     return json.dumps({"vendors": out})
 
 
-async def _get_usage_velocity(args: dict, org_id: str) -> str:
+async def _get_usage_velocity(args: dict) -> str:
     sku = (args.get("sku") or "").strip().upper()
     days = min(int(args.get("days") or 30), 365)
     since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
-    p = await catalog_find_by_sku(sku, organization_id=org_id)
+    p = await catalog_find_by_sku(sku)
     if not p:
         return json.dumps({"error": f"Product '{sku}' not found"})
     vel = await withdrawal_velocity([p.id], since, org_id)
@@ -195,10 +196,10 @@ async def _get_usage_velocity(args: dict, org_id: str) -> str:
     )
 
 
-async def _get_reorder_suggestions(args: dict, org_id: str) -> str:
+async def _get_reorder_suggestions(args: dict) -> str:
     limit = min(int(args.get("limit") or 20), 50)
     since = (datetime.now(UTC) - timedelta(days=30)).isoformat()
-    low_stock = await catalog_list_low_stock(limit=100, organization_id=org_id)
+    low_stock = await catalog_list_low_stock(limit=100)
     if not low_stock:
         return json.dumps({"count": 0, "suggestions": []})
     product_ids = [p.id for p in low_stock]
@@ -245,9 +246,9 @@ async def _get_reorder_suggestions(args: dict, org_id: str) -> str:
     )
 
 
-async def _get_department_health(org_id: str) -> str:
-    depts = await catalog_list_departments(organization_id=org_id)
-    all_products = await catalog_list_products(organization_id=org_id)
+async def _get_department_health() -> str:
+    depts = await catalog_list_departments()
+    all_products = await catalog_list_products()
     by_dept: dict[str, list] = defaultdict(list)
     for p in all_products:
         if p.department_id:
@@ -272,14 +273,14 @@ async def _get_department_health(org_id: str) -> str:
     return json.dumps({"departments": rows})
 
 
-async def _get_top_products(args: dict, org_id: str) -> str:
+async def _get_top_products(args: dict) -> str:
     days = min(int(args.get("days") or 30), 365)
     by = args.get("by", "revenue").lower()
     if by not in ("volume", "revenue"):
         by = "revenue"
     limit = min(int(args.get("limit") or 10), 50)
     since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
-    withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=org_id)
+    withdrawals = await list_withdrawals(start_date=since, limit=10000, organization_id=get_org_id())
     product_map: dict[str, dict] = {}
     for w in withdrawals:
         for item in w.items:
@@ -305,14 +306,14 @@ async def _get_top_products(args: dict, org_id: str) -> str:
     )
 
 
-async def _get_department_activity(args: dict, org_id: str) -> str:
+async def _get_department_activity(args: dict) -> str:
     dept_code = (args.get("dept_code") or "").strip().upper()
     days = min(int(args.get("days") or 30), 365)
     since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
-    dept = await catalog_get_dept_by_code(dept_code, organization_id=org_id)
+    dept = await catalog_get_dept_by_code(dept_code)
     if not dept:
         return json.dumps({"error": f"Department '{dept_code}' not found or has no products"})
-    products = await catalog_list_products(department_id=dept.id, organization_id=org_id)
+    products = await catalog_list_products(department_id=dept.id)
     if not products:
         return json.dumps({"error": f"Department '{dept_code}' not found or has no products"})
     product_ids = [p.id for p in products]
@@ -330,10 +331,10 @@ async def _get_department_activity(args: dict, org_id: str) -> str:
     )
 
 
-async def _forecast_stockout(args: dict, org_id: str) -> str:
+async def _forecast_stockout(args: dict) -> str:
     limit = min(int(args.get("limit") or 15), 50)
     since = (datetime.now(UTC) - timedelta(days=30)).isoformat()
-    products = await catalog_list_products(organization_id=org_id)
+    products = await catalog_list_products()
     in_stock = [p for p in products if p.quantity > 0]
     in_stock.sort(key=lambda p: p.quantity)
     in_stock = in_stock[:200]
@@ -368,11 +369,11 @@ async def _forecast_stockout(args: dict, org_id: str) -> str:
     return json.dumps({"count": len(forecast), "forecast": forecast[:limit]})
 
 
-async def _get_slow_movers(args: dict, org_id: str) -> str:
+async def _get_slow_movers(args: dict) -> str:
     limit = min(int(args.get("limit") or 20), 100)
     days = min(int(args.get("days") or 30), 365)
     since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
-    products = await catalog_list_products(organization_id=org_id)
+    products = await catalog_list_products()
     in_stock = [p for p in products if p.quantity > 0]
     if not in_stock:
         return json.dumps({"period_days": days, "count": 0, "slow_movers": []})

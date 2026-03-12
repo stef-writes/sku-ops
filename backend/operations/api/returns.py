@@ -3,9 +3,8 @@
 from fastapi import APIRouter, HTTPException, Request
 
 from finance.application.credit_note_service import insert_credit_note
-from identity.application.org_service import get_org_settings
+from finance.application.org_settings_service import get_org_settings
 from inventory.application.inventory_service import restock_as_return
-from kernel import events
 from operations.application.queries import get_return_by_id as _get_return_by_id
 from operations.application.queries import get_withdrawal_by_id
 from operations.application.queries import list_returns as _list_returns
@@ -13,7 +12,9 @@ from operations.application.return_service import create_return
 from operations.domain.returns import ReturnCreate
 from shared.api.deps import AdminDep, CurrentUserDep
 from shared.infrastructure import event_hub
+from shared.infrastructure.database import get_org_id
 from shared.infrastructure.middleware.audit import audit_log
+from shared.kernel import events
 
 router = APIRouter(prefix="/returns", tags=["returns"])
 
@@ -25,7 +26,7 @@ async def create_material_return(
     current_user: AdminDep,
 ):
     """Process a return against a previous withdrawal. Restocks inventory and creates credit note."""
-    settings = await get_org_settings(current_user.organization_id)
+    settings = await get_org_settings(get_org_id())
     try:
         result = await create_return(
             data,
@@ -48,9 +49,12 @@ async def create_material_return(
             request=request,
             org_id=current_user.organization_id,
         )
-        org_id = current_user.organization_id
-        await event_hub.emit(events.INVENTORY_UPDATED, org_id=org_id)
-        await event_hub.emit(events.WITHDRAWAL_UPDATED, org_id=org_id, id=data.withdrawal_id)
+        await event_hub.emit(events.INVENTORY_UPDATED, org_id=current_user.organization_id)
+        await event_hub.emit(
+            events.WITHDRAWAL_UPDATED,
+            org_id=current_user.organization_id,
+            id=data.withdrawal_id,
+        )
         return result
     except (ValueError, RuntimeError, OSError) as e:
         status = getattr(e, "status_hint", 400)
@@ -65,13 +69,11 @@ async def list_returns(
     start_date: str | None = None,
     end_date: str | None = None,
 ):
-    org_id = current_user.organization_id
     return await _list_returns(
         contractor_id=contractor_id,
         withdrawal_id=withdrawal_id,
         start_date=start_date,
         end_date=end_date,
-        organization_id=org_id,
     )
 
 
@@ -80,8 +82,7 @@ async def get_return(
     return_id: str,
     current_user: CurrentUserDep,
 ):
-    org_id = current_user.organization_id
-    ret = await _get_return_by_id(return_id, org_id)
+    ret = await _get_return_by_id(return_id)
     if not ret:
         raise HTTPException(status_code=404, detail="Return not found")
     return ret

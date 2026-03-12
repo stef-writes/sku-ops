@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -11,12 +12,14 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from assistant.application.llm import generate_with_image, generate_with_pdf
 from documents.domain.document import Document
 from documents.infrastructure.document_repo import document_repo
 from shared.infrastructure.config import ANTHROPIC_AVAILABLE, LLM_SETUP_URL
+from shared.infrastructure.db import get_org_id
 
 if TYPE_CHECKING:
-    from kernel.types import CurrentUser
+    from shared.kernel.types import CurrentUser
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +47,6 @@ async def persist_parsed_document(
     current_user: CurrentUser,
 ) -> dict:
     """Save parsed document to the archive and return the extracted data with document_id."""
-    import hashlib
-
     doc = Document(
         filename=filename,
         document_type="other",
@@ -56,7 +57,7 @@ async def persist_parsed_document(
         parsed_data=json.dumps(extracted),
         status="parsed",
         uploaded_by_id=current_user.id,
-        organization_id=current_user.organization_id,
+        organization_id=get_org_id(),
     )
     try:
         await document_repo.insert(doc)
@@ -88,8 +89,6 @@ async def parse_document_with_ai(
 
     def _do_parse():
         if is_pdf:
-            from assistant.application.llm import generate_with_pdf
-
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tf:
                 tf.write(contents)
                 temp_path = tf.name
@@ -103,8 +102,6 @@ async def parse_document_with_ai(
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)
         else:
-            from assistant.application.llm import generate_with_image
-
             return generate_with_image(
                 "Extract all product and vendor information. Return only valid JSON.",
                 contents,

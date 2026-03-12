@@ -3,14 +3,14 @@
 from datetime import UTC, datetime
 
 from identity.application.user_service import get_user_by_id
-from kernel.types import CurrentUser
 from operations.application.queries import (
     get_material_request_by_id,
     mark_material_request_processed,
 )
 from operations.application.withdrawal_service import create_withdrawal_wired
 from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
-from shared.infrastructure.database import transaction
+from shared.infrastructure.database import get_org_id, transaction
+from shared.kernel.types import CurrentUser
 
 
 class MaterialRequestError(Exception):
@@ -25,7 +25,6 @@ async def process_material_request(
     job_id_override: str | None,
     service_address_override: str | None,
     notes: str | None,
-    org_id: str,
     current_user_id: str,
     current_user_name: str,
 ) -> dict:
@@ -34,7 +33,8 @@ async def process_material_request(
     Returns the created withdrawal dict.
     Raises MaterialRequestError on validation failure.
     """
-    req = await get_material_request_by_id(request_id, organization_id=org_id)
+    org_id = get_org_id()
+    req = await get_material_request_by_id(request_id)
     if not req:
         raise MaterialRequestError("Material request not found", 404)
     if req.status != "pending":

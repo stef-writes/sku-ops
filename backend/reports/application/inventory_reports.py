@@ -12,11 +12,12 @@ from datetime import UTC, datetime, timedelta
 from catalog.application.queries import list_low_stock, list_products
 from finance.application import ledger_queries as ledger_repo
 from inventory.application.queries import daily_withdrawal_activity, withdrawal_velocity
-from kernel.types import round_money
+from shared.infrastructure.db import get_org_id
+from shared.kernel.types import round_money
 
 
-async def inventory_report(org_id: str) -> dict:
-    products = await list_products(organization_id=org_id)
+async def inventory_report() -> dict:
+    products = await list_products()
 
     total_products = len(products)
     total_retail = round_money(sum(p.price * p.quantity for p in products))
@@ -55,12 +56,12 @@ async def inventory_report(org_id: str) -> dict:
 
 
 async def product_performance_report(
-    org_id: str,
     *,
     start_date: str | None = None,
     end_date: str | None = None,
     limit: int = 200,
 ) -> dict:
+    org_id = get_org_id()
     margin_data, products_data, units_sold_map = await asyncio.gather(
         ledger_repo.product_margins(
             org_id=org_id,
@@ -68,7 +69,7 @@ async def product_performance_report(
             end_date=end_date,
             limit=limit,
         ),
-        list_products(organization_id=org_id),
+        list_products(),
         ledger_repo.units_sold_by_product(org_id=org_id, start_date=start_date, end_date=end_date),
     )
 
@@ -108,7 +109,6 @@ async def product_performance_report(
 
 
 async def reorder_urgency_report(
-    org_id: str,
     *,
     days: int = 30,
     limit: int = 50,
@@ -116,15 +116,15 @@ async def reorder_urgency_report(
     since = (datetime.now(UTC) - timedelta(days=min(days, 365))).isoformat()
 
     low_stock, _all_products = await asyncio.gather(
-        list_low_stock(limit=200, organization_id=org_id),
-        list_products(organization_id=org_id),
+        list_low_stock(limit=200),
+        list_products(),
     )
 
     product_ids = [p.id for p in low_stock]
     if not product_ids:
         return {"products": [], "total": 0}
 
-    velocity_map = await withdrawal_velocity(product_ids, since, org_id)
+    velocity_map = await withdrawal_velocity(product_ids, since)
 
     result = []
     for p in low_stock:
@@ -168,11 +168,10 @@ async def reorder_urgency_report(
 
 
 async def product_activity_report(
-    org_id: str,
     *,
     product_id: str | None = None,
     days: int = 365,
 ) -> dict:
     since = (datetime.now(UTC) - timedelta(days=min(days, 730))).isoformat()
-    rows = await daily_withdrawal_activity(org_id, since, product_id=product_id)
+    rows = await daily_withdrawal_activity(get_org_id(), since, product_id=product_id)
     return {"series": rows, "product_id": product_id, "days": days}

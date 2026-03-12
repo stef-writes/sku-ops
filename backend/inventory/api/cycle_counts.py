@@ -10,11 +10,11 @@ from inventory.application.cycle_count_service import (
     open_cycle_count,
     update_counted_qty,
 )
-from kernel import events
-from kernel.errors import ResourceNotFoundError
 from shared.api.deps import AdminDep
 from shared.infrastructure import event_hub
 from shared.infrastructure.middleware.audit import audit_log
+from shared.kernel import events
+from shared.kernel.errors import ResourceNotFoundError
 
 router = APIRouter(prefix="/cycle-counts", tags=["cycle-counts"])
 
@@ -36,7 +36,6 @@ async def open_count(
 ):
     try:
         count = await open_cycle_count(
-            organization_id=current_user.organization_id,
             created_by_id=current_user.id,
             created_by_name=current_user.name,
             scope=data.scope,
@@ -62,7 +61,6 @@ async def list_counts(
     status: str | None = Query(None, description="Filter by status: open or committed"),
 ):
     return await list_cycle_counts(
-        organization_id=current_user.organization_id,
         status=status,
     )
 
@@ -73,7 +71,7 @@ async def get_count(
     current_user: AdminDep,
 ):
     try:
-        return await get_count_detail(count_id, current_user.organization_id)
+        return await get_count_detail(count_id)
     except ResourceNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
@@ -91,7 +89,6 @@ async def update_item(
             item_id=item_id,
             counted_qty=data.counted_qty,
             notes=data.notes,
-            organization_id=current_user.organization_id,
         )
     except ResourceNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
@@ -108,7 +105,6 @@ async def commit_count(
     try:
         result = await commit_cycle_count(
             count_id=count_id,
-            organization_id=current_user.organization_id,
             committed_by_id=current_user.id,
             committed_by_name=current_user.name,
         )

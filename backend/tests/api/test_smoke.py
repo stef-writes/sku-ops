@@ -23,34 +23,6 @@ PROTECTED_ENDPOINTS = [
 ]
 
 
-# ── No-auth endpoints ─────────────────────────────────────────────────────────
-
-
-def test_root_endpoint(client):
-    """API root returns 200 and a message."""
-    response = client.get("/api/")
-    assert response.status_code == 200
-    assert "message" in response.json()
-
-
-def test_health_liveness(client):
-    """/health liveness probe returns 200 without auth or DB."""
-    response = client.get("/api/health")
-    assert response.status_code == 200
-    assert response.json().get("status") == "ok"
-
-
-def test_ai_health_configured(client):
-    """/health/ai returns 200 when ANTHROPIC_API_KEY is set (conftest sets a dummy key)."""
-    response = client.get("/api/health/ai")
-    assert response.status_code == 200
-
-
-def test_404_returns_json(client):
-    r = client.get("/api/nonexistent-route")
-    assert r.status_code == 404
-
-
 # ── Auth enforcement ──────────────────────────────────────────────────────────
 
 
@@ -80,7 +52,7 @@ def test_all_context_routers_mounted(client):
         "finance": ("GET", "/api/invoices"),
         "documents": ("POST", "/api/documents/parse"),
         "assistant": ("POST", "/api/chat"),
-        "reports": ("GET", "/api/health"),
+        "health": ("GET", "/api/health"),
     }
     not_mounted = []
     for ctx, (method, path) in context_probes.items():

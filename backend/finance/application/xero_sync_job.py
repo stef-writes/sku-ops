@@ -5,32 +5,33 @@ Three passes in order:
   2. Reconciliation — fetch synced documents back from Xero and verify totals + line counts.
   3. Exception summary — return counts of every problem category for the health dashboard.
 
-Call run_sync(org_id) from a scheduler or manually via the /api/xero/sync endpoint.
+Call run_sync() from a scheduler or manually via the /api/xero/sync endpoint.
 """
 
 import logging
 
 from finance.adapters.invoicing_factory import get_invoicing_gateway
 from finance.application.invoice_service import repost_cogs_for_invoice, sync_invoice
+from finance.application.org_settings_service import get_org_settings
 from finance.application.po_sync_service import sync_po_bill
 from finance.domain.xero_settings import XeroSettings
 from finance.infrastructure.credit_note_repo import credit_note_repo
 from finance.infrastructure.invoice_repo import invoice_repo
-from identity.application.org_service import get_org_settings
 from purchasing.application.queries import list_unsynced_po_bills
+from shared.infrastructure.database import get_org_id
 
 logger = logging.getLogger(__name__)
 
 _TOTAL_TOLERANCE = 0.02  # allow 2 cent rounding drift before flagging mismatch
 
 
-async def _sync_outbound_invoices(org_id: str) -> dict:
-    unsynced = await invoice_repo.list_unsynced_invoices(org_id)
+async def _sync_outbound_invoices() -> dict:
+    unsynced = await invoice_repo.list_unsynced_invoices()
     results = {"synced": 0, "failed": 0, "errors": []}
     for inv in unsynced:
         inv_id = inv.id
         try:
-            result = await sync_invoice(inv_id, org_id)
+            result = await sync_invoice(inv_id)
             if result.get("success"):
                 results["synced"] += 1
                 logger.info("Invoice %s synced to Xero: %s", inv_id, result.get("xero_invoice_id"))
@@ -54,8 +55,8 @@ async def _sync_outbound_invoices(org_id: str) -> dict:
     return results
 
 
-async def _sync_outbound_credit_notes(org_id: str, gateway, settings) -> dict:
-    unsynced = await credit_note_repo.list_unsynced_credit_notes(org_id)
+async def _sync_outbound_credit_notes(gateway, settings) -> dict:
+    unsynced = await credit_note_repo.list_unsynced_credit_notes()
     results = {"synced": 0, "failed": 0, "errors": []}
     for cn in unsynced:
         cn_id = cn.id
@@ -88,13 +89,13 @@ async def _sync_outbound_credit_notes(org_id: str, gateway, settings) -> dict:
     return results
 
 
-async def _sync_outbound_po_bills(org_id: str) -> dict:
-    unsynced = await list_unsynced_po_bills(org_id)
+async def _sync_outbound_po_bills() -> dict:
+    unsynced = await list_unsynced_po_bills()
     results = {"synced": 0, "failed": 0, "errors": []}
     for po in unsynced:
         po_id = po["id"]
         try:
-            result = await sync_po_bill(po_id, org_id)
+            result = await sync_po_bill(po_id)
             if result.get("success") and not result.get("skipped"):
                 results["synced"] += 1
                 logger.info("PO %s synced to Xero as bill: %s", po_id, result.get("xero_bill_id"))
@@ -115,14 +116,14 @@ async def _sync_outbound_po_bills(org_id: str) -> dict:
     return results
 
 
-async def _repost_stale_cogs(org_id: str) -> dict:
+async def _repost_stale_cogs() -> dict:
     """Pass 1b — re-post COGS journals for invoices whose line items changed after sync."""
-    stale = await invoice_repo.list_stale_cogs_invoices(org_id)
+    stale = await invoice_repo.list_stale_cogs_invoices()
     results = {"reposted": 0, "failed": 0, "errors": []}
     for inv in stale:
         inv_id = inv.id
         try:
-            result = await repost_cogs_for_invoice(inv_id, org_id)
+            result = await repost_cogs_for_invoice(inv_id)
             if result.get("success"):
                 results["reposted"] += 1
                 logger.info(
@@ -150,8 +151,8 @@ async def _repost_stale_cogs(org_id: str) -> dict:
     return results
 
 
-async def _reconcile_invoices(org_id: str, gateway, settings) -> dict:
-    to_reconcile = await invoice_repo.list_invoices_needing_reconciliation(org_id)
+async def _reconcile_invoices(gateway, settings) -> dict:
+    to_reconcile = await invoice_repo.list_invoices_needing_reconciliation()
     results = {"verified": 0, "mismatch": 0, "errors": []}
     for inv in to_reconcile:
         inv_id = inv.id
@@ -194,8 +195,8 @@ async def _reconcile_invoices(org_id: str, gateway, settings) -> dict:
     return results
 
 
-async def _reconcile_credit_notes(org_id: str, gateway, settings) -> dict:
-    to_reconcile = await credit_note_repo.list_credit_notes_needing_reconciliation(org_id)
+async def _reconcile_credit_notes(gateway, settings) -> dict:
+    to_reconcile = await credit_note_repo.list_credit_notes_needing_reconciliation()
     results = {"verified": 0, "mismatch": 0, "errors": []}
     for cn in to_reconcile:
         cn_id = cn.id
@@ -232,31 +233,32 @@ async def _reconcile_credit_notes(org_id: str, gateway, settings) -> dict:
     return results
 
 
-async def run_sync(org_id: str, reconcile: bool = True) -> dict:
+async def run_sync(reconcile: bool = True) -> dict:
     """Run the full outbound sync + reconciliation for an org.
 
     Returns a summary dict suitable for logging or returning from an API endpoint.
     Safe to call repeatedly — idempotency is enforced per document via xero_invoice_id guards.
     """
-    xero_settings = XeroSettings.model_validate((await get_org_settings(org_id)).model_dump())
+    org_settings = await get_org_settings(get_org_id())
+    xero_settings = XeroSettings.model_validate(org_settings.model_dump())
     gateway = get_invoicing_gateway(xero_settings)
 
     # Pass 1 — outbound sync
-    invoice_sync = await _sync_outbound_invoices(org_id)
-    cogs_repost = await _repost_stale_cogs(org_id)
-    cn_sync = await _sync_outbound_credit_notes(org_id, gateway, xero_settings)
-    po_sync = await _sync_outbound_po_bills(org_id)
+    invoice_sync = await _sync_outbound_invoices()
+    cogs_repost = await _repost_stale_cogs()
+    cn_sync = await _sync_outbound_credit_notes(gateway, xero_settings)
+    po_sync = await _sync_outbound_po_bills()
 
     # Pass 2 — reconciliation
     invoice_reconcile: dict = {"verified": 0, "mismatch": 0, "errors": []}
     cn_reconcile: dict = {"verified": 0, "mismatch": 0, "errors": []}
     if reconcile:
-        # Re-fetch settings in case token was refreshed during outbound
-        xero_settings = XeroSettings.model_validate((await get_org_settings(org_id)).model_dump())
+        xero_settings = XeroSettings.model_validate((await get_org_settings(get_org_id())).model_dump())
         gateway = get_invoicing_gateway(xero_settings)
-        invoice_reconcile = await _reconcile_invoices(org_id, gateway, xero_settings)
-        cn_reconcile = await _reconcile_credit_notes(org_id, gateway, xero_settings)
+        invoice_reconcile = await _reconcile_invoices(gateway, xero_settings)
+        cn_reconcile = await _reconcile_credit_notes(gateway, xero_settings)
 
+    org_id = get_org_id()
     summary = {
         "org_id": org_id,
         "invoices_synced": invoice_sync["synced"],
