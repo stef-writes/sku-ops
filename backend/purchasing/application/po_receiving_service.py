@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 
 from finance.application.ledger_service import record_po_receipt as _record_ledger
 from purchasing.application.purchase_order_service import PurchasingDeps, _resolve_po_item_cost
-from purchasing.domain.purchase_order import POItemStatus, POStatus
+from purchasing.domain.purchase_order import POItemStatus, POStatus, ReceiveItemUpdate
 from purchasing.infrastructure.po_repo import po_repo as _default_repo
 from purchasing.ports.po_repo_port import PORepoPort
 from shared.kernel.errors import ResourceNotFoundError
@@ -44,7 +44,7 @@ async def mark_delivery_received(
 
 async def receive_po_items(
     po_id: str,
-    item_updates: list,
+    item_updates: list[ReceiveItemUpdate],
     deps: PurchasingDeps,
     current_user: CurrentUser,
     repo: PORepoPort = _default_repo,
@@ -67,7 +67,7 @@ async def receive_po_items(
 
     all_items = await repo.get_po_items(po_id)
     items_by_id = {item["id"]: item for item in all_items}
-    updates_by_id = {u["id"]: u for u in item_updates}
+    updates_by_id = {u.id: u for u in item_updates}
 
     received = []
     matched = []
@@ -92,14 +92,14 @@ async def receive_po_items(
 
         _apply_overrides(item, update)
 
-        delivered = update.get("delivered_qty")
+        delivered = update.delivered_qty
         if delivered is None:
             delivered = item.get("delivered_qty") or item.get("ordered_qty") or 1
         delivered = max(0.0, float(delivered))
 
         try:
-            if update.get("product_id"):
-                item["product_id"] = update["product_id"]
+            if update.product_id:
+                item["product_id"] = update.product_id
 
             existing = await _match_product(item, vendor_id, deps)
 
@@ -220,13 +220,14 @@ _OVERRIDE_FIELDS = (
     "sell_uom",
     "pack_qty",
     "barcode",
+    "original_sku",
 )
 
 
-def _apply_overrides(item: dict, update: dict) -> None:
+def _apply_overrides(item: dict, update: ReceiveItemUpdate) -> None:
     """Merge non-None override fields from the review modal into the PO item dict."""
     for field in _OVERRIDE_FIELDS:
-        val = update.get(field)
+        val = getattr(update, field, None)
         if val is not None:
             item[field] = val
 

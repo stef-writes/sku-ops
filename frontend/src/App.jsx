@@ -8,7 +8,6 @@ import { queryClient } from "./lib/query-client";
 import { ROLES } from "./lib/constants";
 import { useRealtimeSync } from "./hooks/useRealtimeSync";
 import Login from "./pages/Login";
-import Register from "./pages/Register";
 import Layout from "./components/Layout";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -63,7 +62,6 @@ function App() {
           <ErrorBoundary>
             <Routes>
               <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
               <Route
                 path="/*"
                 element={

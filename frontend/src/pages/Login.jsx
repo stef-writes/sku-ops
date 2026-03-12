@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { Button } from "../components/ui/button";
@@ -118,16 +118,6 @@ const Login = () => {
           loading={loading}
         />
       </div>
-      <p className="text-center mt-6 text-muted-foreground text-sm">
-        Don&apos;t have an account?{" "}
-        <Link
-          to="/register"
-          className="text-accent font-medium hover:text-accent transition-colors"
-          data-testid="register-link"
-        >
-          Create one
-        </Link>
-      </p>
     </AuthLayout>
   );
 };

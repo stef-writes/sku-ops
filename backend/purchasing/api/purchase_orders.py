@@ -159,7 +159,7 @@ async def receive_items(
     """Mark selected items as arrived and update inventory stock."""
     result = await receive_po_items(
         po_id=po_id,
-        item_updates=[u.model_dump() for u in data.items],
+        item_updates=data.items,
         deps=_build_deps(),
         current_user=current_user,
     )

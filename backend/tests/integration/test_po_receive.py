@@ -20,6 +20,7 @@ from purchasing.domain.purchase_order import (
     POStatus,
     PurchaseOrder,
     PurchaseOrderItem,
+    ReceiveItemUpdate,
 )
 from purchasing.infrastructure.po_repo import po_repo
 from shared.infrastructure.database import get_connection
@@ -157,7 +158,7 @@ async def test_receive_updates_stock(db):
 
     result = await receive_po_items(
         po_id=po.id,
-        item_updates=[{"id": item.id, "delivered_qty": 50}],
+        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=50)],
         deps=_stub_deps(),
         current_user=_user(),
     )
@@ -177,7 +178,7 @@ async def test_receive_weighted_average_cost(db):
 
     await receive_po_items(
         po_id=po.id,
-        item_updates=[{"id": item.id, "delivered_qty": 50}],
+        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=50)],
         deps=_stub_deps(),
         current_user=_user(),
     )
@@ -200,7 +201,7 @@ async def test_receive_cost_fallback_from_unit_price(db):
 
     result = await receive_po_items(
         po_id=po.id,
-        item_updates=[{"id": item.id, "delivered_qty": 50}],
+        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=50)],
         deps=_stub_deps(),
         current_user=_user(),
     )
@@ -225,7 +226,7 @@ async def test_receive_creates_stock_transaction(db):
 
     await receive_po_items(
         po_id=po.id,
-        item_updates=[{"id": item.id, "delivered_qty": 25}],
+        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=25)],
         deps=_stub_deps(),
         current_user=_user(),
     )
@@ -245,7 +246,7 @@ async def test_receive_creates_ledger_entries(db):
 
     await receive_po_items(
         po_id=po.id,
-        item_updates=[{"id": item.id, "delivered_qty": 20}],
+        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=20)],
         deps=_stub_deps(),
         current_user=_user(),
     )
@@ -272,7 +273,7 @@ async def test_receive_po_status_becomes_received(db):
 
     result = await receive_po_items(
         po_id=po.id,
-        item_updates=[{"id": item.id, "delivered_qty": 10}],
+        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=10)],
         deps=_stub_deps(),
         current_user=_user(),
     )
@@ -293,7 +294,7 @@ async def test_receive_rejects_ordered_items(db):
 
     result = await receive_po_items(
         po_id=po.id,
-        item_updates=[{"id": item.id, "delivered_qty": 10}],
+        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=10)],
         deps=_stub_deps(),
         current_user=_user(),
     )
@@ -314,7 +315,7 @@ async def test_receive_cost_override_affects_wac(db):
 
     result = await receive_po_items(
         po_id=po.id,
-        item_updates=[{"id": item.id, "delivered_qty": 50, "cost": 20.0}],
+        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=50, cost=20.0)],
         deps=_stub_deps(),
         current_user=_user(),
     )
@@ -338,12 +339,12 @@ async def test_receive_creates_product_with_overridden_name(db):
     result = await receive_po_items(
         po_id=po.id,
         item_updates=[
-            {
-                "id": item.id,
-                "delivered_qty": 10,
-                "name": "Corrected Widget Name",
-                "suggested_department": "HDW",
-            }
+            ReceiveItemUpdate(
+                id=item.id,
+                delivered_qty=10,
+                name="Corrected Widget Name",
+                suggested_department="HDW",
+            )
         ],
         deps=_stub_deps(),
         current_user=_user(),
@@ -375,7 +376,7 @@ async def test_receive_product_id_override_matches_explicit(db):
 
     result = await receive_po_items(
         po_id=po.id,
-        item_updates=[{"id": item.id, "delivered_qty": 20, "product_id": product_b.id}],
+        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=20, product_id=product_b.id)],
         deps=_stub_deps(),
         current_user=_user(),
     )
@@ -386,3 +387,30 @@ async def test_receive_product_id_override_matches_explicit(db):
 
     updated_a = await product_repo.get_by_id(product_a.id)
     assert updated_a.quantity == pytest.approx(50.0)
+
+
+@pytest.mark.asyncio
+async def test_receive_items_with_typed_input(db):
+    """receive_po_items accepts ReceiveItemUpdate objects and correctly updates stock."""
+    product = await _create_test_product(name="Typed Input Product", quantity=20.0, cost=5.0)
+    po, item = await _create_po_with_item(product_id=product.id, cost=6.0, ordered_qty=15)
+
+    update = ReceiveItemUpdate(
+        id=item.id,
+        delivered_qty=15,
+        cost=6.0,
+    )
+
+    result = await receive_po_items(
+        po_id=po.id,
+        item_updates=[update],
+        deps=_stub_deps(),
+        current_user=_user(),
+    )
+
+    assert result["matched"] == 1
+    assert result["errors"] == 0
+    assert result["cost_total"] == pytest.approx(6.0 * 15)
+
+    updated = await product_repo.get_by_id(product.id)
+    assert updated.quantity == pytest.approx(35.0)

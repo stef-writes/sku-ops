@@ -6,10 +6,26 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from catalog.application.product_lifecycle import create_product as lifecycle_create
+from catalog.application.queries import (
+    find_product_by_name_and_vendor,
+    find_product_by_original_sku_and_vendor,
+    find_vendor_by_name,
+    get_department_by_code,
+    get_product_by_id,
+    insert_vendor,
+    list_departments,
+    list_products_by_vendor,
+    update_product,
+)
 from documents.application.enrichment_service import enrich_for_import
 from documents.application.import_parser import infer_uom, resolve_uom, suggest_department
 from documents.domain.document import DocumentLineItem
+from inventory.application.inventory_service import process_receiving_stock_changes
+from inventory.application.uom_classifier import classify_uom_batch as _classify_uom_batch
+from shared.infrastructure.config import LLM_AVAILABLE as _LLM_AVAILABLE
 from shared.infrastructure.db import get_org_id
+from shared.kernel.barcode import validate_barcode
 from shared.kernel.errors import ResourceNotFoundError
 from shared.kernel.types import CurrentUser
 from shared.kernel.units import ALLOWED_BASE_UNITS
@@ -232,3 +248,52 @@ async def import_document(
         "matched_products": matched,
         "error_details": errors,
     }
+
+
+async def _wired_classify_uom_batch(products):
+    """Wire LLM + rule-based deps into the UOM classifier."""
+    gen_text = None
+    if _LLM_AVAILABLE:
+        from assistant.application.llm import generate_text
+
+        gen_text = generate_text
+    return await _classify_uom_batch(products, generate_text=gen_text, rule_infer=infer_uom)
+
+
+async def import_document_wired(
+    vendor_name: str,
+    products: list[DocumentLineItem],
+    department_id: str | None,
+    create_vendor_if_missing: bool,
+    current_user: CurrentUser,
+) -> dict:
+    """Wired entry point: constructs ImportDeps from concrete collaborators.
+
+    The API layer calls this; ``import_document`` remains pure and testable with
+    injected deps.
+    """
+    deps = ImportDeps(
+        list_departments=list_departments,
+        get_department_by_code=get_department_by_code,
+        find_vendor_by_name=find_vendor_by_name,
+        insert_vendor=insert_vendor,
+        list_products_by_vendor=list_products_by_vendor,
+        get_product_by_id=get_product_by_id,
+        find_product_by_sku_and_vendor=find_product_by_original_sku_and_vendor,
+        find_product_by_name_and_vendor=find_product_by_name_and_vendor,
+        update_product=update_product,
+        validate_barcode=validate_barcode,
+        create_product=lambda **kw: lifecycle_create(
+            **kw, on_stock_import=process_receiving_stock_changes
+        ),
+        process_receiving_stock_changes=process_receiving_stock_changes,
+        classify_uom_batch=_wired_classify_uom_batch,
+    )
+    return await import_document(
+        vendor_name=vendor_name,
+        products=products,
+        deps=deps,
+        current_user=current_user,
+        department_id=department_id,
+        create_vendor_if_missing=create_vendor_if_missing,
+    )

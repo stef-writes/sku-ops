@@ -19,7 +19,7 @@ from inventory.application.inventory_service import (
     process_withdrawal_stock_changes,
 )
 from operations.application.withdrawal_service import create_withdrawal
-from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
+from operations.domain.withdrawal import ContractorContext, MaterialWithdrawalCreate, WithdrawalItem
 from shared.kernel.types import CurrentUser
 
 
@@ -56,7 +56,7 @@ async def test_withdrawal_sell_cost_same_unit(db):
         service_address="123 Main",
     )
     user = CurrentUser(id="user-1", email="t@t.com", name="T", role="admin")
-    contractor = {"id": "contractor-1", "name": "C"}
+    contractor = ContractorContext(id="contractor-1", name="C")
 
     result = await create_withdrawal(
         data,
@@ -105,7 +105,7 @@ async def test_withdrawal_sell_cost_unit_conversion(db):
         service_address="456 Oak",
     )
     user = CurrentUser(id="user-1", email="t@t.com", name="T", role="admin")
-    contractor = {"id": "contractor-1", "name": "C"}
+    contractor = ContractorContext(id="contractor-1", name="C")
 
     result = await create_withdrawal(
         data,
@@ -156,7 +156,7 @@ async def test_ledger_cogs_entry_has_quantity_and_unit_cost(db):
         service_address="789 Elm",
     )
     user = CurrentUser(id="user-1", email="t@t.com", name="T", role="admin")
-    contractor = {"id": "contractor-1", "name": "C"}
+    contractor = ContractorContext(id="contractor-1", name="C")
 
     result = await create_withdrawal(
         data,
@@ -214,7 +214,7 @@ async def test_ledger_revenue_entry_has_quantity_and_unit_cost(db):
         service_address="1 A St",
     )
     user = CurrentUser(id="user-1", email="t@t.com", name="T", role="admin")
-    contractor = {"id": "contractor-1", "name": "C"}
+    contractor = ContractorContext(id="contractor-1", name="C")
 
     result = await create_withdrawal(
         data,
@@ -274,7 +274,7 @@ async def test_invoice_line_items_carry_sell_cost(db):
         service_address="2 B St",
     )
     user = CurrentUser(id="user-1", email="t@t.com", name="T", role="admin")
-    contractor = {"id": "contractor-1", "name": "C", "billing_entity": "ACME Inc"}
+    contractor = ContractorContext(id="contractor-1", name="C", billing_entity="ACME Inc")
 
     withdrawal = await create_withdrawal(
         data,
