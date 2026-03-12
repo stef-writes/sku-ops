@@ -19,6 +19,9 @@ from finance.infrastructure.invoice_repo import (
     soft_delete,
     unlink_withdrawals,
     update_fields,
+    update_invoice_billing,
+    update_invoice_fields_dynamic,
+    update_invoice_totals,
 )
 from finance.infrastructure.invoice_repo import (
     invoice_repo as _default_invoice_repo,
@@ -141,7 +144,7 @@ async def create_invoice_from_withdrawals(
     due_date = compute_due_date(now, payment_terms)
     first_tax_rate = withdrawals[0].tax_rate if withdrawals else 0
 
-    async with transaction() as conn:
+    async with transaction():
         invoice_number = await next_invoice_number()
 
         await insert_invoice_row(
@@ -165,10 +168,7 @@ async def create_invoice_from_withdrawals(
             total_tax += w.tax
 
         total = round(total_subtotal + total_tax, 2)
-        await conn.execute(
-            "UPDATE invoices SET subtotal = ?, tax = ?, total = ? WHERE id = ?",
-            (total_subtotal, total_tax, total, inv_id),
-        )
+        await update_invoice_totals(inv_id, total_subtotal, total_tax, total)
 
         for wid in withdrawal_ids:
             await link_withdrawal(inv_id, wid)
@@ -196,16 +196,13 @@ async def add_withdrawals_to_invoice(
     if inv.billing_entity and inv.billing_entity != billing_entity:
         raise ValueError("Invoice billing_entity does not match withdrawals")
 
-    async with transaction() as conn:
+    async with transaction():
         if not inv.billing_entity and billing_entity:
-            await conn.execute(
-                "UPDATE invoices SET billing_entity = ?, contact_name = ?, updated_at = ? WHERE id = ?",
-                (
-                    billing_entity,
-                    contact_name or inv.contact_name,
-                    datetime.now(UTC).isoformat(),
-                    invoice_id,
-                ),
+            await update_invoice_billing(
+                invoice_id,
+                billing_entity,
+                contact_name or inv.contact_name,
+                datetime.now(UTC).isoformat(),
             )
 
         total_subtotal = 0.0
@@ -217,10 +214,7 @@ async def add_withdrawals_to_invoice(
             total_tax += w.tax
 
         total = round(total_subtotal + total_tax, 2)
-        await conn.execute(
-            "UPDATE invoices SET subtotal = ?, tax = ?, total = ?, updated_at = ? WHERE id = ?",
-            (total_subtotal, total_tax, total, datetime.now(UTC).isoformat(), invoice_id),
-        )
+        await update_invoice_totals(invoice_id, total_subtotal, total_tax, total)
 
         for wid in withdrawal_ids:
             await link_withdrawal(invoice_id, wid)
@@ -250,28 +244,19 @@ async def update_invoice(
     if not inv:
         return None
 
-    now = datetime.now(UTC).isoformat()
-
-    async with transaction() as conn:
+    async with transaction():
         if line_items is not None:
             subtotal = await replace_line_items(invoice_id, line_items)
             tax_val = tax if tax is not None else float(inv.tax)
             total = round(subtotal + tax_val, 2)
-            sync_updates: dict[str, Any] = {
+            sync_fields: dict[str, Any] = {
                 "subtotal": subtotal,
                 "tax": tax_val,
                 "total": total,
-                "updated_at": now,
             }
             if inv.xero_invoice_id:
-                sync_updates["xero_sync_status"] = "cogs_stale"
-            set_clauses = [f"{k} = ?" for k in sync_updates]
-            params: list = list(sync_updates.values())
-            params.append(invoice_id)
-            await conn.execute(
-                f"UPDATE invoices SET {', '.join(set_clauses)} WHERE id = ?",
-                params,
-            )
+                sync_fields["xero_sync_status"] = "cogs_stale"
+            await update_invoice_fields_dynamic(invoice_id, sync_fields)
         else:
             updates: dict[str, Any] = {}
             if billing_entity is not None:
@@ -303,15 +288,7 @@ async def update_invoice(
                 updates["billing_address"] = billing_address
             if po_reference is not None:
                 updates["po_reference"] = po_reference
-            if updates:
-                updates["updated_at"] = now
-                set_clauses = [f"{k} = ?" for k in updates]
-                params = list(updates.values())
-                params.append(invoice_id)
-                await conn.execute(
-                    f"UPDATE invoices SET {', '.join(set_clauses)} WHERE id = ?",
-                    params,
-                )
+            await update_invoice_fields_dynamic(invoice_id, updates)
 
     return await _default_invoice_repo.get_by_id(invoice_id)
 

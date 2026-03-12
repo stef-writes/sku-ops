@@ -62,7 +62,7 @@ async def create_material_return(
 
 @router.get("")
 async def list_returns(
-    current_user: AdminDep,  # noqa: ARG001
+    current_user: AdminDep,
     contractor_id: str | None = None,
     withdrawal_id: str | None = None,
     start_date: str | None = None,
@@ -79,7 +79,7 @@ async def list_returns(
 @router.get("/{return_id}")
 async def get_return(
     return_id: str,
-    current_user: CurrentUserDep,  # noqa: ARG001
+    current_user: CurrentUserDep,
 ):
     ret = await _get_return_by_id(return_id)
     if not ret:

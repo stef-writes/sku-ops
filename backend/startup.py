@@ -33,6 +33,24 @@ async def _get_active_org_ids() -> list[str]:
     return [o.id for o in orgs] if orgs else ["default"]
 
 
+async def _ensure_default_org() -> None:
+    """Insert the default organization row if it doesn't exist yet."""
+    from datetime import UTC, datetime
+
+    from shared.infrastructure.database import get_connection
+
+    conn = get_connection()
+    cursor = await conn.execute("SELECT id FROM organizations WHERE id = ?", (DEFAULT_ORG_ID,))
+    if await cursor.fetchone():
+        return
+    await conn.execute(
+        "INSERT INTO organizations (id, name, slug, created_at) VALUES (?, ?, ?, ?)",
+        (DEFAULT_ORG_ID, "Default", DEFAULT_ORG_ID, datetime.now(UTC).isoformat()),
+    )
+    await conn.commit()
+    logger.info("Default organization created (id=%s)", DEFAULT_ORG_ID)
+
+
 async def _ensure_demo_users() -> None:
     """Create admin + contractor demo accounts if they don't already exist."""
     import uuid
@@ -82,7 +100,7 @@ async def _ensure_demo_users() -> None:
             ),
         )
         await conn.commit()
-        logger.info("Created demo user: %s (%s)", u["email"], u["role"])
+        logger.info("Demo user ready: %s / %s (%s)", u["email"], DEMO_USER_PASSWORD, u["role"])
 
 
 @asynccontextmanager
@@ -116,6 +134,7 @@ async def lifespan(app: FastAPI):
     if seed_on_startup:
         token = org_id_var.set(DEFAULT_ORG_ID)
         try:
+            await _ensure_default_org()
             await _ensure_demo_users()
         finally:
             org_id_var.reset(token)

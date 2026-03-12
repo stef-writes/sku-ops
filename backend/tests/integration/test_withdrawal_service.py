@@ -6,14 +6,20 @@ from catalog.application.product_lifecycle import create_product
 from catalog.application.queries import list_products
 from catalog.infrastructure.product_repo import product_repo
 from finance.application.invoice_service import create_invoice_from_withdrawals
+from finance.infrastructure.ledger_repo import entries_exist
 from inventory.application.inventory_service import (
     process_import_stock_changes,
     process_withdrawal_stock_changes,
 )
 from inventory.domain.errors import InsufficientStockError
 from inventory.infrastructure.stock_repo import stock_repo
-from operations.application.withdrawal_service import create_withdrawal as _create_withdrawal
-from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
+from operations.application.withdrawal_service import (
+    bulk_mark_withdrawals_paid,
+)
+from operations.application.withdrawal_service import (
+    create_withdrawal as _create_withdrawal,
+)
+from operations.domain.withdrawal import ContractorContext, MaterialWithdrawalCreate, WithdrawalItem
 from operations.infrastructure.withdrawal_repo import withdrawal_repo
 from shared.kernel.types import CurrentUser
 
@@ -22,12 +28,25 @@ def _test_user(user_id="user-1", name="Test User"):
     return CurrentUser(id=user_id, email="test@test.com", name=name, role="admin")
 
 
+def _to_contractor_ctx(contractor) -> ContractorContext:
+    """Convert a dict or ContractorContext to ContractorContext for test helpers."""
+    if isinstance(contractor, ContractorContext):
+        return contractor
+    return ContractorContext(
+        id=contractor.get("id", ""),
+        name=contractor.get("name", ""),
+        company=contractor.get("company", ""),
+        billing_entity=contractor.get("billing_entity", ""),
+        billing_entity_id=contractor.get("billing_entity_id"),
+    )
+
+
 async def create_withdrawal(data, contractor, current_user):
     if isinstance(current_user, dict):
         current_user = CurrentUser(**{"email": "test@test.com", "role": "admin", **current_user})
     return await _create_withdrawal(
         data,
-        contractor,
+        _to_contractor_ctx(contractor),
         current_user,
         list_products=list_products,
         process_stock_changes=process_withdrawal_stock_changes,
@@ -311,7 +330,7 @@ async def test_create_withdrawal_auto_invoice_failure_still_creates_withdrawal(d
         )
     ]
     data = MaterialWithdrawalCreate(items=items, job_id="JOB-FAIL", service_address="Fail St")
-    contractor = {"id": "contractor-1", "name": "Contractor"}
+    contractor = ContractorContext(id="contractor-1", name="Contractor")
     user = _test_user()
 
     result = await _create_withdrawal(
@@ -328,3 +347,116 @@ async def test_create_withdrawal_auto_invoice_failure_still_creates_withdrawal(d
 
     updated = await product_repo.get_by_id(product.id)
     assert updated.quantity == 8
+
+
+# ---------------------------------------------------------------------------
+# bulk_mark_withdrawals_paid — transaction boundary tests
+# ---------------------------------------------------------------------------
+
+
+async def _make_paid_withdrawal(product, quantity: int, contractor_id: str = "contractor-1") -> str:
+    """Helper: create a withdrawal and return its id."""
+    items = [
+        WithdrawalItem(
+            product_id=product.id,
+            sku=product.sku,
+            name=product.name,
+            quantity=quantity,
+            price=10.0,
+            cost=5.0,
+            subtotal=float(quantity * 10),
+        )
+    ]
+    data = MaterialWithdrawalCreate(items=items, job_id="JOB-BULK", service_address="Bulk St")
+    contractor = ContractorContext(id=contractor_id, name="Contractor", billing_entity="ACME Inc")
+    user = _test_user()
+    result = await _create_withdrawal(
+        data,
+        contractor,
+        user,
+        list_products=list_products,
+        process_stock_changes=process_withdrawal_stock_changes,
+        create_invoice=None,
+    )
+    return result["id"]
+
+
+@pytest.mark.asyncio
+async def test_bulk_mark_paid_records_ledger_for_each(db):
+    """bulk_mark_withdrawals_paid records a payment ledger entry for every withdrawal."""
+    product = await create_product(
+        department_id="dept-1",
+        department_name="Hardware",
+        name="Bulk Ledger Test",
+        quantity=30,
+        price=10.0,
+        cost=5.0,
+        user_id="user-1",
+        user_name="Test",
+        on_stock_import=process_import_stock_changes,
+    )
+
+    wid1 = await _make_paid_withdrawal(product, quantity=1)
+    wid2 = await _make_paid_withdrawal(product, quantity=2)
+    wid3 = await _make_paid_withdrawal(product, quantity=3)
+
+    updated = await bulk_mark_withdrawals_paid(
+        withdrawal_ids=[wid1, wid2, wid3],
+        performed_by_user_id="user-1",
+    )
+
+    assert updated == 3
+
+    for wid in (wid1, wid2, wid3):
+        w = await withdrawal_repo.get_by_id(wid)
+        assert w.payment_status == "paid"
+        assert await entries_exist("payment", wid)
+
+
+@pytest.mark.asyncio
+async def test_bulk_mark_paid_atomicity(db):
+    """If a mid-loop step fails, the entire bulk operation is rolled back."""
+    from unittest.mock import patch
+
+    product = await create_product(
+        department_id="dept-1",
+        department_name="Hardware",
+        name="Atomicity Test",
+        quantity=30,
+        price=10.0,
+        cost=5.0,
+        user_id="user-1",
+        user_name="Test",
+        on_stock_import=process_import_stock_changes,
+    )
+
+    wid1 = await _make_paid_withdrawal(product, quantity=1)
+    wid2 = await _make_paid_withdrawal(product, quantity=2)
+
+    call_count = 0
+
+    async def failing_record_payment(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count >= 2:
+            raise RuntimeError("Simulated ledger failure")
+
+    with patch(
+        "operations.application.withdrawal_service._record_payment",
+        side_effect=failing_record_payment,
+    ):
+        with pytest.raises(RuntimeError, match="Simulated ledger failure"):
+            await bulk_mark_withdrawals_paid(
+                withdrawal_ids=[wid1, wid2],
+                performed_by_user_id="user-1",
+            )
+
+    # Both withdrawals must still be unpaid — full rollback
+    w1 = await withdrawal_repo.get_by_id(wid1)
+    w2 = await withdrawal_repo.get_by_id(wid2)
+    assert w1.payment_status == "unpaid"
+    assert w2.payment_status == "unpaid"
+
+    # No payment ledger entries written
+    assert not await entries_exist("payment", wid1)
+    assert not await entries_exist("payment", wid2)

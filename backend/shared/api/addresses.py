@@ -27,7 +27,7 @@ class AddressCreate(BaseModel):
 
 @router.get("")
 async def list_addresses(
-    current_user: AdminDep,  # noqa: ARG001
+    current_user: AdminDep,
     billing_entity_id: str | None = None,
     job_id: str | None = None,
     q: str | None = None,
@@ -45,7 +45,7 @@ async def list_addresses(
 
 @router.get("/search")
 async def search_addresses(
-    current_user: CurrentUserDep,  # noqa: ARG001
+    current_user: CurrentUserDep,
     q: str = "",
     limit: int = 20,
 ):
@@ -58,7 +58,7 @@ async def search_addresses(
 
 
 @router.get("/{address_id}")
-async def get_address(address_id: str, current_user: AdminDep):  # noqa: ARG001
+async def get_address(address_id: str, current_user: AdminDep):
     addr = await address_repo.get_by_id(address_id)
     if not addr:
         raise HTTPException(status_code=404, detail="Address not found")
@@ -68,7 +68,7 @@ async def get_address(address_id: str, current_user: AdminDep):  # noqa: ARG001
 @router.post("")
 async def create_address(
     data: AddressCreate,
-    current_user: AdminDep,  # noqa: ARG001
+    current_user: AdminDep,
 ):
     if not data.line1.strip():
         raise HTTPException(status_code=400, detail="Address line 1 is required")

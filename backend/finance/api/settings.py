@@ -23,7 +23,7 @@ def _mask(settings: OrgSettings) -> dict:
 
 
 @router.get("/xero")
-async def get_xero_settings(current_user: AdminDep):  # noqa: ARG001
+async def get_xero_settings(current_user: AdminDep):
     """Return Xero config for the org. Secrets are masked in the response."""
     settings = await get_org_settings()
     return _mask(settings)
@@ -32,7 +32,7 @@ async def get_xero_settings(current_user: AdminDep):  # noqa: ARG001
 @router.put("/xero")
 async def update_xero_settings(
     data: OrgSettingsUpdate,
-    current_user: AdminDep,  # noqa: ARG001
+    current_user: AdminDep,
 ):
     """Update Xero account codes and/or API credentials."""
     settings = await get_org_settings()

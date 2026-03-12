@@ -18,7 +18,11 @@ from finance.application.ledger_service import record_withdrawal as _record_ledg
 from finance.application.org_settings_service import get_org_settings
 from inventory.application.inventory_service import process_withdrawal_stock_changes
 from jobs.application.job_service import ensure_job as _ensure_job
-from operations.domain.withdrawal import MaterialWithdrawal, MaterialWithdrawalCreate
+from operations.domain.withdrawal import (
+    ContractorContext,
+    MaterialWithdrawal,
+    MaterialWithdrawalCreate,
+)
 from operations.infrastructure.withdrawal_repo import withdrawal_repo as _default_withdrawal_repo
 from shared.infrastructure.database import get_org_id, transaction
 from shared.kernel.stock import StockDecrement
@@ -55,7 +59,7 @@ def _convert_price_per_unit(
 
 async def create_withdrawal(
     data: MaterialWithdrawalCreate,
-    contractor: dict,
+    contractor: ContractorContext,
     current_user: CurrentUser,
     *,
     list_products: ListProductsFn,
@@ -68,6 +72,9 @@ async def create_withdrawal(
 
     Returns withdrawal dict with optional invoice_id.
     """
+    if not contractor.id:
+        raise ValueError("contractor.id must not be empty")
+
     org_id = get_org_id()
     if data.job_id:
         await _ensure_job(data.job_id)
@@ -107,8 +114,8 @@ async def create_withdrawal(
         enriched_items.append(item)
     data = data.model_copy(update={"items": enriched_items})
 
-    billing_entity_name = contractor.get("billing_entity", "")
-    billing_entity_id = contractor.get("billing_entity_id")
+    billing_entity_name = contractor.billing_entity
+    billing_entity_id = contractor.billing_entity_id
     if billing_entity_name and not billing_entity_id:
         be = await ensure_billing_entity(billing_entity_name)
         billing_entity_id = be.id if be else None
@@ -122,9 +129,9 @@ async def create_withdrawal(
         tax=0,
         total=0,
         cost_total=0,
-        contractor_id=contractor["id"],
-        contractor_name=contractor.get("name", ""),
-        contractor_company=contractor.get("company", ""),
+        contractor_id=contractor.id,
+        contractor_name=contractor.name,
+        contractor_company=contractor.company,
         billing_entity=billing_entity_name,
         billing_entity_id=billing_entity_id,
         payment_status="unpaid",
@@ -200,13 +207,20 @@ async def create_withdrawal_wired(
 ) -> dict:
     """Wired version of create_withdrawal that resolves org settings and injects collaborators.
 
-    Eliminates the duplicate do_create_withdrawal helpers in withdrawals.py and
-    material_requests.py.
+    Accepts a raw dict for backward compatibility with API/material-request callers,
+    converts it to ContractorContext before delegating.
     """
     settings = await get_org_settings()
+    ctx = ContractorContext(
+        id=contractor.get("id", "") or contractor.get("contractor_id", ""),
+        name=contractor.get("name", ""),
+        company=contractor.get("company", ""),
+        billing_entity=contractor.get("billing_entity", ""),
+        billing_entity_id=contractor.get("billing_entity_id"),
+    )
     return await create_withdrawal(
         data,
-        contractor,
+        ctx,
         current_user,
         list_products=list_products,
         process_stock_changes=process_withdrawal_stock_changes,
@@ -246,22 +260,27 @@ async def bulk_mark_withdrawals_paid(
 ) -> int:
     """Mark multiple withdrawals as paid in bulk.
 
+    All status updates, invoice marking, and ledger entries run inside a single
+    transaction. If any step fails, the entire operation is rolled back — no
+    partial state is ever written.
+
     Returns count of updated withdrawals.
     """
     if len(withdrawal_ids) > 200:
         raise ValueError("Cannot mark more than 200 withdrawals at once")
 
     paid_at = datetime.now(UTC).isoformat()
-    updated = await withdrawal_repo.bulk_mark_paid(withdrawal_ids, paid_at)
-    for wid in withdrawal_ids:
-        await mark_paid_for_withdrawal(wid)
-        w = await withdrawal_repo.get_by_id(wid)
-        if w:
-            await _record_payment(
-                withdrawal_id=wid,
-                amount=w.total,
-                billing_entity=w.billing_entity,
-                contractor_id=w.contractor_id,
-                performed_by_user_id=performed_by_user_id,
-            )
+    async with transaction():
+        updated = await withdrawal_repo.bulk_mark_paid(withdrawal_ids, paid_at)
+        for wid in withdrawal_ids:
+            w = await withdrawal_repo.get_by_id(wid)
+            if w:
+                await mark_paid_for_withdrawal(wid)
+                await _record_payment(
+                    withdrawal_id=wid,
+                    amount=w.total,
+                    billing_entity=w.billing_entity,
+                    contractor_id=w.contractor_id,
+                    performed_by_user_id=performed_by_user_id,
+                )
     return updated

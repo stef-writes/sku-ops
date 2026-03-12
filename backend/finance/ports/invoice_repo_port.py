@@ -1,6 +1,6 @@
 """Invoice repository port — testable contract for invoice persistence."""
 
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from finance.domain.invoice import Invoice, InvoiceWithDetails
 
@@ -33,6 +33,28 @@ class InvoiceRepoPort(Protocol):
     ) -> InvoiceWithDetails | None: ...
 
     async def mark_paid_for_withdrawal(self, withdrawal_id: str) -> None: ...
+
+    async def update_invoice_totals(
+        self,
+        invoice_id: str,
+        subtotal: float,
+        tax: float,
+        total: float,
+    ) -> None: ...
+
+    async def update_invoice_billing(
+        self,
+        invoice_id: str,
+        billing_entity: str,
+        contact_name: str,
+        updated_at: str,
+    ) -> None: ...
+
+    async def update_invoice_fields_dynamic(
+        self,
+        invoice_id: str,
+        fields: dict[str, Any],
+    ) -> None: ...
 
     async def set_xero_invoice_id(
         self,

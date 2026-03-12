@@ -33,7 +33,7 @@ class ContractorUpdate(BaseModel):
 
 @router.get("")
 async def get_contractors(
-    current_user: AdminDep,  # noqa: ARG001
+    current_user: AdminDep,
     search: str | None = Query(
         None, description="Search by name, email, company, billing entity, or phone"
     ),
@@ -42,7 +42,7 @@ async def get_contractors(
 
 
 @router.post("")
-async def create_contractor_route(data: ContractorCreate, current_user: AdminDep):  # noqa: ARG001
+async def create_contractor_route(data: ContractorCreate, current_user: AdminDep):
     try:
         result = await create_contractor(
             email=data.email,
@@ -61,7 +61,7 @@ async def create_contractor_route(data: ContractorCreate, current_user: AdminDep
 async def update_contractor_route(
     contractor_id: str,
     data: ContractorUpdate,
-    current_user: AdminDep,  # noqa: ARG001
+    current_user: AdminDep,
 ):
     updates = {k: v for k, v in data.model_dump().items() if v is not None}
     result = await update_contractor(contractor_id, updates)
@@ -71,7 +71,7 @@ async def update_contractor_route(
 
 
 @router.delete("/{contractor_id}")
-async def delete_contractor_route(contractor_id: str, current_user: AdminDep):  # noqa: ARG001
+async def delete_contractor_route(contractor_id: str, current_user: AdminDep):
     deleted = await delete_contractor(contractor_id)
     if deleted == 0:
         raise HTTPException(status_code=404, detail="Contractor not found")

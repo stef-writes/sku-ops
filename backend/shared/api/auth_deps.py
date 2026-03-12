@@ -2,6 +2,13 @@
 
 Validates JWTs and builds CurrentUser from token claims. No DB
 roundtrip required — all user data comes from the token payload.
+
+Supports two JWT shapes:
+  1. Dev-issued (HS256 signed with JWT_SECRET): role is a top-level claim.
+  2. Supabase-issued (HS256 signed with Supabase project JWT secret, which must
+     match JWT_SECRET in config): role is in app_metadata.role.
+     Supabase puts custom claims in app_metadata — set via admin API or an
+     auth hook. The sub claim is the Supabase user UUID.
 """
 
 from __future__ import annotations
@@ -25,6 +32,21 @@ security = HTTPBearer()
 BearerToken = Annotated[HTTPAuthorizationCredentials, Depends(security)]
 
 
+def _extract_role(payload: dict) -> str:
+    """Extract role from JWT payload.
+
+    Checks both locations in priority order:
+    1. app_metadata.role  — Supabase-issued token (custom claim set via admin API)
+    2. role               — Dev-issued token (direct top-level claim)
+
+    Raises 401 if role is absent from both locations. Never defaults to 'admin'.
+    """
+    role = (payload.get("app_metadata") or {}).get("role") or payload.get("role")
+    if not role:
+        raise HTTPException(status_code=401, detail="Invalid token: missing role claim")
+    return role
+
+
 async def get_current_user(
     credentials: BearerToken,
 ) -> CurrentUser:
@@ -35,7 +57,7 @@ async def get_current_user(
             raise HTTPException(status_code=401, detail="Invalid token: no user_id")
         email = payload.get("email", "")
         name = payload.get("name", "")
-        role = payload.get("role", "admin")
+        role = _extract_role(payload)
         org_id = payload.get("organization_id") or DEFAULT_ORG_ID
         user_id_var.set(user_id)
         org_id_var.set(org_id)

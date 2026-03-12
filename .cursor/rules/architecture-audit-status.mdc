@@ -25,7 +25,7 @@ The backend is a **well-organized modular monolith with transaction-script tende
 - `documents/api/documents.py` — parse_document AI orchestration
 - `reports/api/reports.py` — 555 lines of computation inline
 - `reports/api/dashboard.py` — computation + cross-context raw SQL for PO summary
-- `identity/api/auth.py` — registration/user-creation flow
+- `shared/api/auth.py` — login/register/me (deliberately thin; no business logic)
 - `catalog/api/sku.py` — SKU format construction
 
 ### 2. invoice_repo.py was an application service disguised as a repository
@@ -64,6 +64,11 @@ These changes exist in the codebase and need to be evaluated:
 | OAuth state repo | `identity/infrastructure/oauth_state_repo.py` | Good | Moved raw SQL from xero_auth.py to proper identity infra. |
 | `xero_port.py` alias cleanup | `finance/ports/xero_port.py` | Partial | Removed aliases but file still exists as re-export shim. |
 | Invoice repo port sync | `finance/ports/invoice_repo_port.py` | OK | Synced with repo reality but still has stale shape (methods that moved to service). |
+| Auth endpoints restored | `shared/api/auth.py` | Good | login/me/register re-added after identity/ deletion. Thin routes, no business logic. Supabase-ready: /me always mounted, login/register are dev bridge only. |
+| Auth role-default security fix | `shared/api/auth_deps.py` | Good | Removed `"admin"` default on missing role claim. Now raises 401. Also reads `app_metadata.role` for Supabase-issued JWTs. |
+| Auth router registered | `routes.py` | Good | `auth_router` mounted at `/api/auth`. All three endpoints now reachable. |
+| Auth smoke test coverage | `tests/api/test_smoke.py` | Good | Added 4 tests covering /me auth enforcement, login/register mount, and /me with valid token. |
+| Frontend Supabase wiring | `frontend/src/context/AuthContext.jsx`, `frontend/src/lib/supabase.js` | Good | AuthContext supports Supabase mode (prod) and bridge mode (dev). Dual-mode gated on `VITE_SUPABASE_URL`. |
 
 ## What needs proper correction (in priority order)
 

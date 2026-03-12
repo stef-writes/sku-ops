@@ -16,7 +16,7 @@ router = APIRouter(prefix="/audit-log", tags=["audit-log"])
 
 @router.get("")
 async def list_audit_log(
-    current_user: AdminDep,  # noqa: ARG001
+    current_user: AdminDep,
     user_id: str | None = None,
     action: str | None = None,
     resource_type: str | None = None,
@@ -41,14 +41,14 @@ async def list_audit_log(
 
 
 @router.get("/actions")
-async def list_audit_actions(current_user: AdminDep):  # noqa: ARG001
+async def list_audit_actions(current_user: AdminDep):
     """Return distinct action names for filter dropdowns."""
     return await distinct_actions()
 
 
 @router.get("/export")
 async def export_audit_log(
-    current_user: AdminDep,  # noqa: ARG001
+    current_user: AdminDep,
     user_id: str | None = None,
     action: str | None = None,
     resource_type: str | None = None,

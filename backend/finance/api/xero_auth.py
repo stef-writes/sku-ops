@@ -43,7 +43,7 @@ def _require_xero_configured():
 
 
 @router.get("/connect")
-async def xero_connect(current_user: AdminDep):  # noqa: ARG001
+async def xero_connect(current_user: AdminDep):
     """Initiate Xero OAuth 2.0 Authorization Code flow. Redirects to Xero consent page."""
     _require_xero_configured()
     state = secrets.token_urlsafe(32)
@@ -108,7 +108,7 @@ async def xero_callback(code: str = "", state: str = "", error: str = ""):
 
 
 @router.get("/tenants")
-async def list_xero_tenants(current_user: AdminDep):  # noqa: ARG001
+async def list_xero_tenants(current_user: AdminDep):
     """List Xero organisations the connected token can access. Use to select tenant_id."""
     settings = await get_org_settings()
     if not settings.xero_access_token:
@@ -125,7 +125,7 @@ async def list_xero_tenants(current_user: AdminDep):  # noqa: ARG001
 @router.post("/select-tenant")
 async def select_xero_tenant(
     tenant_id: str,
-    current_user: AdminDep,  # noqa: ARG001
+    current_user: AdminDep,
 ):
     """Save the chosen Xero tenant (organisation) ID for this org."""
     settings = await get_org_settings()
@@ -137,14 +137,14 @@ async def select_xero_tenant(
 
 
 @router.post("/disconnect")
-async def xero_disconnect(current_user: AdminDep):  # noqa: ARG001
+async def xero_disconnect(current_user: AdminDep):
     """Remove Xero OAuth tokens for this org."""
     await clear_xero_tokens()
     return {"disconnected": True}
 
 
 @router.get("/tracking-categories")
-async def list_tracking_categories(current_user: AdminDep):  # noqa: ARG001
+async def list_tracking_categories(current_user: AdminDep):
     """List Xero tracking categories for the connected org."""
     settings = await get_org_settings()
     if not settings.xero_access_token:
@@ -164,7 +164,7 @@ async def list_tracking_categories(current_user: AdminDep):  # noqa: ARG001
 @router.post("/select-tracking-category")
 async def select_tracking_category(
     tracking_category_id: str,
-    current_user: AdminDep,  # noqa: ARG001
+    current_user: AdminDep,
 ):
     """Save the chosen Xero tracking category ID for job_id tagging on invoice lines."""
     settings = await get_org_settings()

@@ -7,6 +7,7 @@ from finance.application.invoice_service import (
     delete_draft_invoice,
     update_invoice,
 )
+from finance.infrastructure.invoice_mutations import update_invoice_totals
 from finance.infrastructure.invoice_repo import invoice_repo
 from operations.infrastructure.withdrawal_repo import withdrawal_repo
 
@@ -280,3 +281,58 @@ async def test_create_invoice_from_already_invoiced_withdrawal_raises(db):
 
     with pytest.raises((ValueError, Exception)):
         await create_invoice_from_withdrawals([wid])
+
+
+@pytest.mark.asyncio
+async def test_update_invoice_totals_persists_correctly(db):
+    """update_invoice_totals writes the correct subtotal/tax/total to the DB."""
+    wid = await _create_withdrawal_with_items(
+        contractor_id="contractor-1",
+        billing_entity="ACME Inc",
+        items=[
+            {
+                "product_id": "p1",
+                "sku": "X",
+                "name": "A",
+                "quantity": 1,
+                "price": 10.0,
+                "subtotal": 10.0,
+            }
+        ],
+    )
+    inv = await create_invoice_from_withdrawals([wid])
+
+    await update_invoice_totals(inv.id, subtotal=50.0, tax=5.0, total=55.0)
+
+    refreshed = await invoice_repo.get_by_id(inv.id)
+    assert float(refreshed.subtotal) == pytest.approx(50.0)
+    assert float(refreshed.tax) == pytest.approx(5.0)
+    assert float(refreshed.total) == pytest.approx(55.0)
+
+
+@pytest.mark.asyncio
+async def test_update_invoice_with_line_items_recalculates_total(db):
+    """update_invoice with line_items replaces lines and recomputes total = subtotal + tax."""
+    wid = await _create_withdrawal_with_items(
+        contractor_id="contractor-1",
+        billing_entity="ACME Inc",
+        items=[
+            {
+                "product_id": "p1",
+                "sku": "X",
+                "name": "A",
+                "quantity": 1,
+                "price": 10.0,
+                "subtotal": 10.0,
+            }
+        ],
+    )
+    inv = await create_invoice_from_withdrawals([wid])
+
+    new_line_items = [{"description": "New Item", "quantity": 2, "unit_price": 25.0, "cost": 10.0}]
+    updated = await update_invoice(inv.id, line_items=new_line_items, tax=5.0)
+
+    assert updated is not None
+    assert float(updated.subtotal) == pytest.approx(50.0)
+    assert float(updated.tax) == pytest.approx(5.0)
+    assert float(updated.total) == pytest.approx(55.0)

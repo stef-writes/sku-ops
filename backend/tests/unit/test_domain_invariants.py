@@ -14,7 +14,7 @@ import pytest
 
 from inventory.domain.errors import InsufficientStockError
 from inventory.domain.stock import StockDecrement
-from operations.domain.withdrawal import MaterialWithdrawal, WithdrawalItem
+from operations.domain.withdrawal import ContractorContext, MaterialWithdrawal, WithdrawalItem
 from shared.kernel.types import LineItem
 from shared.kernel.units import (
     ALLOWED_BASE_UNITS,
@@ -261,3 +261,57 @@ class TestWithdrawalInvariants:
         w = self._make_withdrawal(items)
         w.compute_totals(tax_rate=0.13)
         assert w.total == pytest.approx(w.subtotal + w.tax, abs=0.01)
+
+
+# ── 7. ContractorContext invariants ───────────────────────────────────────────
+
+
+class TestContractorContext:
+    def test_requires_id_field(self):
+        """ContractorContext.id is a required positional argument."""
+        ctx = ContractorContext(id="abc-123")
+        assert ctx.id == "abc-123"
+
+    def test_defaults_are_empty_strings(self):
+        ctx = ContractorContext(id="c-1")
+        assert ctx.name == ""
+        assert ctx.company == ""
+        assert ctx.billing_entity == ""
+        assert ctx.billing_entity_id is None
+
+    def test_is_frozen(self):
+        """ContractorContext must be immutable — prevents accidental mutation."""
+        from dataclasses import FrozenInstanceError
+
+        ctx = ContractorContext(id="c-1")
+        with pytest.raises(FrozenInstanceError):
+            ctx.id = "mutated"  # type: ignore[misc]
+
+    def test_create_withdrawal_raises_on_empty_id(self):
+        """create_withdrawal must raise ValueError when contractor.id is empty."""
+        import asyncio
+
+        from catalog.application.queries import list_products
+        from inventory.application.inventory_service import process_withdrawal_stock_changes
+        from operations.application.withdrawal_service import create_withdrawal
+        from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
+        from shared.kernel.types import CurrentUser
+
+        data = MaterialWithdrawalCreate(
+            items=[WithdrawalItem(product_id="p1", sku="X", name="A", quantity=1, unit_price=10.0)],
+            job_id="J1",
+            service_address="123 Main",
+        )
+        ctx = ContractorContext(id="")
+        user = CurrentUser(id="u1", email="a@b.com", name="A", role="admin")
+
+        with pytest.raises(ValueError, match=r"contractor\.id"):
+            asyncio.get_event_loop().run_until_complete(
+                create_withdrawal(
+                    data,
+                    ctx,
+                    user,
+                    list_products=list_products,
+                    process_stock_changes=process_withdrawal_stock_changes,
+                )
+            )

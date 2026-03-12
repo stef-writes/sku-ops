@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from finance.infrastructure._invoice_fetch import get_by_id
@@ -200,5 +200,58 @@ async def mark_paid_for_withdrawal(withdrawal_id: str) -> None:
     await conn.execute(
         "UPDATE invoices SET status = 'paid', updated_at = ? WHERE id = ?",
         (now, row[0]),
+    )
+    await conn.commit()
+
+
+async def update_invoice_totals(
+    invoice_id: str,
+    subtotal: float,
+    tax: float,
+    total: float,
+) -> None:
+    """Update the computed financial totals on an invoice row."""
+    conn = get_connection()
+    now = datetime.now(UTC).isoformat()
+    await conn.execute(
+        "UPDATE invoices SET subtotal = ?, tax = ?, total = ?, updated_at = ? WHERE id = ?",
+        (subtotal, tax, total, now, invoice_id),
+    )
+    await conn.commit()
+
+
+async def update_invoice_billing(
+    invoice_id: str,
+    billing_entity: str,
+    contact_name: str,
+    updated_at: str,
+) -> None:
+    """Update billing entity and contact name on an invoice row."""
+    conn = get_connection()
+    await conn.execute(
+        "UPDATE invoices SET billing_entity = ?, contact_name = ?, updated_at = ? WHERE id = ?",
+        (billing_entity, contact_name, updated_at, invoice_id),
+    )
+    await conn.commit()
+
+
+async def update_invoice_fields_dynamic(
+    invoice_id: str,
+    fields: dict[str, Any],
+) -> None:
+    """Update arbitrary invoice columns from a pre-validated dict.
+
+    Validation belongs in the application layer. This function only persists.
+    """
+    if not fields:
+        return
+    conn = get_connection()
+    fields = {**fields, "updated_at": datetime.now(UTC).isoformat()}
+    set_clauses = [f"{k} = ?" for k in fields]
+    params: list = list(fields.values())
+    params.append(invoice_id)
+    await conn.execute(
+        f"UPDATE invoices SET {', '.join(set_clauses)} WHERE id = ?",
+        params,
     )
     await conn.commit()

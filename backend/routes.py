@@ -31,12 +31,14 @@ from reports.api.dashboard import router as dashboard_router
 from reports.api.reports import router as reports_router
 from shared.api.addresses import router as addresses_router
 from shared.api.audit import router as audit_router
+from shared.api.auth import router as auth_router
 from shared.api.health import router as health_router
 from shared.api.websocket import router as ws_router
 from shared.infrastructure.config import is_development, is_test
 
 api_router = APIRouter(prefix="/api")
 
+api_router.include_router(auth_router)
 api_router.include_router(audit_router)
 api_router.include_router(health_router)
 api_router.include_router(sku_router)

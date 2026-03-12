@@ -1,9 +1,27 @@
 """Material withdrawal (POS) models."""
 
+from dataclasses import dataclass
+
 from pydantic import BaseModel, field_validator
 
 from shared.kernel.entity import Entity
 from shared.kernel.types import LineItem, round_money
+
+
+@dataclass(frozen=True)
+class ContractorContext:
+    """Typed snapshot of contractor identity used when creating a withdrawal.
+
+    Replaces the raw ``dict`` previously threaded through the application layer.
+    Using a dataclass ensures ``id`` is always present and prevents silent None
+    propagation as ``contractor_id``.
+    """
+
+    id: str
+    name: str = ""
+    company: str = ""
+    billing_entity: str = ""
+    billing_entity_id: str | None = None
 
 
 class WithdrawalItem(LineItem):

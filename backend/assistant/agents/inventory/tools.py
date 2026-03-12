@@ -175,7 +175,7 @@ async def _get_usage_velocity(args: dict) -> str:
     p = await catalog_find_by_sku(sku)
     if not p:
         return json.dumps({"error": f"Product '{sku}' not found"})
-    vel = await withdrawal_velocity([p.id], since, org_id)
+    vel = await withdrawal_velocity([p.id], since)
     total_used = float(vel.get(p.id, 0))
     avg_daily = round(total_used / days, 2)
     days_until_zero = round(p.quantity / avg_daily, 1) if avg_daily > 0 else None
@@ -203,7 +203,7 @@ async def _get_reorder_suggestions(args: dict) -> str:
     if not low_stock:
         return json.dumps({"count": 0, "suggestions": []})
     product_ids = [p.id for p in low_stock]
-    velocity_map = await withdrawal_velocity(product_ids, since, org_id)
+    velocity_map = await withdrawal_velocity(product_ids, since)
     suggestions = []
     for p in low_stock:
         total_used = float(velocity_map.get(p.id, 0))
@@ -280,9 +280,7 @@ async def _get_top_products(args: dict) -> str:
         by = "revenue"
     limit = min(int(args.get("limit") or 10), 50)
     since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
-    withdrawals = await list_withdrawals(
-        start_date=since, limit=10000, organization_id=get_org_id()
-    )
+    withdrawals = await list_withdrawals(start_date=since, limit=10000)
     product_map: dict[str, dict] = {}
     for w in withdrawals:
         for item in w.items:
@@ -319,7 +317,7 @@ async def _get_department_activity(args: dict) -> str:
     if not products:
         return json.dumps({"error": f"Department '{dept_code}' not found or has no products"})
     product_ids = [p.id for p in products]
-    vel = await withdrawal_velocity(product_ids, since, org_id)
+    vel = await withdrawal_velocity(product_ids, since)
     total_withdrawn = sum(float(v) for v in vel.values())
     low_stock_count = sum(1 for p in products if p.quantity <= p.min_stock)
     return json.dumps(
@@ -343,7 +341,7 @@ async def _forecast_stockout(args: dict) -> str:
     if not in_stock:
         return json.dumps({"count": 0, "forecast": []})
     product_ids = [p.id for p in in_stock]
-    velocity_map = await withdrawal_velocity(product_ids, since, org_id)
+    velocity_map = await withdrawal_velocity(product_ids, since)
     forecast = []
     for p in in_stock:
         total_used = float(velocity_map.get(p.id, 0))
@@ -380,7 +378,7 @@ async def _get_slow_movers(args: dict) -> str:
     if not in_stock:
         return json.dumps({"period_days": days, "count": 0, "slow_movers": []})
     product_ids = [p.id for p in in_stock]
-    velocity_map = await withdrawal_velocity(product_ids, since, org_id)
+    velocity_map = await withdrawal_velocity(product_ids, since)
     ranked = []
     for p in in_stock:
         withdrawn = float(velocity_map.get(p.id, 0))

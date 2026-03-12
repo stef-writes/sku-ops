@@ -28,6 +28,9 @@ from finance.infrastructure.invoice_mutations import (
     soft_delete,
     unlink_withdrawals,
     update_fields,
+    update_invoice_billing,
+    update_invoice_fields_dynamic,
+    update_invoice_totals,
 )
 
 # Re-export Xero sync functions
@@ -186,6 +189,9 @@ class InvoiceRepo:
     soft_delete = staticmethod(soft_delete)
     insert_invoice_row = staticmethod(insert_invoice_row)
     mark_paid_for_withdrawal = staticmethod(mark_paid_for_withdrawal)
+    update_invoice_totals = staticmethod(update_invoice_totals)
+    update_invoice_billing = staticmethod(update_invoice_billing)
+    update_invoice_fields_dynamic = staticmethod(update_invoice_fields_dynamic)
 
     # Xero sync (from invoice_xero_queries)
     set_xero_invoice_id = staticmethod(set_xero_invoice_id)

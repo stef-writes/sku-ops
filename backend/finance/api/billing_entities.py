@@ -29,7 +29,7 @@ router = APIRouter(prefix="/billing-entities", tags=["billing-entities"])
 
 @router.get("")
 async def list_billing_entities(
-    current_user: AdminDep,  # noqa: ARG001
+    current_user: AdminDep,
     is_active: bool | None = None,
     q: str | None = None,
     limit: int = 200,
@@ -45,7 +45,7 @@ async def list_billing_entities(
 
 @router.get("/search")
 async def search_billing_entities(
-    current_user: AdminDep,  # noqa: ARG001
+    current_user: AdminDep,
     q: str = "",
     limit: int = 20,
 ):
@@ -59,7 +59,7 @@ async def search_billing_entities(
 
 
 @router.get("/{entity_id}")
-async def get_billing_entity(entity_id: str, current_user: AdminDep):  # noqa: ARG001
+async def get_billing_entity(entity_id: str, current_user: AdminDep):
     entity = await get_billing_entity_by_id(entity_id)
     if not entity:
         raise HTTPException(status_code=404, detail="Billing entity not found")
@@ -69,7 +69,7 @@ async def get_billing_entity(entity_id: str, current_user: AdminDep):  # noqa: A
 @router.post("")
 async def create_billing_entity(
     data: BillingEntityCreate,
-    current_user: AdminDep,  # noqa: ARG001
+    current_user: AdminDep,
 ):
     name = data.name.strip()
     if not name:
@@ -95,7 +95,7 @@ async def create_billing_entity(
 async def update_billing_entity(
     entity_id: str,
     data: BillingEntityUpdate,
-    current_user: AdminDep,  # noqa: ARG001
+    current_user: AdminDep,
 ):
     existing = await get_billing_entity_by_id(entity_id)
     if not existing:
