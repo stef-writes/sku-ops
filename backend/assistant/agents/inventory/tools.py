@@ -72,12 +72,12 @@ async def _search_semantic(args: dict) -> str:
         method = "bm25"
     out = [
         {
-            "sku": p.get("sku"),
-            "name": p.get("name"),
-            "quantity": p.get("quantity"),
-            "sell_uom": p.get("sell_uom", "each"),
-            "min_stock": p.get("min_stock"),
-            "department": p.get("department_name"),
+            "sku": p.sku,
+            "name": p.name,
+            "quantity": p.quantity,
+            "sell_uom": p.sell_uom or "each",
+            "min_stock": p.min_stock,
+            "department": p.department_name,
         }
         for p in results
     ]

@@ -17,13 +17,11 @@ import { useReportPL, useReportTrends, useReportKpis, useReportArAging } from "@
 import { MultiLineChart } from "@/components/charts/MultiLineChart";
 import { WaterfallChart } from "@/components/charts/WaterfallChart";
 import { ChartExplainer } from "@/components/charts/ChartExplainer";
-import { Panel, SectionHead as SectionHeadBase } from "@/components/Panel";
+import { ReportPanel, ReportSectionHead } from "@/components/ReportPanel";
 import { PL_DIMENSIONS, PLBreakdownTable, ARAgingTable, PLStatement } from "./ReportHelpers";
 
 const Stat = StatCard;
-const SectionHead = ({ title, action }) => (
-  <SectionHeadBase title={title} action={action} variant="report" />
-);
+const SectionHead = ({ title, action }) => <ReportSectionHead title={title} action={action} />;
 
 export function PLTab({ reportFilters, dateParams }) {
   const t = themeColors();
@@ -216,7 +214,7 @@ export function PLTab({ reportFilters, dateParams }) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <PLStatement summary={plData.summary} />
             {waterfallItems.length > 0 && (
-              <Panel>
+              <ReportPanel>
                 <SectionHead title="P&L Waterfall" />
                 <ChartExplainer
                   title="Waterfall Chart"
@@ -229,7 +227,7 @@ export function PLTab({ reportFilters, dateParams }) {
                 >
                   <WaterfallChart items={waterfallItems} height={260} />
                 </ChartExplainer>
-              </Panel>
+              </ReportPanel>
             )}
           </div>
         </>
@@ -237,7 +235,7 @@ export function PLTab({ reportFilters, dateParams }) {
 
       {/* Revenue, Cost & Profit time-series */}
       {trendsReport?.series?.length > 0 && (
-        <Panel>
+        <ReportPanel>
           <SectionHead
             title={
               activeDrillLabel
@@ -270,7 +268,7 @@ export function PLTab({ reportFilters, dateParams }) {
             height={280}
             stepped
           />
-        </Panel>
+        </ReportPanel>
       )}
 
       {/* KPI metrics — overall only */}

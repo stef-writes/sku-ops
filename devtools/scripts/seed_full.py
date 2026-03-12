@@ -231,7 +231,7 @@ async def main():
         logger.error("Failed to create demo users")
         return None
 
-    departments = await list_departments(org_id)
+    departments = await list_departments()
     dept_by_code = {d["code"]: d for d in departments}
     dept_name_map = {d["id"]: d["name"] for d in departments}
 

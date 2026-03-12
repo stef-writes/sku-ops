@@ -57,7 +57,9 @@ async def sku_overview(product_name: str | None = None) -> dict:
     slug = slug_from_name(product_name or "", max_len=6) if product_name else _DEFAULT_SLUG
     depts_with_next = []
     for d in departments:
-        code = d["code"]
+        code = d.code
         next_num = counters.get(code, 0) + 1
-        depts_with_next.append({**d, "next_sku": f"{code}-{slug}-{str(next_num).zfill(6)}"})
+        dept_data = d.model_dump()
+        dept_data["next_sku"] = f"{code}-{slug}-{str(next_num).zfill(6)}"
+        depts_with_next.append(dept_data)
     return {"format": SKU_FORMAT, "departments": depts_with_next}

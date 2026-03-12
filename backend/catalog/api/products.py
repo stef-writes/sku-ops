@@ -91,7 +91,7 @@ async def get_products(
         offset=offset,
         product_group=product_group,
     )
-    items = [_enrich_sell_fields(p) for p in items]
+    items = [_enrich_sell_fields(p.model_dump()) for p in items]
     if is_contractor:
         items = [_strip_for_contractor(p) for p in items]
     if limit is not None:

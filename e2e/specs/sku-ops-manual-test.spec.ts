@@ -14,9 +14,10 @@ test.describe("SKU-Ops Manual Testing Suite", () => {
     await page.screenshot({ path: "test-results/01-login-page.png", fullPage: true });
 
     // Attempt login with admin@demo.local / demo123
-    const emailInput = page.locator('input[type="email"], input[name="email"], input[placeholder*="email" i]');
-    const passwordInput = page.locator('input[type="password"], input[name="password"]');
-    const loginButton = page.locator('button[type="submit"], button:has-text("Login"), button:has-text("Sign in")');
+    // There are two login forms (admin and contractor), use the admin one
+    const emailInput = page.getByTestId('admin-login-email-input');
+    const passwordInput = page.locator('#admin-login-email').locator('..').locator('input[type="password"]');
+    const loginButton = page.locator('button[type="submit"]').first();
 
     await emailInput.fill(ADMIN_EMAIL);
     await passwordInput.fill(ADMIN_PASSWORD);

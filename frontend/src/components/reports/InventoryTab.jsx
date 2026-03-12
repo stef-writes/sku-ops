@@ -21,13 +21,11 @@ import { ProductBubblePlot } from "@/components/charts/ProductBubblePlot";
 import { LollipopChart } from "@/components/charts/LollipopChart";
 import { ActivityHeatmap } from "@/components/charts/ActivityHeatmap";
 import { ChartExplainer, BubbleChartGuide } from "@/components/charts/ChartExplainer";
-import { Panel, SectionHead as SectionHeadBase } from "@/components/Panel";
+import { ReportPanel, ReportSectionHead } from "@/components/ReportPanel";
 import { LowStockList } from "./ReportHelpers";
 
 const Stat = StatCard;
-const SectionHead = ({ title, action }) => (
-  <SectionHeadBase title={title} action={action} variant="report" />
-);
+const SectionHead = ({ title, action }) => <ReportSectionHead title={title} action={action} />;
 
 export function InventoryTab({ dateParams, onProductClick }) {
   const t = themeColors();
@@ -182,7 +180,7 @@ export function InventoryTab({ dateParams, onProductClick }) {
       )}
 
       {productPerf.length > 0 && (
-        <Panel>
+        <ReportPanel>
           <SectionHead
             title="Product Portfolio — Sell-Through vs Margin"
             action={
@@ -194,11 +192,11 @@ export function InventoryTab({ dateParams, onProductClick }) {
           <ChartExplainer title="Product Portfolio" wide content={<BubbleChartGuide />}>
             <ProductBubblePlot products={productPerf} onBubbleClick={onProductClick} height={420} />
           </ChartExplainer>
-        </Panel>
+        </ReportPanel>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Panel>
+        <ReportPanel>
           <SectionHead
             title="Reorder Urgency — Days to Stockout"
             action={
@@ -234,8 +232,8 @@ export function InventoryTab({ dateParams, onProductClick }) {
               All stock levels healthy
             </p>
           )}
-        </Panel>
-        <Panel>
+        </ReportPanel>
+        <ReportPanel>
           <SectionHead title="Value by Department" />
           {departmentChartData.length > 0 ? (
             <HorizontalBarChart
@@ -252,11 +250,11 @@ export function InventoryTab({ dateParams, onProductClick }) {
           ) : (
             <p className="text-sm text-muted-foreground py-8 text-center">No data</p>
           )}
-        </Panel>
+        </ReportPanel>
       </div>
 
       {productGroups?.length > 0 && (
-        <Panel>
+        <ReportPanel>
           <SectionHead
             title="Product Groups"
             action={
@@ -283,10 +281,10 @@ export function InventoryTab({ dateParams, onProductClick }) {
               </button>
             ))}
           </div>
-        </Panel>
+        </ReportPanel>
       )}
 
-      <Panel>
+      <ReportPanel>
         <SectionHead title="Top Products by Revenue" />
         {margins.length > 0 ? (
           <HorizontalBarChart
@@ -302,9 +300,9 @@ export function InventoryTab({ dateParams, onProductClick }) {
         ) : (
           <p className="text-sm text-muted-foreground py-8 text-center">No data</p>
         )}
-      </Panel>
+      </ReportPanel>
 
-      <Panel>
+      <ReportPanel>
         <SectionHead
           title="Product Activity"
           action={
@@ -343,9 +341,9 @@ export function InventoryTab({ dateParams, onProductClick }) {
             No withdrawal activity found
           </p>
         )}
-      </Panel>
+      </ReportPanel>
 
-      <Panel>
+      <ReportPanel>
         <SectionHead title="Stock Health" />
         <div className="flex h-5 rounded-lg overflow-hidden gap-px mb-3">
           <div className="bg-success" style={{ width: `${(inStock / totalP) * 100}%` }} />
@@ -376,10 +374,10 @@ export function InventoryTab({ dateParams, onProductClick }) {
             Out <strong className="tabular-nums">{inventoryReport?.out_of_stock_count || 0}</strong>
           </span>
         </div>
-      </Panel>
+      </ReportPanel>
 
       {inventoryReport?.low_stock_items?.length > 0 && (
-        <Panel>
+        <ReportPanel>
           <SectionHead
             title="Low Stock Alert"
             action={
@@ -391,7 +389,7 @@ export function InventoryTab({ dateParams, onProductClick }) {
           <div className="max-h-[360px] overflow-auto -mx-6 px-6">
             <LowStockList items={inventoryReport.low_stock_items} />
           </div>
-        </Panel>
+        </ReportPanel>
       )}
     </div>
   );

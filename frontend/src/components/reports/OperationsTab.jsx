@@ -8,13 +8,11 @@ import { HorizontalBarChart } from "@/components/charts/HorizontalBarChart";
 import { DotColumnChart } from "@/components/charts/DotColumnChart";
 import { ActivityHeatmap } from "@/components/charts/ActivityHeatmap";
 import { ChartExplainer } from "@/components/charts/ChartExplainer";
-import { Panel, SectionHead as SectionHeadBase } from "@/components/Panel";
+import { ReportPanel, ReportSectionHead } from "@/components/ReportPanel";
 import { PaymentStrip } from "./ReportHelpers";
 
 const Stat = StatCard;
-const SectionHead = ({ title, action }) => (
-  <SectionHeadBase title={title} action={action} variant="report" />
-);
+const SectionHead = ({ title, action }) => <ReportSectionHead title={title} action={action} />;
 
 export function OperationsTab({ reportFilters }) {
   const t = themeColors();
@@ -96,14 +94,14 @@ export function OperationsTab({ reportFilters }) {
       </div>
 
       {paymentChartData.length > 0 && (
-        <Panel>
+        <ReportPanel>
           <SectionHead title="Payment Status" />
           <PaymentStrip data={paymentChartData} />
-        </Panel>
+        </ReportPanel>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Panel>
+        <ReportPanel>
           <SectionHead title="Job Throughput — Top by Revenue" />
           {jobPlData?.rows?.length > 0 ? (
             <HorizontalBarChart
@@ -120,8 +118,8 @@ export function OperationsTab({ reportFilters }) {
           ) : (
             <p className="text-sm text-muted-foreground py-8 text-center">No job data</p>
           )}
-        </Panel>
-        <Panel>
+        </ReportPanel>
+        <ReportPanel>
           <SectionHead title="Contractor Activity — Top by Revenue" />
           {contractorPlData?.rows?.length > 0 ? (
             <HorizontalBarChart
@@ -137,11 +135,11 @@ export function OperationsTab({ reportFilters }) {
           ) : (
             <p className="text-sm text-muted-foreground py-8 text-center">No contractor data</p>
           )}
-        </Panel>
+        </ReportPanel>
       </div>
 
       {dotColumnData.length > 0 && (
-        <Panel>
+        <ReportPanel>
           <SectionHead
             title="Daily Operational Activity"
             action={
@@ -161,11 +159,11 @@ export function OperationsTab({ reportFilters }) {
           >
             <DotColumnChart data={dotColumnData} height={260} />
           </ChartExplainer>
-        </Panel>
+        </ReportPanel>
       )}
 
       {heatmapData.length > 0 && (
-        <Panel>
+        <ReportPanel>
           <SectionHead
             title="Transaction Activity — Last 12 Months"
             action={
@@ -193,7 +191,7 @@ export function OperationsTab({ reportFilters }) {
               }
             />
           </ChartExplainer>
-        </Panel>
+        </ReportPanel>
       )}
     </div>
   );

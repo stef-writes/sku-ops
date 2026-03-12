@@ -61,16 +61,14 @@ async def product_performance_report(
     end_date: str | None = None,
     limit: int = 200,
 ) -> dict:
-    org_id = get_org_id()
     margin_data, products_data, units_sold_map = await asyncio.gather(
         ledger_repo.product_margins(
-            org_id=org_id,
             start_date=start_date,
             end_date=end_date,
             limit=limit,
         ),
         list_products(),
-        ledger_repo.units_sold_by_product(org_id=org_id, start_date=start_date, end_date=end_date),
+        ledger_repo.units_sold_by_product(start_date=start_date, end_date=end_date),
     )
 
     product_map = {p.id: p for p in products_data}

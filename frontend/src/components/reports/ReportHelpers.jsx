@@ -5,7 +5,7 @@ import { themeColors } from "@/lib/chartTheme";
 import { DataTable } from "@/components/DataTable";
 import { StatCard } from "@/components/StatCard";
 import { StackedBarChart } from "@/components/charts/StackedBarChart";
-import { Panel, SectionHead as SectionHeadBase } from "@/components/Panel";
+import { ReportPanel, ReportSectionHead } from "@/components/ReportPanel";
 
 export const PaymentStrip = ({ data = [] }) => {
   const total = data.reduce((s, d) => s + d.value, 0) || 1;
@@ -287,9 +287,7 @@ export const ARAgingTable = ({ data }) => {
   );
 };
 
-const SectionHead = ({ title, action }) => (
-  <SectionHeadBase title={title} action={action} variant="report" />
-);
+const SectionHead = ({ title, action }) => <ReportSectionHead title={title} action={action} />;
 
 export const FinanceTab = ({ financialSummary, arAging, arAgingOpen, setArAgingOpen }) => {
   const t = themeColors();
@@ -329,7 +327,7 @@ export const FinanceTab = ({ financialSummary, arAging, arAgingOpen, setArAgingO
 
       {financialSummary?.by_billing_entity &&
         Object.keys(financialSummary.by_billing_entity).length > 0 && (
-          <Panel>
+          <ReportPanel>
             <SectionHead title="By Billing Entity" />
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {Object.entries(financialSummary.by_billing_entity).map(([entity, data]) => {
@@ -389,11 +387,11 @@ export const FinanceTab = ({ financialSummary, arAging, arAgingOpen, setArAgingO
                 );
               })}
             </div>
-          </Panel>
+          </ReportPanel>
         )}
 
       {arAging?.length > 0 && (
-        <Panel>
+        <ReportPanel>
           <SectionHead title="AR Aging by Entity" />
           <StackedBarChart
             data={arAging.map((r) => ({
@@ -415,7 +413,7 @@ export const FinanceTab = ({ financialSummary, arAging, arAgingOpen, setArAgingO
             valueFormatter={valueFormatter}
             height={Math.max(200, arAging.length * 40)}
           />
-        </Panel>
+        </ReportPanel>
       )}
 
       {arAging?.length > 0 && (

@@ -68,68 +68,58 @@ const Layout = ({ children }) => {
       ];
     }
 
-    const dailyItems = [
+    const operationsItems = [
       { path: "/pos", icon: ShoppingCart, label: "Issue Materials" },
       {
         path: "/pending-requests",
         icon: ClipboardList,
         label: "Pending Requests",
       },
+      { path: "/contractors", icon: HardHat, label: "Contractors" },
+      { path: "/billing-entities", icon: Building2, label: "Billing Entities" },
+    ];
+
+    const purchasingItems = [
       { path: "/import", icon: Truck, label: "Receive / Import" },
-      {
-        path: "/reports?tab=operations",
-        icon: BarChart3,
-        label: "Operations Report",
-      },
-    ];
-
-    const catalogItems = [
-      { path: "/inventory", icon: Package, label: "Products" },
-      { path: "/departments", icon: Layers, label: "Departments" },
-      { path: "/vendors", icon: Users, label: "Vendors" },
-    ];
-
-    const inventoryItems = [
-      { path: "/cycle-counts", icon: ClipboardCheck, label: "Stock Counts" },
       {
         path: "/purchase-orders",
         icon: ClipboardList,
         label: "Purchase Orders",
       },
-      {
-        path: "/reports?tab=inventory",
-        icon: BarChart3,
-        label: "Stock Report",
-      },
+      { path: "/vendors", icon: Users, label: "Vendors" },
+    ];
+
+    const inventoryItems = [
+      { path: "/inventory", icon: Package, label: "Products" },
+      { path: "/departments", icon: Layers, label: "Departments" },
+      { path: "/cycle-counts", icon: ClipboardCheck, label: "Stock Counts" },
     ];
 
     const financeItems = [
       { path: "/invoices", icon: FileText, label: "Invoices" },
       { path: "/payments", icon: CreditCard, label: "Payments" },
-      { path: "/billing-entities", icon: Building2, label: "Billing Entities" },
-      { path: "/reports?tab=pl", icon: BarChart3, label: "Financials" },
+      {
+        path: "/xero-health",
+        icon: ShieldCheck,
+        label: "Xero Sync Health",
+      },
     ];
+
+    const reportItems = [{ path: "/reports", icon: BarChart3, label: "Reports" }];
 
     const groups = [
       { items: [{ path: "/", icon: LayoutDashboard, label: "Dashboard" }] },
-      { section: "Daily", items: dailyItems },
-      { section: "Catalog", items: catalogItems },
+      { section: "Operations", items: operationsItems },
+      { section: "Purchasing", items: purchasingItems },
       { section: "Inventory", items: inventoryItems },
       { section: "Finance", items: financeItems },
+      { section: "Reports", items: reportItems },
     ];
 
     if (role === ROLES.ADMIN) {
       groups.push({
         section: "System",
-        items: [
-          { path: "/contractors", icon: HardHat, label: "Contractors" },
-          { path: "/settings", icon: Settings, label: "Settings" },
-          {
-            path: "/xero-health",
-            icon: ShieldCheck,
-            label: "Xero Sync Health",
-          },
-        ],
+        items: [{ path: "/settings", icon: Settings, label: "Settings" }],
       });
     }
 

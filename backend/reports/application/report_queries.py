@@ -26,7 +26,6 @@ from reports.application.inventory_reports import (  # noqa: F401
     product_performance_report,
     reorder_urgency_report,
 )
-from shared.infrastructure.db import get_org_id
 from shared.kernel.types import round_money
 
 
@@ -38,7 +37,6 @@ async def kpi_report(
     department: str | None = None,
     billing_entity: str | None = None,
 ) -> dict:
-    org_id = get_org_id()
     accounts, products_data, units_sold_map = await asyncio.gather(
         ledger_repo.summary_by_account(
             start_date=start_date,
@@ -48,7 +46,7 @@ async def kpi_report(
             billing_entity=billing_entity,
         ),
         list_products(),
-        ledger_repo.units_sold_by_product(org_id=org_id, start_date=start_date, end_date=end_date),
+        ledger_repo.units_sold_by_product(start_date=start_date, end_date=end_date),
     )
 
     total_revenue = accounts.get("revenue", 0)

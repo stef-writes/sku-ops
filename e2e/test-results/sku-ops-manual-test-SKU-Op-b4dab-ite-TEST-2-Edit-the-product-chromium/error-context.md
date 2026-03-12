@@ -1,0 +1,43 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - region "Notifications alt+T"
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - img [ref=e8]
+      - heading "Supply Yard" [level=1] [ref=e10]
+      - paragraph [ref=e11]: Material management for contractors & warehouses
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - generic [ref=e14]:
+          - img [ref=e16]
+          - heading "Admin / Warehouse" [level=2] [ref=e19]
+        - generic [ref=e20]:
+          - generic [ref=e21]:
+            - text: Email
+            - textbox "Email" [active] [ref=e22]:
+              - /placeholder: you@company.com
+              - text: admin@demo.local
+          - generic [ref=e23]:
+            - text: Password
+            - textbox "Password" [ref=e24]:
+              - /placeholder: ••••••••
+          - button "Sign in" [ref=e25] [cursor=pointer]
+        - paragraph [ref=e26]: "Demo: admin@demo.local / demo123"
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - img [ref=e30]
+          - heading "Contractor" [level=2] [ref=e35]
+        - generic [ref=e36]:
+          - generic [ref=e37]:
+            - text: Email
+            - textbox "Email" [ref=e38]:
+              - /placeholder: you@company.com
+          - generic [ref=e39]:
+            - text: Password
+            - textbox "Password" [ref=e40]:
+              - /placeholder: ••••••••
+          - button "Sign in" [ref=e41] [cursor=pointer]
+        - paragraph [ref=e42]: "Demo: contractor@demo.local / demo123"
+```

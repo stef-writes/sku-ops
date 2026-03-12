@@ -7,6 +7,7 @@ import asyncio
 import contextlib
 import logging
 import re
+from typing import Protocol
 
 import numpy as np
 
@@ -22,6 +23,16 @@ logger = logging.getLogger(__name__)
 EMBEDDING_MODEL = "text-embedding-3-small"
 EMBEDDING_DIM = 1536
 
+
+class ProductLike(Protocol):
+    name: str
+    description: str
+    department_name: str
+    vendor_name: str
+    sku: str
+    organization_id: str
+
+
 # Registry: org_id → ProductSearchIndex
 _indexes: dict[str, "ProductSearchIndex"] = {}
 
@@ -31,20 +42,20 @@ def _tokenize(text: str) -> list[str]:
     return [t for t in tokens if len(t) > 1]
 
 
-def _product_text(p: dict) -> str:
+def _product_text(p: ProductLike) -> str:
     parts = [
-        p.get("name") or "",
-        p.get("description") or "",
-        p.get("department_name") or "",
-        p.get("vendor_name") or "",
-        p.get("sku") or "",
+        p.name or "",
+        p.description or "",
+        p.department_name or "",
+        p.vendor_name or "",
+        p.sku or "",
     ]
     return " ".join(filter(None, parts))
 
 
 class ProductSearchIndex:
     def __init__(self):
-        self._products: list[dict] = []
+        self._products: list[ProductLike] = []
         # Semantic (OpenAI embeddings)
         self._embeddings: np.ndarray | None = None  # shape (N, EMBEDDING_DIM)
         # Keyword fallback (BM25)
@@ -65,7 +76,7 @@ class ProductSearchIndex:
         else:
             self._build_bm25(products)
 
-    async def _build_embeddings(self, products: list[dict], api_key: str) -> None:
+    async def _build_embeddings(self, products: list[ProductLike], api_key: str) -> None:
         try:
             from openai import AsyncOpenAI
 
@@ -87,14 +98,14 @@ class ProductSearchIndex:
             logger.info(
                 "Embedding index built: %d products (org=%s)",
                 len(products),
-                self._products[0].get("organization_id", "unknown") if products else "?",
+                self._products[0].organization_id if products else "?",
             )
         except (ValueError, RuntimeError, OSError, TypeError) as e:
             logger.warning("Embedding build failed, falling back to BM25: %s", e)
             self._embeddings = None
             self._build_bm25(products)
 
-    def _build_bm25(self, products: list[dict]) -> None:
+    def _build_bm25(self, products: list[ProductLike]) -> None:
         try:
             from rank_bm25 import BM25Okapi
         except ImportError:
@@ -104,7 +115,9 @@ class ProductSearchIndex:
         self._bm25 = BM25Okapi(corpus)
         logger.info("BM25 index built: %d products (fallback mode)", len(products))
 
-    async def search_semantic(self, query: str, limit: int = 10, api_key: str = "") -> list[dict]:
+    async def search_semantic(
+        self, query: str, limit: int = 10, api_key: str = ""
+    ) -> list[ProductLike]:
         """Embed the query and return nearest products by cosine similarity."""
         if self._embeddings is None or not self._products:
             return self.search_bm25(query, limit)
@@ -124,7 +137,7 @@ class ProductSearchIndex:
             logger.warning("Semantic search failed, falling back to BM25: %s", e)
             return self.search_bm25(query, limit)
 
-    def search_bm25(self, query: str, limit: int = 10) -> list[dict]:
+    def search_bm25(self, query: str, limit: int = 10) -> list[ProductLike]:
         if not self._bm25 or not self._products:
             return []
         tokens = _tokenize(query)
@@ -138,7 +151,7 @@ class ProductSearchIndex:
         )
         return [p for _, p in ranked[:limit]]
 
-    def search(self, query: str, limit: int = 10) -> list[dict]:
+    def search(self, query: str, limit: int = 10) -> list[ProductLike]:
         """Sync BM25 search — used as keyword fallback from tool wrappers that can't await."""
         return self.search_bm25(query, limit)
 

@@ -18,7 +18,7 @@ case "${1:-help}" in
     ;;
   test:e2e)
     echo "Running e2e tests..."
-    npx --prefix e2e playwright test "${@:2}"
+    npx --prefix e2e playwright test --config=e2e/playwright.config.ts "${@:2}"
     ;;
   fmt)
     echo "Formatting code..."

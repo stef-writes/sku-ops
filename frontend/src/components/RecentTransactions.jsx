@@ -16,7 +16,14 @@ import { keys } from "@/hooks/queryKeys";
 import { dateToISO, endOfDayISO } from "@/lib/utils";
 import { useContractors } from "@/hooks/useContractors";
 
-export function RecentTransactions({ dateRange, onProductStockHistory, onWithdrawalClick }) {
+export function RecentTransactions({
+  dateRange,
+  onProductStockHistory,
+  onWithdrawalClick,
+  title = "Recent Transactions",
+  viewAllHref = "/reports",
+  viewAllLabel = "View all",
+}) {
   const [contractorId, setContractorId] = useState("");
   const [invoiceStatus, setInvoiceStatus] = useState("");
   const [offset, setOffset] = useState(0);
@@ -65,12 +72,12 @@ export function RecentTransactions({ dateRange, onProductStockHistory, onWithdra
       data-testid="recent-transactions-terminal"
     >
       <div className="flex items-center justify-between mb-4 pb-3 border-b border-border">
-        <h2 className="text-lg font-semibold text-foreground">Recent Transactions</h2>
+        <h2 className="text-lg font-semibold text-foreground">{title}</h2>
         <Link
-          to="/reports"
+          to={viewAllHref}
           className="text-sm text-muted-foreground hover:text-accent flex items-center gap-1"
         >
-          View all <ArrowRight className="w-4 h-4" />
+          {viewAllLabel} <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
 

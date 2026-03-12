@@ -16,9 +16,9 @@ import { InventoryTab } from "@/components/reports/InventoryTab";
 import api from "@/lib/api-client";
 
 const TABS = [
-  { value: "pl", label: "Financials", icon: DollarSign },
+  { value: "pl", label: "Financial", icon: DollarSign },
   { value: "operations", label: "Operations", icon: Activity },
-  { value: "inventory", label: "Stock", icon: Package },
+  { value: "inventory", label: "Inventory", icon: Package },
 ];
 
 const Reports = () => {
@@ -126,7 +126,7 @@ const Reports = () => {
         <div>
           <h1 className="text-2xl font-semibold text-foreground tracking-tight">Reports</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Financial, operational, and stock analytics
+            Financial, operational, and inventory analytics
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

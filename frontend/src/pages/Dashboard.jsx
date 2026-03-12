@@ -2,17 +2,7 @@ import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
-import {
-  AlertTriangle,
-  ArrowRight,
-  Truck,
-  ClipboardList,
-  FileText,
-  ShoppingCart,
-  Package,
-  TrendingUp,
-  DollarSign,
-} from "lucide-react";
+import { AlertTriangle, Truck, ClipboardList, ShoppingCart, Package, HardHat } from "lucide-react";
 import { format } from "date-fns";
 import { valueFormatter } from "@/lib/chartConfig";
 import { ROLES, DATE_PRESETS } from "@/lib/constants";
@@ -21,7 +11,8 @@ import { StatCard } from "@/components/StatCard";
 import { StockHistoryModal } from "@/components/StockHistoryModal";
 import { StatusBadge } from "@/components/StatusBadge";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
-import { TransactionsTable } from "@/components/TransactionsTable";
+import { RecentTransactions } from "@/components/RecentTransactions";
+import { ActionTile } from "@/components/ActionTile";
 import { useDashboardStats } from "@/hooks/useDashboard";
 import { dateToISO, endOfDayISO } from "@/lib/utils";
 import { Panel, SectionHead } from "@/components/Panel";
@@ -186,130 +177,135 @@ const Dashboard = () => {
   }
 
   const hasPOs = stats?.po_summary && Object.keys(stats.po_summary).length > 0;
-  const openPOCount =
-    (stats?.po_summary?.ordered?.count || 0) + (stats?.po_summary?.partial?.count || 0);
+  const orderedPOCount = stats?.po_summary?.ordered?.count || 0;
+  const partialPOCount = stats?.po_summary?.partial?.count || 0;
+  const receivedPOCount = stats?.po_summary?.received?.count || 0;
+  const openPOCount = orderedPOCount + partialPOCount;
 
   return (
     <div className="p-8" data-testid="dashboard-page">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-semibold text-foreground tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1 text-sm">{rangeLabel}</p>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Daily yard activity, inbound deliveries, and contractor work · {rangeLabel}
+          </p>
         </div>
         <DateRangeFilter value={dateRange} onChange={setDateRange} />
       </div>
 
-      {/* ── Alerts ── */}
-      {(stats?.low_stock_count > 0 || (pendingRequests ?? 0) > 0) && (
-        <div className="flex flex-wrap gap-2 mb-6">
-          {(pendingRequests ?? 0) > 0 && (
-            <Link
-              to="/pending-requests"
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-info/10 border border-info/30 text-info hover:bg-info/15 text-sm"
-            >
-              <ClipboardList className="w-4 h-4" />
-              <span>{pendingRequests} pending requests</span>
-              <ArrowRight className="w-3.5 h-3.5 text-info" />
-            </Link>
-          )}
-          {stats?.low_stock_count > 0 && (
-            <Link
-              to="/inventory?low_stock=1"
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border text-foreground hover:bg-muted text-sm"
-            >
-              <AlertTriangle className="w-4 h-4 text-accent" />
-              <span>{stats.low_stock_count} items low on stock</span>
-              <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
-            </Link>
-          )}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-semibold text-foreground">Quick actions</h2>
         </div>
-      )}
-
-      {/* ── Financial KPI row ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-        <StatCard
-          label="Revenue"
-          value={valueFormatter(stats?.range_revenue || 0)}
-          icon={DollarSign}
-          accent="blue"
-          note={`${stats?.range_transactions || 0} transactions`}
-          href="/reports"
-        />
-        <StatCard
-          label="Gross Profit"
-          value={valueFormatter(stats?.range_gross_profit || 0)}
-          icon={TrendingUp}
-          accent={stats?.range_gross_profit > 0 ? "emerald" : "slate"}
-          note={stats?.range_margin_pct != null ? `${stats.range_margin_pct}% margin` : undefined}
-          href="/reports"
-        />
-        <StatCard
-          label="Uninvoiced"
-          value={valueFormatter(stats?.unpaid_total || 0)}
-          icon={FileText}
-          accent={stats?.unpaid_total > 0 ? "amber" : "slate"}
-          note="outstanding balance"
-          href="/invoices"
-        />
-        <StatCard
-          label="Inventory Cost"
-          value={valueFormatter(stats?.inventory_cost || 0)}
-          icon={Package}
-          accent="slate"
-          note={`${stats?.inventory_units || 0} units on hand`}
-          href="/inventory"
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <ActionTile
+            to="/pending-requests"
+            icon={ClipboardList}
+            title="Review requests"
+            description="Process contractor requests waiting for issue."
+          />
+          <ActionTile
+            to="/pos"
+            icon={ShoppingCart}
+            title="Issue materials"
+            description="Create a new material issue for a contractor."
+          />
+          <ActionTile
+            to="/import"
+            icon={Truck}
+            title="Receive delivery"
+            description="Review inbound documents and receive stock into inventory."
+          />
+          <ActionTile
+            to="/purchase-orders"
+            icon={Package}
+            title="Open purchase orders"
+            description="Track vendor deliveries and what's still on order."
+          />
+        </div>
       </div>
 
-      {/* ── Operational KPI cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-semibold text-foreground">Work queues</h2>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            label="Pending Requests"
+            value={pendingRequests ?? 0}
+            icon={ClipboardList}
+            accent="blue"
+            note={pendingRequests > 0 ? "awaiting processing" : "all clear"}
+            href="/pending-requests"
+          />
+          <StatCard
+            label="Awaiting Delivery"
+            value={orderedPOCount}
+            icon={Truck}
+            accent={orderedPOCount > 0 ? "violet" : "slate"}
+            note={
+              orderedPOCount > 0
+                ? `${valueFormatter(stats?.po_summary?.ordered?.total || 0)} on order`
+                : "no inbound orders"
+            }
+            href="/purchase-orders"
+          />
+          <StatCard
+            label="At Dock"
+            value={partialPOCount}
+            icon={Package}
+            accent={partialPOCount > 0 ? "orange" : "slate"}
+            note={partialPOCount > 0 ? "ready to receive into stock" : "nothing at dock"}
+            href="/purchase-orders"
+          />
+          <StatCard
+            label="Low Stock Alerts"
+            value={stats?.low_stock_count || 0}
+            icon={AlertTriangle}
+            accent={stats?.low_stock_count > 0 ? "amber" : "slate"}
+            note={`${stats?.inventory_units || 0} total units on hand`}
+            href="/inventory?low_stock=1"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
         <StatCard
-          label="Pending Requests"
-          value={pendingRequests ?? 0}
-          icon={ClipboardList}
-          accent="blue"
-          note={pendingRequests > 0 ? "awaiting processing" : "all clear"}
-          href="/pending-requests"
-        />
-        <StatCard
-          label="Low Stock Alerts"
-          value={stats?.low_stock_count || 0}
-          icon={Package}
-          accent={stats?.low_stock_count > 0 ? "amber" : "slate"}
-          note={`${stats?.inventory_units || 0} total units`}
-          href="/inventory?low_stock=1"
-        />
-        <StatCard
-          label="Total Contractors"
-          value={stats?.total_contractors || 0}
-          icon={ClipboardList}
-          accent="slate"
-          note={`${stats?.total_vendors || 0} vendors`}
-          href="/contractors"
-        />
-        <StatCard
-          label="Open Purchase Orders"
+          label="Open POs"
           value={openPOCount}
           icon={Truck}
           accent={openPOCount > 0 ? "violet" : "slate"}
+          note={hasPOs ? "orders still inbound" : "none in progress"}
+          href="/purchase-orders"
+        />
+        <StatCard
+          label="Received This Period"
+          value={receivedPOCount}
+          icon={Package}
+          accent={receivedPOCount > 0 ? "emerald" : "slate"}
           note={
-            hasPOs
-              ? valueFormatter(
-                  (stats?.po_summary?.ordered?.total || 0) +
-                    (stats?.po_summary?.partial?.total || 0),
-                ) + " in progress"
-              : "none in progress"
+            receivedPOCount > 0
+              ? `${valueFormatter(stats?.po_summary?.received?.total || 0)} received`
+              : "no completed receipts"
           }
           href="/purchase-orders"
         />
+        <StatCard
+          label="Contractors"
+          value={stats?.total_contractors || 0}
+          icon={HardHat}
+          accent="slate"
+          note={`${stats?.total_vendors || 0} vendors in network`}
+          href="/contractors"
+        />
       </div>
 
-      {/* ── PO Activity + Low Stock ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {hasPOs && (
           <Panel>
             <SectionHead
-              title="Purchase orders"
+              title="Inbound delivery status"
               action={
                 <Link
                   to="/purchase-orders"
@@ -319,11 +315,16 @@ const Dashboard = () => {
                 </Link>
               }
             />
-            <div className="mb-4">
-              <span className="text-lg font-bold text-foreground tabular-nums">
-                {openPOCount} open
-              </span>
-              <span className="text-xs text-muted-foreground ml-2">purchase orders</span>
+            <div className="mb-4 flex flex-wrap items-end gap-4">
+              <div>
+                <span className="text-lg font-bold text-foreground tabular-nums">
+                  {openPOCount}
+                </span>
+                <span className="text-xs text-muted-foreground ml-2">still inbound</span>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {orderedPOCount} on order · {partialPOCount} at dock · {receivedPOCount} received
+              </div>
             </div>
             <POSummaryStrip summary={stats.po_summary} />
           </Panel>
@@ -364,8 +365,13 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* ── Transactions Table ── */}
-      {!isContractor && <TransactionsTable dateParams={statsParams} />}
+      <RecentTransactions
+        dateRange={dateRange}
+        onProductStockHistory={setStockHistoryProduct}
+        title="Recent material activity"
+        viewAllHref="/reports?tab=operations"
+        viewAllLabel="Operations view"
+      />
 
       {!isContractor && (
         <StockHistoryModal

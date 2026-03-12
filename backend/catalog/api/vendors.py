@@ -46,7 +46,7 @@ async def delete_vendor(vendor_id: str, request: Request, current_user: AdminDep
         action="vendor.delete",
         resource_type="vendor",
         resource_id=vendor_id,
-        details={"name": existing.get("name")},
+        details={"name": existing.name},
         request=request,
         org_id=current_user.organization_id,
     )

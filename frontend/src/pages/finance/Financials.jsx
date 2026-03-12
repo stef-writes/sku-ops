@@ -22,7 +22,7 @@ import { valueFormatter } from "@/lib/chartConfig";
 import { dateToISO, endOfDayISO } from "@/lib/utils";
 import { HorizontalBarChart } from "@/components/charts/HorizontalBarChart";
 import { StackedBarChart } from "@/components/charts/StackedBarChart";
-import { Panel, SectionHead } from "@/components/Panel";
+import { ReportPanel, ReportSectionHead } from "@/components/ReportPanel";
 
 const buildColumns = (onViewJob) => [
   {
@@ -259,8 +259,8 @@ const Financials = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {summary?.by_contractor?.length > 0 && (
-          <Panel>
-            <SectionHead title="Top Contractors by Spend" variant="report" />
+          <ReportPanel>
+            <ReportSectionHead title="Top Contractors by Spend" />
             <HorizontalBarChart
               data={[...summary.by_contractor]
                 .sort((a, b) => (b.revenue ?? b.total ?? 0) - (a.revenue ?? a.total ?? 0))
@@ -280,11 +280,11 @@ const Financials = () => {
               valueFormatter={valueFormatter}
               height={Math.max(200, Math.min(summary.by_contractor.length, 10) * 36)}
             />
-          </Panel>
+          </ReportPanel>
         )}
         {arAging?.length > 0 && (
-          <Panel>
-            <SectionHead title="AR Aging by Entity" variant="report" />
+          <ReportPanel>
+            <ReportSectionHead title="AR Aging by Entity" />
             <StackedBarChart
               data={arAging.map((r) => ({
                 name: r.billing_entity,
@@ -308,15 +308,13 @@ const Financials = () => {
               valueFormatter={valueFormatter}
               height={Math.max(200, arAging.length * 40)}
             />
-          </Panel>
+          </ReportPanel>
         )}
       </div>
 
       {summary?.by_billing_entity && Object.keys(summary.by_billing_entity).length > 0 && (
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm mb-6">
-          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground mb-3">
-            By Billing Entity
-          </p>
+        <ReportPanel className="mb-6">
+          <ReportSectionHead title="By Billing Entity" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {Object.entries(summary.by_billing_entity).map(([entity, data]) => {
               const aging = arAgingByEntity[entity];
@@ -375,7 +373,7 @@ const Financials = () => {
               );
             })}
           </div>
-        </div>
+        </ReportPanel>
       )}
 
       <ViewToolbar

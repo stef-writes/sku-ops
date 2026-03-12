@@ -61,7 +61,7 @@ async def delete_department(dept_id: str, request: Request, current_user: AdminD
         action="department.delete",
         resource_type="department",
         resource_id=dept_id,
-        details={"name": existing.get("name"), "code": existing.get("code")},
+        details={"name": existing.name, "code": existing.code},
         request=request,
         org_id=current_user.organization_id,
     )

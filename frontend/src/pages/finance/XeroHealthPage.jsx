@@ -1,5 +1,14 @@
 import { RefreshCw, CheckCircle2, AlertTriangle, XCircle, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ReportPanel, ReportSectionHead } from "@/components/ReportPanel";
 import { useXeroHealth, useTriggerXeroSync } from "@/hooks/useXeroHealth";
 
 function formatDate(iso) {
@@ -27,17 +36,21 @@ function SectionHeader({ icon: Icon, label, count, variant = "neutral" }) {
     ok: "text-success",
   };
   return (
-    <div className="flex items-center gap-2 mb-2">
-      <Icon className={`w-4 h-4 ${colors[variant]}`} />
-      <h2 className="font-semibold text-foreground text-sm">{label}</h2>
-      <span
-        className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
-          count === 0 ? "bg-muted text-muted-foreground" : "bg-warning/15 text-accent"
-        }`}
-      >
-        {count}
-      </span>
-    </div>
+    <ReportSectionHead
+      title={label}
+      action={
+        <div className="flex items-center gap-2 shrink-0">
+          <Icon className={`w-4 h-4 ${colors[variant]}`} />
+          <span
+            className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
+              count === 0 ? "bg-muted text-muted-foreground" : "bg-warning/15 text-accent"
+            }`}
+          >
+            {count}
+          </span>
+        </div>
+      }
+    />
   );
 }
 
@@ -53,36 +66,36 @@ function EmptyRow() {
 
 function DocTable({ rows, columns }) {
   return (
-    <div className="rounded-lg border border-border overflow-hidden mb-6">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-muted border-b border-border">
+    <div className="rounded-lg border border-border overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/80 hover:bg-muted/80">
             {columns.map((col) => (
-              <th
+              <TableHead
                 key={col.key}
                 className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide"
               >
                 {col.label}
-              </th>
+              </TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border/50">
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {rows.length === 0 ? (
             <EmptyRow />
           ) : (
             rows.map((row, i) => (
-              <tr key={row.id ?? i} className="hover:bg-muted/60 transition-colors">
+              <TableRow key={row.id ?? i} className="hover:bg-muted/60 transition-colors">
                 {columns.map((col) => (
-                  <td key={col.key} className="px-4 py-2.5 text-foreground">
+                  <TableCell key={col.key} className="px-4 py-2.5 text-foreground">
                     {col.render ? col.render(row) : (row[col.key] ?? "—")}
-                  </td>
+                  </TableCell>
                 ))}
-              </tr>
+              </TableRow>
             ))
           )}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -229,7 +242,7 @@ export default function XeroHealthPage() {
         ))}
       </div>
 
-      <section>
+      <ReportPanel>
         <SectionHeader
           icon={FileText}
           label="Unsynced Invoices"
@@ -237,9 +250,9 @@ export default function XeroHealthPage() {
           variant="warn"
         />
         <DocTable rows={data?.unsynced_invoices ?? []} columns={INVOICE_COLS} />
-      </section>
+      </ReportPanel>
 
-      <section>
+      <ReportPanel>
         <SectionHeader
           icon={FileText}
           label="Unsynced Credit Notes"
@@ -247,9 +260,9 @@ export default function XeroHealthPage() {
           variant="warn"
         />
         <DocTable rows={data?.unsynced_credits ?? []} columns={CN_COLS} />
-      </section>
+      </ReportPanel>
 
-      <section>
+      <ReportPanel>
         <SectionHeader
           icon={FileText}
           label="Unsynced Vendor Bills (POs)"
@@ -257,9 +270,9 @@ export default function XeroHealthPage() {
           variant="warn"
         />
         <DocTable rows={data?.unsynced_po_bills ?? []} columns={PO_COLS} />
-      </section>
+      </ReportPanel>
 
-      <section>
+      <ReportPanel>
         <SectionHeader
           icon={AlertTriangle}
           label="Invoice Mismatches"
@@ -267,9 +280,9 @@ export default function XeroHealthPage() {
           variant="danger"
         />
         <DocTable rows={data?.mismatch_invoices ?? []} columns={MISMATCH_INVOICE_COLS} />
-      </section>
+      </ReportPanel>
 
-      <section>
+      <ReportPanel>
         <SectionHeader
           icon={AlertTriangle}
           label="Credit Note Mismatches"
@@ -277,9 +290,9 @@ export default function XeroHealthPage() {
           variant="danger"
         />
         <DocTable rows={data?.mismatch_credits ?? []} columns={CN_COLS} />
-      </section>
+      </ReportPanel>
 
-      <section>
+      <ReportPanel>
         <SectionHeader
           icon={XCircle}
           label="Failed Invoices"
@@ -287,9 +300,9 @@ export default function XeroHealthPage() {
           variant="danger"
         />
         <DocTable rows={data?.failed_invoices ?? []} columns={INVOICE_COLS} />
-      </section>
+      </ReportPanel>
 
-      <section>
+      <ReportPanel>
         <SectionHeader
           icon={XCircle}
           label="Failed Credit Notes"
@@ -297,9 +310,9 @@ export default function XeroHealthPage() {
           variant="danger"
         />
         <DocTable rows={data?.failed_credits ?? []} columns={CN_COLS} />
-      </section>
+      </ReportPanel>
 
-      <section>
+      <ReportPanel>
         <SectionHeader
           icon={XCircle}
           label="Failed Vendor Bills"
@@ -307,7 +320,7 @@ export default function XeroHealthPage() {
           variant="danger"
         />
         <DocTable rows={data?.failed_po_bills ?? []} columns={PO_COLS} />
-      </section>
+      </ReportPanel>
     </div>
   );
 }

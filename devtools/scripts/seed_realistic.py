@@ -690,7 +690,7 @@ async def main():
         logger.error("Demo users not found. Start the server first to run seed_mock_user().")
         return
 
-    departments = await list_departments(org_id)
+    departments = await list_departments()
     dept_by_code = {d["code"]: d for d in departments}
     if not dept_by_code:
         logger.error(

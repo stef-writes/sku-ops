@@ -94,7 +94,7 @@ async def seed_standard_departments(organization_id: str = "default") -> None:
         {"name": "Appliances", "code": "APP", "description": "Home appliances"},
     ]
     for d in standard:
-        if not await get_department_by_code(d["code"], organization_id):
+        if not await get_department_by_code(d["code"]):
             dept = Department(name=d["name"], code=d["code"], description=d.get("description", ""))
             d_dict = dept.model_dump()
             d_dict["organization_id"] = organization_id
@@ -106,7 +106,7 @@ async def seed_demo_inventory(organization_id: str = "default") -> None:
     if not MOCK_USER_EMAIL:
         return
     try:
-        count = await count_all_products(organization_id)
+        count = await count_all_products()
         if count > 0:
             return
         if not os.path.exists(DEMO_CSV_PATH):
@@ -122,7 +122,7 @@ async def seed_demo_inventory(organization_id: str = "default") -> None:
         with open(DEMO_CSV_PATH, "rb") as f:
             content = f.read()
         rows = parse_csv_products(content)
-        all_depts = await list_departments(organization_id)
+        all_depts = await list_departments()
         dept_by_code = {d["code"]: d for d in all_depts}
 
         imported = 0
@@ -266,7 +266,7 @@ async def seed_demo_tenants() -> None:
 
             admin_user = await _get_user_by_email(f"admin@{org['slug']}.demo")
             if admin_user and rows:
-                all_depts = await list_departments(org_id)
+                all_depts = await list_departments()
                 dept_by_code = {d["code"]: d for d in all_depts}
                 imported = 0
                 for item in rows:

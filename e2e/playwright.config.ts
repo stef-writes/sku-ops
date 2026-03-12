@@ -1,17 +1,36 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./specs",
-  timeout: 30_000,
+  timeout: 60_000,
+  expect: { timeout: 10_000 },
   retries: 0,
+  fullyParallel: false,
   use: {
-    baseURL: "http://localhost:8000",
+    baseURL: "http://localhost:3000",
     trace: "on-first-retry",
+    screenshot: "on",
+    video: "retain-on-failure",
+    actionTimeout: 15_000,
   },
-  webServer: {
-    command: "cd ../.. && ./bin/dev server",
-    port: 8000,
-    reuseExistingServer: true,
-    timeout: 30_000,
-  },
+  projects: [
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+    },
+  ],
+  webServer: [
+    {
+      command: "cd .. && ./bin/dev server",
+      port: 8000,
+      reuseExistingServer: true,
+      timeout: 30_000,
+    },
+    {
+      command: "cd .. && ./bin/dev ui",
+      port: 3000,
+      reuseExistingServer: true,
+      timeout: 30_000,
+    },
+  ],
 });

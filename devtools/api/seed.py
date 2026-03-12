@@ -34,6 +34,8 @@ async def seed_departments(current_user: AdminDep):
 async def _clear_all_tables(conn) -> None:
     """Delete all data from core tables (FK order)."""
     await conn.execute("DELETE FROM financial_ledger")
+    await conn.execute("DELETE FROM payment_withdrawals")
+    await conn.execute("DELETE FROM payments")
     await conn.execute("DELETE FROM credit_note_line_items")
     await conn.execute("DELETE FROM credit_notes")
     await conn.execute("DELETE FROM returns")
@@ -43,6 +45,8 @@ async def _clear_all_tables(conn) -> None:
     await conn.execute("DELETE FROM invoice_counters")
     await conn.execute("DELETE FROM material_requests")
     await conn.execute("DELETE FROM withdrawals")
+    await conn.execute("DELETE FROM cycle_count_items")
+    await conn.execute("DELETE FROM cycle_counts")
     await conn.execute("DELETE FROM purchase_order_items")
     await conn.execute("DELETE FROM purchase_orders")
     await conn.execute("DELETE FROM stock_transactions")
@@ -50,6 +54,9 @@ async def _clear_all_tables(conn) -> None:
     await conn.execute("DELETE FROM sku_counters")
     await conn.execute("DELETE FROM vendors")
     await conn.execute("DELETE FROM departments")
+    await conn.execute("DELETE FROM jobs")
+    await conn.execute("DELETE FROM addresses")
+    await conn.execute("DELETE FROM billing_entities")
     await conn.execute("DELETE FROM users")
     await conn.execute("DELETE FROM organizations")
     await conn.commit()
@@ -266,7 +273,7 @@ async def reset_and_reseed_inventory(current_user: AdminDep):
         await conn.commit()
         logger.info("Inventory reset complete")
         await seed_demo_inventory(org_id)
-        count = await count_all_products(org_id)
+        count = await count_all_products()
         return {"message": f"Inventory reset and reseeded with {count} products"}
     except Exception as e:
         logger.exception("Reset inventory failed")
