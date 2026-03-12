@@ -74,3 +74,27 @@ def date_extract(column: str) -> str:
     if d == "sqlite":
         return f"DATE({column})"
     return f"({column})::date"
+
+
+def days_overdue_expr(due_date_expr: str) -> str:
+    """Return a SQL expression for days since a due date (positive = overdue).
+
+    SQLite:     ``julianday('now') - julianday(due_date_expr)``
+    PostgreSQL: ``EXTRACT(EPOCH FROM (NOW() - (due_date_expr)::timestamp)) / 86400.0``
+    """
+    d = _get_dialect()
+    if d == "sqlite":
+        return f"julianday('now') - julianday({due_date_expr})"
+    return f"EXTRACT(EPOCH FROM (NOW() - ({due_date_expr})::timestamp)) / 86400.0"
+
+
+def date_add_days_expr(column: str, days: int) -> str:
+    """Return a SQL expression that adds days to a timestamp column.
+
+    SQLite:     ``datetime(column, '+N days')``
+    PostgreSQL: ``column::timestamp + INTERVAL 'N days'``
+    """
+    d = _get_dialect()
+    if d == "sqlite":
+        return f"datetime({column}, '+{days} days')"
+    return f"{column}::timestamp + INTERVAL '{days} days'"

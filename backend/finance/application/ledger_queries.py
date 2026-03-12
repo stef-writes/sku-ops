@@ -52,7 +52,7 @@ async def summary_by_account(
     )
 
     query = (
-        "SELECT account, ROUND(SUM(amount), 2) AS total"
+        "SELECT account, ROUND(CAST(SUM(amount) AS NUMERIC), 2) AS total"
         " FROM financial_ledger"
         " WHERE organization_id = ?"
     )
@@ -79,9 +79,9 @@ async def summary_by_department(
 
     query = (
         "SELECT department,"
-        " ROUND(SUM(CASE WHEN account = 'revenue' THEN amount ELSE 0 END), 2) AS revenue,"
-        " ROUND(SUM(CASE WHEN account = 'cogs' THEN amount ELSE 0 END), 2) AS cost,"
-        " ROUND(SUM(CASE WHEN account = 'shrinkage' THEN amount ELSE 0 END), 2) AS shrinkage"
+        " ROUND(CAST(SUM(CASE WHEN account = 'revenue' THEN amount ELSE 0 END) AS NUMERIC), 2) AS revenue,"
+        " ROUND(CAST(SUM(CASE WHEN account = 'cogs' THEN amount ELSE 0 END) AS NUMERIC), 2) AS cost,"
+        " ROUND(CAST(SUM(CASE WHEN account = 'shrinkage' THEN amount ELSE 0 END) AS NUMERIC), 2) AS shrinkage"
         " FROM financial_ledger"
         " WHERE organization_id = ?"
         " AND account IN ('revenue', 'cogs', 'shrinkage')"
@@ -131,8 +131,8 @@ async def summary_by_job(
     base = (
         "SELECT job_id,"
         " billing_entity,"
-        " ROUND(SUM(CASE WHEN account = 'revenue' THEN amount ELSE 0 END), 2) AS revenue,"
-        " ROUND(SUM(CASE WHEN account = 'cogs' THEN amount ELSE 0 END), 2) AS cost,"
+        " ROUND(CAST(SUM(CASE WHEN account = 'revenue' THEN amount ELSE 0 END) AS NUMERIC), 2) AS revenue,"
+        " ROUND(CAST(SUM(CASE WHEN account = 'cogs' THEN amount ELSE 0 END) AS NUMERIC), 2) AS cost,"
         " COUNT(DISTINCT reference_id) AS transaction_count"
         " FROM financial_ledger"
         " WHERE organization_id = ?"
@@ -197,9 +197,9 @@ async def summary_by_billing_entity(
 
     query = (
         "SELECT billing_entity,"
-        " ROUND(SUM(CASE WHEN account = 'revenue' THEN amount ELSE 0 END), 2) AS revenue,"
-        " ROUND(SUM(CASE WHEN account = 'cogs' THEN amount ELSE 0 END), 2) AS cost,"
-        " ROUND(SUM(CASE WHEN account = 'accounts_receivable' THEN amount ELSE 0 END), 2) AS ar_balance,"
+        " ROUND(CAST(SUM(CASE WHEN account = 'revenue' THEN amount ELSE 0 END) AS NUMERIC), 2) AS revenue,"
+        " ROUND(CAST(SUM(CASE WHEN account = 'cogs' THEN amount ELSE 0 END) AS NUMERIC), 2) AS cost,"
+        " ROUND(CAST(SUM(CASE WHEN account = 'accounts_receivable' THEN amount ELSE 0 END) AS NUMERIC), 2) AS ar_balance,"
         " COUNT(DISTINCT reference_id) AS transaction_count"
         " FROM financial_ledger"
         " WHERE organization_id = ?"
@@ -245,8 +245,8 @@ async def summary_by_contractor(
 
     query = (
         "SELECT fl.contractor_id,"
-        " ROUND(SUM(CASE WHEN fl.account = 'revenue' THEN fl.amount ELSE 0 END), 2) AS revenue,"
-        " ROUND(SUM(CASE WHEN fl.account = 'accounts_receivable' THEN fl.amount ELSE 0 END), 2) AS ar_balance,"
+        " ROUND(CAST(SUM(CASE WHEN fl.account = 'revenue' THEN fl.amount ELSE 0 END) AS NUMERIC), 2) AS revenue,"
+        " ROUND(CAST(SUM(CASE WHEN fl.account = 'accounts_receivable' THEN fl.amount ELSE 0 END) AS NUMERIC), 2) AS ar_balance,"
         " COUNT(DISTINCT fl.reference_id) AS transaction_count"
         " FROM financial_ledger fl"
         " WHERE fl.organization_id = ?"

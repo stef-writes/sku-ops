@@ -77,6 +77,50 @@ jobs:
       - name: Run tests
         run: npm test -- --run
 
+  backend-postgres:
+    name: Backend (Postgres)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: sku_ops_test
+          POSTGRES_USER: sku_ops
+          POSTGRES_PASSWORD: testpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sku_ops"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install project and dev deps
+        run: uv sync --dev
+
+      - name: Run tests against Postgres
+        env:
+          ENV: test
+          DATABASE_URL: "postgresql://sku_ops:testpass@localhost:5432/sku_ops_test"
+          JWT_SECRET: ci-test-secret
+          ANTHROPIC_API_KEY: ci-dummy-key
+        run: uv run pytest --tb=short -q --ignore=tests/test_llm_anthropic.py
+
   docker:
     name: Docker build
     runs-on: ubuntu-latest

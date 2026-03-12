@@ -80,7 +80,7 @@ async def trial_balance() -> dict[str, float]:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        """SELECT account, ROUND(SUM(amount), 2) AS balance
+        """SELECT account, ROUND(CAST(SUM(amount) AS NUMERIC), 2) AS balance
            FROM financial_ledger
            WHERE organization_id = ?
            GROUP BY account

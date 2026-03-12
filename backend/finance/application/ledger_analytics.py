@@ -5,7 +5,11 @@ re-exported from ledger_queries so existing callers are unaffected.
 """
 
 from shared.infrastructure.database import get_connection, get_org_id
-from shared.infrastructure.db.sql_compat import date_group_expr
+from shared.infrastructure.db.sql_compat import (
+    date_add_days_expr,
+    date_group_expr,
+    days_overdue_expr,
+)
 
 
 def _build_dimension_filter(
@@ -58,9 +62,9 @@ async def trend_series(
     query += period_expr
     query += (
         " AS period,"
-        " ROUND(SUM(CASE WHEN account = 'revenue' THEN amount ELSE 0 END), 2) AS revenue,"
-        " ROUND(SUM(CASE WHEN account = 'cogs' THEN amount ELSE 0 END), 2) AS cost,"
-        " ROUND(SUM(CASE WHEN account = 'shrinkage' THEN amount ELSE 0 END), 2) AS shrinkage,"
+        " ROUND(CAST(SUM(CASE WHEN account = 'revenue' THEN amount ELSE 0 END) AS NUMERIC), 2) AS revenue,"
+        " ROUND(CAST(SUM(CASE WHEN account = 'cogs' THEN amount ELSE 0 END) AS NUMERIC), 2) AS cost,"
+        " ROUND(CAST(SUM(CASE WHEN account = 'shrinkage' THEN amount ELSE 0 END) AS NUMERIC), 2) AS shrinkage,"
         " COUNT(DISTINCT reference_id) AS transaction_count"
         " FROM financial_ledger"
         " WHERE organization_id = ?"
@@ -104,17 +108,18 @@ async def ar_aging(
         date_filter += " AND fl.created_at <= ?"
         params.append(end_date)
 
+    fallback = date_add_days_expr("fl.created_at", 30)
+    due = f"COALESCE(inv.due_date, {fallback})"
+    age = days_overdue_expr(due)
+
     query = (
         "SELECT fl.billing_entity,"
-        " ROUND(SUM(fl.amount), 2) AS total_ar,"
-        " ROUND(SUM(CASE WHEN julianday('now') - julianday(COALESCE(inv.due_date, datetime(fl.created_at, '+30 days'))) <= 0 THEN fl.amount ELSE 0 END), 2) AS current_not_due,"
-        " ROUND(SUM(CASE WHEN julianday('now') - julianday(COALESCE(inv.due_date, datetime(fl.created_at, '+30 days'))) > 0"
-        " AND julianday('now') - julianday(COALESCE(inv.due_date, datetime(fl.created_at, '+30 days'))) <= 30 THEN fl.amount ELSE 0 END), 2) AS overdue_1_30,"
-        " ROUND(SUM(CASE WHEN julianday('now') - julianday(COALESCE(inv.due_date, datetime(fl.created_at, '+30 days'))) > 30"
-        " AND julianday('now') - julianday(COALESCE(inv.due_date, datetime(fl.created_at, '+30 days'))) <= 60 THEN fl.amount ELSE 0 END), 2) AS overdue_31_60,"
-        " ROUND(SUM(CASE WHEN julianday('now') - julianday(COALESCE(inv.due_date, datetime(fl.created_at, '+30 days'))) > 60"
-        " AND julianday('now') - julianday(COALESCE(inv.due_date, datetime(fl.created_at, '+30 days'))) <= 90 THEN fl.amount ELSE 0 END), 2) AS overdue_61_90,"
-        " ROUND(SUM(CASE WHEN julianday('now') - julianday(COALESCE(inv.due_date, datetime(fl.created_at, '+30 days'))) > 90 THEN fl.amount ELSE 0 END), 2) AS overdue_90_plus"
+        " ROUND(CAST(SUM(fl.amount) AS NUMERIC), 2) AS total_ar,"
+        f" ROUND(CAST(SUM(CASE WHEN {age} <= 0 THEN fl.amount ELSE 0 END) AS NUMERIC), 2) AS current_not_due,"
+        f" ROUND(CAST(SUM(CASE WHEN {age} > 0 AND {age} <= 30 THEN fl.amount ELSE 0 END) AS NUMERIC), 2) AS overdue_1_30,"
+        f" ROUND(CAST(SUM(CASE WHEN {age} > 30 AND {age} <= 60 THEN fl.amount ELSE 0 END) AS NUMERIC), 2) AS overdue_31_60,"
+        f" ROUND(CAST(SUM(CASE WHEN {age} > 60 AND {age} <= 90 THEN fl.amount ELSE 0 END) AS NUMERIC), 2) AS overdue_61_90,"
+        f" ROUND(CAST(SUM(CASE WHEN {age} > 90 THEN fl.amount ELSE 0 END) AS NUMERIC), 2) AS overdue_90_plus"
         " FROM financial_ledger fl"
         " LEFT JOIN invoice_withdrawals iw ON fl.reference_id = iw.withdrawal_id AND fl.reference_type = 'withdrawal'"
         " LEFT JOIN invoices inv ON iw.invoice_id = inv.id"
@@ -123,7 +128,7 @@ async def ar_aging(
         " AND fl.billing_entity IS NOT NULL"
     )
     query += date_filter
-    query += " GROUP BY fl.billing_entity HAVING ROUND(SUM(fl.amount), 2) != 0"
+    query += " GROUP BY fl.billing_entity HAVING ROUND(CAST(SUM(fl.amount) AS NUMERIC), 2) != 0"
     cursor = await conn.execute(query, params)
     return [dict(r) for r in await cursor.fetchall()]
 
@@ -153,8 +158,8 @@ async def product_margins(
 
     query = (
         "SELECT product_id,"
-        " ROUND(SUM(CASE WHEN account = 'revenue' THEN amount ELSE 0 END), 2) AS revenue,"
-        " ROUND(SUM(CASE WHEN account = 'cogs' THEN amount ELSE 0 END), 2) AS cost"
+        " ROUND(CAST(SUM(CASE WHEN account = 'revenue' THEN amount ELSE 0 END) AS NUMERIC), 2) AS revenue,"
+        " ROUND(CAST(SUM(CASE WHEN account = 'cogs' THEN amount ELSE 0 END) AS NUMERIC), 2) AS cost"
         " FROM financial_ledger"
         " WHERE organization_id = ?"
         " AND account IN ('revenue', 'cogs')"
@@ -198,7 +203,7 @@ async def purchase_spend(
         params.append(end_date)
 
     query = (
-        "SELECT ROUND(COALESCE(SUM(amount), 0), 2) AS total"
+        "SELECT ROUND(CAST(COALESCE(SUM(amount), 0) AS NUMERIC), 2) AS total"
         " FROM financial_ledger"
         " WHERE organization_id = ?"
         " AND account = 'inventory'"

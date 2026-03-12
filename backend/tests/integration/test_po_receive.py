@@ -253,7 +253,7 @@ async def test_receive_creates_ledger_entries(db):
 
     conn = get_connection()
     cursor = await conn.execute(
-        "SELECT account, ROUND(SUM(amount), 2) FROM financial_ledger WHERE reference_id = ? GROUP BY account",
+        "SELECT account, ROUND(CAST(SUM(amount) AS NUMERIC), 2) FROM financial_ledger WHERE reference_id = ? GROUP BY account",
         (po.id,),
     )
     rows = {r[0]: r[1] for r in await cursor.fetchall()}

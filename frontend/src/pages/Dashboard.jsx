@@ -266,7 +266,7 @@ const Dashboard = () => {
             value={stats?.low_stock_count || 0}
             icon={AlertTriangle}
             accent={stats?.low_stock_count > 0 ? "amber" : "slate"}
-            note={`${stats?.inventory_units || 0} total units on hand`}
+            note={`${stats?.total_products || 0} SKUs · ${stats?.inventory_units || 0} units on hand`}
             href="/inventory?low_stock=1"
           />
         </div>
@@ -274,12 +274,12 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
         <StatCard
-          label="Open POs"
-          value={openPOCount}
-          icon={Truck}
-          accent={openPOCount > 0 ? "violet" : "slate"}
-          note={hasPOs ? "orders still inbound" : "none in progress"}
-          href="/purchase-orders"
+          label="Inventory Value"
+          value={valueFormatter(stats?.inventory_retail || 0)}
+          icon={Package}
+          accent="emerald"
+          note={`${valueFormatter(stats?.inventory_cost || 0)} cost basis`}
+          href="/inventory"
         />
         <StatCard
           label="Received This Period"

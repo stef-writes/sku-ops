@@ -240,7 +240,7 @@ async def payment_status_breakdown(
         " WHEN w.invoice_id IS NOT NULL THEN 'Invoiced'"
         " ELSE 'Unpaid'"
         " END AS status,"
-        " ROUND(SUM(w.total), 2) AS total"
+        " ROUND(CAST(SUM(w.total) AS NUMERIC), 2) AS total"
         " FROM withdrawals w"
         " WHERE w.organization_id = ?"
     )
