@@ -15,6 +15,7 @@ from pydantic_ai import Agent as SynthAgent
 import assistant.agents.unified.agent as _unified_agent
 from assistant.agents.core.contracts import AgentResult, UsageInfo
 from assistant.agents.core.deps import AgentDeps
+from assistant.agents.core.tokens import compress_history
 from assistant.agents.memory.extract import extract_and_save
 from assistant.agents.memory.store import recall
 from assistant.agents.routing.dag import execute_plan, match_report
@@ -60,6 +61,8 @@ async def chat(
         user_id=ctx.get("user_id", ""),
         user_name=ctx.get("user_name", ""),
     )
+
+    history = compress_history(history) or history
 
     result = await _unified_agent.run(
         user_message, history=history, deps=deps, session_id=session_id

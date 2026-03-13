@@ -1,7 +1,7 @@
 """Model registry — maps task types to models.
 
 Thin adapter over the LLM infrastructure package.
-All agents use Haiku for fast, reliable responses.
+Agent tasks use AGENT_PRIMARY_MODEL (from models.yaml / env) by default.
 
 Env-var overrides still work:
     MODEL_REGISTRY_AGENT_INVENTORY=anthropic/claude-opus-4-6
@@ -19,12 +19,24 @@ from shared.infrastructure.config import AGENT_PRIMARY_MODEL
 logger = logging.getLogger(__name__)
 
 # ── Per-task model assignments ────────────────────────────────────────────────
+# Agent tasks inherit AGENT_PRIMARY_MODEL (resolved from models.yaml / env).
+# Only non-agent tasks get a separate default.
+
+
+def _agent_model_id() -> str:
+    """Return the configured primary model in OpenRouter slash format."""
+    m = AGENT_PRIMARY_MODEL
+    if ":" in m and "/" not in m:
+        provider, _, model = m.partition(":")
+        return f"{provider}/{model}"
+    return m
+
 
 _DEFAULTS: dict[str, str] = {
-    "agent:unified": "anthropic/claude-haiku-4-5",
-    "agent:inventory": "anthropic/claude-haiku-4-5",
-    "agent:ops": "anthropic/claude-haiku-4-5",
-    "agent:finance": "anthropic/claude-haiku-4-5",
+    "agent:unified": _agent_model_id(),
+    "agent:inventory": _agent_model_id(),
+    "agent:ops": _agent_model_id(),
+    "agent:finance": _agent_model_id(),
     "infra:synthesis": "meta-llama/llama-3.3-70b-instruct",
 }
 
@@ -35,7 +47,7 @@ def _resolve(task: str) -> str:
     override = os.environ.get(env_key, "").strip()
     if override:
         return override
-    return _DEFAULTS.get(task, _DEFAULTS["agent:inventory"])
+    return _DEFAULTS.get(task, _agent_model_id())
 
 
 def get_model_name(task: str) -> str:
@@ -55,14 +67,16 @@ def get_model_name(task: str) -> str:
 def get_model(task: str):
     """Return a PydanticAI-compatible model for *task*.
 
-    Falls back to AGENT_PRIMARY_MODEL if init_llm() has not been called yet.
+    Falls back to get_model_name() string if init_llm() has not been called yet
+    (e.g. during module-level agent construction before lifespan starts).
+    PydanticAI can resolve provider:model strings via its own SDK.
     """
     model_name = _resolve(task)
     try:
         return _llm_get_model(model_name)
     except RuntimeError:
-        logger.debug("LLM provider not yet initialized, using AGENT_PRIMARY_MODEL fallback")
-        return AGENT_PRIMARY_MODEL
+        logger.debug("LLM provider not yet initialized, falling back to model name string")
+        return get_model_name(task)
 
 
 def calc_cost(task_or_model: str, usage) -> float:

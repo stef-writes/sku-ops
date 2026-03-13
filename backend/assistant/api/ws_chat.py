@@ -47,6 +47,7 @@ from assistant.agents.core.messages import (
     extract_tool_calls_detailed,
 )
 from assistant.agents.core.model_registry import calc_cost, get_model_name
+from assistant.agents.core.tokens import compress_history
 from assistant.agents.core.validators import validate_response
 from assistant.agents.unified.agent import _agent
 from assistant.application import session_store
@@ -245,6 +246,7 @@ async def _handle_chat(
             ]
 
     deps = AgentDeps(user_id=user_id, user_name=user_name)
+    history = compress_history(history) or history
     msg_history = build_message_history(history)
 
     await _send(ws, {"type": "chat.status", "status": "thinking"})

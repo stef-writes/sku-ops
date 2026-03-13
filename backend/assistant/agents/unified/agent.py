@@ -10,7 +10,7 @@ from pydantic_ai import Agent, RunContext
 
 from assistant.agents.core.deps import AgentDeps
 from assistant.agents.core.messages import build_message_history
-from assistant.agents.core.model_registry import get_model_name
+from assistant.agents.core.model_registry import get_model
 from assistant.agents.core.runner import run_specialist
 from assistant.agents.core.tokens import budget_tool_result
 from assistant.agents.finance.tools import (
@@ -53,9 +53,10 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = load_prompt(__file__, "prompt.md")
 
 _agent = Agent(
-    get_model_name("agent:unified"),
+    get_model("agent:unified"),
     deps_type=AgentDeps,
     system_prompt=SYSTEM_PROMPT,
+    model_settings={"temperature": 0},
 )
 
 
@@ -77,13 +78,13 @@ async def search_semantic(ctx: RunContext[AgentDeps], query: str, limit: int = 1
 @_agent.tool
 async def get_product_details(ctx: RunContext[AgentDeps], sku: str) -> str:
     """Get full details for one product by SKU: price, cost, vendor, UOM, barcode, reorder point."""
-    return budget_tool_result(await _get_product_details({"sku": sku}), max_tokens=400)
+    return budget_tool_result(await _get_product_details({"sku": sku}))
 
 
 @_agent.tool
 async def get_inventory_stats(ctx: RunContext[AgentDeps]) -> str:
     """Catalogue summary: total_skus, total_cost_value, low_stock_count, out_of_stock_count."""
-    return budget_tool_result(await _get_inventory_stats(), max_tokens=300)
+    return budget_tool_result(await _get_inventory_stats())
 
 
 @_agent.tool
@@ -107,13 +108,13 @@ async def list_vendors(ctx: RunContext[AgentDeps]) -> str:
 @_agent.tool
 async def get_usage_velocity(ctx: RunContext[AgentDeps], sku: str, days: int = 30) -> str:
     """How fast a product moves: total and average daily withdrawals over the last N days."""
-    return budget_tool_result(await _get_usage_velocity({"sku": sku, "days": days}), max_tokens=300)
+    return budget_tool_result(await _get_usage_velocity({"sku": sku, "days": days}))
 
 
 @_agent.tool
 async def get_reorder_suggestions(ctx: RunContext[AgentDeps], limit: int = 20) -> str:
     """Priority reorder list: low-stock products ranked by urgency."""
-    return budget_tool_result(await _get_reorder_suggestions({"limit": limit}), max_tokens=600)
+    return budget_tool_result(await _get_reorder_suggestions({"limit": limit}))
 
 
 @_agent.tool
@@ -143,14 +144,13 @@ async def get_department_activity(
     """Stock movement summary for a department over the last N days."""
     return budget_tool_result(
         await _get_department_activity({"dept_code": dept_code, "days": days}),
-        max_tokens=400,
     )
 
 
 @_agent.tool
 async def forecast_stockout(ctx: RunContext[AgentDeps], limit: int = 15) -> str:
     """Products predicted to run out soonest based on recent withdrawal velocity."""
-    return budget_tool_result(await _forecast_stockout({"limit": limit}), max_tokens=600)
+    return budget_tool_result(await _forecast_stockout({"limit": limit}))
 
 
 # ── Operations tools ──────────────────────────────────────────────────────────
@@ -188,7 +188,7 @@ async def list_pending_material_requests(ctx: RunContext[AgentDeps], limit: int 
 @_agent.tool
 async def get_invoice_summary(ctx: RunContext[AgentDeps]) -> str:
     """Invoice counts and totals grouped by status (draft, sent, paid)."""
-    return budget_tool_result(await _get_invoice_summary(), max_tokens=300)
+    return budget_tool_result(await _get_invoice_summary())
 
 
 @_agent.tool
@@ -200,13 +200,13 @@ async def get_outstanding_balances(ctx: RunContext[AgentDeps], limit: int = 20) 
 @_agent.tool
 async def get_revenue_summary(ctx: RunContext[AgentDeps], days: int = 30) -> str:
     """Revenue summary for the last N days: total revenue, tax collected, transaction count."""
-    return budget_tool_result(await _get_revenue_summary({"days": days}), max_tokens=300)
+    return budget_tool_result(await _get_revenue_summary({"days": days}))
 
 
 @_agent.tool
 async def get_pl_summary(ctx: RunContext[AgentDeps], days: int = 30) -> str:
     """Profit & loss for the last N days: revenue, COGS, gross profit and margin."""
-    return budget_tool_result(await _get_pl_summary({"days": days}), max_tokens=300)
+    return budget_tool_result(await _get_pl_summary({"days": days}))
 
 
 @_agent.tool

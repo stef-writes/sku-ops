@@ -13,9 +13,9 @@ tiers:
     default_model: meta-llama/llama-3.3-70b-instruct
 
   standard:
-    description: "Agent work — Haiku default, Sonnet for deep"
+    description: "Agent work — uses AGENT_PRIMARY_MODEL (Sonnet default)"
     max_output_tokens: 4000
-    default_model: anthropic/claude-haiku-4-5
+    default_model: anthropic/claude-sonnet-4-6
 
 models:
   anthropic/claude-sonnet-4-6:

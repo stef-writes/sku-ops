@@ -22,14 +22,12 @@ def count_tokens(text: str) -> int:
 
 
 # ── Tool result budgeting ─────────────────────────────────────────────────────
-# Fields to drop first when trimming (low information density)
+# Fields to drop first when trimming (low information density).
+# sell_uom is NOT here — the system prompt requires UOM in every answer.
 _LOW_VALUE_FIELDS = frozenset(
     (
         "_note",
         "method",
-        "sell_uom",
-        "base_unit",
-        "pack_qty",
         "original_sku",
         "barcode",
     )
@@ -50,7 +48,7 @@ _LIST_KEYS = (
 )
 
 
-def budget_tool_result(raw_json: str, max_tokens: int = 500) -> str:
+def budget_tool_result(raw_json: str, max_tokens: int = 2000) -> str:
     """Truncate a tool's JSON output if it exceeds *max_tokens*.
 
     Strategy (applied in order until under budget):
@@ -130,7 +128,7 @@ def estimate_turn_tokens(
 
 def compress_history(
     history: list[dict] | None,
-    max_tokens: int = 1500,
+    max_tokens: int = 8000,
 ) -> list[dict] | None:
     """Trim conversation history to fit within *max_tokens*.
 
