@@ -110,16 +110,14 @@ async def create_return(
 
         await return_repo.insert(ret)
 
-        w_dept_map = {
-            wi.product_id: getattr(wi, "department_name", None) for wi in withdrawal.items
-        }
+        w_dept_map = {wi.product_id: getattr(wi, "category_name", None) for wi in withdrawal.items}
         ledger_items = [
             {
                 "product_id": item.product_id,
                 "quantity": item.quantity,
                 "unit_price": item.unit_price,
                 "cost": item.cost,
-                "department_name": w_dept_map.get(item.product_id),
+                "category_name": w_dept_map.get(item.product_id),
             }
             for item in enriched_items
         ]

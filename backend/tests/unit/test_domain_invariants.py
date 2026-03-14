@@ -291,7 +291,7 @@ class TestContractorContext:
         """create_withdrawal must raise ValueError when contractor.id is empty."""
         import asyncio
 
-        from catalog.application.queries import list_products
+        from catalog.application.queries import list_skus
         from inventory.application.inventory_service import process_withdrawal_stock_changes
         from operations.application.withdrawal_service import create_withdrawal
         from operations.domain.withdrawal import MaterialWithdrawalCreate, WithdrawalItem
@@ -311,7 +311,7 @@ class TestContractorContext:
                     data,
                     ctx,
                     user,
-                    list_products=list_products,
+                    list_skus=list_skus,
                     process_stock_changes=process_withdrawal_stock_changes,
                 )
             )

@@ -36,7 +36,7 @@ def _extract_item(item) -> tuple:
     cost = _g("cost", 0)
     sell_cost = _g("sell_cost", None) or cost
     sell_uom = _g("sell_uom", None) or unit
-    dept = _g("department_name", None)
+    dept = _g("category_name", None)
     pid = _g("product_id", None)
     return qty, unit, unit_price, cost, sell_cost, sell_uom, dept, pid
 

@@ -212,7 +212,6 @@ def _load_agent_model() -> str:
 
 AGENT_PRIMARY_MODEL: str = _load_agent_model()
 LLM_SETUP_URL = "https://console.anthropic.com/"
-LLM_AVAILABLE = ANTHROPIC_AVAILABLE  # alias used by enrichment/uom services
 # Per-session AI spend cap in USD. 0 = unlimited. Set SESSION_COST_CAP=2.00 in .env.
 SESSION_COST_CAP = float(os.environ.get("SESSION_COST_CAP", "2.00"))
 

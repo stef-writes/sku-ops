@@ -17,7 +17,7 @@ const INITIAL_FORM = {
   cost: "",
   quantity: "",
   min_stock: "5",
-  department_id: "",
+  category_id: "",
   barcode: "",
   base_unit: "each",
   sell_uom: "each",
@@ -34,7 +34,7 @@ const ADVANCED_FIELDS = new Set([
   "barcode",
 ]);
 
-const ESSENTIAL_FIELDS = new Set(["name", "department_id", "price", "quantity"]);
+const ESSENTIAL_FIELDS = new Set(["name", "category_id", "price", "quantity"]);
 
 export function ProductFormDialog({ open, onOpenChange, editingProduct, departments = [] }) {
   const [form, setForm] = useState(INITIAL_FORM);
@@ -46,11 +46,11 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, departme
   const suggestMutation = useSuggestUom();
   const saving = createMutation.isPending || updateMutation.isPending;
 
-  const skuPreviewEnabled = open && !editingProduct && !!form.department_id;
+  const skuPreviewEnabled = open && !editingProduct && !!form.category_id;
   const { data: skuPreviewData } = useQuery({
-    queryKey: ["skuPreview", form.department_id, form.name],
+    queryKey: ["skuPreview", form.category_id, form.name],
     queryFn: () => {
-      const params = { department_id: form.department_id };
+      const params = { category_id: form.category_id };
       if (form.name?.trim()) params.product_name = form.name.trim();
       return api.sku.preview(params);
     },
@@ -68,7 +68,7 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, departme
         cost: editingProduct.cost?.toString() || "",
         quantity: editingProduct.quantity.toString(),
         min_stock: editingProduct.min_stock?.toString() || "5",
-        department_id: editingProduct.department_id,
+        category_id: editingProduct.category_id,
         barcode: editingProduct.barcode || "",
         base_unit: editingProduct.base_unit || "each",
         sell_uom: editingProduct.sell_uom || "each",
@@ -160,7 +160,7 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, departme
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.price || !form.department_id) {
+    if (!form.name || !form.price || !form.category_id) {
       toast.error("Please fill in required fields");
       return;
     }
@@ -182,7 +182,7 @@ export function ProductFormDialog({ open, onOpenChange, editingProduct, departme
       cost,
       quantity: parseFloat(form.quantity) || 0,
       min_stock: parseInt(form.min_stock) || 5,
-      department_id: form.department_id,
+      category_id: form.category_id,
       barcode: form.barcode || null,
       base_unit: form.base_unit || "each",
       sell_uom: form.sell_uom || "each",

@@ -22,7 +22,7 @@ from documents.application.import_parser import infer_uom, resolve_uom, suggest_
 from documents.domain.document import DocumentLineItem
 from inventory.application.inventory_service import process_receiving_stock_changes
 from inventory.application.uom_classifier import classify_uom_batch as _classify_uom_batch
-from shared.infrastructure.config import LLM_AVAILABLE as _LLM_AVAILABLE
+from shared.infrastructure.config import ANTHROPIC_AVAILABLE as _LLM_AVAILABLE
 from shared.infrastructure.db import get_org_id
 from shared.kernel.barcode import validate_barcode
 from shared.kernel.errors import ResourceNotFoundError
@@ -38,12 +38,12 @@ class ImportDeps:
     get_department_by_code: Callable[..., Awaitable[Any]]
     find_vendor_by_name: Callable[..., Awaitable[Any]]
     insert_vendor: Callable[..., Awaitable[None]]
-    get_product_by_id: Callable[..., Awaitable[Any]]
+    get_sku_by_id: Callable[..., Awaitable[Any]]
     find_product_by_sku_and_vendor: Callable[..., Awaitable[Any]]
     find_product_by_name_and_vendor: Callable[..., Awaitable[Any]]
-    update_product: Callable[..., Awaitable[Any]]
+    update_sku: Callable[..., Awaitable[Any]]
     validate_barcode: Callable[..., Any]
-    create_product: Callable[..., Awaitable[Any]]
+    create_sku: Callable[..., Awaitable[Any]]
     process_receiving_stock_changes: Callable[..., Awaitable[None]]
     classify_uom_batch: Callable[..., Awaitable[list]]
 
@@ -53,7 +53,7 @@ async def import_document(
     products: list[DocumentLineItem],
     deps: ImportDeps,
     current_user: CurrentUser,
-    department_id: str | None = None,
+    category_id: str | None = None,
     create_vendor_if_missing: bool = True,
 ) -> dict:
     """Import parsed products; create or match vendor, add/receive inventory."""
@@ -154,7 +154,7 @@ async def import_document(
 
             existing = None
             if item.get("product_id"):
-                existing = await deps.get_product_by_id(item["product_id"])
+                existing = await deps.get_sku_by_id(item["product_id"])
             if not existing and item.get("original_sku") and vendor_id:
                 existing = await deps.find_product_by_sku_and_vendor(
                     str(item["original_sku"]).strip(), vendor_id
@@ -172,13 +172,13 @@ async def import_document(
                     user_name=current_user.name,
                     reference_id=None,
                 )
-                updated = await deps.get_product_by_id(existing.id)
+                updated = await deps.get_sku_by_id(existing.id)
                 matched.append(updated)
                 continue
 
             dept = None
-            if department_id and department_id in dept_by_id:
-                dept = dept_by_id[department_id]
+            if category_id and category_id in dept_by_id:
+                dept = dept_by_id[category_id]
             if not dept:
                 code = (item.get("suggested_department") or "HDW").upper()
                 dept = dept_by_code.get(code) or default_dept
@@ -208,7 +208,7 @@ async def import_document(
             else:
                 barcode_val = None
 
-            product = await deps.create_product(
+            product = await deps.create_sku(
                 category_id=dept.id,
                 category_name=dept.name,
                 name=item.get("name", "Unknown"),
@@ -254,7 +254,7 @@ async def _wired_classify_uom_batch(products):
 async def import_document_wired(
     vendor_name: str,
     products: list[DocumentLineItem],
-    department_id: str | None,
+    category_id: str | None,
     create_vendor_if_missing: bool,
     current_user: CurrentUser,
 ) -> dict:
@@ -268,12 +268,12 @@ async def import_document_wired(
         get_department_by_code=get_department_by_code,
         find_vendor_by_name=find_vendor_by_name,
         insert_vendor=insert_vendor,
-        get_product_by_id=get_sku_by_id,
+        get_sku_by_id=get_sku_by_id,
         find_product_by_sku_and_vendor=find_product_by_original_sku_and_vendor,
         find_product_by_name_and_vendor=find_product_by_name_and_vendor,
-        update_product=update_sku,
+        update_sku=update_sku,
         validate_barcode=validate_barcode,
-        create_product=lambda **kw: lifecycle_create(
+        create_sku=lambda **kw: lifecycle_create(
             **kw, on_stock_import=process_receiving_stock_changes
         ),
         process_receiving_stock_changes=process_receiving_stock_changes,
@@ -284,6 +284,6 @@ async def import_document_wired(
         products=products,
         deps=deps,
         current_user=current_user,
-        department_id=department_id,
+        category_id=category_id,
         create_vendor_if_missing=create_vendor_if_missing,
     )

@@ -11,7 +11,7 @@ from typing import Protocol
 
 import numpy as np
 
-from catalog.application.queries import list_products
+from catalog.application.queries import list_skus
 from shared.infrastructure import event_hub
 from shared.infrastructure.config import OPENAI_API_KEY
 from shared.infrastructure.db import get_org_id
@@ -60,7 +60,7 @@ class ProductSearchIndex:
         self._bm25 = None
 
     async def rebuild(self) -> None:
-        products = await list_products(limit=10000)
+        products = await list_skus(limit=10000)
         if not products:
             self._products = []
             self._embeddings = None

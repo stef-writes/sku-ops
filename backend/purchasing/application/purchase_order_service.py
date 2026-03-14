@@ -77,7 +77,7 @@ async def create_purchase_order(
     current_user: CurrentUser,
     document_date: str | None = None,
     total: float | None = None,
-    department_id: str | None = None,
+    category_id: str | None = None,
     create_vendor_if_missing: bool = True,
     repo: PORepoPort = _default_repo,
 ) -> dict:
@@ -112,8 +112,8 @@ async def create_purchase_order(
     dept_codes = list(dept_by_code.keys())
 
     override_dept_code = None
-    if department_id and department_id in dept_by_id:
-        override_dept_code = dept_by_id[department_id].code.upper()
+    if category_id and category_id in dept_by_id:
+        override_dept_code = dept_by_id[category_id].code.upper()
 
     selected = [p for p in products if p.selected]
 

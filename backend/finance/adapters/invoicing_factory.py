@@ -14,7 +14,3 @@ def get_invoicing_gateway(settings: XeroSettings):
         except ImportError:
             pass
     return StubXeroAdapter()
-
-
-# Backward-compatible alias
-get_xero_gateway = get_invoicing_gateway

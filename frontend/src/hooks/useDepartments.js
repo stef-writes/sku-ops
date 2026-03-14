@@ -12,16 +12,11 @@ export {
   useCreate as useCreateDepartment,
   useUpdate as useUpdateDepartment,
   useDelete as useDeleteDepartment,
-  useCreate as useCreateCategory,
-  useUpdate as useUpdateCategory,
-  useDelete as useDeleteCategory,
 };
 
 export function useDepartments() {
   return useList();
 }
-
-export const useCategories = useDepartments;
 
 export function useSkuOverview() {
   return useQuery({

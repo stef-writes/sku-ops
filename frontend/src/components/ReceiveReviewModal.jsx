@@ -15,7 +15,6 @@ export function ReceiveReviewModal({
   onOpenChange,
   items: rawItems,
   categories = [],
-  departments: _departments = categories, // backward-compat alias for callers still passing departments=
   onConfirm,
   isSubmitting = false,
 }) {
@@ -295,7 +294,7 @@ function NewCard({
           sell_uom: item._sell_uom ?? item.sell_uom ?? "each",
           pack_qty: item._pack_qty ?? item.pack_qty ?? 1,
           barcode: item._barcode ?? "",
-          department_id: item._suggested_department ?? item.suggested_department ?? "",
+          category_id: item._suggested_department ?? item.suggested_department ?? "",
           quantity: item._delivered_qty ?? item.delivered_qty ?? 1,
         }}
         onChange={(field, value) => {
@@ -307,7 +306,7 @@ function NewCard({
             sell_uom: "_sell_uom",
             pack_qty: "_pack_qty",
             barcode: "_barcode",
-            department_id: "_suggested_department",
+            category_id: "_suggested_department",
             quantity: "_delivered_qty",
           };
           onChange(fieldMap[field] || field, value);

@@ -6,11 +6,11 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 
 from catalog.application.queries import (
-    count_all_products,
+    count_all_skus,
     count_low_stock,
     count_vendors,
     list_low_stock,
-    list_products,
+    list_skus,
 )
 from finance.application import ledger_queries as ledger_repo
 from operations.application.contractor_service import count_contractors
@@ -94,8 +94,8 @@ async def admin_dashboard(
     ) = await asyncio.gather(
         list_withdrawals(start_date=sd, end_date=ed, limit=10000),
         list_withdrawals(payment_status="unpaid", start_date=sd, end_date=ed, limit=10000),
-        list_products(),
-        count_all_products(),
+        list_skus(),
+        count_all_skus(),
         count_low_stock(),
         count_vendors(),
         count_contractors(),

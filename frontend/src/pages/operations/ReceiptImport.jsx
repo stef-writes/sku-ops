@@ -190,7 +190,7 @@ const ReceiptImport = () => {
       await api.purchaseOrders.create({
         vendor_name: vName,
         create_vendor_if_missing: createVendorIfMissing,
-        department_id: selectedDept || null,
+        category_id: selectedDept || null,
         document_date: extractedData?.document_date || null,
         total: extractedData?.total || null,
         products: productsToSave,
@@ -509,12 +509,12 @@ const ReceiptImport = () => {
                                   sell_uom: product.sell_uom || "each",
                                   pack_qty: product.pack_qty ?? 1,
                                   barcode: product.barcode || "",
-                                  department_id: product.suggested_department || "",
+                                  category_id: product.suggested_department || "",
                                   quantity: product.delivered_qty ?? product.quantity ?? 1,
                                 }}
                                 onChange={(field, value) => {
                                   const mapped =
-                                    field === "department_id"
+                                    field === "category_id"
                                       ? "suggested_department"
                                       : field === "quantity"
                                         ? "delivered_qty"

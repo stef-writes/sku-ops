@@ -33,19 +33,20 @@ axios.interceptors.response.use(
 );
 
 const api = {
-  // ── Products ──────────────────────────────────────────────────────────
+  // ── SKUs ──────────────────────────────────────────────────────────────
   products: {
-    list: (params) => axios.get(`${API}/products`, { params }).then((r) => r.data),
-    get: (id) => axios.get(`${API}/products/${id}`).then((r) => r.data),
-    create: (data) => axios.post(`${API}/products`, data).then((r) => r.data),
-    update: (id, data) => axios.put(`${API}/products/${id}`, data).then((r) => r.data),
-    delete: (id) => axios.delete(`${API}/products/${id}`),
+    list: (params) => axios.get(`${API}/catalog/skus`, { params }).then((r) => r.data),
+    get: (id) => axios.get(`${API}/catalog/skus/${id}`).then((r) => r.data),
+    create: (data) => axios.post(`${API}/catalog/skus`, data).then((r) => r.data),
+    update: (id, data) => axios.put(`${API}/catalog/skus/${id}`, data).then((r) => r.data),
+    delete: (id) => axios.delete(`${API}/catalog/skus/${id}`),
     adjust: (id, data) => axios.post(`${API}/stock/${id}/adjust`, data).then((r) => r.data),
-    suggestUom: (data) => axios.post(`${API}/products/suggest-uom`, data).then((r) => r.data),
+    suggestUom: (data) => axios.post(`${API}/catalog/skus/suggest-uom`, data).then((r) => r.data),
     stockHistory: (id) => axios.get(`${API}/stock/${id}/history`).then((r) => r.data),
     byBarcode: (barcode) =>
-      axios.get(`${API}/products/by-barcode`, { params: { barcode } }).then((r) => r.data),
-    importCsv: (formData) => axios.post(`${API}/products/import-csv`, formData).then((r) => r.data),
+      axios.get(`${API}/catalog/skus/by-barcode`, { params: { barcode } }).then((r) => r.data),
+    importCsv: (formData) =>
+      axios.post(`${API}/catalog/skus/import-csv`, formData).then((r) => r.data),
   },
 
   // ── Catalog (new ontology) ──────────────────────────────────────────

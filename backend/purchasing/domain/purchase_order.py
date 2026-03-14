@@ -110,7 +110,7 @@ class POItemCreate(BaseModel):
 class CreatePORequest(BaseModel):
     vendor_name: str
     create_vendor_if_missing: bool = True
-    department_id: str | None = None
+    category_id: str | None = None
     document_date: str | None = None
     total: float | None = None
     products: list[POItemCreate]

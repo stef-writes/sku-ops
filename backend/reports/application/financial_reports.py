@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import asyncio
 
-from catalog.application.queries import list_products
+from catalog.application.queries import list_skus
 from finance.application import ledger_queries as ledger_repo
 from shared.kernel.types import round_money
 
@@ -26,7 +26,7 @@ async def sales_report(
         ledger_repo.summary_by_account(start_date=start_date, end_date=end_date, **dim_kw),
         ledger_repo.product_margins(start_date=start_date, end_date=end_date, limit=10, **dim_kw),
         ledger_repo.reference_counts(start_date=start_date, end_date=end_date),
-        list_products(),
+        list_skus(),
         ledger_repo.payment_status_breakdown(start_date=start_date, end_date=end_date),
     )
     product_map = {p.id: p for p in catalog}
@@ -102,7 +102,7 @@ async def product_margins_report(
             department=department,
             billing_entity=billing_entity,
         ),
-        list_products(),
+        list_skus(),
     )
     product_map = {p.id: p for p in catalog}
     for m in margin_data:
@@ -207,7 +207,7 @@ async def pl_report(
     elif group_by == "product":
         rows, catalog = await asyncio.gather(
             ledger_repo.product_margins(**date_kw, limit=limit),
-            list_products(),
+            list_skus(),
         )
         pmap = {p.id: p for p in catalog}
         for m in rows:

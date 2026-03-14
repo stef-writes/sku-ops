@@ -13,7 +13,7 @@ Inventory is only touched at commit — never during the counting phase.
 
 from datetime import UTC, datetime
 
-from catalog.application.queries import list_products
+from catalog.application.queries import list_skus
 from inventory.application.inventory_service import process_adjustment_stock_changes
 from inventory.domain.cycle_count import CycleCount, CycleCountItem, CycleCountStatus
 from inventory.infrastructure import cycle_count_repo
@@ -29,12 +29,12 @@ async def open_cycle_count(
     """Open a new cycle count session.
 
     Snapshots the current quantity of every active product in scope.
-    scope=None counts everything; scope=<department_name> limits to that dept.
+    scope=None counts everything; scope=<category_name> limits to that category.
     Returns the serialized CycleCount.
     """
-    products = await list_products()
+    products = await list_skus()
     if scope:
-        products = [p for p in products if p.department_name == scope]
+        products = [p for p in products if p.category_name == scope]
 
     if not products:
         raise ValueError(

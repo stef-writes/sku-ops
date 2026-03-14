@@ -35,7 +35,7 @@ from purchasing.domain.purchase_order import (
 )
 from shared.api.deps import AdminDep
 from shared.infrastructure import event_hub
-from shared.infrastructure.config import LLM_AVAILABLE as _LLM_AVAILABLE
+from shared.infrastructure.config import ANTHROPIC_AVAILABLE as _LLM_AVAILABLE
 from shared.infrastructure.middleware.audit import audit_log
 from shared.kernel import events
 
@@ -90,7 +90,7 @@ async def create_po(
         current_user=current_user,
         document_date=data.document_date,
         total=data.total,
-        department_id=data.department_id,
+        category_id=data.category_id,
         create_vendor_if_missing=data.create_vendor_if_missing,
     )
     await audit_log(

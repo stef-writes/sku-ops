@@ -66,7 +66,7 @@ const InventoryPage = () => {
         render: (row) => <p className="font-semibold">{row.name}</p>,
       },
       {
-        key: "department_name",
+        key: "category_name",
         label: "Category",
         type: "enum",
         filterValues: departments.map((d) => d.name),

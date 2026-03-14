@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime
 
-from catalog.application.queries import list_products
+from catalog.application.queries import list_skus
 from finance.application import ledger_queries as ledger_repo
 from reports.application.financial_reports import (  # noqa: F401
     ar_aging_report,
@@ -45,7 +45,7 @@ async def kpi_report(
             department=department,
             billing_entity=billing_entity,
         ),
-        list_products(),
+        list_skus(),
         ledger_repo.units_sold_by_product(start_date=start_date, end_date=end_date),
     )
 

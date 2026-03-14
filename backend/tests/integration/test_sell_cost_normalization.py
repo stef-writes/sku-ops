@@ -12,7 +12,7 @@ tests/unit/test_xero_cogs_journal.py.
 
 import pytest
 
-from catalog.application.queries import list_products
+from catalog.application.queries import list_skus
 from catalog.application.sku_lifecycle import create_product_with_sku
 from inventory.application.inventory_service import (
     process_import_stock_changes,
@@ -62,7 +62,7 @@ async def test_withdrawal_sell_cost_same_unit(db):
         data,
         contractor,
         user,
-        list_products=list_products,
+        list_skus=list_skus,
         process_stock_changes=process_withdrawal_stock_changes,
     )
 
@@ -111,7 +111,7 @@ async def test_withdrawal_sell_cost_unit_conversion(db):
         data,
         contractor,
         user,
-        list_products=list_products,
+        list_skus=list_skus,
         process_stock_changes=process_withdrawal_stock_changes,
     )
 
@@ -162,7 +162,7 @@ async def test_ledger_cogs_entry_has_quantity_and_unit_cost(db):
         data,
         contractor,
         user,
-        list_products=list_products,
+        list_skus=list_skus,
         process_stock_changes=process_withdrawal_stock_changes,
     )
 
@@ -220,7 +220,7 @@ async def test_ledger_revenue_entry_has_quantity_and_unit_cost(db):
         data,
         contractor,
         user,
-        list_products=list_products,
+        list_skus=list_skus,
         process_stock_changes=process_withdrawal_stock_changes,
     )
 
@@ -280,7 +280,7 @@ async def test_invoice_line_items_carry_sell_cost(db):
         data,
         contractor,
         user,
-        list_products=list_products,
+        list_skus=list_skus,
         process_stock_changes=process_withdrawal_stock_changes,
     )
 

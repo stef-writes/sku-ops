@@ -31,7 +31,7 @@ class DocumentImportRequest(BaseModel):
 
     vendor_name: str
     create_vendor_if_missing: bool = True
-    department_id: str | None = None
+    category_id: str | None = None
     products: list[DocumentLineItem]
 
 

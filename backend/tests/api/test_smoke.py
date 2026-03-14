@@ -8,8 +8,8 @@ import pytest
 from tests.helpers.auth import admin_headers
 
 PROTECTED_ENDPOINTS = [
-    ("GET", "/api/products"),
-    ("GET", "/api/products/by-barcode"),
+    ("GET", "/api/catalog/skus"),
+    ("GET", "/api/catalog/skus/by-barcode"),
     ("GET", "/api/vendors"),
     ("GET", "/api/departments"),
     ("GET", "/api/withdrawals"),
@@ -46,7 +46,7 @@ def test_all_context_routers_mounted(client):
     endpoint returns 401/403 (auth required) rather than 404 (route not found).
     """
     context_probes = {
-        "catalog": ("GET", "/api/products"),
+        "catalog": ("GET", "/api/catalog/skus"),
         "operations": ("GET", "/api/withdrawals"),
         "purchasing": ("GET", "/api/purchase-orders"),
         "finance": ("GET", "/api/invoices"),

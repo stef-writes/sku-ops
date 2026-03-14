@@ -1,6 +1,6 @@
 """SKU (stock-keeping unit) domain models."""
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, field_validator
 
 from shared.kernel.entity import AuditedEntity
 from shared.kernel.units import ALLOWED_BASE_UNITS
@@ -20,20 +20,8 @@ class SkuCreate(BaseModel):
     cost: float = 0.0
     quantity: float = 0
     min_stock: int = 5
-    category_id: str | None = None
-    department_id: str | None = None
+    category_id: str
     product_id: str | None = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def accept_department_id(cls, data):
-        if isinstance(data, dict):
-            if not data.get("category_id") and data.get("department_id"):
-                data["category_id"] = data["department_id"]
-            if not data.get("category_id"):
-                raise ValueError("category_id is required")
-        return data
-
     barcode: str | None = None
     vendor_barcode: str | None = None
     base_unit: str = "each"
@@ -63,16 +51,7 @@ class SkuUpdate(BaseModel):
     quantity: float | None = None
     min_stock: int | None = None
     category_id: str | None = None
-    department_id: str | None = None
     product_id: str | None = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def accept_department_id(cls, data):
-        if isinstance(data, dict) and not data.get("category_id") and data.get("department_id"):
-            data["category_id"] = data["department_id"]
-        return data
-
     barcode: str | None = None
     vendor_barcode: str | None = None
     base_unit: str | None = None
@@ -114,14 +93,6 @@ class Sku(AuditedEntity):
     pack_qty: int = 1
     purchase_uom: str = "each"
     purchase_pack_qty: int = 1
-
-    @property
-    def department_id(self) -> str:
-        return self.category_id
-
-    @property
-    def department_name(self) -> str:
-        return self.category_name
 
     @property
     def is_low_stock(self) -> bool:

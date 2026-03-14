@@ -3,7 +3,7 @@
 Other bounded contexts import from here, never from purchasing.infrastructure directly.
 """
 
-from catalog.application.queries import get_product_by_id as _get_product
+from catalog.application.queries import get_sku_by_id as _get_product
 from purchasing.infrastructure.po_repo import po_repo as _po_repo
 
 

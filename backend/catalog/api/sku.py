@@ -12,12 +12,12 @@ router = APIRouter(tags=["sku"])
 @router.get("/sku/preview")
 async def get_sku_preview(
     _current_user: CurrentUserDep,
-    department_id: str,
+    category_id: str,
     product_name: str | None = None,
 ):
-    """Preview the next SKU for a department (without consuming it)."""
+    """Preview the next SKU for a category (without consuming it)."""
     try:
-        return await preview_sku(department_id, product_name)
+        return await preview_sku(category_id, product_name)
     except ResourceNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 

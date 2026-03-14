@@ -30,7 +30,7 @@ const isReadOnly = (set, name) => set?.has(name);
 /**
  * Shared product field grid, extracted from ProductFormDialog.
  *
- * @param {object}   fields          Current field values (name, description, price, cost, quantity, min_stock, department_id, barcode, base_unit, sell_uom, pack_qty)
+ * @param {object}   fields          Current field values (name, description, price, cost, quantity, min_stock, category_id, barcode, base_unit, sell_uom, pack_qty)
  * @param {function} onChange        (fieldName, value) => void
  * @param {array}    departments     Category list
  * @param {Set}      hiddenFields    Field names to hide entirely
@@ -89,13 +89,13 @@ export function ProductFields({
         </div>
       )}
 
-      {!isHidden(h, "department_id") && (
+      {!isHidden(h, "category_id") && (
         <div>
           <Label className={labelCls}>Category {!compact && "*"}</Label>
           <Select
-            value={field("department_id")}
-            onValueChange={(v) => set("department_id", v)}
-            disabled={isReadOnly(ro, "department_id")}
+            value={field("category_id")}
+            onValueChange={(v) => set("category_id", v)}
+            disabled={isReadOnly(ro, "category_id")}
           >
             <SelectTrigger className={inputCls} data-testid="pf-department">
               <SelectValue placeholder="Select category" />

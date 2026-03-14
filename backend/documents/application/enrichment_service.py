@@ -10,7 +10,7 @@ import logging
 import re
 
 from assistant.application.llm import generate_text
-from shared.infrastructure.config import LLM_AVAILABLE
+from shared.infrastructure.config import ANTHROPIC_AVAILABLE as LLM_AVAILABLE
 from shared.infrastructure.prompt_loader import load_prompt
 from shared.kernel.units import ALLOWED_BASE_UNITS
 

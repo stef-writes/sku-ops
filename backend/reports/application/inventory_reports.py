@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime, timedelta
 
-from catalog.application.queries import list_low_stock, list_products
+from catalog.application.queries import list_low_stock, list_skus
 from finance.application import ledger_queries as ledger_repo
 from inventory.application.queries import daily_withdrawal_activity, withdrawal_velocity
 from shared.infrastructure.db import get_org_id
@@ -17,7 +17,7 @@ from shared.kernel.types import round_money
 
 
 async def inventory_report() -> dict:
-    products = await list_products()
+    products = await list_skus()
 
     total_products = len(products)
     total_retail = round_money(sum(p.price * p.quantity for p in products))
@@ -29,7 +29,7 @@ async def inventory_report() -> dict:
 
     by_department: dict = {}
     for p in products:
-        dept = p.department_name or "Unknown"
+        dept = p.category_name or "Unknown"
         if dept not in by_department:
             by_department[dept] = {"count": 0, "retail_value": 0, "cost_value": 0}
         by_department[dept]["count"] += 1
@@ -67,7 +67,7 @@ async def product_performance_report(
             end_date=end_date,
             limit=limit,
         ),
-        list_products(),
+        list_skus(),
         ledger_repo.units_sold_by_product(start_date=start_date, end_date=end_date),
     )
 
@@ -90,7 +90,7 @@ async def product_performance_report(
                 "product_id": pid,
                 "name": p.name if p else "Unknown",
                 "sku": p.sku if p else "",
-                "department": p.department_name if p else "",
+                "department": p.category_name if p else "",
                 "current_stock": current_stock,
                 "catalog_unit_cost": round(p.cost if p else 0, 2),
                 "units_sold": units_sold,
@@ -115,7 +115,7 @@ async def reorder_urgency_report(
 
     low_stock, _all_products = await asyncio.gather(
         list_low_stock(limit=200),
-        list_products(),
+        list_skus(),
     )
 
     product_ids = [p.id for p in low_stock]
@@ -146,7 +146,7 @@ async def reorder_urgency_report(
                 "product_id": p.id,
                 "name": p.name,
                 "sku": p.sku,
-                "department": p.department_name,
+                "department": p.category_name,
                 "current_stock": qty,
                 "min_stock": p.min_stock,
                 "avg_daily_use": round(avg_daily, 2),

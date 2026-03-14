@@ -150,25 +150,6 @@ async def find_vendor_item_by_sku_and_vendor(sku_id: str, vendor_id: str) -> Ven
     return await _vi_repo.find_by_sku_and_vendor(sku_id, vendor_id)
 
 
-# ── Backward-compat aliases ─────────────────────────────────────────────────
-# These map old names (used by other contexts) to the new SKU-based functions.
-# Callers that imported `list_products` expecting SKU-shaped objects keep working.
-
-list_products = list_skus
-count_all_products = count_all_skus
-get_product_by_id = get_sku_by_id
-find_product_by_sku = find_sku_by_sku_code
-update_product = update_sku
-atomic_decrement = atomic_decrement_sku
-increment_quantity = increment_sku_quantity
-add_quantity = add_sku_quantity
-atomic_adjust = atomic_adjust_sku
-add_product_quantity = add_sku_quantity
-atomic_adjust_product = atomic_adjust_sku
-atomic_decrement_product = atomic_decrement_sku
-increment_product_quantity = increment_sku_quantity
-
-
 async def find_product_by_original_sku_and_vendor(original_sku: str, vendor_id: str) -> Sku | None:
     """Resolve vendor part number → VendorItem → SKU."""
     vi = await _vi_repo.find_by_vendor_and_vendor_sku(vendor_id, original_sku)

@@ -7,7 +7,7 @@ from assistant.api.monitoring import router as monitoring_router
 from assistant.api.ws_chat import router as ws_chat_router
 from catalog.api.departments import router as departments_router
 from catalog.api.product_families import router as product_families_router
-from catalog.api.products import router as products_router
+from catalog.api.products import router as skus_router
 from catalog.api.sku import router as sku_router
 from catalog.api.vendor_items import router as vendor_items_router
 from catalog.api.vendors import router as vendors_router
@@ -52,7 +52,7 @@ api_router.include_router(monitoring_router)
 api_router.include_router(contractors_router)
 api_router.include_router(departments_router)
 api_router.include_router(vendors_router)
-api_router.include_router(products_router)
+api_router.include_router(skus_router)
 api_router.include_router(product_families_router)
 api_router.include_router(vendor_items_router)
 api_router.include_router(stock_router)

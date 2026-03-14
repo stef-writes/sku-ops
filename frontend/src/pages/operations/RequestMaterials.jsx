@@ -45,7 +45,7 @@ const RequestMaterials = () => {
 
   const productParams = {
     search: search || undefined,
-    department_id: selectedDept !== "all" ? selectedDept : undefined,
+    category_id: selectedDept !== "all" ? selectedDept : undefined,
   };
   const {
     data: productsData,

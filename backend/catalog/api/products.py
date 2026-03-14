@@ -1,4 +1,4 @@
-"""SKU CRUD routes (backward-compatible /api/products endpoints)."""
+"""SKU CRUD routes — /api/catalog/skus."""
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
@@ -25,13 +25,13 @@ from catalog.domain.product import SkuCreate, SkuUpdate
 from inventory.application.inventory_service import process_import_stock_changes
 from inventory.application.uom_classifier import classify_uom
 from shared.api.deps import AdminDep, CurrentUserDep
-from shared.infrastructure.config import LLM_AVAILABLE
+from shared.infrastructure.config import ANTHROPIC_AVAILABLE as LLM_AVAILABLE
 from shared.infrastructure.middleware.audit import audit_log
 from shared.kernel.barcode import validate_barcode
 from shared.kernel.errors import ResourceNotFoundError
 from shared.kernel.units import compute_sell_fields
 
-router = APIRouter(prefix="/products", tags=["products"])
+router = APIRouter(prefix="/catalog/skus", tags=["catalog-skus"])
 
 _CONTRACTOR_HIDDEN_FIELDS = {
     "cost",
@@ -46,11 +46,7 @@ _CONTRACTOR_HIDDEN_FIELDS = {
 
 
 def _enrich_sell_fields(sku: dict) -> dict:
-    """Add pre-computed sell_price, sell_cost, sell_quantity for POS display.
-
-    Also adds backward-compat aliases (department_id/department_name) so
-    existing frontends continue to work during the category rename transition.
-    """
+    """Add pre-computed sell_price, sell_cost, sell_quantity for POS display."""
     sku.update(
         compute_sell_fields(
             price=sku.get("price", 0.0),
@@ -61,8 +57,6 @@ def _enrich_sell_fields(sku: dict) -> dict:
             pack_qty=sku.get("pack_qty", 1),
         )
     )
-    sku.setdefault("department_id", sku.get("category_id", ""))
-    sku.setdefault("department_name", sku.get("category_name", ""))
     return sku
 
 
@@ -74,7 +68,7 @@ def _strip_for_contractor(sku: dict) -> dict:
 @router.get("")
 async def get_products(
     current_user: CurrentUserDep,
-    department_id: str | None = None,
+    category_id: str | None = None,
     search: str | None = None,
     low_stock: bool = False,
     limit: int | None = Query(None, ge=1, le=500),
@@ -82,7 +76,7 @@ async def get_products(
 ):
     is_contractor = current_user.role == "contractor"
     items = await list_skus(
-        category_id=department_id,
+        category_id=category_id,
         search=search,
         low_stock=low_stock,
         limit=limit,
@@ -93,7 +87,7 @@ async def get_products(
         items = [_strip_for_contractor(p) for p in items]
     if limit is not None:
         total = await count_skus(
-            category_id=department_id,
+            category_id=category_id,
             search=search,
             low_stock=low_stock,
         )

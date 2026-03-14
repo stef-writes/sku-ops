@@ -2,7 +2,7 @@
 
 import pytest
 
-from catalog.application.queries import list_products
+from catalog.application.queries import list_skus
 from catalog.application.sku_lifecycle import create_product_with_sku
 from catalog.infrastructure.sku_repo import sku_repo
 from finance.application.invoice_service import create_invoice_from_withdrawals
@@ -48,7 +48,7 @@ async def create_withdrawal(data, contractor, current_user):
         data,
         _to_contractor_ctx(contractor),
         current_user,
-        list_products=list_products,
+        list_skus=list_skus,
         process_stock_changes=process_withdrawal_stock_changes,
         create_invoice=create_invoice_from_withdrawals,
     )
@@ -337,7 +337,7 @@ async def test_create_withdrawal_auto_invoice_failure_still_creates_withdrawal(d
         data,
         contractor,
         user,
-        list_products=list_products,
+        list_skus=list_skus,
         process_stock_changes=process_withdrawal_stock_changes,
         create_invoice=failing_create_invoice,
     )
@@ -374,7 +374,7 @@ async def _make_paid_withdrawal(product, quantity: int, contractor_id: str = "co
         data,
         contractor,
         user,
-        list_products=list_products,
+        list_skus=list_skus,
         process_stock_changes=process_withdrawal_stock_changes,
         create_invoice=None,
     )

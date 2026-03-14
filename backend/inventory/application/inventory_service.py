@@ -10,11 +10,11 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from catalog.application.queries import (
-    add_product_quantity,
-    atomic_adjust_product,
-    atomic_decrement_product,
-    get_product_by_id,
-    increment_product_quantity,
+    add_sku_quantity,
+    atomic_adjust_sku,
+    atomic_decrement_sku,
+    get_sku_by_id,
+    increment_sku_quantity,
 )
 from finance.application.ledger_service import record_adjustment as _record_ledger_adjustment
 from inventory.domain.errors import InsufficientStockError, NegativeStockError
@@ -78,7 +78,7 @@ async def process_withdrawal_stock_changes(
 
     try:
         for item in items:
-            product = await get_product_by_id(item.product_id)
+            product = await get_sku_by_id(item.product_id)
             base_unit = (product.base_unit if product else "each").lower()
             requested_unit = (item.unit or "each").lower()
 
@@ -87,7 +87,7 @@ async def process_withdrawal_stock_changes(
             else:
                 canonical_qty = item.quantity
 
-            result = await atomic_decrement_product(item.product_id, canonical_qty, now)
+            result = await atomic_decrement_sku(item.product_id, canonical_qty, now)
 
             if not result:
                 available = product.quantity if product else 0
@@ -112,7 +112,7 @@ async def process_withdrawal_stock_changes(
 
     except Exception:
         for product_id, qty in completed:
-            await increment_product_quantity(product_id, qty, now)
+            await increment_sku_quantity(product_id, qty, now)
         raise
 
 
@@ -131,7 +131,7 @@ async def process_receiving_stock_changes(
 
     Converts from the supplied unit to the product's base_unit before adding.
     """
-    product = await get_product_by_id(product_id)
+    product = await get_sku_by_id(product_id)
     base_unit = (product.base_unit if product else "each").lower()
     incoming_unit = (unit or "each").lower()
 
@@ -141,7 +141,7 @@ async def process_receiving_stock_changes(
         canonical_qty = quantity
 
     now = datetime.now(UTC).isoformat()
-    result = await add_product_quantity(product_id, canonical_qty, now)
+    result = await add_sku_quantity(product_id, canonical_qty, now)
     if not result:
         raise ResourceNotFoundError("Product", product_id)
 
@@ -205,12 +205,12 @@ async def process_adjustment_stock_changes(
     if quantity_delta == 0:
         raise ValueError("quantity_delta must not be zero")
     now = datetime.now(UTC).isoformat()
-    product = await get_product_by_id(product_id)
+    product = await get_sku_by_id(product_id)
     if not product:
         raise ResourceNotFoundError("Product", product_id)
 
     base_unit = product.base_unit.lower()
-    result = await atomic_adjust_product(product_id, quantity_delta, now)
+    result = await atomic_adjust_sku(product_id, quantity_delta, now)
     if not result:
         raise NegativeStockError(product_id, current=product.quantity, delta=quantity_delta)
 
@@ -236,7 +236,7 @@ async def process_adjustment_stock_changes(
         product_id=product_id,
         product_cost=product.cost,
         quantity_delta=quantity_delta,
-        department=product.department_name,
+        department=product.category_name,
         reason=reason,
         performed_by_user_id=user_id,
     )

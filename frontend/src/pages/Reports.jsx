@@ -79,7 +79,7 @@ const Reports = () => {
         const rows = (products.items || products).map((p) => [
           p.sku,
           p.name,
-          p.department_name || "",
+          p.category_name || "",
           p.quantity,
           p.min_stock,
           p.price,

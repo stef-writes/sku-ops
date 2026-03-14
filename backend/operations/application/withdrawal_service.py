@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from catalog.application.queries import list_products
+from catalog.application.queries import list_skus
 from finance.application.billing_entity_service import ensure_billing_entity
 from finance.application.invoice_service import (
     create_invoice_from_withdrawals,
@@ -62,7 +62,7 @@ async def create_withdrawal(
     contractor: ContractorContext,
     current_user: CurrentUser,
     *,
-    list_products: ListProductsFn,
+    list_skus: ListProductsFn,
     process_stock_changes: StockChangesFn,
     create_invoice: CreateInvoiceFn = None,
     withdrawal_repo: WithdrawalRepoPort = _default_withdrawal_repo,
@@ -78,9 +78,9 @@ async def create_withdrawal(
     org_id = get_org_id()
     if data.job_id:
         await _ensure_job(data.job_id)
-    products = await list_products()
+    products = await list_skus()
     product_map = {p.id: p for p in products}
-    dept_map = {p.id: p.department_name for p in products}
+    dept_map = {p.id: p.category_name for p in products}
     enriched_items = []
     for item in data.items:
         p = product_map.get(item.product_id)
@@ -170,7 +170,7 @@ async def create_withdrawal(
                 "cost": i.cost,
                 "sell_uom": i.sell_uom,
                 "sell_cost": i.sell_cost,
-                "department_name": dept_map.get(i.product_id),
+                "category_name": dept_map.get(i.product_id),
             }
             for i in data.items
         ]
@@ -222,7 +222,7 @@ async def create_withdrawal_wired(
         data,
         ctx,
         current_user,
-        list_products=list_products,
+        list_skus=list_skus,
         process_stock_changes=process_withdrawal_stock_changes,
         create_invoice=create_invoice_from_withdrawals,
         tax_rate=settings.default_tax_rate,

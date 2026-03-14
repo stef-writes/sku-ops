@@ -85,7 +85,7 @@ async def import_document(
         return await import_document_wired(
             vendor_name=data.vendor_name,
             products=data.products,
-            department_id=data.department_id,
+            category_id=data.category_id,
             create_vendor_if_missing=data.create_vendor_if_missing,
             current_user=current_user,
         )

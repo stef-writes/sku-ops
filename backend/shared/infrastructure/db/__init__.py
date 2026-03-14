@@ -85,9 +85,9 @@ async def init_db() -> None:
     _state["backend"] = _make_backend(DATABASE_URL)
     await _state["backend"].connect(DATABASE_URL)
 
-    from shared.infrastructure.migrations.runner import run_migrations
+    from shared.infrastructure.migrations.runner import run_schema
 
-    await run_migrations(_state["backend"])
+    await run_schema(_state["backend"])
 
 
 def get_org_id() -> str:
