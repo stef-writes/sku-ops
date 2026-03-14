@@ -39,6 +39,7 @@ def _convert_sql(sql: str) -> str:
     converted = _convert_placeholders(sql)
     converted = converted.replace("INSERT OR IGNORE", "INSERT")
     converted = converted.replace("INSERT OR REPLACE", "INSERT")
+    converted = converted.replace("datetime('now')", "NOW()")
     if had_or_ignore and "ON CONFLICT" not in converted:
         converted = re.sub(
             r"(VALUES\s*\([^)]+\))",

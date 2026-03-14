@@ -117,9 +117,22 @@ async def receive_po_items(
             try:
                 existing = await _match_sku(working, vendor_id, deps)
 
+                # Transition status FIRST to act as a concurrency guard.
+                # The UPDATE uses WHERE status != 'arrived', so only one
+                # concurrent request can succeed — the loser gets
+                # transitioned=False and skips stock changes.
                 resolved_pid = None
                 if existing:
                     resolved_pid = existing.id
+
+                    transitioned = await repo.update_po_item(
+                        item_id,
+                        POItemStatus.ARRIVED,
+                        product_id=existing.id,
+                        delivered_qty=delivered,
+                    )
+                    if not transitioned:
+                        continue
 
                     purchase_pack_qty = int(
                         working.get("purchase_pack_qty") or existing.purchase_pack_qty or 1
@@ -157,15 +170,6 @@ async def receive_po_items(
 
                     if new_cost is not None:
                         await deps.update_sku(existing.id, SkuUpdate(cost=new_cost))
-
-                    transitioned = await repo.update_po_item(
-                        item_id,
-                        POItemStatus.ARRIVED,
-                        product_id=existing.id,
-                        delivered_qty=delivered,
-                    )
-                    if not transitioned:
-                        continue
 
                     updated = await deps.get_sku_by_id(existing.id)
                     matched.append(updated)

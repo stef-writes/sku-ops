@@ -293,9 +293,12 @@ async def bulk_mark_withdrawals_paid(
         if w:
             withdrawals.append(w)
 
+    changed_ids: set[str] = set()
     async with transaction():
-        updated = await withdrawal_repo.bulk_mark_paid(withdrawal_ids, paid_at)
+        changed_ids = set(await withdrawal_repo.bulk_mark_paid(withdrawal_ids, paid_at))
         for w in withdrawals:
+            if w.id not in changed_ids:
+                continue
             await _mark_invoice_paid(w.id)
             await _record_payment_ledger(
                 withdrawal_id=w.id,
@@ -306,6 +309,8 @@ async def bulk_mark_withdrawals_paid(
             )
 
     for w in withdrawals:
+        if w.id not in changed_ids:
+            continue
         await dispatch(
             WithdrawalPaid(
                 org_id=w.organization_id or get_org_id(),
@@ -316,4 +321,4 @@ async def bulk_mark_withdrawals_paid(
                 performed_by_user_id=performed_by_user_id,
             )
         )
-    return updated
+    return len(changed_ids)

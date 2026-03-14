@@ -155,6 +155,16 @@ async def commit_cycle_count(
 
     adjusted_product_ids: list[str] = []
     async with transaction():
+        # Flip status first — if another request already committed, abort before
+        # touching stock. Stock adjustments only proceed if this transaction wins
+        # the conditional UPDATE.
+        committed = await cycle_count_repo.commit_count(
+            count_id=count_id,
+            committed_by_id=committed_by_id,
+            committed_at=committed_at,
+        )
+        if not committed:
+            raise ValueError("Cycle count is already committed.")
         for item in items_to_adjust:
             await process_adjustment_stock_changes(
                 product_id=item.product_id,
@@ -165,13 +175,6 @@ async def commit_cycle_count(
                 emit_event=False,
             )
             adjusted_product_ids.append(item.product_id)
-        committed = await cycle_count_repo.commit_count(
-            count_id=count_id,
-            committed_by_id=committed_by_id,
-            committed_at=committed_at,
-        )
-        if not committed:
-            raise ValueError("Cycle count is already committed.")
 
     if adjusted_product_ids:
         await dispatch(

@@ -11,8 +11,10 @@ transactions, making these tests unreliable on SQLite.
 
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any
 
 import pytest
+from starlette.testclient import TestClient
 
 from tests.e2e.helpers import (
     create_po,
@@ -120,10 +122,12 @@ def _query_ledger_entries(client, reference_id, account, reference_type=None):
 class TestConcurrencyExtended:
     """Race condition tests that verify data integrity under concurrent access."""
 
-    def test_concurrent_po_receive_no_double_stock(self, client, seed_dept_id):
+    def test_concurrent_po_receive_no_double_stock(
+        self, client: TestClient, seed_dept_id: str
+    ) -> None:
         """Two concurrent receives of the same PO item must not double-count stock."""
         headers = admin_headers()
-        product = create_product(
+        product: dict[str, Any] = create_product(
             client, headers, dept_id=seed_dept_id, quantity=100, name="CC-PO-Race"
         )
 
@@ -136,25 +140,29 @@ class TestConcurrencyExtended:
             [f.result() for f in as_completed([f1, f2])]
 
         resp = client.get(f"/api/catalog/skus/{product['id']}", headers=headers)
-        final_qty = resp.json()["quantity"]
+        final_qty: float = resp.json()["quantity"]
 
         assert final_qty == pytest.approx(150.0), (
             f"Stock should be 100 + 50 = 150 (not 200). Got {final_qty}"
         )
 
-    def test_concurrent_cycle_count_commit_no_double_adjust(self, client, seed_dept_id):
+    def test_concurrent_cycle_count_commit_no_double_adjust(
+        self, client: TestClient, seed_dept_id: str
+    ) -> None:
         """Two concurrent commits of the same cycle count must not double-apply variances."""
         headers = admin_headers()
-        product = create_product(
+        product: dict[str, Any] = create_product(
             client, headers, dept_id=seed_dept_id, quantity=100, name="CC-CycleRace"
         )
 
         count = open_cycle_count(client, headers)
-        count_id = count["id"]
+        count_id: str = count["id"]
 
         detail_resp = client.get(f"/api/cycle-counts/{count_id}", headers=headers)
-        items = detail_resp.json().get("items", [])
-        target_item = next((i for i in items if i["product_id"] == product["id"]), None)
+        items: list[dict[str, Any]] = detail_resp.json().get("items", [])
+        target_item: dict[str, Any] | None = next(
+            (i for i in items if i["product_id"] == product["id"]), None
+        )
         assert target_item is not None, "Product should be in cycle count"
 
         update_cycle_count_item(client, headers, count_id, target_item["id"], counted_qty=90)
@@ -169,7 +177,7 @@ class TestConcurrencyExtended:
         assert successes <= 1, f"At most one commit should succeed, got {successes}"
 
         resp = client.get(f"/api/catalog/skus/{product['id']}", headers=headers)
-        final_qty = resp.json()["quantity"]
+        final_qty: float = resp.json()["quantity"]
         assert final_qty == pytest.approx(90.0), (
             f"Stock should be 90 (adjusted once by -10), got {final_qty}"
         )

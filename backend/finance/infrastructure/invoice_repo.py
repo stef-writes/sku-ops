@@ -57,7 +57,7 @@ async def next_invoice_number() -> str:
     key = f"{org_id}|inv"
     await conn.execute(
         """INSERT INTO invoice_counters (key, counter) VALUES (?, 1)
-           ON CONFLICT(key) DO UPDATE SET counter = counter + 1""",
+           ON CONFLICT(key) DO UPDATE SET counter = invoice_counters.counter + 1""",
         (key,),
     )
     cursor = await conn.execute(

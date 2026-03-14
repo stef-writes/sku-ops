@@ -135,9 +135,10 @@ async def mark_paid(withdrawal_id: str, paid_at: str) -> tuple[MaterialWithdrawa
     return await get_by_id(withdrawal_id), cursor.rowcount > 0
 
 
-async def bulk_mark_paid(withdrawal_ids: list[str], paid_at: str) -> int:
+async def bulk_mark_paid(withdrawal_ids: list[str], paid_at: str) -> list[str]:
+    """Mark withdrawals paid. Returns IDs that were actually changed (previously unpaid)."""
     if not withdrawal_ids:
-        return 0
+        return []
     conn = get_connection()
     org_id = get_org_id()
     placeholders = ",".join("?" * len(withdrawal_ids))
@@ -145,11 +146,12 @@ async def bulk_mark_paid(withdrawal_ids: list[str], paid_at: str) -> int:
         "UPDATE withdrawals SET payment_status = 'paid', paid_at = ? WHERE id IN ("
         + placeholders
         + ") AND payment_status != 'paid'"
-        " AND (organization_id = ? OR organization_id IS NULL)",
+        " AND (organization_id = ? OR organization_id IS NULL) RETURNING id",
         [paid_at, *withdrawal_ids, org_id],
     )
     await conn.commit()
-    return cursor.rowcount
+    rows = await cursor.fetchall()
+    return [row[0] for row in rows]
 
 
 async def link_to_invoice(withdrawal_id: str, invoice_id: str) -> bool:
