@@ -115,9 +115,6 @@ async def update_invoice_route(
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     try:
-        line_items_data = [
-            i.model_dump() if hasattr(i, "model_dump") else i for i in (data.line_items or [])
-        ]
         updated = await update_invoice(
             invoice_id,
             billing_entity=data.billing_entity,
@@ -132,13 +129,10 @@ async def update_invoice_route(
             payment_terms=data.payment_terms,
             billing_address=data.billing_address,
             po_reference=data.po_reference,
-            line_items=line_items_data if data.line_items is not None else None,
+            line_items=data.line_items,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        logger.exception("Invoice update failed for %s", invoice_id)
-        raise HTTPException(status_code=500, detail="Failed to update invoice") from e
     changes = {k: v for k, v in data.model_dump(exclude_none=True).items() if k != "line_items"}
     if data.line_items is not None:
         changes["line_items_updated"] = True

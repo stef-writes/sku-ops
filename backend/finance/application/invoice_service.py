@@ -83,7 +83,7 @@ async def _validate_withdrawals_for_invoice(
     """Fetch and validate withdrawals. Returns (withdrawals, billing_entity, contact_name)."""
     billing_entity: str | None = None
     contact_name = ""
-    withdrawals: list = []
+    withdrawals: list[dict] = []
 
     for wid in withdrawal_ids:
         w = await get_withdrawal_by_id(wid)
@@ -124,7 +124,7 @@ def _build_line_items_from_withdrawal(w, inv_id: str) -> list[dict]:
 
 
 async def create_invoice_from_withdrawals(
-    withdrawal_ids: list,
+    withdrawal_ids: list[str],
 ) -> InvoiceWithDetails:
     """Create new invoice from unpaid withdrawals. All must share same billing_entity."""
     if not withdrawal_ids:
@@ -168,7 +168,9 @@ async def create_invoice_from_withdrawals(
 
         for wid in withdrawal_ids:
             await link_withdrawal(inv_id, wid)
-            await link_withdrawal_to_invoice(wid, inv_id)
+            linked = await link_withdrawal_to_invoice(wid, inv_id)
+            if not linked:
+                raise ValueError(f"Withdrawal {wid} was already linked to another invoice")
 
     await dispatch(
         InvoiceCreated(
@@ -182,7 +184,7 @@ async def create_invoice_from_withdrawals(
 
 async def add_withdrawals_to_invoice(
     invoice_id: str,
-    withdrawal_ids: list,
+    withdrawal_ids: list[str],
 ) -> InvoiceWithDetails | None:
     """Link additional withdrawals to an existing invoice."""
     if not withdrawal_ids:
@@ -221,7 +223,9 @@ async def add_withdrawals_to_invoice(
 
         for wid in withdrawal_ids:
             await link_withdrawal(invoice_id, wid)
-            await link_withdrawal_to_invoice(wid, invoice_id)
+            linked = await link_withdrawal_to_invoice(wid, invoice_id)
+            if not linked:
+                raise ValueError(f"Withdrawal {wid} was already linked to another invoice")
 
     return await _default_invoice_repo.get_by_id(invoice_id)
 
@@ -240,7 +244,7 @@ async def update_invoice(
     payment_terms: str | None = None,
     billing_address: str | None = None,
     po_reference: str | None = None,
-    line_items: list | None = None,
+    line_items: list[InvoiceLineItem] | None = None,
 ) -> InvoiceWithDetails | None:
     """Update invoice fields and/or replace line items."""
     inv = await _default_invoice_repo.get_by_id(invoice_id)
@@ -249,7 +253,10 @@ async def update_invoice(
 
     async with transaction():
         if line_items is not None:
-            subtotal = await replace_line_items(invoice_id, line_items)
+            subtotal = await replace_line_items(
+                invoice_id,
+                [i.model_dump() if hasattr(i, "model_dump") else i for i in line_items],
+            )
             tax_val = tax if tax is not None else float(inv.tax)
             total = round(subtotal + tax_val, 2)
             sync_fields: dict[str, Any] = {

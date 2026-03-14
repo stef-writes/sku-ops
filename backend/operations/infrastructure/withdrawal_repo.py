@@ -10,7 +10,7 @@ from shared.infrastructure.database import get_connection, get_org_id
 def _row_to_model(row) -> MaterialWithdrawal | None:
     if row is None:
         return None
-    d = dict(row) if hasattr(row, "keys") else {}
+    d = dict(row)
     if d and "items" in d and isinstance(d["items"], str):
         d["items"] = json.loads(d["items"]) if d["items"] else []
     return MaterialWithdrawal.model_validate(d)
@@ -122,15 +122,17 @@ async def get_by_id(withdrawal_id: str) -> MaterialWithdrawal | None:
     return _row_to_model(row)
 
 
-async def mark_paid(withdrawal_id: str, paid_at: str) -> MaterialWithdrawal | None:
+async def mark_paid(withdrawal_id: str, paid_at: str) -> tuple[MaterialWithdrawal | None, bool]:
+    """Mark withdrawal paid. Returns (withdrawal, actually_changed)."""
     conn = get_connection()
     org_id = get_org_id()
-    await conn.execute(
-        "UPDATE withdrawals SET payment_status = 'paid', paid_at = ? WHERE id = ? AND organization_id = ?",
+    cursor = await conn.execute(
+        "UPDATE withdrawals SET payment_status = 'paid', paid_at = ? "
+        "WHERE id = ? AND payment_status != 'paid' AND organization_id = ?",
         (paid_at, withdrawal_id, org_id),
     )
     await conn.commit()
-    return await get_by_id(withdrawal_id)
+    return await get_by_id(withdrawal_id), cursor.rowcount > 0
 
 
 async def bulk_mark_paid(withdrawal_ids: list[str], paid_at: str) -> int:
@@ -142,21 +144,27 @@ async def bulk_mark_paid(withdrawal_ids: list[str], paid_at: str) -> int:
     cursor = await conn.execute(
         "UPDATE withdrawals SET payment_status = 'paid', paid_at = ? WHERE id IN ("
         + placeholders
-        + ") AND (organization_id = ? OR organization_id IS NULL)",
+        + ") AND payment_status != 'paid'"
+        " AND (organization_id = ? OR organization_id IS NULL)",
         [paid_at, *withdrawal_ids, org_id],
     )
     await conn.commit()
     return cursor.rowcount
 
 
-async def link_to_invoice(withdrawal_id: str, invoice_id: str) -> None:
-    """Set invoice_id and mark as invoiced. Called by finance context via facade."""
+async def link_to_invoice(withdrawal_id: str, invoice_id: str) -> bool:
+    """Set invoice_id and mark as invoiced. Returns False if already linked.
+
+    Called by finance context via facade.
+    """
     conn = get_connection()
-    await conn.execute(
-        "UPDATE withdrawals SET invoice_id = ?, payment_status = 'invoiced' WHERE id = ?",
+    cursor = await conn.execute(
+        "UPDATE withdrawals SET invoice_id = ?, payment_status = 'invoiced' "
+        "WHERE id = ? AND invoice_id IS NULL",
         (invoice_id, withdrawal_id),
     )
     await conn.commit()
+    return cursor.rowcount > 0
 
 
 async def unlink_from_invoice(withdrawal_ids: list[str]) -> None:

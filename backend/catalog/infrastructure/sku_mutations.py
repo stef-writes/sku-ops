@@ -7,8 +7,8 @@ from catalog.infrastructure.sku_repo import get_by_id
 from shared.infrastructure.database import get_connection, get_org_id
 
 
-async def insert(sku: Sku | dict) -> None:
-    sku_dict = sku if isinstance(sku, dict) else sku.model_dump()
+async def insert(sku: Sku) -> None:
+    sku_dict = sku.model_dump()
     conn = get_connection()
     org_id = sku_dict.get("organization_id") or get_org_id()
     await conn.execute(

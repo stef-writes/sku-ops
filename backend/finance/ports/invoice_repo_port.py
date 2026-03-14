@@ -7,7 +7,7 @@ from finance.domain.invoice import Invoice, InvoiceWithDetails
 
 @runtime_checkable
 class InvoiceRepoPort(Protocol):
-    async def insert(self, invoice: Invoice | dict) -> InvoiceWithDetails | None: ...
+    async def insert(self, invoice: Invoice) -> InvoiceWithDetails | None: ...
 
     async def get_by_id(
         self,

@@ -157,12 +157,12 @@ class TestPORepoContract:
         assert len(items) == 1
         read_item = items[0]
 
-        assert "unit_price" in read_item, (
-            f"PO item missing 'unit_price' — got keys: {list(read_item.keys())}"
+        assert hasattr(read_item, "unit_price"), (
+            f"PO item missing 'unit_price' — got fields: {list(read_item.model_fields)}"
         )
-        assert read_item["unit_price"] == pytest.approx(12.99)
-        assert read_item["ordered_qty"] == pytest.approx(5.5)
-        assert read_item["base_unit"] == "foot"
+        assert read_item.unit_price == pytest.approx(12.99)
+        assert read_item.ordered_qty == pytest.approx(5.5)
+        assert read_item.base_unit == "foot"
 
     @pytest.mark.usefixtures("_db")
     @pytest.mark.asyncio
@@ -196,7 +196,7 @@ class TestPORepoContract:
         read_item = items[0]
 
         for field in ("ordered_qty", "delivered_qty", "unit_price", "cost"):
-            val = read_item[field]
+            val = getattr(read_item, field)
             assert isinstance(val, (int, float)), f"{field} is {type(val)}"
             assert float(val) == float(getattr(item, field))
 

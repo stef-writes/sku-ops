@@ -91,8 +91,3 @@ async def import_document(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        logger.exception("Document import failed")
-        raise HTTPException(
-            status_code=500, detail="Import failed — please check the file and try again"
-        ) from e

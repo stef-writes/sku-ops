@@ -11,9 +11,7 @@ from shared.infrastructure.database import get_connection, get_org_id
 def _row_to_model(row) -> Document | None:
     if row is None:
         return None
-    d = dict(row) if hasattr(row, "keys") else {}
-    if not d:
-        return None
+    d = dict(row)
     if "parsed_data" in d and isinstance(d["parsed_data"], str):
         with contextlib.suppress(json.JSONDecodeError, TypeError):
             d["parsed_data"] = json.loads(d["parsed_data"])
@@ -25,8 +23,8 @@ def _row_to_model(row) -> Document | None:
 _COLUMNS = "id, filename, document_type, vendor_name, file_hash, file_size, mime_type, parsed_data, po_id, status, uploaded_by_id, organization_id, created_at, updated_at"
 
 
-async def insert(doc: Document | dict) -> None:
-    d = doc if isinstance(doc, dict) else doc.model_dump()
+async def insert(doc: Document) -> None:
+    d = doc.model_dump()
     conn = get_connection()
     parsed = d.get("parsed_data")
     if parsed and not isinstance(parsed, str):

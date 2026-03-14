@@ -34,7 +34,7 @@ class PORepoPort(ABC):
         status: POItemStatus,
         product_id: str | None = None,
         delivered_qty: float | None = None,
-    ) -> None: ...
+    ) -> bool: ...
 
     @abstractmethod
     async def update_po_status(

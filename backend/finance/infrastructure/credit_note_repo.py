@@ -26,9 +26,7 @@ async def _next_credit_note_number() -> str:
 def _row_to_model(row) -> CreditNote | None:
     if row is None:
         return None
-    d = dict(row) if hasattr(row, "keys") else {}
-    if not d:
-        return None
+    d = dict(row)
     for fld in (
         "quantity",
         "unit_price",
@@ -47,7 +45,7 @@ def _row_to_model(row) -> CreditNote | None:
 
 
 def _row_to_line_item(row) -> CreditNoteLineItem:
-    d = dict(row) if hasattr(row, "keys") else {}
+    d = dict(row)
     for fld in ("quantity", "unit_price", "amount", "cost"):
         if fld in d and d[fld] is not None:
             d[fld] = float(d[fld])
@@ -57,7 +55,7 @@ def _row_to_line_item(row) -> CreditNoteLineItem:
 async def insert_credit_note(
     return_id: str,
     invoice_id: str | None,
-    items: list,
+    items: list[dict],
     subtotal: float,
     tax: float,
     total: float,
@@ -82,9 +80,7 @@ async def insert_credit_note(
         cursor = await conn.execute("SELECT billing_entity FROM invoices " + inv_where, inv_params)
         inv_row = await cursor.fetchone()
         if inv_row:
-            billing_entity = (dict(inv_row) if hasattr(inv_row, "keys") else {}).get(
-                "billing_entity", ""
-            )
+            billing_entity = dict(inv_row).get("billing_entity", "")
 
     await conn.execute(
         """INSERT INTO credit_notes (id, credit_note_number, invoice_id, return_id,
@@ -110,9 +106,8 @@ async def insert_credit_note(
     )
 
     for item in items:
-        i = item if isinstance(item, dict) else item.model_dump()
-        qty = i.get("quantity", 1)
-        price = float(i.get("unit_price") or i.get("price") or 0)
+        qty = item.get("quantity", 1)
+        price = float(item.get("unit_price") or item.get("price") or 0)
         amt = round(qty * price, 2)
         await conn.execute(
             """INSERT INTO credit_note_line_items
@@ -121,12 +116,12 @@ async def insert_credit_note(
             (
                 str(uuid4()),
                 cn_id,
-                i.get("name") or i.get("description", ""),
+                item.get("name") or item.get("description", ""),
                 qty,
                 price,
                 amt,
-                float(i.get("cost", 0)),
-                i.get("product_id"),
+                float(item.get("cost", 0)),
+                item.get("product_id"),
             ),
         )
 

@@ -68,9 +68,7 @@ class ContractorCreateResult(BaseModel):
 def _row_to_model(row) -> Contractor | None:
     if row is None:
         return None
-    d = dict(row) if hasattr(row, "keys") else {}
-    if not d:
-        return None
+    d = dict(row)
     if "is_active" in d:
         d["is_active"] = bool(d["is_active"])
     d.pop("password", None)

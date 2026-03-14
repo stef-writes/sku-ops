@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
 
-from catalog.application.queries import count_all_skus as count_all_products
+from catalog.application.queries import count_all_skus
 from devtools.scripts.seed import (
     seed_demo_inventory,
     seed_demo_tenants,
@@ -276,7 +276,7 @@ async def reset_and_reseed_inventory(current_user: AdminDep):
         await conn.commit()
         logger.info("Inventory reset complete")
         await seed_demo_inventory(org_id)
-        count = await count_all_products()
+        count = await count_all_skus()
         return {"message": f"Inventory reset and reseeded with {count} products"}
     except Exception as e:
         logger.exception("Reset inventory failed")

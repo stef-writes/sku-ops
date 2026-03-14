@@ -59,11 +59,8 @@ async def persist_parsed_document(
         uploaded_by_id=current_user.id,
         organization_id=get_org_id(),
     )
-    try:
-        await document_repo.insert(doc)
-        extracted["document_id"] = doc.id
-    except (RuntimeError, OSError, ValueError) as e:
-        logger.warning("Failed to persist document record: %s", e)
+    await document_repo.insert(doc)
+    extracted["document_id"] = doc.id
     return extracted
 
 

@@ -75,15 +75,17 @@ async def commit_count(
     count_id: str,
     committed_by_id: str,
     committed_at: str,
-) -> None:
+) -> bool:
+    """Atomically transition status open -> committed. Returns False if already committed."""
     conn = get_connection()
-    await conn.execute(
+    cursor = await conn.execute(
         """UPDATE cycle_counts
            SET status = 'committed', committed_by_id = ?, committed_at = ?
-           WHERE id = ?""",
+           WHERE id = ? AND status = 'open'""",
         (committed_by_id, committed_at, count_id),
     )
     await conn.commit()
+    return cursor.rowcount > 0
 
 
 async def get_count(count_id: str) -> CycleCount | None:

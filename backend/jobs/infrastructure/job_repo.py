@@ -9,17 +9,15 @@ from shared.infrastructure.database import get_connection, get_org_id
 def _row_to_model(row) -> Job | None:
     if row is None:
         return None
-    d = dict(row) if hasattr(row, "keys") else {}
-    if not d:
-        return None
+    d = dict(row)
     return Job.model_validate(d)
 
 
 _COLUMNS = "id, code, name, billing_entity_id, status, service_address, notes, organization_id, created_at, updated_at"
 
 
-async def insert(job: Job | dict) -> None:
-    d = job if isinstance(job, dict) else job.model_dump()
+async def insert(job: Job) -> None:
+    d = job.model_dump()
     conn = get_connection()
     ins_q = "INSERT INTO jobs ("
     ins_q += _COLUMNS

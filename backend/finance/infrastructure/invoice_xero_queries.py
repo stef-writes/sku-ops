@@ -44,9 +44,7 @@ async def set_xero_sync_status(invoice_id: str, status: str) -> None:
 def _row_to_invoice(row) -> Invoice | None:
     if row is None:
         return None
-    d = dict(row) if hasattr(row, "keys") else {}
-    if not d:
-        return None
+    d = dict(row)
     if d.get("organization_id") is None:
         d.pop("organization_id", None)
     return Invoice.model_validate(d)

@@ -9,7 +9,7 @@ from operations.application.queries import (
     link_credit_note_to_return,
     mark_withdrawals_paid_by_invoice,
 )
-from shared.infrastructure.database import get_org_id
+from shared.infrastructure.database import get_org_id, transaction
 from shared.infrastructure.domain_events import dispatch
 from shared.kernel.domain_events import CreditNoteApplied
 
@@ -17,21 +17,22 @@ from shared.kernel.domain_events import CreditNoteApplied
 async def insert_credit_note(
     return_id: str,
     invoice_id: str | None,
-    items: list,
+    items: list[dict],
     subtotal: float = 0,
     tax: float = 0,
     total: float = 0,
 ) -> CreditNote:
     """Create a credit note and link it to the return (operations-owned mutation)."""
-    cn = await _repo.insert_credit_note(
-        return_id=return_id,
-        invoice_id=invoice_id,
-        items=items,
-        subtotal=subtotal,
-        tax=tax,
-        total=total,
-    )
-    await link_credit_note_to_return(return_id, cn.id)
+    async with transaction():
+        cn = await _repo.insert_credit_note(
+            return_id=return_id,
+            invoice_id=invoice_id,
+            items=items,
+            subtotal=subtotal,
+            tax=tax,
+            total=total,
+        )
+        await link_credit_note_to_return(return_id, cn.id)
     return cn
 
 
@@ -42,21 +43,23 @@ async def apply_credit_note(
     """Apply a credit note to its linked invoice and write AR ledger entry.
 
     If the invoice balance reaches zero, marks linked withdrawals as paid
-    via the operations facade.
+    via the operations facade. All steps run in a single transaction so
+    invoice, withdrawal, and ledger state stay consistent.
     """
-    result = await _repo.apply_credit_note(credit_note_id)
+    async with transaction():
+        result = await _repo.apply_credit_note(credit_note_id)
 
-    if result.auto_paid and result.invoice_id:
-        now = datetime.now(UTC).isoformat()
-        await mark_withdrawals_paid_by_invoice(result.invoice_id, now)
+        if result.auto_paid and result.invoice_id:
+            now = datetime.now(UTC).isoformat()
+            await mark_withdrawals_paid_by_invoice(result.invoice_id, now)
 
-    await record_credit_note_application(
-        credit_note_id=credit_note_id,
-        amount=float(result.credit_note.total),
-        billing_entity=result.credit_note.billing_entity,
-        contractor_id="",
-        performed_by_user_id=performed_by_user_id,
-    )
+        await record_credit_note_application(
+            credit_note_id=credit_note_id,
+            amount=float(result.credit_note.total),
+            billing_entity=result.credit_note.billing_entity,
+            contractor_id="",
+            performed_by_user_id=performed_by_user_id,
+        )
 
     await dispatch(
         CreditNoteApplied(

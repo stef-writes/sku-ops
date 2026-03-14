@@ -9,9 +9,7 @@ from shared.infrastructure.database import get_connection, get_org_id
 def _row_to_model(row) -> Vendor | None:
     if row is None:
         return None
-    d = dict(row) if hasattr(row, "keys") else {}
-    if not d:
-        return None
+    d = dict(row)
     if d.get("organization_id") is None:
         d.pop("organization_id", None)
     return Vendor.model_validate(d)
@@ -57,8 +55,8 @@ async def find_by_name(name: str) -> Vendor | None:
     return _row_to_model(row)
 
 
-async def insert(vendor: Vendor | dict) -> None:
-    vendor_dict = vendor if isinstance(vendor, dict) else vendor.model_dump()
+async def insert(vendor: Vendor) -> None:
+    vendor_dict = vendor.model_dump()
     conn = get_connection()
     org_id = vendor_dict.get("organization_id") or get_org_id()
     await conn.execute(

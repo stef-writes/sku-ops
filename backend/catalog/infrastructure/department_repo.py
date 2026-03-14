@@ -9,9 +9,7 @@ from shared.infrastructure.database import get_connection, get_org_id
 def _row_to_model(row) -> Department | None:
     if row is None:
         return None
-    d = dict(row) if hasattr(row, "keys") else {}
-    if not d:
-        return None
+    d = dict(row)
     if d.get("organization_id") is None:
         d.pop("organization_id", None)
     return Department.model_validate(d)
@@ -53,8 +51,8 @@ async def get_by_code(code: str) -> Department | None:
     return _row_to_model(row)
 
 
-async def insert(department: Department | dict) -> None:
-    dept_dict = department if isinstance(department, dict) else department.model_dump()
+async def insert(department: Department) -> None:
+    dept_dict = department.model_dump()
     dept_dict["organization_id"] = dept_dict.get("organization_id") or get_org_id()
     conn = get_connection()
     org_id = dept_dict["organization_id"]

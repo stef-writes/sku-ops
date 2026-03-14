@@ -9,7 +9,7 @@ from shared.infrastructure.database import get_connection, get_org_id
 def _row_to_dict(row) -> dict | None:
     if row is None:
         return None
-    return dict(row) if hasattr(row, "keys") else {}
+    return dict(row)
 
 
 _COLUMNS = "id, label, line1, line2, city, state, postal_code, country, billing_entity_id, job_id, organization_id, created_at"

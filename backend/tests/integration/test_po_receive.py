@@ -163,8 +163,8 @@ async def test_receive_updates_stock(db):
         current_user=_user(),
     )
 
-    assert result["matched"] == 1
-    assert result["errors"] == 0
+    assert result.matched == 1
+    assert result.errors == 0
 
     updated = await sku_repo.get_by_id(product.id)
     assert updated.quantity == pytest.approx(150.0)
@@ -206,8 +206,8 @@ async def test_receive_cost_fallback_from_unit_price(db):
         current_user=_user(),
     )
 
-    assert result["cost_total"] > 0, "cost_total should use unit_price fallback"
-    assert result["cost_total"] == pytest.approx(7.0 * 50)
+    assert result.cost_total > 0, "cost_total should use unit_price fallback"
+    assert result.cost_total == pytest.approx(7.0 * 50)
 
     conn = get_connection()
     cursor = await conn.execute(
@@ -278,7 +278,7 @@ async def test_receive_po_status_becomes_received(db):
         current_user=_user(),
     )
 
-    assert result["status"] == "received"
+    assert result.status == "received"
 
 
 @pytest.mark.asyncio
@@ -299,9 +299,9 @@ async def test_receive_rejects_ordered_items(db):
         current_user=_user(),
     )
 
-    assert result["errors"] == 1
-    assert result["matched"] == 0
-    assert "not yet marked" in result["error_details"][0]["error"]
+    assert result.errors == 1
+    assert result.matched == 0
+    assert "not yet marked" in result.error_details[0].error
 
 
 # ── Override fields from review modal ──────────────────────────────────────
@@ -320,7 +320,7 @@ async def test_receive_cost_override_affects_wac(db):
         current_user=_user(),
     )
 
-    assert result["matched"] == 1
+    assert result.matched == 1
     updated = await sku_repo.get_by_id(product.id)
     expected_wac = (100 * 8 + 50 * 20) / 150
     assert updated.cost == pytest.approx(expected_wac, abs=0.01)
@@ -350,8 +350,8 @@ async def test_receive_creates_product_with_overridden_name(db):
         current_user=_user(),
     )
 
-    assert result["received"] == 1
-    assert result["errors"] == 0
+    assert result.received == 1
+    assert result.errors == 0
 
     conn = get_connection()
     cursor = await conn.execute(
@@ -381,7 +381,7 @@ async def test_receive_product_id_override_matches_explicit(db):
         current_user=_user(),
     )
 
-    assert result["matched"] == 1
+    assert result.matched == 1
     updated_b = await sku_repo.get_by_id(product_b.id)
     assert updated_b.quantity == pytest.approx(50.0)
 
@@ -408,9 +408,9 @@ async def test_receive_items_with_typed_input(db):
         current_user=_user(),
     )
 
-    assert result["matched"] == 1
-    assert result["errors"] == 0
-    assert result["cost_total"] == pytest.approx(6.0 * 15)
+    assert result.matched == 1
+    assert result.errors == 0
+    assert result.cost_total == pytest.approx(6.0 * 15)
 
     updated = await sku_repo.get_by_id(product.id)
     assert updated.quantity == pytest.approx(35.0)

@@ -118,16 +118,17 @@ class PgPORepo(PORepoPort):
         status: POItemStatus,
         product_id: str | None = None,
         delivered_qty: float | None = None,
-    ) -> None:
+    ) -> bool:
         conn = get_connection()
-        await conn.execute(
+        cursor = await conn.execute(
             """UPDATE purchase_order_items
                SET status = ?, product_id = COALESCE(?, product_id),
                    delivered_qty = COALESCE(?, delivered_qty)
-               WHERE id = ?""",
-            (status.value, product_id, delivered_qty, item_id),
+               WHERE id = ? AND status != ?""",
+            (status.value, product_id, delivered_qty, item_id, POItemStatus.ARRIVED.value),
         )
         await conn.commit()
+        return cursor.rowcount > 0
 
     async def update_po_status(
         self,

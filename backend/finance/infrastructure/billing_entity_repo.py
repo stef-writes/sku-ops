@@ -9,9 +9,7 @@ from shared.infrastructure.database import get_connection, get_org_id
 def _row_to_model(row) -> BillingEntity | None:
     if row is None:
         return None
-    d = dict(row) if hasattr(row, "keys") else {}
-    if not d:
-        return None
+    d = dict(row)
     if "is_active" in d:
         d["is_active"] = bool(d["is_active"])
     return BillingEntity.model_validate(d)
@@ -20,8 +18,8 @@ def _row_to_model(row) -> BillingEntity | None:
 _COLUMNS = "id, name, contact_name, contact_email, billing_address, payment_terms, xero_contact_id, is_active, organization_id, created_at, updated_at"
 
 
-async def insert(entity: BillingEntity | dict) -> None:
-    d = entity if isinstance(entity, dict) else entity.model_dump()
+async def insert(entity: BillingEntity) -> None:
+    d = entity.model_dump()
     conn = get_connection()
     ins_q = "INSERT INTO billing_entities ("
     ins_q += _COLUMNS

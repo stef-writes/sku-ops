@@ -10,9 +10,7 @@ from shared.infrastructure.database import get_connection, get_org_id
 def _row_to_model(row) -> MaterialReturn | None:
     if row is None:
         return None
-    d = dict(row) if hasattr(row, "keys") else {}
-    if not d:
-        return None
+    d = dict(row)
     if "items" in d and isinstance(d["items"], str):
         d["items"] = json.loads(d["items"]) if d["items"] else []
     return MaterialReturn.model_validate(d)

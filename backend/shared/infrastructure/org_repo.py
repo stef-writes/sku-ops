@@ -20,9 +20,7 @@ class Organization(BaseModel):
 def _row_to_model(row) -> Organization | None:
     if row is None:
         return None
-    d = dict(row) if hasattr(row, "keys") else {}
-    if not d:
-        return None
+    d = dict(row)
     d.pop("organization_id", None)
     return Organization.model_validate(d)
 

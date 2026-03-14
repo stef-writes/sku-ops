@@ -5,7 +5,7 @@ Split from purchase_order_service to keep each module under 300 lines.
 
 from datetime import UTC, datetime
 
-from catalog.domain.product import SkuUpdate
+from catalog.application.queries import SkuUpdate
 from finance.application.ledger_service import record_po_receipt as _record_po_receipt_ledger
 from purchasing.application.purchase_order_service import PurchasingDeps, _resolve_po_item_cost
 from purchasing.domain.purchase_order import (
@@ -89,132 +89,157 @@ async def receive_po_items(
     cost_total = 0.0
     ledger_items: list[ReceivedItemSummary] = []
 
-    for item_id, update in updates_by_id.items():
-        item = items_by_id.get(item_id)
-        if not item:
-            error_details.append(ReceiveItemError(item=item_id, error="Item not found"))
-            continue
+    async with transaction():
+        for item_id, update in updates_by_id.items():
+            item = items_by_id.get(item_id)
+            if not item:
+                error_details.append(ReceiveItemError(item=item_id, error="Item not found"))
+                continue
 
-        current_status = POItemStatus(item.status)
-        if current_status == POItemStatus.ARRIVED:
-            continue
-        if current_status == POItemStatus.ORDERED:
-            error_details.append(
-                ReceiveItemError(item=item.name, error="Item not yet marked as received at dock")
-            )
-            continue
-
-        # Build a mutable working copy for this item with user overrides applied
-        working = _apply_overrides(item, update)
-
-        delivered = update.delivered_qty
-        if delivered is None:
-            delivered = working.get("delivered_qty") or working.get("ordered_qty") or 1
-        delivered = max(0.0, float(delivered))
-
-        try:
-            existing = await _match_sku(working, vendor_id, deps)
-
-            resolved_pid = None
-            if existing:
-                resolved_pid = existing.id
-                await deps.process_receiving_stock_changes(
-                    product_id=existing.id,
-                    sku=existing.sku,
-                    product_name=existing.name,
-                    quantity=delivered,
-                    user_id=current_user.id,
-                    user_name=current_user.name,
-                    reference_id=po_id,
+            current_status = POItemStatus(item.status)
+            if current_status == POItemStatus.ARRIVED:
+                continue
+            if current_status == POItemStatus.ORDERED:
+                error_details.append(
+                    ReceiveItemError(
+                        item=item.name, error="Item not yet marked as received at dock"
+                    )
                 )
-                po_item_cost = _resolve_po_item_cost(working)
-                old_qty = float(existing.quantity)
-                old_cost = float(existing.cost)
-                new_cost: float | None = None
-                if (old_qty + delivered) > 0:
-                    new_cost = round(
-                        (old_qty * old_cost + delivered * po_item_cost) / (old_qty + delivered), 4
+                continue
+
+            working = _apply_overrides(item, update)
+
+            delivered = update.delivered_qty
+            if delivered is None:
+                delivered = working.get("delivered_qty") or working.get("ordered_qty") or 1
+            delivered = max(0.0, float(delivered))
+
+            try:
+                existing = await _match_sku(working, vendor_id, deps)
+
+                resolved_pid = None
+                if existing:
+                    resolved_pid = existing.id
+
+                    purchase_pack_qty = int(
+                        working.get("purchase_pack_qty") or existing.purchase_pack_qty or 1
+                    )
+                    purchase_uom = (
+                        working.get("purchase_uom") or existing.purchase_uom or "each"
+                    ).lower()
+                    base_unit = (existing.base_unit or "each").lower()
+                    stock_qty = _convert_purchase_to_base(
+                        delivered, purchase_uom, base_unit, purchase_pack_qty
                     )
 
-                if new_cost is not None:
-                    await deps.update_sku(existing.id, SkuUpdate(cost=new_cost))
-                await repo.update_po_item(
-                    item_id,
-                    POItemStatus.ARRIVED,
-                    product_id=existing.id,
-                    delivered_qty=delivered,
-                )
-                updated = await deps.get_sku_by_id(existing.id)
-                matched.append(updated)
-            else:
-                dept = (
-                    dept_by_code.get((working.get("suggested_department") or "HDW").upper())
-                    or default_dept
-                )
-                if not dept:
-                    error_details.append(
-                        ReceiveItemError(item=working.get("name"), error="No valid department")
+                    await deps.process_receiving_stock_changes(
+                        product_id=existing.id,
+                        sku=existing.sku,
+                        product_name=existing.name,
+                        quantity=stock_qty,
+                        user_id=current_user.id,
+                        user_name=current_user.name,
+                        reference_id=po_id,
                     )
-                    continue
+                    po_item_cost = _resolve_po_item_cost(working)
+                    per_base_cost = (
+                        po_item_cost / purchase_pack_qty if purchase_pack_qty > 1 else po_item_cost
+                    )
+                    old_qty = float(existing.quantity)
+                    old_cost = float(existing.cost)
+                    new_cost: float | None = None
+                    if (old_qty + stock_qty) > 0:
+                        new_cost = round(
+                            (old_qty * old_cost + stock_qty * per_base_cost)
+                            / (old_qty + stock_qty),
+                            4,
+                        )
 
-                cost_val = _resolve_po_item_cost(working)
-                new_sku = await deps.create_product_with_sku(
-                    category_id=dept.id,
-                    category_name=dept.name,
-                    name=working.get("name", "Unknown"),
-                    description="",
-                    price=float(working.get("unit_price") or working.get("price") or 0),
-                    cost=round(cost_val, 2),
-                    quantity=delivered,
-                    min_stock=5,
-                    barcode=working.get("barcode") or None,
-                    base_unit=working.get("base_unit") or "each",
-                    sell_uom=working.get("sell_uom") or "each",
-                    pack_qty=int(working.get("pack_qty") or 1),
-                    purchase_uom=working.get("purchase_uom") or "each",
-                    purchase_pack_qty=int(working.get("purchase_pack_qty") or 1),
-                    user_id=current_user.id,
-                    user_name=current_user.name,
-                )
-                resolved_pid = new_sku.id
+                    if new_cost is not None:
+                        await deps.update_sku(existing.id, SkuUpdate(cost=new_cost))
 
-                if vendor_id and working.get("original_sku"):
-                    await deps.add_vendor_item(
-                        sku_id=new_sku.id,
-                        vendor_id=vendor_id,
-                        vendor_sku=str(working["original_sku"]),
+                    transitioned = await repo.update_po_item(
+                        item_id,
+                        POItemStatus.ARRIVED,
+                        product_id=existing.id,
+                        delivered_qty=delivered,
+                    )
+                    if not transitioned:
+                        continue
+
+                    updated = await deps.get_sku_by_id(existing.id)
+                    matched.append(updated)
+                else:
+                    dept = (
+                        dept_by_code.get((working.get("suggested_department") or "HDW").upper())
+                        or default_dept
+                    )
+                    if not dept:
+                        error_details.append(
+                            ReceiveItemError(item=working.get("name"), error="No valid department")
+                        )
+                        continue
+
+                    cost_val = _resolve_po_item_cost(working)
+                    new_sku = await deps.create_product_with_sku(
+                        category_id=dept.id,
+                        category_name=dept.name,
+                        name=working.get("name", "Unknown"),
+                        description="",
+                        price=float(working.get("unit_price") or working.get("price") or 0),
+                        cost=round(cost_val, 2),
+                        quantity=delivered,
+                        min_stock=5,
+                        barcode=working.get("barcode") or None,
+                        base_unit=working.get("base_unit") or "each",
+                        sell_uom=working.get("sell_uom") or "each",
+                        pack_qty=int(working.get("pack_qty") or 1),
                         purchase_uom=working.get("purchase_uom") or "each",
                         purchase_pack_qty=int(working.get("purchase_pack_qty") or 1),
-                        cost=round(cost_val, 2),
-                        is_preferred=True,
+                        user_id=current_user.id,
+                        user_name=current_user.name,
                     )
+                    resolved_pid = new_sku.id
 
-                await repo.update_po_item(
-                    item_id, POItemStatus.ARRIVED, product_id=new_sku.id, delivered_qty=delivered
+                    if vendor_id and working.get("original_sku"):
+                        await deps.add_vendor_item(
+                            sku_id=new_sku.id,
+                            vendor_id=vendor_id,
+                            vendor_sku=str(working["original_sku"]),
+                            purchase_uom=working.get("purchase_uom") or "each",
+                            purchase_pack_qty=int(working.get("purchase_pack_qty") or 1),
+                            cost=round(cost_val, 2),
+                            is_preferred=True,
+                        )
+
+                    transitioned = await repo.update_po_item(
+                        item_id,
+                        POItemStatus.ARRIVED,
+                        product_id=new_sku.id,
+                        delivered_qty=delivered,
+                    )
+                    if not transitioned:
+                        continue
+
+                    received.append(new_sku)
+
+                item_cost = _resolve_po_item_cost(working)
+                cost_total += item_cost * delivered
+                dept_code = (working.get("suggested_department") or "HDW").upper()
+                ledger_items.append(
+                    ReceivedItemSummary(
+                        cost=item_cost,
+                        delivered_qty=delivered,
+                        product_id=resolved_pid,
+                        department=dept_by_code[dept_code].name
+                        if dept_code in dept_by_code
+                        else dept_code,
+                    )
                 )
-                received.append(new_sku)
+            except (ValueError, RuntimeError, OSError, KeyError) as e:
+                error_details.append(ReceiveItemError(item=item.name, error=str(e)))
 
-            item_cost = _resolve_po_item_cost(working)
-            cost_total += item_cost * delivered
-            dept_code = (working.get("suggested_department") or "HDW").upper()
-            ledger_items.append(
-                ReceivedItemSummary(
-                    cost=item_cost,
-                    delivered_qty=delivered,
-                    product_id=resolved_pid,
-                    department=dept_by_code[dept_code].name
-                    if dept_code in dept_by_code
-                    else dept_code,
-                )
-            )
-        except (ValueError, RuntimeError, OSError, KeyError) as e:
-            error_details.append(ReceiveItemError(item=item.name, error=str(e)))
-
-    new_status = await _recompute_po_status(po_id, po, current_user, repo)
-
-    if ledger_items:
-        product_ids = tuple(li.product_id for li in ledger_items if li.product_id)
-        async with transaction():
+        if ledger_items:
             await _record_po_receipt_ledger(
                 po_id=po_id,
                 items=ledger_items,
@@ -222,6 +247,10 @@ async def receive_po_items(
                 performed_by_user_id=current_user.id,
             )
 
+    new_status = await _recompute_po_status(po_id, po, current_user, repo)
+
+    if ledger_items:
+        product_ids = tuple(li.product_id for li in ledger_items if li.product_id)
         await dispatch(
             POItemsReceived(
                 org_id=current_user.organization_id,
@@ -252,6 +281,28 @@ async def receive_po_items(
 
 
 # ── Internal helpers ───────────────────────────────────────────────────────────
+
+_DISCRETE_CONTAINER_UOMS = frozenset({"case", "box", "pack", "bag", "roll", "kit"})
+
+
+def _convert_purchase_to_base(
+    delivered: float,
+    purchase_uom: str,
+    base_unit: str,
+    purchase_pack_qty: int,
+) -> float:
+    """Convert delivered quantity from purchase UOM to base stock units.
+
+    Discrete containers (case, box, etc.) use purchase_pack_qty as the
+    multiplier because the generic unit conversion treats them all as 1:1.
+    """
+    if purchase_uom == base_unit or purchase_pack_qty <= 1:
+        return delivered
+    if purchase_uom in _DISCRETE_CONTAINER_UOMS:
+        return delivered * purchase_pack_qty
+    return delivered
+
+
 _OVERRIDE_FIELDS = (
     "name",
     "cost",

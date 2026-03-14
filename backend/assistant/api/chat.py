@@ -9,7 +9,7 @@ import asyncio
 import logging
 import uuid
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from assistant.api.schemas import ChatRequest
 from assistant.application import session_store
@@ -104,25 +104,14 @@ async def chat_assistant(
             ),
             timeout=120,
         )
-    except TimeoutError:
-        return {
-            "response": "The AI assistant took too long to respond. Please try again.",
-            "tool_calls": [],
-            "thinking": [],
-            "agent": None,
-            "session_id": session_id,
-            "usage": {"cost_usd": 0, "timed_out": True},
-        }
+    except TimeoutError as e:
+        raise HTTPException(
+            status_code=504,
+            detail="The AI assistant took too long to respond. Please try again.",
+        ) from e
     except Exception:
         logger.exception("Unexpected error in chat_assistant")
-        return {
-            "response": "Sorry, something went wrong processing your request. Please try again.",
-            "tool_calls": [],
-            "thinking": [],
-            "agent": None,
-            "session_id": session_id,
-            "usage": {"cost_usd": 0, "error": True},
-        }
+        raise
 
     agent_history = result.pop("history", [])
     turn_cost = result.get("usage", {}).get("cost_usd", 0.0)

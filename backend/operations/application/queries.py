@@ -39,7 +39,8 @@ async def get_withdrawal_by_id(
 
 
 async def mark_withdrawal_paid(withdrawal_id: str, paid_at: str) -> MaterialWithdrawal | None:
-    return await _wd_repo.mark_paid(withdrawal_id, paid_at)
+    result, _changed = await _wd_repo.mark_paid(withdrawal_id, paid_at)
+    return result
 
 
 async def list_returns(
@@ -64,9 +65,12 @@ async def get_return_by_id(
     return await _ret_repo.get_by_id(return_id)
 
 
-async def link_withdrawal_to_invoice(withdrawal_id: str, invoice_id: str) -> None:
-    """Link a withdrawal to an invoice. Operations owns this mutation."""
-    await _wd_repo.link_to_invoice(withdrawal_id, invoice_id)
+async def link_withdrawal_to_invoice(withdrawal_id: str, invoice_id: str) -> bool:
+    """Link a withdrawal to an invoice. Operations owns this mutation.
+
+    Returns False if the withdrawal was already linked to another invoice.
+    """
+    return await _wd_repo.link_to_invoice(withdrawal_id, invoice_id)
 
 
 async def unlink_withdrawals_from_invoice(withdrawal_ids: list[str]) -> None:

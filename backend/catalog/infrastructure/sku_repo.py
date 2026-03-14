@@ -7,9 +7,7 @@ from shared.infrastructure.database import get_connection, get_org_id
 def _row_to_sku(row) -> Sku | None:
     if row is None:
         return None
-    d = dict(row) if hasattr(row, "keys") else {}
-    if not d:
-        return None
+    d = dict(row)
     if "quantity" in d:
         d["quantity"] = float(d["quantity"])
     if "min_stock" in d:

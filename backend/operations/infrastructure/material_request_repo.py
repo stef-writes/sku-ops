@@ -10,9 +10,7 @@ from shared.kernel.errors import InvalidTransitionError
 def _row_to_model(row) -> MaterialRequest | None:
     if row is None:
         return None
-    d = dict(row) if hasattr(row, "keys") else {}
-    if not d:
-        return None
+    d = dict(row)
     if d.get("items") and isinstance(d["items"], str):
         d["items"] = json.loads(d["items"]) if d["items"] else []
     if d.get("organization_id") is None:

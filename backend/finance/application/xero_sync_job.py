@@ -12,7 +12,7 @@ import logging
 
 from finance.adapters.invoicing_factory import get_invoicing_gateway
 from finance.application.invoice_sync import repost_cogs_for_invoice, sync_invoice
-from finance.application.org_settings_service import get_org_settings
+from finance.application.org_settings_service import get_xero_settings
 from finance.application.po_sync_service import sync_po_bill
 from finance.application.sync_results import (
     ReconcilePassResult,
@@ -20,7 +20,6 @@ from finance.application.sync_results import (
     SyncPassResult,
     XeroSyncSummary,
 )
-from finance.domain.xero_settings import XeroSettings
 from finance.infrastructure.credit_note_repo import credit_note_repo
 from finance.infrastructure.invoice_repo import invoice_repo
 from purchasing.application.queries import list_unsynced_po_bills
@@ -211,8 +210,7 @@ async def run_sync(reconcile: bool = True) -> XeroSyncSummary:
     Returns a typed summary suitable for logging or returning from an API endpoint.
     Safe to call repeatedly — idempotency is enforced per document via xero_invoice_id guards.
     """
-    org_settings = await get_org_settings()
-    xero_settings = XeroSettings.model_validate(org_settings.model_dump())
+    xero_settings = await get_xero_settings()
     gateway = get_invoicing_gateway(xero_settings)
 
     # Pass 1 — outbound sync
@@ -221,11 +219,11 @@ async def run_sync(reconcile: bool = True) -> XeroSyncSummary:
     cn_sync = await _sync_outbound_credit_notes(gateway, xero_settings)
     po_sync = await _sync_outbound_po_bills()
 
-    # Pass 2 — reconciliation
+    # Pass 2 — reconciliation (re-fetch settings so tokens are fresh after pass 1)
     invoice_reconcile = ReconcilePassResult()
     cn_reconcile = ReconcilePassResult()
     if reconcile:
-        xero_settings = XeroSettings.model_validate((await get_org_settings()).model_dump())
+        xero_settings = await get_xero_settings()
         gateway = get_invoicing_gateway(xero_settings)
         invoice_reconcile = await _reconcile_invoices(gateway, xero_settings)
         cn_reconcile = await _reconcile_credit_notes(gateway, xero_settings)

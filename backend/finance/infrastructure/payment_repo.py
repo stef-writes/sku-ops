@@ -7,9 +7,7 @@ from shared.infrastructure.database import get_connection, get_org_id
 def _row_to_model(row) -> Payment | None:
     if row is None:
         return None
-    d = dict(row) if hasattr(row, "keys") else {}
-    if not d:
-        return None
+    d = dict(row)
     if d.get("organization_id") is None:
         d.pop("organization_id", None)
     return Payment.model_validate(d)
@@ -18,8 +16,8 @@ def _row_to_model(row) -> Payment | None:
 _COLUMNS = "id, invoice_id, billing_entity_id, amount, method, reference, payment_date, notes, recorded_by_id, xero_payment_id, organization_id, created_at, updated_at"
 
 
-async def insert(payment: Payment | dict, withdrawal_ids: list[str] | None = None) -> None:
-    d = payment if isinstance(payment, dict) else payment.model_dump()
+async def insert(payment: Payment, withdrawal_ids: list[str] | None = None) -> None:
+    d = payment.model_dump()
     conn = get_connection()
     org_id = get_org_id()
     ins_q = "INSERT INTO payments ("

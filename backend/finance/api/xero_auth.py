@@ -13,11 +13,11 @@ from finance.adapters.xero_adapter import XeroAdapter
 from finance.application.org_settings_service import (
     clear_xero_tokens,
     get_org_settings,
+    get_xero_settings,
     pop_oauth_state,
     save_oauth_state,
     upsert_org_settings,
 )
-from finance.domain.xero_settings import XeroSettings
 from shared.api.deps import AdminDep
 from shared.infrastructure.config import (
     FRONTEND_URL,
@@ -150,7 +150,7 @@ async def list_tracking_categories(current_user: AdminDep):
     if not settings.xero_access_token:
         raise HTTPException(status_code=400, detail="Xero not connected for this org")
 
-    xero_settings = XeroSettings.model_validate(settings.model_dump())
+    xero_settings = await get_xero_settings()
     gateway = get_invoicing_gateway(xero_settings)
     try:
         categories = await gateway.list_tracking_categories(xero_settings)

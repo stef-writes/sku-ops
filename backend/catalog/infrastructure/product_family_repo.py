@@ -9,16 +9,14 @@ from shared.infrastructure.database import get_connection, get_org_id
 def _row_to_product(row) -> Product | None:
     if row is None:
         return None
-    d = dict(row) if hasattr(row, "keys") else {}
-    if not d:
-        return None
+    d = dict(row)
     if d.get("organization_id") is None:
         d.pop("organization_id", None)
     return Product.model_validate(d)
 
 
-async def insert(product: Product | dict) -> None:
-    p = product if isinstance(product, dict) else product.model_dump()
+async def insert(product: Product) -> None:
+    p = product.model_dump()
     conn = get_connection()
     org_id = p.get("organization_id") or get_org_id()
     await conn.execute(

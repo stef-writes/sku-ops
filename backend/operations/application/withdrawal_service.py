@@ -242,28 +242,30 @@ async def mark_single_withdrawal_paid(
     paid_at = datetime.now(UTC).isoformat()
 
     async with transaction():
-        result = await withdrawal_repo.mark_paid(withdrawal_id, paid_at)
+        result, changed = await withdrawal_repo.mark_paid(withdrawal_id, paid_at)
         if not result:
             raise ValueError(f"Withdrawal {withdrawal_id} could not be marked paid")
-        await _mark_invoice_paid(withdrawal_id)
-        await _record_payment_ledger(
-            withdrawal_id=withdrawal_id,
-            amount=withdrawal.total,
-            billing_entity=withdrawal.billing_entity or "",
-            contractor_id=withdrawal.contractor_id,
-            performed_by_user_id=performed_by_user_id,
-        )
+        if changed:
+            await _mark_invoice_paid(withdrawal_id)
+            await _record_payment_ledger(
+                withdrawal_id=withdrawal_id,
+                amount=withdrawal.total,
+                billing_entity=withdrawal.billing_entity or "",
+                contractor_id=withdrawal.contractor_id,
+                performed_by_user_id=performed_by_user_id,
+            )
 
-    await dispatch(
-        WithdrawalPaid(
-            org_id=withdrawal.organization_id or get_org_id(),
-            withdrawal_id=withdrawal_id,
-            amount=withdrawal.total,
-            billing_entity=withdrawal.billing_entity or "",
-            contractor_id=withdrawal.contractor_id,
-            performed_by_user_id=performed_by_user_id,
+    if changed:
+        await dispatch(
+            WithdrawalPaid(
+                org_id=withdrawal.organization_id or get_org_id(),
+                withdrawal_id=withdrawal_id,
+                amount=withdrawal.total,
+                billing_entity=withdrawal.billing_entity or "",
+                contractor_id=withdrawal.contractor_id,
+                performed_by_user_id=performed_by_user_id,
+            )
         )
-    )
     return result
 
 

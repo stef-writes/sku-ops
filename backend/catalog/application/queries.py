@@ -253,6 +253,8 @@ async def find_vendor_by_name(name: str) -> Vendor | None:
 
 
 async def insert_vendor(vendor: Vendor | dict) -> None:
+    if isinstance(vendor, dict):
+        vendor = Vendor.model_validate(vendor)
     return await _vendor_repo.insert(vendor)
 
 

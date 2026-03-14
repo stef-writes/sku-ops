@@ -9,9 +9,7 @@ from shared.infrastructure.database import get_connection, get_org_id
 def _row_to_model(row) -> VendorItem | None:
     if row is None:
         return None
-    d = dict(row) if hasattr(row, "keys") else {}
-    if not d:
-        return None
+    d = dict(row)
     if d.get("organization_id") is None:
         d.pop("organization_id", None)
     if "is_preferred" in d:
@@ -19,8 +17,8 @@ def _row_to_model(row) -> VendorItem | None:
     return VendorItem.model_validate(d)
 
 
-async def insert(item: VendorItem | dict) -> None:
-    d = item if isinstance(item, dict) else item.model_dump()
+async def insert(item: VendorItem) -> None:
+    d = item.model_dump()
     conn = get_connection()
     org_id = d.get("organization_id") or get_org_id()
     await conn.execute(

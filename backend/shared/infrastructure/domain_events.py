@@ -161,6 +161,13 @@ async def _run_handler(handler: Handler, event: DomainEvent) -> bool:
             return True
         except Exception:
             if attempt == max_retries:
+                logger.exception(
+                    "Handler %s.%s failed for %s after %d attempt(s)",
+                    handler.__module__,
+                    handler.__qualname__,
+                    type(event).__name__,
+                    max_retries + 1,
+                )
                 return False
             delay = base_delay * (2**attempt)
             logger.warning(

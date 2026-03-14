@@ -12,9 +12,7 @@ from uuid import uuid4
 import bcrypt
 
 from catalog.application.queries import (
-    count_all_skus as count_all_products,
-)
-from catalog.application.queries import (
+    count_all_skus,
     get_department_by_code,
     insert_department,
     list_departments,
@@ -104,7 +102,7 @@ async def seed_demo_inventory(organization_id: str = "default") -> None:
     """Seed products from CSV for a full demo experience."""
     try:
         org_id_var.set(organization_id)
-        count = await count_all_products()
+        count = await count_all_skus()
         if count > 0:
             return
         if not os.path.exists(DEMO_CSV_PATH):

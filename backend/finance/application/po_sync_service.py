@@ -8,9 +8,8 @@ import logging
 from datetime import UTC, datetime
 
 from finance.adapters.invoicing_factory import get_invoicing_gateway
-from finance.application.org_settings_service import get_org_settings
+from finance.application.org_settings_service import get_xero_settings
 from finance.application.sync_results import POBillSyncResult
-from finance.domain.xero_settings import XeroSettings
 from purchasing.application.queries import (
     get_po_with_cost,
     set_xero_bill_id,
@@ -40,8 +39,7 @@ async def sync_po_bill(po_id: str, cost_total: float | None = None) -> POBillSyn
         await set_xero_sync_status(po_id, "skipped", now)
         return POBillSyncResult(po_id=po_id, success=True, skipped=True, reason="zero cost")
 
-    org_settings = await get_org_settings()
-    xero_settings = XeroSettings.model_validate(org_settings.model_dump())
+    xero_settings = await get_xero_settings()
     gateway = get_invoicing_gateway(xero_settings)
 
     try:

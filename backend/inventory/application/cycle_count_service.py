@@ -165,11 +165,13 @@ async def commit_cycle_count(
                 emit_event=False,
             )
             adjusted_product_ids.append(item.product_id)
-        await cycle_count_repo.commit_count(
+        committed = await cycle_count_repo.commit_count(
             count_id=count_id,
             committed_by_id=committed_by_id,
             committed_at=committed_at,
         )
+        if not committed:
+            raise ValueError("Cycle count is already committed.")
 
     if adjusted_product_ids:
         await dispatch(

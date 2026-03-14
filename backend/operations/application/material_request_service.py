@@ -16,7 +16,6 @@ from operations.domain.withdrawal import (
     ContractorContext,
     MaterialWithdrawal,
     MaterialWithdrawalCreate,
-    WithdrawalItem,
 )
 from shared.infrastructure.database import get_org_id, transaction
 from shared.infrastructure.domain_events import dispatch
@@ -113,10 +112,7 @@ async def process_material_request(
         raise MaterialRequestError("Service address is required")
 
     withdrawal_data = MaterialWithdrawalCreate(
-        items=[
-            WithdrawalItem(**i.model_dump()) if hasattr(i, "model_dump") else WithdrawalItem(**i)
-            for i in req.items
-        ],
+        items=list(req.items),
         job_id=job_id,
         service_address=service_address,
         notes=notes,

@@ -70,8 +70,8 @@ async def next_invoice_number() -> str:
     return f"INV-{str(num).zfill(5)}"
 
 
-async def insert(invoice: Invoice | dict) -> InvoiceWithDetails | None:
-    invoice_dict = invoice if isinstance(invoice, dict) else invoice.model_dump()
+async def insert(invoice: Invoice) -> InvoiceWithDetails | None:
+    invoice_dict = invoice.model_dump()
     conn = get_connection()
     org_id = get_org_id()
     invoice_id = invoice_dict.get("id") or str(uuid4())

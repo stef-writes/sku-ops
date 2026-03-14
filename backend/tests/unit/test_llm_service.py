@@ -8,7 +8,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from inventory.application.uom_classifier import UOMClassification
 from shared.infrastructure.config import ANTHROPIC_AVAILABLE
+
+_DEFAULT_UOM = UOMClassification(base_unit="each", sell_uom="each", pack_qty=1)
 
 
 class TestLLMAvailability:
@@ -61,7 +64,7 @@ class TestUOMClassifierFallback:
         from inventory.application.uom_classifier import classify_uom
 
         result = await classify_uom("Mystery product")
-        assert result == {"base_unit": "each", "sell_uom": "each", "pack_qty": 1}
+        assert result == _DEFAULT_UOM
 
     async def test_classify_uom_handles_malformed_llm_response(self):
         from inventory.application.uom_classifier import classify_uom
@@ -70,7 +73,7 @@ class TestUOMClassifierFallback:
             return "not valid json at all {{{}"
 
         result = await classify_uom("5 Gal Paint", generate_text=mock_generate_text)
-        assert result == {"base_unit": "each", "sell_uom": "each", "pack_qty": 1}
+        assert result == _DEFAULT_UOM
 
     async def test_classify_uom_handles_llm_exception(self):
         from inventory.application.uom_classifier import classify_uom
@@ -79,4 +82,4 @@ class TestUOMClassifierFallback:
             raise RuntimeError("LLM unavailable")
 
         result = await classify_uom("5 Gal Paint", generate_text=mock_generate_text)
-        assert result == {"base_unit": "each", "sell_uom": "each", "pack_qty": 1}
+        assert result == _DEFAULT_UOM
