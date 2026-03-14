@@ -180,9 +180,8 @@ async def update_product(product_id: str, data: SkuUpdate, current_user: AdminDe
     if not sku:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
     try:
-        result = await lifecycle_update(product_id, update_data, current_sku=sku)
+        result = await lifecycle_update(product_id, data, current_sku=sku)
     except ResourceNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except DuplicateBarcodeError as e:

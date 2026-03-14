@@ -10,12 +10,11 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from typing import Any
 
 from catalog.application.product_family_lifecycle import create_product as create_product_parent
 from catalog.application.sku_service import generate_sku
 from catalog.domain.errors import DuplicateBarcodeError, InvalidBarcodeError
-from catalog.domain.product import Sku
+from catalog.domain.product import Sku, SkuUpdate
 from catalog.infrastructure.department_repo import department_repo
 from catalog.infrastructure.product_family_repo import product_family_repo
 from catalog.infrastructure.sku_repo import sku_repo
@@ -166,7 +165,7 @@ async def create_product_with_sku(
 
 async def update_sku(
     sku_id: str,
-    updates: dict[str, Any],
+    updates: SkuUpdate,
     current_sku: Sku | None = None,
 ) -> Sku:
     """Update a SKU. Resolves category name changes and adjusts counters."""
@@ -174,7 +173,7 @@ async def update_sku(
     if not sku:
         raise ResourceNotFoundError("Sku", sku_id)
 
-    update_data = {k: v for k, v in updates.items() if v is not None}
+    update_data = updates.model_dump(exclude_none=True)
     update_data["updated_at"] = datetime.now(UTC).isoformat()
 
     if "barcode" in update_data:

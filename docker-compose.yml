@@ -42,6 +42,7 @@ services:
         condition: service_started
     environment:
       ENV: ${ENV:-production}
+      AUTH_PROVIDER: ${AUTH_PROVIDER:-supabase}
       DATABASE_URL: postgresql://sku_ops:${POSTGRES_PASSWORD}@db:5432/sku_ops
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
@@ -56,6 +57,10 @@ services:
       SENTRY_DSN: ${SENTRY_DSN:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       WORKERS: ${WORKERS:-1}
+      PG_POOL_MIN: ${PG_POOL_MIN:-2}
+      PG_POOL_MAX: ${PG_POOL_MAX:-10}
+      PG_ACQUIRE_TIMEOUT: ${PG_ACQUIRE_TIMEOUT:-10}
+      PG_COMMAND_TIMEOUT: ${PG_COMMAND_TIMEOUT:-30}
     deploy:
       resources:
         limits:

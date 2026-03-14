@@ -4,12 +4,6 @@ from inventory.domain.cycle_count import CycleCount, CycleCountItem
 from shared.infrastructure.database import get_connection, get_org_id
 
 
-def _row(row) -> dict | None:
-    if row is None:
-        return None
-    return dict(row) if hasattr(row, "keys") else {}
-
-
 async def insert_count(count: CycleCount) -> None:
     conn = get_connection()
     d = count.model_dump()
@@ -63,7 +57,7 @@ async def update_item_counted(
     counted_qty: float,
     variance: float,
     notes: str | None,
-) -> dict | None:
+) -> CycleCountItem | None:
     conn = get_connection()
     cursor = await conn.execute(
         """UPDATE cycle_count_items
@@ -74,7 +68,7 @@ async def update_item_counted(
     )
     row = await cursor.fetchone()
     await conn.commit()
-    return _row(row)
+    return CycleCountItem.model_validate(dict(row)) if row else None
 
 
 async def commit_count(
@@ -92,17 +86,18 @@ async def commit_count(
     await conn.commit()
 
 
-async def get_count(count_id: str) -> dict | None:
+async def get_count(count_id: str) -> CycleCount | None:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
         "SELECT * FROM cycle_counts WHERE id = ? AND organization_id = ?",
         (count_id, org_id),
     )
-    return _row(await cursor.fetchone())
+    row = await cursor.fetchone()
+    return CycleCount.model_validate(dict(row)) if row else None
 
 
-async def list_counts(status: str | None = None) -> list:
+async def list_counts(status: str | None = None) -> list[CycleCount]:
     conn = get_connection()
     org_id = get_org_id()
     if status:
@@ -116,23 +111,24 @@ async def list_counts(status: str | None = None) -> list:
             (org_id,),
         )
     rows = await cursor.fetchall()
-    return [_row(r) for r in rows]
+    return [CycleCount.model_validate(dict(r)) for r in rows]
 
 
-async def list_items(cycle_count_id: str) -> list:
+async def list_items(cycle_count_id: str) -> list[CycleCountItem]:
     conn = get_connection()
     cursor = await conn.execute(
         "SELECT * FROM cycle_count_items WHERE cycle_count_id = ? ORDER BY sku ASC",
         (cycle_count_id,),
     )
     rows = await cursor.fetchall()
-    return [_row(r) for r in rows]
+    return [CycleCountItem.model_validate(dict(r)) for r in rows]
 
 
-async def get_item(item_id: str, cycle_count_id: str) -> dict | None:
+async def get_item(item_id: str, cycle_count_id: str) -> CycleCountItem | None:
     conn = get_connection()
     cursor = await conn.execute(
         "SELECT * FROM cycle_count_items WHERE id = ? AND cycle_count_id = ?",
         (item_id, cycle_count_id),
     )
-    return _row(await cursor.fetchone())
+    row = await cursor.fetchone()
+    return CycleCountItem.model_validate(dict(row)) if row else None

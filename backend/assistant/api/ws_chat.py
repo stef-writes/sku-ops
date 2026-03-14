@@ -52,12 +52,14 @@ from assistant.agents.core.validators import validate_response
 from assistant.agents.unified.agent import _agent
 from assistant.application import session_store
 from assistant.application.assistant import recall_memory, schedule_memory_extraction
+from shared.api.auth_provider import resolve_claims
 from shared.infrastructure.config import (
     ANTHROPIC_AVAILABLE,
     JWT_ALGORITHM,
     JWT_SECRET,
     OPENROUTER_AVAILABLE,
     SESSION_COST_CAP,
+    is_deployed,
 )
 from shared.infrastructure.logging_config import org_id_var, user_id_var
 from shared.kernel.constants import DEFAULT_ORG_ID
@@ -94,10 +96,18 @@ async def ws_chat_endpoint(websocket: WebSocket):
         await websocket.close(code=4001, reason="Invalid or expired token")
         return
 
-    org_id = payload.get("organization_id") or DEFAULT_ORG_ID
-    user_id = payload.get("user_id") or payload.get("sub", "")
-    user_name = payload.get("name") or (payload.get("user_metadata") or {}).get("name") or ""
-    role = (payload.get("app_metadata") or {}).get("role") or payload.get("role", "")
+    try:
+        claims = resolve_claims(payload)
+    except ValueError:
+        await websocket.close(code=4001, reason="Invalid token: missing required claims")
+        return
+    if is_deployed and claims.organization_id is None:
+        await websocket.close(code=4001, reason="Invalid token: missing organization_id claim")
+        return
+    org_id = claims.organization_id or DEFAULT_ORG_ID
+    user_id = claims.user_id
+    user_name = claims.name
+    role = claims.role
 
     org_id_var.set(org_id)
     user_id_var.set(user_id)

@@ -2,6 +2,8 @@
 
 from enum import StrEnum
 
+from pydantic import BaseModel
+
 from shared.kernel.entity import Entity
 
 
@@ -38,3 +40,33 @@ class CycleCountItem(Entity):
     variance: float | None = None
     unit: str = "each"
     notes: str | None = None
+
+
+class CycleCountDetail(BaseModel):
+    """Count header plus all its line items — returned by get_count_detail."""
+
+    id: str
+    organization_id: str
+    status: CycleCountStatus
+    scope: str | None
+    created_by_id: str
+    created_by_name: str
+    committed_by_id: str | None
+    committed_at: str | None
+    created_at: str
+    items: list[CycleCountItem]
+
+
+class CommitCycleCountResult(BaseModel):
+    """Result of commit_cycle_count — includes the updated count + adjustment count."""
+
+    id: str
+    organization_id: str
+    status: CycleCountStatus
+    scope: str | None
+    created_by_id: str
+    created_by_name: str
+    committed_by_id: str | None
+    committed_at: str | None
+    created_at: str
+    items_adjusted: int

@@ -1,8 +1,9 @@
 # SKU-Ops — Agent Rules
 
-You are working on a launch-focused modular monolith (Python/FastAPI backend, React frontend). An expert architecture audit has been performed. A first remediation attempt produced incorrect results (code relocation, not correction). These rules exist to prevent repeating those mistakes.
+Modular monolith in production. Python/FastAPI backend, React frontend. Architecture remediation complete. These rules encode what was learned — follow them precisely.
 
-Read `.cursor/rules/architecture-audit-status.mdc` before any structural backend change. It tracks what was found, what was attempted, what failed, and what still needs proper correction.
+Consult `.cursor/rules/known-good-patterns.mdc` before any structural backend change.
+Consult `.cursor/rules/deployment-hardening.mdc` before any Docker, nginx, CORS, or auth change.
 
 ---
 
@@ -24,13 +25,13 @@ Violations of this graph are bugs, not tech debt.
 
 ### Cross-context ownership
 
-Each bounded context owns its tables, state transitions, and invariants. Cross-context mutation goes through the owning context's application facade. The owning context controls its own data.
+Each bounded context owns its tables, state transitions, and invariants. Cross-context mutation goes through the owning context's application facade.
 
 ```python
-# THIS IS A BUG — finance mutating operations' table
+# BUG — finance mutating operations' table directly
 await conn.execute("UPDATE withdrawals SET payment_status = 'invoiced' WHERE id = ?", (wid,))
 
-# THIS IS CORRECT — operations owns the mutation
+# CORRECT — operations owns the mutation
 from operations.application.withdrawal_facade import link_to_invoice
 await link_to_invoice(withdrawal_ids, invoice_id, org_id)
 ```
@@ -47,17 +48,16 @@ Repos do CRUD and queries. No business validation, no orchestration, no cross-co
 
 ## 2. Forbidden patterns
 
-These patterns have been identified as root causes of structural problems. Do not introduce or preserve them.
-
 | Pattern | Why forbidden | What to do instead |
 |---------|--------------|-------------------|
 | `_wiring = {}` / `set_*_getter()` | Mutable global state hiding circular deps | Fix the boundary design; use module-level imports from application facades |
 | `from x.infrastructure.y import z` inside function body | Service reaching through to infra details | Import collaborators at module level |
 | Giant service file (15+ functions, mixed concerns) | Dumping ground; untestable | One module per important use case under `application/use_cases/` |
 | `dict` as primary contract for mutation flows | No type safety, silent schema drift | Typed command/result dataclasses |
-| `conn=None` on port signatures | Infrastructure leaking through abstraction | Unit of Work (contextvar-based ambient transaction) |
+| `conn=None` on port signatures | Infrastructure leaking through abstraction | Repos call `get_connection()` directly; no `conn` parameters |
 | Raw SQL in API routes | Persistence logic in transport layer | Delegate to application → infrastructure |
 | Cross-context raw SQL | Invisible coupling, ownership violation | Application facade on the owning context |
+| Inline JWT claim path-sniffing | Provider-specific logic scattered everywhere | Use `resolve_claims()` from `shared/api/auth_provider.py` |
 | Claiming idempotency without defining mechanism | False safety guarantee | Define dedupe key, state guard, failure modes before implementation |
 
 ---
@@ -79,17 +79,21 @@ Any mutation that crosses context boundaries or interacts with external systems 
 
 ### Database layer
 
-- **SQLite (dev):** Single connection. `get_connection()` inside `transaction()` returns the same conn.
-- **Postgres (prod):** Pool proxy. `get_connection()` returns autocommitting pool proxy. `transaction()` yields a dedicated connection. **These are different objects.** Code that calls `get_connection()` inside a `transaction()` block is NOT in the transaction on Postgres.
-- **Consequence:** Until a contextvar-based Unit of Work is implemented, `conn` parameter threading is the only way to share a transaction. This is a known infrastructure debt, not a pattern to emulate.
+- **SQLite (dev):** Single connection. `get_connection()` inside `transaction()` returns the ambient connection.
+- **Postgres (prod):** Pool proxy. `get_connection()` inside `transaction()` returns the dedicated transactional connection (not the pool proxy). These are the same object only because of the contextvar Unit of Work — do not call `get_connection()` outside a `transaction()` block in application code.
+- **Pool config:** `PG_POOL_MIN`, `PG_POOL_MAX`, `PG_ACQUIRE_TIMEOUT`, `PG_COMMAND_TIMEOUT` — all in `config.py` and `docker-compose.yml`. Always set these explicitly in production.
 
-### Event hub
+### Event system
 
-Exists (`shared/infrastructure/event_hub.py`). Used for WebSocket/UI notifications. Not yet used for cross-context domain events. Available for future use but do not add event-driven patterns speculatively.
+`shared/infrastructure/domain_events.py` — handler registry. Register with `@on(EventType)`, dispatch with `await dispatch(event)`. Import handler modules at startup to trigger registration. `event_hub.emit()` is only called from `shared/infrastructure/ws_bridge.py` — never call it directly from application code.
+
+### Auth provider
+
+`shared/api/auth_provider.py` — single source of truth for JWT claim extraction. Controlled by `AUTH_PROVIDER` env var (`supabase` or `internal`). All three auth entry points call `resolve_claims(payload)`. Do not add claim path-sniffing anywhere else.
 
 ### Adapter pattern
 
-Only one true port-and-adapter pair exists: `InvoicingGateway` (Xero). Port protocol, factory, real adapter, stub adapter. This is the reference implementation for the pattern.
+Only one true port-and-adapter pair: `InvoicingGateway` (Xero). Reference implementation for the pattern. Do not create new ports unless all three criteria are met (see `backend-conventions.mdc`).
 
 ---
 
@@ -113,30 +117,12 @@ Yes for mutation flows and cross-context data transfer. No for simple pass-throu
 
 ---
 
-## 6. Current remediation status
+## 6. What not to do
 
-Architecture remediation is complete. Consult `.cursor/rules/architecture-audit-status.mdc` for the full history. All identified items have been resolved.
-
-| Item | Status |
-|------|--------|
-| Fiscal periods vertical slice | Done |
-| auth_service split (pure logic vs FastAPI deps) | Done |
-| InvoiceSyncResult rename (xero_ → external_) | Done |
-| OAuth state repo extraction | Done |
-| Invoice service redesign | Done |
-| Unit of Work (contextvar ambient transactions) | Done |
-| Fat controller extraction | Done |
-| Reporting extraction | Done |
-| conn=None port cleanup | Done |
-| Unused port deletion | Done |
-
----
-
-## 7. What not to do
-
-- Do not relocate code and call it architecture. Moving a function from file A to file B without changing its dependency structure, contract shape, or boundary design is not a fix.
-- Do not preserve bad structure because it exists. If the current code violates these rules, the fix is to redesign, not to work around.
+- Do not relocate code and call it architecture. Moving a function from file A to file B without changing its dependency structure is not a fix.
+- Do not preserve bad structure because it exists. If current code violates these rules, redesign, don't work around.
 - Do not rush. One correctly structured module is worth more than ten relocated functions.
 - Do not add abstraction layers that have one caller and one implementation. That is ceremony, not architecture.
-- Do not create generic patterns (Repository[T], Service[T]) in a codebase with 5-15 entities per context. They will never pay for themselves.
+- Do not create generic patterns (Repository[T], Service[T]) in a codebase with 5-15 entities per context.
 - Do not decrease test coverage. If new abstractions are harder to test than the concrete code they replace, the abstraction is wrong.
+- Do not touch Docker, nginx, CORS, or auth without reading `deployment-hardening.mdc` first.

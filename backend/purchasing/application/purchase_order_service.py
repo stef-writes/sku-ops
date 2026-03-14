@@ -12,6 +12,7 @@ from typing import Any
 from uuid import uuid4
 
 from purchasing.domain.purchase_order import (
+    CreatePOResult,
     POItemCreate,
     POItemStatus,
     POStatus,
@@ -80,7 +81,7 @@ async def create_purchase_order(
     category_id: str | None = None,
     create_vendor_if_missing: bool = True,
     repo: PORepoPort = _default_repo,
-) -> dict:
+) -> CreatePOResult:
     """Save reviewed receipt items as a pending purchase order.
 
     Runs enrichment (UOM inference, dept suggestion, LLM) but does NOT update
@@ -200,15 +201,15 @@ async def create_purchase_order(
     await repo.insert_po(po)
     await repo.insert_items(po_items)
 
-    return {
-        "id": po.id,
-        "vendor_id": vendor_id,
-        "vendor_created": vendor_created,
-        "vendor_name": vendor_name,
-        "status": po.status.value,
-        "item_count": len(po_items),
-        "created_at": po.created_at,
-    }
+    return CreatePOResult(
+        id=po.id,
+        vendor_id=vendor_id,
+        vendor_created=vendor_created,
+        vendor_name=vendor_name,
+        status=po.status.value,
+        item_count=len(po_items),
+        created_at=po.created_at,
+    )
 
 
 # Re-export receiving functions so existing imports from this module keep working
@@ -221,6 +222,7 @@ from purchasing.application.po_receiving_service import (  # noqa: E402
 )
 
 __all__ = [
+    "CreatePOResult",
     "PurchasingDeps",
     "_apply_overrides",
     "_match_sku",

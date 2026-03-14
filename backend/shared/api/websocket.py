@@ -14,8 +14,9 @@ import logging
 import jwt
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from shared.api.auth_provider import resolve_claims
 from shared.infrastructure import event_hub
-from shared.infrastructure.config import JWT_ALGORITHM, JWT_SECRET
+from shared.infrastructure.config import JWT_ALGORITHM, JWT_SECRET, is_deployed
 from shared.kernel.constants import DEFAULT_ORG_ID
 from shared.kernel.events import CONTRACTOR_VISIBLE_EVENTS, Event, is_shutdown
 
@@ -50,9 +51,17 @@ async def ws_endpoint(websocket: WebSocket):
         await websocket.close(code=4001, reason="Invalid or expired token")
         return
 
-    org_id = payload.get("organization_id") or DEFAULT_ORG_ID
-    role = (payload.get("app_metadata") or {}).get("role") or payload.get("role", "")
-    user_id = payload.get("user_id") or payload.get("sub", "")
+    try:
+        claims = resolve_claims(payload)
+    except ValueError:
+        await websocket.close(code=4001, reason="Invalid token: missing required claims")
+        return
+    if is_deployed and claims.organization_id is None:
+        await websocket.close(code=4001, reason="Invalid token: missing organization_id claim")
+        return
+    org_id = claims.organization_id or DEFAULT_ORG_ID
+    role = claims.role
+    user_id = claims.user_id
     await websocket.accept()
 
     queue = event_hub.subscribe()

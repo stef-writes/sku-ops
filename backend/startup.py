@@ -1,4 +1,4 @@
-"""Application lifespan — init, seed, warm-up, shutdown.
+"""Application lifespan — init, warm-up, shutdown.
 
 Owns everything that happens between process start and first request,
 and between last response and process exit.
@@ -13,53 +13,14 @@ from fastapi import FastAPI
 
 from scheduler import xero_sync_loop
 from shared.infrastructure.config import (
-    RESET_DB,
     cors_warn_in_deployed,
     is_deployed,
     is_test,
 )
 from shared.infrastructure.database import close_db, init_db
-from shared.infrastructure.logging_config import org_id_var
 from shared.infrastructure.redis import close_redis, init_redis, is_redis_available
-from shared.kernel.constants import DEFAULT_ORG_ID
 
 logger = logging.getLogger(__name__)
-
-
-async def _reset_db() -> None:
-    """Drop all application tables so init_db() recreates them clean.
-
-    Used when RESET_DB=true is set in the environment. Intended for fresh
-    deploys and demo resets where all data is synthetic and a full wipe is
-    acceptable.
-
-    SAFETY: this checks whether any data already exists before dropping.
-    If the database has been seeded (organizations table is non-empty) this
-    raises RuntimeError rather than silently wiping production data. To force
-    a wipe of a populated database, unset RESET_DB after the first deploy —
-    you cannot accidentally trigger a second wipe via a restart.
-    """
-    from shared.infrastructure.database import get_connection
-    from shared.infrastructure.db import drop_all_tables
-
-    conn = get_connection()
-    try:
-        cursor = await conn.execute("SELECT COUNT(*) FROM organizations")
-        row = await cursor.fetchone()
-        count = row[0] if row else 0
-    except Exception:
-        count = 0
-
-    if count > 0:
-        raise RuntimeError(
-            "RESET_DB=true but the database already contains data "
-            f"({count} organization(s)). Remove the RESET_DB environment "
-            "variable to prevent accidental data loss on restart."
-        )
-
-    logger.warning("RESET_DB=true — dropping all tables for a clean restart")
-    await drop_all_tables()
-    logger.warning("RESET_DB: all tables dropped — schema will be recreated on init_db()")
 
 
 async def _get_active_org_ids() -> list[str]:
@@ -67,82 +28,12 @@ async def _get_active_org_ids() -> list[str]:
     from shared.infrastructure.org_repo import list_all
 
     orgs = await list_all()
-    return [o.id for o in orgs] if orgs else ["default"]
-
-
-async def _ensure_default_org() -> None:
-    """Insert the default organization row if it doesn't exist yet."""
-    from datetime import UTC, datetime
-
-    from shared.infrastructure.database import get_connection
-
-    conn = get_connection()
-    cursor = await conn.execute("SELECT id FROM organizations WHERE id = ?", (DEFAULT_ORG_ID,))
-    if await cursor.fetchone():
-        return
-    await conn.execute(
-        "INSERT INTO organizations (id, name, slug, created_at) VALUES (?, ?, ?, ?)",
-        (DEFAULT_ORG_ID, "Default", DEFAULT_ORG_ID, datetime.now(UTC).isoformat()),
-    )
-    await conn.commit()
-    logger.info("Default organization created (id=%s)", DEFAULT_ORG_ID)
-
-
-async def _ensure_demo_users() -> None:
-    """Create admin + contractor demo accounts if they don't already exist."""
-    import uuid
-    from datetime import UTC, datetime
-
-    import bcrypt
-
-    from shared.infrastructure.config import (
-        DEMO_CONTRACTOR_EMAIL,
-        DEMO_USER_EMAIL,
-        DEMO_USER_PASSWORD,
-    )
-    from shared.infrastructure.database import get_connection
-
-    def hash_password(pw: str) -> str:
-        return bcrypt.hashpw(pw.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-
-    demo_users = [
-        {"email": DEMO_USER_EMAIL, "name": "Admin", "role": "admin"},
-    ]
-    if DEMO_CONTRACTOR_EMAIL:
-        demo_users.append(
-            {
-                "email": DEMO_CONTRACTOR_EMAIL,
-                "name": "Demo Contractor",
-                "role": "contractor",
-                "company": "ABC Plumbing",
-            }
-        )
-    conn = get_connection()
-    for u in demo_users:
-        cursor = await conn.execute("SELECT id FROM users WHERE email = ?", (u["email"],))
-        if await cursor.fetchone():
-            continue
-        await conn.execute(
-            "INSERT INTO users (id, email, password, name, role, company, is_active, organization_id, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)",
-            (
-                str(uuid.uuid4()),
-                u["email"],
-                hash_password(DEMO_USER_PASSWORD),
-                u["name"],
-                u["role"],
-                u.get("company", ""),
-                DEFAULT_ORG_ID,
-                datetime.now(UTC).isoformat(),
-            ),
-        )
-        await conn.commit()
-        logger.info("Demo user ready: %s / %s (%s)", u["email"], DEMO_USER_PASSWORD, u["role"])
+    return [o.id for o in orgs] if orgs else []
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize DB and seed data on startup; close DB on shutdown."""
+    """Initialize DB on startup; close DB on shutdown."""
     worker_count = int(os.environ.get("WORKERS", "1"))
 
     await init_redis()
@@ -163,21 +54,9 @@ async def lifespan(app: FastAPI):
         logger.warning(
             "CORS_ORIGINS is permissive (*). Set CORS_ORIGINS explicitly for staging/production."
         )
-    if RESET_DB:
-        await _reset_db()
 
     await init_db()
     logger.info("Database initialized")
-
-    from shared.infrastructure.config import seed_on_startup
-
-    if seed_on_startup:
-        token = org_id_var.set(DEFAULT_ORG_ID)
-        try:
-            await _ensure_default_org()
-            await _ensure_demo_users()
-        finally:
-            org_id_var.reset(token)
 
     import assistant.agents.tools.search  # noqa: F401 — registers index invalidation handler
     import finance.application.event_handlers  # noqa: F401
@@ -194,6 +73,9 @@ async def lifespan(app: FastAPI):
 
     init_tools()
     logger.info("Tool registry initialized")
+
+    from shared.infrastructure.logging_config import org_id_var
+
     org_ids = await _get_active_org_ids()
     for oid in org_ids:
         token = org_id_var.set(oid)

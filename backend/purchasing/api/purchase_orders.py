@@ -95,7 +95,7 @@ async def create_po(
         user_id=current_user.id,
         action="po.create",
         resource_type="purchase_order",
-        resource_id=result.get("id"),
+        resource_id=result.id,
         details={"vendor": data.vendor_name, "item_count": len(data.products)},
         request=request,
         org_id=current_user.organization_id,
@@ -110,13 +110,20 @@ async def list_purchase_orders(
 ):
     """List purchase orders, optionally filtered by status (ordered/received)."""
     pos = await list_pos(status=status)
+    result = []
     for po in pos:
-        items = await get_po_items(po["id"])
-        po["item_count"] = len(items)
-        po["ordered_count"] = sum(1 for i in items if i["status"] == "ordered")
-        po["pending_count"] = sum(1 for i in items if i["status"] == "pending")
-        po["arrived_count"] = sum(1 for i in items if i["status"] == "arrived")
-    return pos
+        items = await get_po_items(po.id)
+        result.append(
+            po.model_copy(
+                update={
+                    "item_count": len(items),
+                    "ordered_count": sum(1 for i in items if i.status == "ordered"),
+                    "pending_count": sum(1 for i in items if i.status == "pending"),
+                    "arrived_count": sum(1 for i in items if i.status == "arrived"),
+                }
+            )
+        )
+    return result
 
 
 @router.get("/{po_id}")
@@ -129,7 +136,7 @@ async def get_purchase_order(
     if not po:
         raise HTTPException(status_code=404, detail=f"Purchase order not found: {po_id}")
     items = await get_po_items(po_id)
-    return {**po, "items": items}
+    return po.model_copy(update={"items": items})
 
 
 @router.post("/{po_id}/delivery")
@@ -166,14 +173,14 @@ async def receive_items(
         resource_type="purchase_order",
         resource_id=po_id,
         details={
-            "received": result.get("received", 0),
-            "matched": result.get("matched", 0),
-            "cost_total": result.get("cost_total", 0),
+            "received": result.received,
+            "matched": result.matched,
+            "cost_total": result.cost_total,
         },
         request=request,
         org_id=current_user.organization_id,
     )
-    if result.get("cost_total", 0) > 0:
+    if result.cost_total > 0:
         try:
             await queue_po_for_sync(po_id)
         except (RuntimeError, OSError, ValueError) as e:

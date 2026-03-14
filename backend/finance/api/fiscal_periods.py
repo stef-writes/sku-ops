@@ -48,9 +48,9 @@ async def close_period(
         resource_type="fiscal_period",
         resource_id=period_id,
         details={
-            "name": result.get("name"),
-            "start_date": result.get("start_date"),
-            "end_date": result.get("end_date"),
+            "name": result.name,
+            "start_date": result.start_date,
+            "end_date": result.end_date,
         },
         request=request,
         org_id=current_user.organization_id,

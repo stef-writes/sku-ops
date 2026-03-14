@@ -397,6 +397,33 @@ async def _get_slow_movers(args: dict) -> str:
     return json.dumps({"period_days": days, "count": len(out), "slow_movers": out})
 
 
+async def _search_vendors_semantic(args: dict) -> str:
+    query = (args.get("query") or "").strip()
+    limit = min(int(args.get("limit") or 10), 30)
+    index = await get_index()
+    results = await index.search_entity(query, "vendor", limit=limit)
+    out = [{"id": r.entity_id, "score": round(r.score, 3), **r.data} for r in results]
+    return json.dumps({"count": len(out), "vendors": out})
+
+
+async def _search_pos_semantic(args: dict) -> str:
+    query = (args.get("query") or "").strip()
+    limit = min(int(args.get("limit") or 10), 30)
+    index = await get_index()
+    results = await index.search_entity(query, "purchase_order", limit=limit)
+    out = [{"id": r.entity_id, "score": round(r.score, 3), **r.data} for r in results]
+    return json.dumps({"count": len(out), "purchase_orders": out})
+
+
+async def _search_jobs_semantic(args: dict) -> str:
+    query = (args.get("query") or "").strip()
+    limit = min(int(args.get("limit") or 10), 30)
+    index = await get_index()
+    results = await index.search_entity(query, "job", limit=limit)
+    out = [{"job_id": r.entity_id, "score": round(r.score, 3), **r.data} for r in results]
+    return json.dumps({"count": len(out), "jobs": out})
+
+
 # ── Registry ──────────────────────────────────────────────────────────────────
 
 _reg("search_products", "inventory", _search_products, lookup_key="search_products")
@@ -413,3 +440,6 @@ _reg("get_slow_movers", "inventory", _get_slow_movers)
 _reg("get_top_products", "inventory", _get_top_products)
 _reg("get_department_activity", "inventory", _get_department_activity)
 _reg("forecast_stockout", "inventory", _forecast_stockout)
+_reg("search_vendors_semantic", "inventory", _search_vendors_semantic)
+_reg("search_pos_semantic", "inventory", _search_pos_semantic)
+_reg("search_jobs_semantic", "inventory", _search_jobs_semantic)

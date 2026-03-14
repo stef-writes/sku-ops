@@ -141,7 +141,7 @@ async def drop_all_tables() -> None:
     Connects to the database if not already initialized. After this call
     the database is empty — call init_db() to recreate the schema.
 
-    Only for use in demo/reset flows (RESET_DB=true). Never call in production
+    Only for use in demo/reset flows. Never call in production
     unless you explicitly intend to wipe all data.
     """
     if _state["backend"] is None:
@@ -180,7 +180,6 @@ async def drop_all_tables() -> None:
         "refresh_tokens",
         "users",
         "organizations",
-        "schema_versions",
     ]
     for table in tables:
         await conn.execute(f"DROP TABLE IF EXISTS {table}")

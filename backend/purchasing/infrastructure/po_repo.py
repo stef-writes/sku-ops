@@ -1,6 +1,12 @@
 """Purchase order repository — typed implementation of PORepoPort."""
 
-from purchasing.domain.purchase_order import POItemStatus, PurchaseOrder, PurchaseOrderItem
+from purchasing.domain.purchase_order import (
+    POItemRow,
+    POItemStatus,
+    PORow,
+    PurchaseOrder,
+    PurchaseOrderItem,
+)
 from purchasing.ports.po_repo_port import PORepoPort
 from shared.infrastructure.database import get_connection, get_org_id
 
@@ -71,7 +77,7 @@ class PgPORepo(PORepoPort):
             )
         await conn.commit()
 
-    async def list_pos(self, status: str | None = None) -> list[dict]:
+    async def list_pos(self, status: str | None = None) -> list[PORow]:
         conn = get_connection()
         org_id = get_org_id()
         if status:
@@ -85,9 +91,9 @@ class PgPORepo(PORepoPort):
                 (org_id,),
             )
         rows = await cursor.fetchall()
-        return [dict(r) for r in rows]
+        return [PORow.model_validate(dict(r)) for r in rows]
 
-    async def get_po(self, po_id: str) -> dict | None:
+    async def get_po(self, po_id: str) -> PORow | None:
         conn = get_connection()
         org_id = get_org_id()
         cursor = await conn.execute(
@@ -95,16 +101,16 @@ class PgPORepo(PORepoPort):
             (po_id, org_id),
         )
         row = await cursor.fetchone()
-        return _row(row)
+        return PORow.model_validate(dict(row)) if row else None
 
-    async def get_po_items(self, po_id: str) -> list[dict]:
+    async def get_po_items(self, po_id: str) -> list[POItemRow]:
         conn = get_connection()
         cursor = await conn.execute(
             "SELECT * FROM purchase_order_items WHERE po_id = ? ORDER BY id",
             (po_id,),
         )
         rows = await cursor.fetchall()
-        return [dict(r) for r in rows]
+        return [POItemRow.model_validate(dict(r)) for r in rows]
 
     async def update_po_item(
         self,

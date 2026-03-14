@@ -2,7 +2,13 @@
 
 from abc import ABC, abstractmethod
 
-from purchasing.domain.purchase_order import POItemStatus, PurchaseOrder, PurchaseOrderItem
+from purchasing.domain.purchase_order import (
+    POItemRow,
+    POItemStatus,
+    PORow,
+    PurchaseOrder,
+    PurchaseOrderItem,
+)
 
 
 class PORepoPort(ABC):
@@ -13,13 +19,13 @@ class PORepoPort(ABC):
     async def insert_items(self, items: list[PurchaseOrderItem]) -> None: ...
 
     @abstractmethod
-    async def list_pos(self, org_id: str, status: str | None = None) -> list[dict]: ...
+    async def list_pos(self, status: str | None = None) -> list[PORow]: ...
 
     @abstractmethod
-    async def get_po(self, po_id: str, org_id: str) -> dict | None: ...
+    async def get_po(self, po_id: str) -> PORow | None: ...
 
     @abstractmethod
-    async def get_po_items(self, po_id: str) -> list[dict]: ...
+    async def get_po_items(self, po_id: str) -> list[POItemRow]: ...
 
     @abstractmethod
     async def update_po_item(

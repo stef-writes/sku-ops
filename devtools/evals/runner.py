@@ -18,9 +18,6 @@ from pathlib import Path
 
 import yaml
 
-from assistant.agents.routing.dag import match_report
-from assistant.agents.routing.lookups import try_lookup
-from assistant.agents.routing.router import classify_domain, is_trivial
 from assistant.agents.tools.registry import init_tools
 from assistant.application.assistant import chat
 from devtools.evals.scorer import score_case
@@ -83,41 +80,8 @@ def load_dataset(suite: str) -> list[dict]:
 
 
 async def _eval_routing_case(case: dict) -> EvalCaseResult:
-    """Run a single routing classification test against the new 4-path dispatch.
-
-    expected_path: "trivial" | "lookup" | "report" | "inventory" | "ops" | "finance"
-    """
-    t0 = time.monotonic()
-    try:
-        message = case["input"]
-        expected = case.get("expected_path", case.get("expected_agents", ["inventory"])[0])
-
-        if is_trivial(message):
-            actual = "trivial"
-        elif await try_lookup(message, "default") is not None:
-            actual = "lookup"
-        elif match_report(message) is not None:
-            actual = "report"
-        else:
-            actual = classify_domain(message)
-
-        latency = int((time.monotonic() - t0) * 1000)
-        passed = actual == expected
-
-        return EvalCaseResult(
-            case_id=case["id"],
-            passed=passed,
-            assertions=[
-                {
-                    "name": f"expected_path:{expected}",
-                    "passed": passed,
-                    "detail": f"got {actual}" if not passed else "",
-                }
-            ],
-            latency_ms=latency,
-        )
-    except (ValueError, KeyError, RuntimeError, OSError) as e:
-        return EvalCaseResult(case_id=case["id"], passed=False, error=str(e))
+    """Run a routing test case through the unified agent (LLM-native routing)."""
+    return await _eval_agent_case(case, agent_type="routing")
 
 
 # ── Agent eval ────────────────────────────────────────────────────────────────

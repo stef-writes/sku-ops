@@ -101,5 +101,4 @@ async def update_billing_entity(
     if not existing:
         raise HTTPException(status_code=404, detail="Billing entity not found")
 
-    updates = data.model_dump(exclude_none=True)
-    return await svc_update(entity_id, updates)
+    return await svc_update(entity_id, data)

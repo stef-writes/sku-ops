@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
@@ -156,10 +155,17 @@ class PostgresBackend:
         self._acquire_timeout: float = 30.0
 
     async def connect(self, url: str) -> None:
-        min_size = int(os.environ.get("PG_POOL_MIN", "2"))
-        max_size = int(os.environ.get("PG_POOL_MAX", "10"))
-        command_timeout = int(os.environ.get("PG_COMMAND_TIMEOUT", "60"))
-        self._acquire_timeout = float(os.environ.get("PG_ACQUIRE_TIMEOUT", "30"))
+        from shared.infrastructure.config import (
+            PG_ACQUIRE_TIMEOUT,
+            PG_COMMAND_TIMEOUT,
+            PG_POOL_MAX,
+            PG_POOL_MIN,
+        )
+
+        min_size = PG_POOL_MIN
+        max_size = PG_POOL_MAX
+        command_timeout = PG_COMMAND_TIMEOUT
+        self._acquire_timeout = PG_ACQUIRE_TIMEOUT
 
         if ":6543" in url:
             from shared.infrastructure.config import is_deployed

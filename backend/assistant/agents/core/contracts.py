@@ -7,20 +7,7 @@ Pure data models with no side effects; safe to import anywhere.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import StrEnum
 from typing import Any
-
-# ── Enums ─────────────────────────────────────────────────────────────────────
-
-
-class Complexity(StrEnum):
-    """Query intent — drives dispatch to the cheapest correct path."""
-
-    TRIVIAL = "trivial"
-    LOOKUP = "lookup"
-    REPORT = "report"
-    REASONING = "reasoning"
-
 
 # ── Agent configuration ───────────────────────────────────────────────────────
 
@@ -89,17 +76,3 @@ class AgentResult:
         if self.validation is not None:
             result["validation"] = self.validation
         return result
-
-
-# ── Orchestration state ───────────────────────────────────────────────────────
-
-
-@dataclass
-class TurnState:
-    """Full state for one orchestration turn — flows through the dispatch loop."""
-
-    trace_id: str
-    query: str
-    session_id: str
-    complexity: Complexity
-    total_cost: float = 0.0

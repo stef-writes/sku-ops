@@ -292,7 +292,7 @@ def check_production_flags() -> None:
         if "shared.infrastructure.config" in sys.modules:
             importlib.reload(sys.modules["shared.infrastructure.config"])
 
-        from shared.infrastructure.config import ALLOW_PUBLIC_AUTH, ALLOW_RESET, seed_on_startup
+        from shared.infrastructure.config import ALLOW_PUBLIC_AUTH, ALLOW_RESET
 
         if not ALLOW_PUBLIC_AUTH:
             _ok("ALLOW_PUBLIC_AUTH=False in production (login/register endpoints disabled)")
@@ -310,11 +310,6 @@ def check_production_flags() -> None:
             _warn("ALLOW_RESET=True explicitly set — disable after seeding")
         else:
             _fail("ALLOW_RESET=True in production", "Reset endpoint should not be reachable")
-
-        if not seed_on_startup:
-            _ok("seed_on_startup=False in production (no demo data created)")
-        else:
-            _fail("seed_on_startup=True in production", "Demo seeding should not run in production")
 
         os.environ["ENV"] = orig_env
         if "shared.infrastructure.config" in sys.modules:

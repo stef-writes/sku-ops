@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
 
-from catalog.application.queries import count_all_products
+from catalog.application.queries import count_all_skus as count_all_products
 from devtools.scripts.seed import (
     seed_demo_inventory,
     seed_demo_tenants,
@@ -102,8 +102,10 @@ async def reset_empty():
     )
     await seed_mock_user()
     await seed_standard_departments("default")
+    from devtools.scripts.seed import DEMO_USER_EMAIL, DEMO_USER_PASSWORD
+
     return {
-        "message": "Reset complete. Empty state. Log in with demo credentials (admin@demo.local / demo123)."
+        "message": f"Reset complete. Empty state. Log in with {DEMO_USER_EMAIL} / {DEMO_USER_PASSWORD}."
     }
 
 

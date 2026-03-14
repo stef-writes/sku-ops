@@ -67,6 +67,15 @@ if is_deployed and not DATABASE_URL.startswith(("postgresql://", "postgres://"))
         "Got a non-PostgreSQL URL. Set DATABASE_URL=postgresql://user:pass@host:5432/db"
     )
 
+# PostgreSQL connection pool — only meaningful when DATABASE_URL is Postgres.
+# PG_POOL_MIN / PG_POOL_MAX control asyncpg pool size.
+# PG_ACQUIRE_TIMEOUT: seconds a request waits for a free connection before 503.
+# PG_COMMAND_TIMEOUT: seconds a single SQL statement may run before cancellation.
+PG_POOL_MIN = int(os.environ.get("PG_POOL_MIN", "2"))
+PG_POOL_MAX = int(os.environ.get("PG_POOL_MAX", "10"))
+PG_ACQUIRE_TIMEOUT = float(os.environ.get("PG_ACQUIRE_TIMEOUT", "10"))
+PG_COMMAND_TIMEOUT = int(os.environ.get("PG_COMMAND_TIMEOUT", "30"))
+
 # Redis — required for multi-worker (WORKERS > 1); optional in dev/test
 REDIS_URL = os.environ.get("REDIS_URL", "").strip()
 
@@ -121,46 +130,27 @@ _enforce_cors()
 SENTRY_DSN = os.environ.get("SENTRY_DSN", "").strip()
 
 
-# Demo / seed
-def _demo_email() -> str:
-    env_val = os.environ.get("DEMO_USER_EMAIL", "").strip()
-    if env_val:
-        return env_val
-    return "admin@demo.local" if is_development else ""
-
-
-def _demo_password() -> str:
-    env_val = os.environ.get("DEMO_USER_PASSWORD", "").strip()
-    if env_val:
-        return env_val
-    return "demo123" if is_development else ""
-
-
-DEMO_USER_EMAIL = _demo_email()
-DEMO_USER_PASSWORD = _demo_password()
-DEMO_CONTRACTOR_EMAIL = os.environ.get("DEMO_CONTRACTOR_EMAIL", "").strip() or (
-    "contractor@demo.local" if is_development else ""
-)
-
-# Seed on startup: dev/test only. Never in production, even if demo creds are set.
-seed_on_startup = (is_development or is_test) and bool(DEMO_USER_EMAIL)
-
 # Reset/seed endpoints: dev/test by default.
 # Set ALLOW_RESET=true temporarily in production to seed data, then disable.
 ALLOW_RESET = (
     os.environ.get("ALLOW_RESET", "").lower() in ("1", "true") or is_development or is_test
 )
 
-# Full database reset on startup: drops ALL tables and recreates from schema.
-# Set RESET_DB=true in the deployed environment to nuke demo data and start clean.
-# Remove the var after the first successful deploy — it runs every restart while set.
-RESET_DB = os.environ.get("RESET_DB", "").lower() in ("1", "true")
-
 # Public auth endpoints (login, register): dev/test by default.
 # Set ALLOW_PUBLIC_AUTH=true to enable local auth in production (no Supabase).
 ALLOW_PUBLIC_AUTH = (
     os.environ.get("ALLOW_PUBLIC_AUTH", "").lower() in ("1", "true") or is_development or is_test
 )
+
+# Auth provider — controls JWT claim shape expected by the backend.
+#   supabase  (default) — role in app_metadata.role, user id is sub
+#   internal  — role top-level claim, user id in user_id or sub
+_VALID_AUTH_PROVIDERS = {"supabase", "internal"}
+AUTH_PROVIDER = os.environ.get("AUTH_PROVIDER", "supabase").lower().strip()
+if AUTH_PROVIDER not in _VALID_AUTH_PROVIDERS:
+    raise RuntimeError(
+        f"AUTH_PROVIDER must be one of {sorted(_VALID_AUTH_PROVIDERS)}, got '{AUTH_PROVIDER}'"
+    )
 
 # AI - Anthropic Claude. Set ANTHROPIC_API_KEY to enable.
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()

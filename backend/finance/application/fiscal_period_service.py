@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from finance.domain.fiscal_period import FiscalPeriodCreate
+from finance.domain.fiscal_period import FiscalPeriod, FiscalPeriodCreate
 from finance.infrastructure.fiscal_period_repo import (
     close_period,
     find_closed_period_covering,
@@ -18,16 +18,17 @@ async def check_period_open(entry_date: str) -> None:
     """Raise ValueError if the entry date falls in a closed fiscal period."""
     period = await find_closed_period_covering(entry_date)
     if period:
+        period_id, period_name = period
         raise ValueError(
-            f"Cannot create entries in closed fiscal period '{period.get('name', period['id'])}'"
+            f"Cannot create entries in closed fiscal period '{period_name or period_id}'"
         )
 
 
-async def list_fiscal_periods(status: str | None = None) -> list[dict]:
+async def list_fiscal_periods(status: str | None = None) -> list[FiscalPeriod]:
     return await list_periods(status=status)
 
 
-async def create_fiscal_period(body: FiscalPeriodCreate) -> dict:
+async def create_fiscal_period(body: FiscalPeriodCreate) -> FiscalPeriod:
     period_id = str(uuid4())
     now = datetime.now(UTC).isoformat()
     await insert_period(
@@ -46,11 +47,11 @@ async def create_fiscal_period(body: FiscalPeriodCreate) -> dict:
 async def close_fiscal_period(
     period_id: str,
     closed_by_id: str,
-) -> dict:
+) -> FiscalPeriod:
     period = await get_period(period_id)
     if not period:
         raise ResourceNotFoundError("Fiscal period not found")
-    if period.get("status") != "open":
+    if period.status != "open":
         raise ValueError("Period is already closed")
 
     now = datetime.now(UTC).isoformat()

@@ -11,6 +11,7 @@ import json
 import logging
 import re
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from shared.infrastructure.prompt_loader import load_prompt
 from shared.kernel.units import ALLOWED_BASE_UNITS
@@ -20,6 +21,15 @@ logger = logging.getLogger(__name__)
 # Type aliases for injected dependencies
 GenerateTextFn = Callable[[str, str | None], str | None] | None
 RuleInferFn = Callable[[str], tuple[str, str, int]]
+
+
+@dataclass(frozen=True)
+class UOMClassification:
+    """Result of classifying a product's unit of measure."""
+
+    base_unit: str
+    sell_uom: str
+    pack_qty: int
 
 
 def _default_rule_infer(_name: str) -> tuple[str, str, int]:
@@ -105,14 +115,14 @@ async def classify_uom(
     description: str | None = None,
     *,
     generate_text: GenerateTextFn = None,
-) -> dict:
-    """
-    Use AI to classify UOM for a single product.
-    Returns {"base_unit": str, "sell_uom": str, "pack_qty": int}.
+) -> UOMClassification:
+    """Use AI to classify UOM for a single product.
+
     Pass generate_text callable to enable LLM classification.
+    Falls back to each/each/1 when no LLM is available.
     """
     if not generate_text:
-        return {"base_unit": "each", "sell_uom": "each", "pack_qty": 1}
+        return UOMClassification(base_unit="each", sell_uom="each", pack_qty=1)
 
     units_str = ", ".join(sorted(ALLOWED_BASE_UNITS))
     prompt = f"""Classify the unit of measure for this hardware/building-supply product.
@@ -144,14 +154,14 @@ Return ONLY valid JSON: {{"base_unit": "...", "sell_uom": "...", "pack_qty": 1}}
             json_match = re.search(r"\{[^{}]*\}", response)
             if json_match:
                 data = json.loads(json_match.group())
-                return {
-                    "base_unit": _normalize_unit(data.get("base_unit")),
-                    "sell_uom": _normalize_unit(data.get("sell_uom", data.get("base_unit"))),
-                    "pack_qty": _normalize_pack_qty(data.get("pack_qty")),
-                }
+                return UOMClassification(
+                    base_unit=_normalize_unit(data.get("base_unit")),
+                    sell_uom=_normalize_unit(data.get("sell_uom", data.get("base_unit"))),
+                    pack_qty=_normalize_pack_qty(data.get("pack_qty")),
+                )
     except (json.JSONDecodeError, ValueError, RuntimeError, OSError) as e:
         logger.warning("UOM classification failed: %s", e)
-    return {"base_unit": "each", "sell_uom": "each", "pack_qty": 1}
+    return UOMClassification(base_unit="each", sell_uom="each", pack_qty=1)
 
 
 async def classify_uom_batch(

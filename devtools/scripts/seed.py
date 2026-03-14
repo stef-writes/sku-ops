@@ -1,6 +1,7 @@
 """
-Seed logic: demo users, departments, inventory.
-Lives in scripts/ to avoid cross-domain imports inside identity/.
+Seed helpers: departments, users, and CSV-based inventory import.
+
+Used by devtools/api/seed.py for HTTP reset/seed endpoints.
 """
 
 import logging
@@ -11,7 +12,9 @@ from uuid import uuid4
 import bcrypt
 
 from catalog.application.queries import (
-    count_all_products,
+    count_all_skus as count_all_products,
+)
+from catalog.application.queries import (
     get_department_by_code,
     insert_department,
     list_departments,
@@ -20,17 +23,39 @@ from catalog.application.sku_lifecycle import create_product_with_sku as lifecyc
 from catalog.domain.department import Department
 from documents.application.import_parser import infer_uom, parse_csv_products, suggest_department
 from inventory.application.inventory_service import process_import_stock_changes
-from shared.infrastructure.config import (
-    DEMO_USER_EMAIL as MOCK_USER_EMAIL,
-)
-from shared.infrastructure.config import (
-    DEMO_USER_PASSWORD as MOCK_USER_PASSWORD,
-)
 from shared.infrastructure.database import get_connection
 from shared.infrastructure.logging_config import org_id_var
 from shared.infrastructure.org_repo import organization_repo
 
 logger = logging.getLogger(__name__)
+
+DEMO_USER_EMAIL = "admin@demo.local"
+DEMO_USER_PASSWORD = "demo123"  # noqa: S105
+DEMO_CONTRACTOR_EMAIL = "contractor@demo.local"
+
+DEMO_CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "SY Inventory - Enhanced.csv")
+DEMO_PRODUCT_LIMIT = 2000
+DEMO_PRODUCT_PER_ORG = 80
+
+DEMO_TENANTS = [
+    {"id": "north", "name": "Supply Yard North", "slug": "north"},
+    {"id": "south", "name": "Supply Yard South", "slug": "south"},
+]
+DEMO_USERS_PER_ORG = [
+    {"email": "admin@{slug}.demo", "name": "Admin", "role": "admin"},
+    {"email": "contractor@{slug}.demo", "name": "Contractor", "role": "contractor"},
+]
+
+STANDARD_DEPARTMENTS = [
+    {"name": "Lumber", "code": "LUM", "description": "Wood, plywood, boards"},
+    {"name": "Plumbing", "code": "PLU", "description": "Pipes, fittings, fixtures"},
+    {"name": "Electrical", "code": "ELE", "description": "Wiring, outlets, switches"},
+    {"name": "Paint", "code": "PNT", "description": "Paint, stains, brushes"},
+    {"name": "Tools", "code": "TOL", "description": "Hand tools, power tools"},
+    {"name": "Hardware", "code": "HDW", "description": "Fasteners, hinges, locks"},
+    {"name": "Garden", "code": "GDN", "description": "Plants, soil, fertilizers"},
+    {"name": "Appliances", "code": "APP", "description": "Home appliances"},
+]
 
 
 def hash_password(pw: str) -> str:
@@ -65,34 +90,9 @@ async def _insert_user(user_dict: dict) -> None:
     await conn.commit()
 
 
-DEMO_CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "SY Inventory - Enhanced.csv")
-DEMO_PRODUCT_LIMIT = 2000
-DEMO_PRODUCT_PER_ORG = 80
-
-DEMO_TENANTS = [
-    {"id": "north", "name": "Supply Yard North", "slug": "north"},
-    {"id": "south", "name": "Supply Yard South", "slug": "south"},
-]
-DEMO_USERS_PER_ORG = [
-    {"email": "admin@{slug}.demo", "name": "Admin", "role": "admin"},
-    {"email": "contractor@{slug}.demo", "name": "Contractor", "role": "contractor"},
-]
-DEMO_CONTRACTOR_EMAIL = "contractor@demo.local"
-
-
 async def seed_standard_departments(organization_id: str = "default") -> None:
-    """Seed standard departments if not present."""
-    standard = [
-        {"name": "Lumber", "code": "LUM", "description": "Wood, plywood, boards"},
-        {"name": "Plumbing", "code": "PLU", "description": "Pipes, fittings, fixtures"},
-        {"name": "Electrical", "code": "ELE", "description": "Wiring, outlets, switches"},
-        {"name": "Paint", "code": "PNT", "description": "Paint, stains, brushes"},
-        {"name": "Tools", "code": "TOL", "description": "Hand tools, power tools"},
-        {"name": "Hardware", "code": "HDW", "description": "Fasteners, hinges, locks"},
-        {"name": "Garden", "code": "GDN", "description": "Plants, soil, fertilizers"},
-        {"name": "Appliances", "code": "APP", "description": "Home appliances"},
-    ]
-    for d in standard:
+    """Create standard departments if not already present."""
+    for d in STANDARD_DEPARTMENTS:
         if not await get_department_by_code(d["code"]):
             dept = Department(name=d["name"], code=d["code"], description=d.get("description", ""))
             d_dict = dept.model_dump()
@@ -101,9 +101,7 @@ async def seed_standard_departments(organization_id: str = "default") -> None:
 
 
 async def seed_demo_inventory(organization_id: str = "default") -> None:
-    """Seed ~150 products from CSV on first run for full demo experience."""
-    if not MOCK_USER_EMAIL:
-        return
+    """Seed products from CSV for a full demo experience."""
     try:
         org_id_var.set(organization_id)
         count = await count_all_products()
@@ -114,7 +112,7 @@ async def seed_demo_inventory(organization_id: str = "default") -> None:
             return
 
         await seed_standard_departments(organization_id)
-        demo_user = await _get_user_by_email(MOCK_USER_EMAIL)
+        demo_user = await _get_user_by_email(DEMO_USER_EMAIL)
         if not demo_user:
             logger.warning("Demo user not found, skipping inventory seed")
             return
@@ -150,7 +148,6 @@ async def seed_demo_inventory(organization_id: str = "default") -> None:
                     dept = all_depts[0]
 
                 bu, su, pq = infer_uom(item["name"])
-
                 await lifecycle_create(
                     category_id=dept["id"],
                     category_name=dept["name"],
@@ -177,30 +174,28 @@ async def seed_demo_inventory(organization_id: str = "default") -> None:
         logger.warning("Demo inventory seed: %s", e)
 
 
-async def seed_mock_user(organization_id: str = "default"):
-    """Create demo admin and contractor users if none exist."""
-    if not MOCK_USER_EMAIL:
-        return
+async def seed_mock_user(organization_id: str = "default") -> None:
+    """Create admin and contractor demo users if they don't exist."""
     try:
-        if not await _get_user_by_email(MOCK_USER_EMAIL):
+        if not await _get_user_by_email(DEMO_USER_EMAIL):
             await _insert_user(
                 {
                     "id": str(uuid4()),
-                    "email": MOCK_USER_EMAIL,
-                    "password": hash_password(MOCK_USER_PASSWORD),
+                    "email": DEMO_USER_EMAIL,
+                    "password": hash_password(DEMO_USER_PASSWORD),
                     "name": "Demo Admin",
                     "role": "admin",
                     "organization_id": organization_id,
                 }
             )
-            logger.info("Mock user created: %s", MOCK_USER_EMAIL)
+            logger.info("Created user: %s", DEMO_USER_EMAIL)
 
         if not await _get_user_by_email(DEMO_CONTRACTOR_EMAIL):
             await _insert_user(
                 {
                     "id": str(uuid4()),
                     "email": DEMO_CONTRACTOR_EMAIL,
-                    "password": hash_password(MOCK_USER_PASSWORD),
+                    "password": hash_password(DEMO_USER_PASSWORD),
                     "name": "Demo Contractor",
                     "role": "contractor",
                     "company": "Demo Co",
@@ -208,7 +203,7 @@ async def seed_mock_user(organization_id: str = "default"):
                     "organization_id": organization_id,
                 }
             )
-            logger.info("Demo contractor created: %s", DEMO_CONTRACTOR_EMAIL)
+            logger.info("Created user: %s", DEMO_CONTRACTOR_EMAIL)
     except (ValueError, RuntimeError, OSError) as e:
         logger.warning("Mock user seed: %s", e)
 

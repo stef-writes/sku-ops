@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Project Architecture
 
-Launch-focused modular monolith. Nine bounded contexts with hexagonal aspirations. Pre-production.
+Modular monolith in production. Nine bounded contexts. Architecture remediation complete.
 
 ## Backend root modules
 
@@ -61,21 +61,16 @@ from operations.application.withdrawal_facade import link_to_invoice
 
 Any cross-context mutation must go through the owning context's application facade. The owning context controls its own state transitions.
 
-## Database / Schema
-
-- **Pre-launch (current):** Schema changes go directly in `{context}/infrastructure/schema.py`. `full_schema.py` aggregates all context schemas.
-- **Post-first-deploy:** Every schema change requires a migration.
-- Never add migration functions to `runner.py`.
 
 ## Transaction management
 
-The DB layer uses a contextvar-based Unit of Work (once implemented):
-- `transaction()` stores the transactional connection in a contextvar
-- `get_connection()` checks the contextvar first, falls back to pool proxy
-- Repos never accept `conn` parameters — they call `get_connection()` which participates in any ambient transaction
+The DB layer uses a contextvar-based Unit of Work:
+- `transaction()` stores the transactional connection in `_tx_conn` contextvar
+- `get_connection()` returns the ambient transactional connection when inside a `transaction()` block, otherwise returns the pool proxy
+- Repos never accept `conn` parameters — they call `get_connection()` which automatically participates in the ambient transaction
 - Application-layer use cases own the transaction boundary via `async with transaction():`
 
-Until the Unit of Work is implemented, `conn` threading is tolerated but must not appear in port signatures.
+Do not add `conn` parameters to repos or port signatures. Do not call `get_connection()` directly outside a `transaction()` block in application code.
 
 ## Shared package
 
@@ -83,7 +78,21 @@ Until the Unit of Work is implemented, `conn` threading is tolerated but must no
 
 `shared/infrastructure/` contains: config, db, redis, event_hub, logging, metrics, middleware. These import only from `shared/kernel/` and nothing from any bounded context.
 
-`shared/api/` contains: `deps.py` (auth DI), `websocket.py` (domain event WebSocket router), `health.py` (liveness/readiness probes). These are cross-cutting transport concerns, not owned by any single bounded context.
+`shared/api/` contains: `deps.py` (auth DI), `auth_deps.py` (JWT validation + `CurrentUser` construction), `auth_provider.py` (provider-agnostic claim extraction), `websocket.py` (domain event WebSocket router), `health.py` (liveness/readiness probes). These are cross-cutting transport concerns, not owned by any single bounded context.
+
+## Auth model
+
+JWT validation is stateless — no DB roundtrip per request. `shared/api/auth_deps.py` decodes the token and builds `CurrentUser`. Claim extraction is delegated to `shared/api/auth_provider.py` which is selected by the `AUTH_PROVIDER` config var (`supabase` or `internal`).
+
+To support a new auth provider: add a branch in `auth_provider.py`, add the name to `_VALID_AUTH_PROVIDERS` in `config.py`. No other files change.
+
+`CurrentUser.organization_id` is the org isolation key. Every write must be scoped to it. In production, tokens without `organization_id` are rejected at the transport layer. See `deployment-hardening.mdc` for the full auth hardening spec.
+
+## Schema and migrations
+
+- Schema changes go in `{context}/infrastructure/schema.py`. `full_schema.py` aggregates all context schemas.
+- Post-first-deploy: every schema change requires a migration in `shared/infrastructure/migrations/versions/`.
+- Never add migration logic to `runner.py` — it runs all migration modules found in the versions directory.
 
 ## File size
 

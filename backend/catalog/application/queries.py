@@ -5,7 +5,7 @@ Thin delegation layer that decouples consumers from infrastructure details.
 """
 
 from catalog.domain.department import Department
-from catalog.domain.product import Sku
+from catalog.domain.product import Sku, SkuUpdate
 from catalog.domain.product_family import Product
 from catalog.domain.vendor import Vendor
 from catalog.domain.vendor_item import VendorItem
@@ -113,8 +113,8 @@ async def list_low_stock(limit: int = 10) -> list[Sku]:
 # ── SKU commands (used by inventory / purchasing / documents) ────────────────
 
 
-async def update_sku(sku_id: str, updates: dict) -> Sku | None:
-    return await _sku_repo.update(sku_id, updates)
+async def update_sku(sku_id: str, updates: SkuUpdate) -> Sku | None:
+    return await _sku_repo.update(sku_id, updates.model_dump(exclude_none=True))
 
 
 async def atomic_decrement_sku(sku_id: str, quantity: float, updated_at: str) -> Sku | None:
@@ -161,6 +161,45 @@ async def find_product_by_original_sku_and_vendor(original_sku: str, vendor_id: 
 async def find_product_by_name_and_vendor(name: str, vendor_id: str) -> Sku | None:
     """Name-based fallback for PO matching."""
     return await _sku_repo.find_by_name_and_vendor(name, vendor_id)
+
+
+async def sku_vendor_options(sku_id: str) -> list[dict]:
+    """All vendors for a SKU with cost, lead time, moq, preferred, and last PO date."""
+    from shared.infrastructure.database import get_connection, get_org_id
+
+    items = await _vi_repo.list_by_sku(sku_id)
+    if not items:
+        return []
+
+    conn = get_connection()
+    org_id = get_org_id()
+    result = []
+    for vi in items:
+        vendor = await _vendor_repo.get_by_id(vi.vendor_id)
+        cursor = await conn.execute(
+            """SELECT MAX(po.created_at) AS last_po_date
+               FROM purchase_orders po
+               JOIN purchase_order_items poi ON poi.po_id = po.id
+               WHERE po.vendor_id = ? AND po.organization_id = ?
+                 AND poi.product_id = ?""",
+            (vi.vendor_id, org_id, sku_id),
+        )
+        row = await cursor.fetchone()
+        result.append(
+            {
+                "vendor_id": vi.vendor_id,
+                "vendor_name": vendor.name if vendor else vi.vendor_name,
+                "vendor_sku": vi.vendor_sku,
+                "cost": vi.cost,
+                "lead_time_days": vi.lead_time_days,
+                "moq": vi.moq,
+                "is_preferred": vi.is_preferred,
+                "purchase_uom": vi.purchase_uom,
+                "purchase_pack_qty": vi.purchase_pack_qty,
+                "last_po_date": row["last_po_date"] if row else None,
+            }
+        )
+    return result
 
 
 # ── Department queries ───────────────────────────────────────────────────────

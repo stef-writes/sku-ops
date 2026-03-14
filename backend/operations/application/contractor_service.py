@@ -41,6 +41,16 @@ class Contractor(BaseModel):
     created_at: str = ""
 
 
+class UpdateContractorCommand(BaseModel):
+    """Typed input for updating a contractor's profile fields."""
+
+    name: str | None = None
+    company: str | None = None
+    billing_entity: str | None = None
+    phone: str | None = None
+    is_active: bool | None = None
+
+
 class ContractorCreateResult(BaseModel):
     id: str
     email: str
@@ -216,7 +226,9 @@ async def create_contractor(
     )
 
 
-async def update_contractor(contractor_id: str, updates: dict) -> Contractor | None:
+async def update_contractor(
+    contractor_id: str, updates: UpdateContractorCommand
+) -> Contractor | None:
     """Update contractor profile fields. Returns updated contractor or None."""
     contractor = await get_contractor_by_id(contractor_id)
     if not contractor or contractor.role != "contractor":
@@ -229,12 +241,13 @@ async def update_contractor(contractor_id: str, updates: dict) -> Contractor | N
     set_clauses = []
     values = []
     for key in ("name", "company", "billing_entity", "phone"):
-        if key in updates and updates[key] is not None:
+        val = getattr(updates, key, None)
+        if val is not None:
             set_clauses.append(f"{key} = ?")
-            values.append(updates[key])
-    if "is_active" in updates and updates["is_active"] is not None:
+            values.append(val)
+    if updates.is_active is not None:
         set_clauses.append("is_active = ?")
-        values.append(1 if updates["is_active"] else 0)
+        values.append(1 if updates.is_active else 0)
     if not set_clauses:
         return contractor
     values.extend([contractor_id, org_id])

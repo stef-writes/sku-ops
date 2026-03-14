@@ -1,9 +1,10 @@
 """Fiscal period repository — persistence for fiscal periods."""
 
+from finance.domain.fiscal_period import FiscalPeriod
 from shared.infrastructure.database import get_connection, get_org_id
 
 
-async def get_period(period_id: str) -> dict | None:
+async def get_period(period_id: str) -> FiscalPeriod | None:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
@@ -11,10 +12,10 @@ async def get_period(period_id: str) -> dict | None:
         (period_id, org_id),
     )
     row = await cursor.fetchone()
-    return dict(row) if row else None
+    return FiscalPeriod.model_validate(dict(row)) if row else None
 
 
-async def list_periods(status: str | None = None) -> list[dict]:
+async def list_periods(status: str | None = None) -> list[FiscalPeriod]:
     conn = get_connection()
     org_id = get_org_id()
     query = "SELECT * FROM fiscal_periods WHERE organization_id = ?"
@@ -24,7 +25,7 @@ async def list_periods(status: str | None = None) -> list[dict]:
         params.append(status)
     query += " ORDER BY start_date DESC"
     cursor = await conn.execute(query, params)
-    return [dict(r) for r in await cursor.fetchall()]
+    return [FiscalPeriod.model_validate(dict(r)) for r in await cursor.fetchall()]
 
 
 async def insert_period(
@@ -53,8 +54,8 @@ async def close_period(period_id: str, closed_by_id: str, closed_at: str) -> Non
     await conn.commit()
 
 
-async def find_closed_period_covering(entry_date: str) -> dict | None:
-    """Return a closed fiscal period that covers entry_date, or None."""
+async def find_closed_period_covering(entry_date: str) -> tuple[str, str] | None:
+    """Return (id, name) of a closed fiscal period covering entry_date, or None."""
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
@@ -65,4 +66,4 @@ async def find_closed_period_covering(entry_date: str) -> dict | None:
         (org_id, entry_date[:10], entry_date[:10]),
     )
     row = await cursor.fetchone()
-    return dict(row) if row else None
+    return (row["id"], row["name"]) if row else None

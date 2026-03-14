@@ -45,7 +45,7 @@ async def open_count(
         user_id=current_user.id,
         action="cycle_count.open",
         resource_type="cycle_count",
-        resource_id=count["id"],
+        resource_id=count.id,
         details={"scope": data.scope},
         request=request,
         org_id=current_user.organization_id,
@@ -116,7 +116,7 @@ async def commit_count(
         action="cycle_count.commit",
         resource_type="cycle_count",
         resource_id=count_id,
-        details={"items_adjusted": result.get("items_adjusted", 0)},
+        details={"items_adjusted": result.items_adjusted},
         request=request,
         org_id=current_user.organization_id,
     )

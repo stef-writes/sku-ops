@@ -1,0 +1,63 @@
+---
+description: Established patterns that are correct and must be preserved — consult before structural changes
+globs: backend/**/*.py
+alwaysApply: false
+---
+
+# Known-Good Patterns
+
+These patterns are the result of a completed architecture remediation. They are correct. Do not revert, work around, or replace them with simpler-seeming alternatives without a documented reason.
+
+## Domain layer purity
+
+Zero infrastructure imports across all domain files. Domain modules import only `shared/kernel/`, stdlib, and pydantic. This is verified by the layer dependency rules in `project-architecture.mdc`.
+
+## Shared kernel types
+
+`shared/kernel/` contains: `Entity`, `AuditedEntity`, `LineItem`, `Address`, `CurrentUser`, `DomainError`, `Event`. These have zero infrastructure dependencies. Do not add IO or infrastructure imports to any kernel file.
+
+## Typed domain events
+
+`shared/kernel/domain_events.py` — typed event base classes.
+`shared/kernel/event_payloads.py` — typed value objects for event data.
+`shared/infrastructure/domain_events.py` — handler registry (`@on(EventType)`, `await dispatch(event)`).
+
+Import event types in application and infrastructure layers only. Register handlers in `startup.py` by importing the handler modules.
+
+## WS bridge separation
+
+`shared/infrastructure/ws_bridge.py` is the only component that calls `event_hub.emit()` directly. All other code dispatches typed domain events via `dispatch()`. The bridge translates domain events to WebSocket messages.
+
+## InvoicingGateway port
+
+The only true port-and-adapter pair in the codebase. `finance/ports/invoicing_gateway.py` (protocol), `finance/infrastructure/xero/` (real adapter), stub adapter for tests. This is the reference implementation for the pattern. Do not create new ports unless all three port-creation criteria are met (see `backend-conventions.mdc`).
+
+## Database backend abstraction
+
+`DatabaseBackend` protocol, `SqliteBackend`, `PostgresBackend`. Selected automatically from `DATABASE_URL`. Do not bypass this by importing `sqlite3` or `asyncpg` directly outside of `shared/infrastructure/db/`.
+
+## Unit of Work (contextvar ambient transactions)
+
+`transaction()` in `shared/infrastructure/db/__init__.py` stores the transactional connection in `_tx_conn` contextvar. `get_connection()` returns it when inside a transaction block. Repos never accept `conn` parameters — they call `get_connection()` directly and participate in whatever ambient transaction is active.
+
+Do not add `conn` parameters to repo methods or port signatures.
+
+## Application facades for cross-context reads
+
+`catalog/application/queries.py`, `operations/application/queries.py`, `purchasing/application/queries.py`. Correct entry points for cross-context read access. Never import from another context's `infrastructure/` layer.
+
+## Auth provider abstraction
+
+`shared/api/auth_provider.py` — single source of truth for JWT claim extraction. All auth paths (HTTP, WebSocket domain events, WebSocket chat) call `resolve_claims(payload)`. Never add inline claim path-sniffing (`payload.get("app_metadata")...`) outside this module.
+
+`AUTH_PROVIDER` config var selects the claim shape: `supabase` (default) or `internal`. Adding a new provider means adding a branch in `auth_provider.py` only.
+
+## Org isolation invariant
+
+Every write operation must be scoped to the authenticated user's `organization_id`. There is no global admin bypass that crosses org boundaries. The `org_id` is sourced from the ambient contextvar (`get_org_id()` in the DB package), which is set by the auth layer on every request.
+
+In deployed environments, tokens without an `organization_id` claim are rejected with 401 at the transport layer (`auth_deps.py`, `websocket.py`, `ws_chat.py`). The `DEFAULT_ORG_ID = "default"` fallback in `shared/kernel/constants.py` exists only for dev/test tooling and must never be relied upon in production paths.
+
+## Bounded context ownership
+
+Nine bounded contexts: `identity`, `operations`, `finance`, `catalog`, `purchasing`, `jobs`, `documents`, `reports`, `assistant`. Each owns its tables, state transitions, and invariants. Cross-context mutation goes through the owning context's application facade.

@@ -90,8 +90,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_origins=_cors_origins,
     allow_origin_regex=CORS_ORIGIN_REGEX or None,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
 )
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestIDMiddleware)

@@ -8,6 +8,7 @@ from catalog.application.sku_lifecycle import (
     update_sku,
 )
 from catalog.domain.errors import DuplicateBarcodeError, InvalidBarcodeError
+from catalog.domain.product import SkuUpdate
 from catalog.infrastructure.department_repo import department_repo
 from catalog.infrastructure.sku_repo import sku_repo
 from inventory.application.inventory_service import process_import_stock_changes
@@ -74,7 +75,7 @@ async def test_update_product_changes_department_count(db):
     )
     await conn.commit()
 
-    result = await update_sku(sku.id, {"category_id": "dept-2"})
+    result = await update_sku(sku.id, SkuUpdate(category_id="dept-2"))
     assert result.category_id == "dept-2"
     assert result.category_name == "Plumbing"
 
@@ -174,7 +175,7 @@ async def test_update_product_to_duplicate_barcode_raises(db):
     )
 
     with pytest.raises(DuplicateBarcodeError):
-        await update_sku(sku2.id, {"barcode": "042100005264"})
+        await update_sku(sku2.id, SkuUpdate(barcode="042100005264"))
 
 
 @pytest.mark.asyncio
@@ -189,4 +190,4 @@ async def test_update_product_invalid_upc_raises(db):
     )
 
     with pytest.raises(InvalidBarcodeError):
-        await update_sku(sku.id, {"barcode": "042100005265"})
+        await update_sku(sku.id, SkuUpdate(barcode="042100005265"))

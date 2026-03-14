@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from operations.application.contractor_service import (
+    UpdateContractorCommand,
     create_contractor,
     delete_contractor,
     list_contractors,
@@ -21,14 +22,6 @@ class ContractorCreate(BaseModel):
     company: str | None = None
     billing_entity: str | None = None
     phone: str | None = None
-
-
-class ContractorUpdate(BaseModel):
-    name: str | None = None
-    company: str | None = None
-    billing_entity: str | None = None
-    phone: str | None = None
-    is_active: bool | None = None
 
 
 @router.get("")
@@ -60,11 +53,10 @@ async def create_contractor_route(data: ContractorCreate, current_user: AdminDep
 @router.put("/{contractor_id}")
 async def update_contractor_route(
     contractor_id: str,
-    data: ContractorUpdate,
+    data: UpdateContractorCommand,
     current_user: AdminDep,
 ):
-    updates = {k: v for k, v in data.model_dump().items() if v is not None}
-    result = await update_contractor(contractor_id, updates)
+    result = await update_contractor(contractor_id, data)
     if not result:
         raise HTTPException(status_code=404, detail="Contractor not found")
     return result.model_dump()

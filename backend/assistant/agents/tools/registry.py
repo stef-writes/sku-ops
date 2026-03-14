@@ -83,6 +83,8 @@ def init_tools() -> None:
     """Import agent tool modules so they self-register. Call once at startup."""
     if _TOOLS:
         return
+    import assistant.agents.finance.analytics_tools
     import assistant.agents.finance.tools
     import assistant.agents.inventory.tools
-    import assistant.agents.ops.tools  # noqa: F401
+    import assistant.agents.ops.tools
+    import assistant.agents.purchasing.tools  # noqa: F401

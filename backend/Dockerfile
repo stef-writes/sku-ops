@@ -1,13 +1,11 @@
-FROM python:3.13-slim-bookworm AS base
+FROM python:3.13-slim-bookworm AS builder
 
-WORKDIR /app
+WORKDIR /build
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential \
         libpq-dev \
-        tesseract-ocr \
-        poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install uv
@@ -16,12 +14,41 @@ COPY uv.lock ./
 COPY backend/pyproject.toml ./pyproject.toml
 RUN uv sync --frozen --no-dev --no-editable
 
+
+FROM python:3.13-slim-bookworm AS runtime
+
+WORKDIR /app
+
+# Runtime-only native deps (no build headers)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libpq5 \
+        tesseract-ocr \
+        poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Non-root user
+RUN groupadd --gid 1001 appgroup && \
+    useradd --uid 1001 --gid 1001 --no-create-home --shell /sbin/nologin appuser
+
+# Copy installed packages and uv from builder
+COPY --from=builder /build/.venv /app/.venv
+COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
+
+# Copy application source only — devtools is intentionally excluded
 COPY backend/ .
-COPY devtools/ ./devtools/
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+RUN chown -R appuser:appgroup /app
+
+USER appuser
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import os,urllib.request; urllib.request.urlopen('http://localhost:' + os.environ.get('PORT','8000') + '/api/ready')" || exit 1
 
-CMD ["sh", "-c", "uv run --no-sync uvicorn server:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WORKERS:-1}"]
+CMD ["sh", "-c", "uvicorn server:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WORKERS:-1}"]

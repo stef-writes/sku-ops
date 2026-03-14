@@ -1,19 +1,66 @@
 """
-Seed realistic demo data: vendors, products, SKUs, vendor items, purchase history,
-withdrawals, and invoices. Designed to exercise every user story end-to-end.
+Demo seed — run once after a clean deploy to populate the database with
+realistic supply-yard data.
 
-Run: cd backend && python -m devtools.scripts.seed_realistic
+Creates:
+  - 1 organization (default)
+  - 1 admin user + 1 contractor user
+  - 8 departments
+  - 6 vendors
+  - ~50 SKUs with vendor items
+  - 6 material withdrawals across 4 job sites
+  - 4 invoices (2 marked paid)
+  - Low-stock alerts on 4 SKUs
+
+Usage:
+    ./bin/dev seed
+    # or directly:
+    cd backend && python -m devtools.scripts.seed_realistic
 """
 
 import asyncio
 import logging
 import random as _random_mod
+import sys
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from uuid import uuid4
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
-_rng = _random_mod.Random(42)
+
+# ---------------------------------------------------------------------------
+# Seed data
+# ---------------------------------------------------------------------------
+
+ORG = {"id": "default", "name": "Demo Supply Yard", "slug": "default"}
+
+ADMIN_USER = {
+    "email": "admin@demo.local",
+    "password": "demo123",
+    "name": "Admin",
+    "role": "admin",
+}
+
+CONTRACTOR_USER = {
+    "email": "contractor@demo.local",
+    "password": "demo123",
+    "name": "Demo Contractor",
+    "role": "contractor",
+    "company": "ABC Plumbing",
+    "billing_entity": "ABC Plumbing",
+}
+
+DEPARTMENTS = [
+    {"name": "Lumber", "code": "LUM", "description": "Wood, plywood, boards"},
+    {"name": "Plumbing", "code": "PLU", "description": "Pipes, fittings, fixtures"},
+    {"name": "Electrical", "code": "ELE", "description": "Wiring, outlets, switches"},
+    {"name": "Paint", "code": "PNT", "description": "Paint, stains, brushes"},
+    {"name": "Tools", "code": "TOL", "description": "Hand tools, power tools"},
+    {"name": "Hardware", "code": "HDW", "description": "Fasteners, hinges, locks"},
+    {"name": "Garden", "code": "GDN", "description": "Plants, soil, fertilizers"},
+    {"name": "Appliances", "code": "APP", "description": "Home appliances"},
+]
 
 VENDORS = [
     {
@@ -60,9 +107,7 @@ VENDORS = [
     },
 ]
 
-# Products keyed by (department_code, vendor_index, product_data)
-# "product" field groups SKUs under a parent Product concept
-# "vendor_sku" is the vendor's part number for this item
+# vendor index references VENDORS list above
 PRODUCTS = [
     # === LUMBER (Johnson Lumber) ===
     {
@@ -449,8 +494,6 @@ PRODUCTS = [
         "unit": "box",
         "product": "Screws",
         "vendor_sku": "FA-DS-825",
-        "purchase_uom": "box",
-        "purchase_pack_qty": 1,
     },
     {
         "name": "#8 x 1-5/8in Drywall Screw 1lb",
@@ -522,7 +565,7 @@ PRODUCTS = [
         "unit": "each",
         "vendor_sku": "FA-CA-10",
     },
-    # Multi-vendor items (FastenAll also carries paint supplies)
+    # Multi-vendor items
     {
         "name": "2in Angle Sash Brush",
         "dept": "PNT",
@@ -637,6 +680,13 @@ PRODUCTS = [
     },
 ]
 
+LOW_STOCK_NAMES = [
+    "4x8 3/4in Sanded Plywood",
+    "GFCI Outlet 15A White",
+    "5 Gal Interior Eggshell White",
+    "20V Cordless Drill Kit",
+]
+
 WITHDRAWAL_SCENARIOS = [
     {
         "job_id": "JOB-2026-0041",
@@ -709,83 +759,162 @@ WITHDRAWAL_SCENARIOS = [
 ]
 
 
-async def main():
-    import sys
-    from pathlib import Path
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+_rng = _random_mod.Random(42)
 
-    from shared.infrastructure.database import get_connection, init_db
 
-    await init_db()
+def _hash_password(pw: str) -> str:
+    import bcrypt
 
-    from catalog.application.queries import list_departments
-    from catalog.application.sku_lifecycle import create_product_with_sku
-    from catalog.application.vendor_item_lifecycle import add_vendor_item
-    from catalog.infrastructure.vendor_repo import vendor_repo
-    from finance.application.invoice_service import create_invoice_from_withdrawals
-    from inventory.application.inventory_service import process_import_stock_changes
-    from operations.domain.withdrawal import MaterialWithdrawal, WithdrawalItem
-    from operations.infrastructure.withdrawal_repo import withdrawal_repo
-    from shared.infrastructure.database import get_connection as _get_conn
+    return bcrypt.hashpw(pw.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
-    org_id = "default"
-    conn = get_connection()
 
-    cur = await conn.execute("SELECT COUNT(*) FROM skus WHERE organization_id = ?", (org_id,))
-    count = (await cur.fetchone())[0]
-    if count > 5:
-        logger.info("Already have %d SKUs — skipping seed. Delete DB to re-seed.", count)
+async def _get_user_by_email(conn, email: str) -> dict | None:
+    cursor = await conn.execute("SELECT * FROM users WHERE email = ?", (email,))
+    row = await cursor.fetchone()
+    return dict(row) if row and hasattr(row, "keys") else None
+
+
+# ---------------------------------------------------------------------------
+# Seed steps
+# ---------------------------------------------------------------------------
+
+
+async def seed_org(conn, org_id: str) -> None:
+    cursor = await conn.execute("SELECT id FROM organizations WHERE id = ?", (org_id,))
+    if await cursor.fetchone():
+        logger.info("  Org '%s' already exists — skipping", org_id)
         return
+    await conn.execute(
+        "INSERT INTO organizations (id, name, slug, created_at) VALUES (?, ?, ?, ?)",
+        (org_id, ORG["name"], ORG["slug"], datetime.now(UTC).isoformat()),
+    )
+    await conn.commit()
+    logger.info("  Created org: %s", ORG["name"])
 
-    _c = _get_conn()
-    _cur = await _c.execute("SELECT * FROM users WHERE email = ?", ("admin@demo.local",))
-    _row = await _cur.fetchone()
-    admin = dict(_row) if _row and hasattr(_row, "keys") else None
-    _cur = await _c.execute("SELECT * FROM users WHERE email = ?", ("contractor@demo.local",))
-    _row = await _cur.fetchone()
-    contractor = dict(_row) if _row and hasattr(_row, "keys") else None
-    if not admin or not contractor:
-        logger.error("Demo users not found. Start the server first to run seed_mock_user().")
-        return
 
-    departments = await list_departments()
-    dept_by_code = {d.code: d for d in departments}
-    if not dept_by_code:
-        logger.error(
-            "No departments found. Start the server first to run seed_standard_departments()."
+async def seed_users(conn, org_id: str) -> tuple[dict, dict]:
+    """Create admin and contractor users. Returns (admin, contractor) dicts."""
+    now = datetime.now(UTC).isoformat()
+    admin = await _get_user_by_email(conn, ADMIN_USER["email"])
+    if not admin:
+        user_id = str(uuid4())
+        await conn.execute(
+            "INSERT INTO users (id, email, password, name, role, company, billing_entity, phone, is_active, organization_id, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
+            (
+                user_id,
+                ADMIN_USER["email"],
+                _hash_password(ADMIN_USER["password"]),
+                ADMIN_USER["name"],
+                ADMIN_USER["role"],
+                "",
+                "",
+                "",
+                org_id,
+                now,
+            ),
         )
-        return
+        await conn.commit()
+        logger.info("  Created user: %s (%s)", ADMIN_USER["email"], ADMIN_USER["role"])
+        admin = await _get_user_by_email(conn, ADMIN_USER["email"])
 
-    # 1. Create vendors
-    logger.info("--- Creating vendors ---")
+    contractor = await _get_user_by_email(conn, CONTRACTOR_USER["email"])
+    if not contractor:
+        user_id = str(uuid4())
+        await conn.execute(
+            "INSERT INTO users (id, email, password, name, role, company, billing_entity, phone, is_active, organization_id, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
+            (
+                user_id,
+                CONTRACTOR_USER["email"],
+                _hash_password(CONTRACTOR_USER["password"]),
+                CONTRACTOR_USER["name"],
+                CONTRACTOR_USER["role"],
+                CONTRACTOR_USER.get("company", ""),
+                CONTRACTOR_USER.get("billing_entity", ""),
+                "",
+                org_id,
+                now,
+            ),
+        )
+        await conn.commit()
+        logger.info("  Created user: %s (%s)", CONTRACTOR_USER["email"], CONTRACTOR_USER["role"])
+        contractor = await _get_user_by_email(conn, CONTRACTOR_USER["email"])
+
+    return admin, contractor
+
+
+async def seed_departments(org_id: str) -> dict:
+    """Create standard departments. Returns dept_code -> dept object map."""
+    from catalog.application.queries import (
+        get_department_by_code,
+        insert_department,
+        list_departments,
+    )
+    from catalog.domain.department import Department
+
+    for d in DEPARTMENTS:
+        existing = await get_department_by_code(d["code"])
+        if not existing:
+            dept = Department(name=d["name"], code=d["code"], description=d.get("description", ""))
+            dept_dict = dept.model_dump()
+            dept_dict["organization_id"] = org_id
+            await insert_department(dept_dict)
+            logger.info("  Department: %s", d["name"])
+
+    all_depts = await list_departments()
+    return {d.code: d for d in all_depts}
+
+
+async def seed_vendors(org_id: str) -> list[str]:
+    """Create vendors. Returns list of vendor IDs in VENDORS order."""
+    from catalog.infrastructure.vendor_repo import insert as insert_vendor
+    from shared.infrastructure.database import get_connection
+
+    conn = get_connection()
+    now = datetime.now(UTC).isoformat()
     vendor_ids = []
     for v in VENDORS:
+        cursor = await conn.execute(
+            "SELECT id FROM vendors WHERE name = ? AND organization_id = ?", (v["name"], org_id)
+        )
+        row = await cursor.fetchone()
+        if row:
+            vendor_ids.append(row[0])
+            continue
         vid = str(uuid4())
         vendor_ids.append(vid)
-        await vendor_repo.insert(
+        await insert_vendor(
             {
                 "id": vid,
                 **v,
-                "created_at": datetime.now(UTC).isoformat(),
+                "created_at": now,
                 "organization_id": org_id,
             }
         )
         logger.info("  Vendor: %s", v["name"])
+    return vendor_ids
 
-    # 2. Create products + SKUs + vendor items
-    logger.info("--- Creating products & SKUs ---")
-    sku_map = {}  # name -> first SKU created (for withdrawals)
 
+async def seed_products(vendor_ids: list[str], dept_map: dict, admin: dict) -> dict:
+    """Create products, SKUs, and vendor items. Returns name -> SKU map."""
+    from catalog.application.sku_lifecycle import create_product_with_sku
+    from catalog.application.vendor_item_lifecycle import add_vendor_item
+    from inventory.application.inventory_service import process_import_stock_changes
+
+    sku_map: dict = {}
     for p in PRODUCTS:
-        dept = dept_by_code.get(p["dept"])
+        dept = dept_map.get(p["dept"])
         if not dept:
             logger.warning("  Skipping %s: dept %s not found", p["name"], p["dept"])
             continue
         vid = vendor_ids[p["vendor"]]
         vname = VENDORS[p["vendor"]]["name"]
 
-        # If this is a multi-vendor duplicate (same name already created), just add a VendorItem
         if p["name"] in sku_map:
             existing_sku = sku_map[p["name"]]
             await add_vendor_item(
@@ -818,8 +947,6 @@ async def main():
                 on_stock_import=process_import_stock_changes,
             )
             sku_map[p["name"]] = sku
-
-            # Create vendor item for the primary vendor
             await add_vendor_item(
                 sku_id=sku.id,
                 vendor_id=vid,
@@ -829,7 +956,6 @@ async def main():
                 cost=p["cost"],
                 is_preferred=True,
             )
-
             logger.info(
                 "  %s | %s | qty=%d | %s (%s)",
                 sku.sku,
@@ -841,10 +967,16 @@ async def main():
         except (ValueError, RuntimeError, OSError) as e:
             logger.warning("  Skip %s: %s", p["name"], e)
 
-    logger.info("--- %d unique SKUs created ---", len(sku_map))
+    return sku_map
 
-    # 3. Create withdrawals
-    logger.info("--- Creating withdrawals ---")
+
+async def seed_withdrawals(
+    conn, org_id: str, sku_map: dict, admin: dict, contractor: dict
+) -> list[str]:
+    """Create material withdrawals. Returns list of withdrawal IDs."""
+    from operations.domain.withdrawal import MaterialWithdrawal, WithdrawalItem
+    from operations.infrastructure.withdrawal_repo import withdrawal_repo
+
     now = datetime.now(UTC)
     withdrawal_ids = []
 
@@ -889,7 +1021,6 @@ async def main():
             processed_by_name=admin.get("name", ""),
         )
         withdrawal.compute_totals()
-
         withdrawal.organization_id = org_id
         withdrawal.created_at = created_at
         await withdrawal_repo.insert(withdrawal)
@@ -913,33 +1044,36 @@ async def main():
             item_summary,
         )
 
-    # 4. Create invoices from some withdrawals
-    logger.info("--- Creating invoices ---")
-    if len(withdrawal_ids) >= 4:
-        for wid in withdrawal_ids[:4]:
-            try:
-                inv = await create_invoice_from_withdrawals([wid], organization_id=org_id)
-                logger.info("  Invoice %s... for withdrawal %s...", inv["id"][:8], wid[:8])
-            except (ValueError, RuntimeError, OSError) as e:
-                logger.warning("  Invoice skip: %s", e)
+    return withdrawal_ids
 
-        for wid in withdrawal_ids[:2]:
-            try:
-                paid_at = (now - timedelta(days=5)).isoformat()
-                await withdrawal_repo.mark_paid(wid, paid_at)
-                logger.info("  Marked withdrawal %s... as paid", wid[:8])
-            except (ValueError, RuntimeError, OSError) as e:
-                logger.warning("  Mark paid skip: %s", e)
 
-    # 5. Make a few SKUs critically low to trigger alerts
-    logger.info("--- Setting low-stock alerts ---")
-    low_stock_names = [
-        "4x8 3/4in Sanded Plywood",
-        "GFCI Outlet 15A White",
-        "5 Gal Interior Eggshell White",
-        "20V Cordless Drill Kit",
-    ]
-    for name in low_stock_names:
+async def seed_invoices(now: datetime, org_id: str, withdrawal_ids: list[str]) -> None:
+    """Create invoices for the first 4 withdrawals; mark first 2 as paid."""
+    from finance.application.invoice_service import create_invoice_from_withdrawals
+    from operations.infrastructure.withdrawal_repo import withdrawal_repo
+
+    if len(withdrawal_ids) < 4:
+        return
+
+    for wid in withdrawal_ids[:4]:
+        try:
+            inv = await create_invoice_from_withdrawals([wid], organization_id=org_id)
+            logger.info("  Invoice %s... for withdrawal %s...", inv["id"][:8], wid[:8])
+        except (ValueError, RuntimeError, OSError) as e:
+            logger.warning("  Invoice skip: %s", e)
+
+    for wid in withdrawal_ids[:2]:
+        try:
+            paid_at = (now - timedelta(days=5)).isoformat()
+            await withdrawal_repo.mark_paid(wid, paid_at)
+            logger.info("  Marked withdrawal %s... as paid", wid[:8])
+        except (ValueError, RuntimeError, OSError) as e:
+            logger.warning("  Mark paid skip: %s", e)
+
+
+async def seed_low_stock(conn, sku_map: dict) -> None:
+    """Force a few SKUs below min_stock to trigger alerts."""
+    for name in LOW_STOCK_NAMES:
         sku = sku_map.get(name)
         if sku:
             low_qty = _rng.randint(1, sku.min_stock)
@@ -947,23 +1081,83 @@ async def main():
             logger.info("  %s | %s → qty=%d (min=%d)", sku.sku, name, low_qty, sku.min_stock)
     await conn.commit()
 
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+
+async def main() -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
+    from shared.infrastructure.database import get_connection, init_db
+    from shared.infrastructure.logging_config import org_id_var
+
+    await init_db()
+
+    org_id = ORG["id"]
+    conn = get_connection()
+
+    # Idempotency guard: skip if SKUs already exist for this org
+    cursor = await conn.execute("SELECT COUNT(*) FROM skus WHERE organization_id = ?", (org_id,))
+    count = (await cursor.fetchone())[0]
+    if count > 0:
+        logger.info("Database already seeded (%d SKUs found) — nothing to do.", count)
+        logger.info("To re-seed, drop and recreate the database first.")
+        return
+
+    token = org_id_var.set(org_id)
+    try:
+        logger.info("--- Creating organization ---")
+        await seed_org(conn, org_id)
+
+        logger.info("--- Creating users ---")
+        admin, contractor = await seed_users(conn, org_id)
+
+        logger.info("--- Creating departments ---")
+        dept_map = await seed_departments(org_id)
+
+        logger.info("--- Creating vendors ---")
+        vendor_ids = await seed_vendors(org_id)
+
+        logger.info("--- Creating products & SKUs ---")
+        sku_map = await seed_products(vendor_ids, dept_map, admin)
+        logger.info("  %d unique SKUs created", len(sku_map))
+
+        logger.info("--- Creating withdrawals ---")
+        withdrawal_ids = await seed_withdrawals(conn, org_id, sku_map, admin, contractor)
+
+        logger.info("--- Creating invoices ---")
+        now = datetime.now(UTC)
+        await seed_invoices(now, org_id, withdrawal_ids)
+
+        logger.info("--- Setting low-stock alerts ---")
+        await seed_low_stock(conn, sku_map)
+
+    finally:
+        org_id_var.reset(token)
+
     # Summary
-    cur = await conn.execute("SELECT COUNT(*) FROM skus WHERE organization_id = ?", (org_id,))
-    total_skus = (await cur.fetchone())[0]
-    cur = await conn.execute("SELECT COUNT(*) FROM products WHERE organization_id = ?", (org_id,))
-    total_products = (await cur.fetchone())[0]
-    cur = await conn.execute(
+    cursor = await conn.execute("SELECT COUNT(*) FROM skus WHERE organization_id = ?", (org_id,))
+    total_skus = (await cursor.fetchone())[0]
+    cursor = await conn.execute(
+        "SELECT COUNT(*) FROM products WHERE organization_id = ?", (org_id,)
+    )
+    total_products = (await cursor.fetchone())[0]
+    cursor = await conn.execute(
         "SELECT COUNT(*) FROM vendor_items WHERE organization_id = ?", (org_id,)
     )
-    total_vendor_items = (await cur.fetchone())[0]
-    cur = await conn.execute("SELECT COUNT(*) FROM vendors WHERE organization_id = ?", (org_id,))
-    total_vendors = (await cur.fetchone())[0]
-    cur = await conn.execute(
+    total_vendor_items = (await cursor.fetchone())[0]
+    cursor = await conn.execute("SELECT COUNT(*) FROM vendors WHERE organization_id = ?", (org_id,))
+    total_vendors = (await cursor.fetchone())[0]
+    cursor = await conn.execute(
         "SELECT COUNT(*) FROM withdrawals WHERE organization_id = ?", (org_id,)
     )
-    total_withdrawals = (await cur.fetchone())[0]
-    cur = await conn.execute("SELECT COUNT(*) FROM invoices WHERE organization_id = ?", (org_id,))
-    total_invoices = (await cur.fetchone())[0]
+    total_withdrawals = (await cursor.fetchone())[0]
+    cursor = await conn.execute(
+        "SELECT COUNT(*) FROM invoices WHERE organization_id = ?", (org_id,)
+    )
+    total_invoices = (await cursor.fetchone())[0]
 
     logger.info("\n=== SEED COMPLETE ===")
     logger.info("  %d vendors", total_vendors)
@@ -975,8 +1169,8 @@ async def main():
     )
     logger.info("  %d withdrawals", total_withdrawals)
     logger.info("  %d invoices", total_invoices)
-    logger.info("  Login: admin@demo.local / demo123")
-    logger.info("  Login: contractor@demo.local / demo123")
+    logger.info("  Login: %s / %s", ADMIN_USER["email"], ADMIN_USER["password"])
+    logger.info("  Login: %s / %s", CONTRACTOR_USER["email"], CONTRACTOR_USER["password"])
 
 
 if __name__ == "__main__":

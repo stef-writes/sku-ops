@@ -1,0 +1,191 @@
+---
+description: Production deployment expectations — Docker, nginx, CORS, connection pool, auth hardening
+globs: "{backend/Dockerfile,docker-compose.yml,deploy/**}"
+alwaysApply: false
+---
+
+# Deployment Hardening
+
+This document defines the production-ready expectations for Docker, nginx, CORS, connections, and auth. Deviations are bugs, not preferences.
+
+---
+
+## Docker
+
+### Multi-stage build (required)
+
+The Dockerfile uses two stages:
+- `builder` — installs `build-essential`, `libpq-dev`, runs `uv sync`. Contains all build tooling.
+- `runtime` — copies `.venv` from builder, installs runtime-only apt packages (`libpq5`, `tesseract-ocr`, `poppler-utils`). Contains no compilers or headers.
+
+Never merge the stages. Build headers in the final image increase the attack surface.
+
+### Non-root user (required)
+
+The runtime image creates `appuser:appgroup` (uid/gid 1001) and runs as that user. The `USER appuser` directive must appear before `CMD`. Never run the container as root.
+
+### devtools exclusion (required)
+
+`devtools/` is a workspace-level directory containing seeds, eval scripts, and internal tooling. It must never be copied into the Docker image. The `COPY backend/ .` line is the only source copy. If you need devtools in Docker, you have the wrong problem.
+
+### Python env vars (required)
+
+```dockerfile
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+```
+
+Both must be set in the runtime stage.
+
+### CMD — no uv wrapper in production
+
+The production CMD calls `uvicorn` directly using the activated venv on PATH (`/app/.venv/bin`). Do not wrap with `uv run` in the runtime stage — the venv is already activated and `uv` is an unnecessary process wrapper in production.
+
+---
+
+## nginx
+
+### Upstream keepalive (required)
+
+```nginx
+upstream backend {
+    server backend:8000;
+    keepalive 32;
+}
+```
+
+All proxy locations that forward to `backend` must use HTTP/1.1 and clear the `Connection` header:
+
+```nginx
+proxy_http_version 1.1;
+proxy_set_header Connection "";
+```
+
+WebSocket locations are exempt (they set `Connection "upgrade"` explicitly).
+
+### Timeouts (required on general API proxy)
+
+```nginx
+proxy_connect_timeout 5s;   # fail fast if backend is down
+proxy_send_timeout 30s;     # time to send request body
+proxy_read_timeout 120s;    # time to receive response (long AI calls)
+```
+
+WebSocket locations use `proxy_read_timeout 3600s` / `proxy_send_timeout 3600s` — long-lived connections.
+
+### Rate limiting zones
+
+| Zone | Rate | Applies to |
+|---|---|---|
+| `api` | 60r/m | All `/api/` |
+| `auth` | 10r/m | `/api/auth/` |
+| `chat` | 20r/m | `/api/ws/chat` |
+
+Rate limiting lives entirely in nginx. The Python app has no rate-limit logic.
+
+### Security headers (required on HTTPS server block)
+
+```nginx
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(self), microphone=(), geolocation=()
+```
+
+`Content-Security-Policy` belongs on the frontend, not the nginx server block.
+
+### Metrics endpoint restriction (required)
+
+`/metrics` must be restricted to loopback and RFC1918 ranges only. Never expose Prometheus metrics publicly.
+
+---
+
+## CORS
+
+### Origin locking (enforced at startup)
+
+`_enforce_cors()` in `config.py` raises `RuntimeError` at import time if `CORS_ORIGINS` is `"*"` or empty in staging or production. This is not a warning — it is a hard crash.
+
+Set `CORS_ORIGINS` to the exact frontend domain(s):
+```
+CORS_ORIGINS=https://app.yourdomain.com
+```
+
+For Vercel preview URLs use `CORS_ORIGIN_REGEX`:
+```
+CORS_ORIGIN_REGEX=https://frontend-.*\.vercel\.app
+```
+
+### Allowed methods and headers (explicitly enumerated)
+
+```python
+allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+allow_headers=["Authorization", "Content-Type", "X-Request-ID"]
+```
+
+Do not use `["*"]` for methods or headers. `allow_credentials=True` is required (JWTs sent as Bearer tokens).
+
+---
+
+## Connection pool
+
+All pool settings are configurable via env vars and documented in `config.py`. Defaults are conservative and safe for a single-worker deployment.
+
+| Var | Default | Description |
+|---|---|---|
+| `PG_POOL_MIN` | 2 | Minimum idle connections |
+| `PG_POOL_MAX` | 10 | Maximum pool size |
+| `PG_ACQUIRE_TIMEOUT` | 10s | Max wait for a free connection |
+| `PG_COMMAND_TIMEOUT` | 30s | Max time for a single SQL statement |
+
+For multi-worker deployments (`WORKERS > 1`), `PG_POOL_MAX` per worker multiplies. Set it accordingly (e.g., 2 workers × 5 max = 10 total connections).
+
+`PG_ACQUIRE_TIMEOUT` is the primary defense against connection starvation cascades — when the pool is exhausted, requests fail fast with a clear error rather than queueing indefinitely.
+
+---
+
+## Auth hardening
+
+### No anonymous org access in production
+
+Tokens without an explicit `organization_id` claim are rejected at the transport layer:
+- HTTP: `auth_deps.get_current_user()` raises 401
+- WebSocket (domain events): `ws_endpoint` closes with code 4001
+- WebSocket (chat): `ws_chat_endpoint` closes with code 4001
+
+This is gated on `is_deployed`. Dev/test tokens without `organization_id` fall back to `DEFAULT_ORG_ID = "default"` for local tooling compatibility.
+
+### Auth provider is config-driven
+
+`AUTH_PROVIDER` env var selects JWT claim shape:
+- `supabase` (default) — role in `app_metadata.role`, user id in `sub`
+- `internal` — role as top-level claim, user id in `user_id` or `sub`
+
+Never add inline claim path-sniffing outside `shared/api/auth_provider.py`. All three auth entry points (HTTP, WS domain, WS chat) call `resolve_claims(payload)`.
+
+### JWT secret requirements
+
+- Production: `JWT_SECRET` must be set and must not be the dev default. Startup raises `RuntimeError` otherwise.
+- Staging: same enforcement.
+- Generate: `python -c "import secrets; print(secrets.token_hex(32))"`
+
+---
+
+## Required env vars for production
+
+```
+ENV=production
+DATABASE_URL=postgresql://...
+JWT_SECRET=<64-char hex>
+CORS_ORIGINS=https://your-app-domain.com
+REDIS_URL=redis://redis:6379
+POSTGRES_PASSWORD=<strong password>
+AUTH_PROVIDER=supabase
+```
+
+Optional but recommended:
+```
+SENTRY_DSN=https://...
+PG_POOL_MAX=10
+WORKERS=2
+```

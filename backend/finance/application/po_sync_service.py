@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 
 from finance.adapters.invoicing_factory import get_invoicing_gateway
 from finance.application.org_settings_service import get_org_settings
+from finance.application.sync_results import POBillSyncResult
 from finance.domain.xero_settings import XeroSettings
 from purchasing.application.queries import (
     get_po_with_cost,
@@ -25,11 +26,11 @@ async def queue_po_for_sync(po_id: str) -> None:
     await set_xero_sync_status(po_id, "pending", now)
 
 
-async def sync_po_bill(po_id: str, cost_total: float | None = None) -> dict:
-    """Sync a single PO to Xero as a Bill. Returns a result dict."""
+async def sync_po_bill(po_id: str, cost_total: float | None = None) -> POBillSyncResult:
+    """Sync a single PO to Xero as a Bill."""
     po = await get_po_with_cost(po_id)
     if not po:
-        return {"po_id": po_id, "success": False, "error": "PO not found"}
+        return POBillSyncResult(po_id=po_id, success=False, error="PO not found")
 
     if cost_total is None:
         cost_total = po.get("cost_total", 0.0)
@@ -37,7 +38,7 @@ async def sync_po_bill(po_id: str, cost_total: float | None = None) -> dict:
     if cost_total <= 0:
         now = datetime.now(UTC).isoformat()
         await set_xero_sync_status(po_id, "skipped", now)
-        return {"po_id": po_id, "success": True, "skipped": True, "reason": "zero cost"}
+        return POBillSyncResult(po_id=po_id, success=True, skipped=True, reason="zero cost")
 
     org_settings = await get_org_settings()
     xero_settings = XeroSettings.model_validate(org_settings.model_dump())
@@ -49,7 +50,7 @@ async def sync_po_bill(po_id: str, cost_total: float | None = None) -> dict:
         now = datetime.now(UTC).isoformat()
         await set_xero_sync_status(po_id, "failed", now)
         logger.exception("PO bill sync failed for %s", po_id)
-        return {"po_id": po_id, "success": False, "error": str(e)}
+        return POBillSyncResult(po_id=po_id, success=False, error=str(e))
 
     now = datetime.now(UTC).isoformat()
     if result.success and result.external_id:
@@ -57,9 +58,9 @@ async def sync_po_bill(po_id: str, cost_total: float | None = None) -> dict:
     elif not result.success:
         await set_xero_sync_status(po_id, "failed", now)
 
-    return {
-        "po_id": po_id,
-        "xero_bill_id": result.external_id,
-        "success": result.success,
-        "error": result.error,
-    }
+    return POBillSyncResult(
+        po_id=po_id,
+        success=result.success,
+        xero_bill_id=result.external_id,
+        error=result.error,
+    )

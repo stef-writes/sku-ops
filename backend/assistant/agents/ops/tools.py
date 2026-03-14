@@ -5,7 +5,12 @@ import logging
 from datetime import UTC, datetime, timedelta
 
 from assistant.agents.tools.registry import register as _reg
-from operations.application.queries import list_pending_material_requests, list_withdrawals
+from inventory.application.queries import daily_withdrawal_activity
+from operations.application.queries import (
+    list_pending_material_requests,
+    list_withdrawals,
+    payment_status_breakdown,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +138,35 @@ async def _list_pending_material_requests(args: dict) -> str:
     return json.dumps({"count": len(out), "pending_requests": out})
 
 
+async def _get_daily_withdrawal_activity(args: dict) -> str:
+    days = min(int(args.get("days") or 30), 365)
+    since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+    product_id = (args.get("product_id") or "").strip() or None
+    activity = await daily_withdrawal_activity(since, product_id=product_id)
+    return json.dumps(
+        {
+            "period_days": days,
+            "data_points": len(activity),
+            "activity": activity,
+        }
+    )
+
+
+async def _get_payment_status_breakdown(args: dict) -> str:
+    days = min(int(args.get("days") or 30), 365)
+    since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+    end = datetime.now(UTC).isoformat()
+    breakdown = await payment_status_breakdown(since, end)
+    total = round(sum(breakdown.values()), 2)
+    return json.dumps(
+        {
+            "period_days": days,
+            "total": total,
+            "by_status": {k: round(v, 2) for k, v in breakdown.items()},
+        }
+    )
+
+
 # ── Registry ──────────────────────────────────────────────────────────────────
 
 _reg("get_contractor_history", "ops", _get_contractor_history, lookup_key="contractor_history")
@@ -144,3 +178,5 @@ _reg(
     _list_pending_material_requests,
     lookup_key="pending_requests",
 )
+_reg("get_daily_withdrawal_activity", "ops", _get_daily_withdrawal_activity)
+_reg("get_payment_status_breakdown", "ops", _get_payment_status_breakdown)
