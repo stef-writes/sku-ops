@@ -15,7 +15,8 @@ import jwt
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from shared.infrastructure import event_hub
-from shared.infrastructure.config import DEFAULT_ORG_ID, JWT_ALGORITHM, JWT_SECRET
+from shared.infrastructure.config import JWT_ALGORITHM, JWT_SECRET
+from shared.kernel.constants import DEFAULT_ORG_ID
 from shared.kernel.events import CONTRACTOR_VISIBLE_EVENTS, Event
 
 logger = logging.getLogger(__name__)

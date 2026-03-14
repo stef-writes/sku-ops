@@ -110,11 +110,9 @@ def _format_departments(data: dict) -> str:
     depts = data.get("departments", [])
     if not depts:
         return "No departments found."
-    lines = ["| Code | Name | Products |", "|------|------|----------|"]
+    lines = ["| Code | Name | SKUs |", "|------|------|------|"]
     for d in depts:
-        lines.append(
-            f"| {d.get('code', '')} | {d.get('name', '')} | {d.get('product_count', d.get('sku_count', 0))} |"
-        )
+        lines.append(f"| {d.get('code', '')} | {d.get('name', '')} | {d.get('sku_count', 0)} |")
     return "**Departments:**\n\n" + "\n".join(lines)
 
 

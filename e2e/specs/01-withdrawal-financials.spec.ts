@@ -32,9 +32,9 @@ test.describe.serial("Story 1: Withdrawal financials", () => {
     const page = await browser.newPage();
     ctx = await freshSeed(page.request);
     productId = (
-      await apiPost(page.request, ctx.token, "/api/products", {
+      await apiPost(page.request, ctx.token, "/api/catalog/skus", {
         ...PRODUCT,
-        department_id: ctx.categoryIds["ELE"],
+        category_id: ctx.categoryIds["ELE"],
       })
     ).id;
     await apiPost(page.request, ctx.token, "/api/jobs", { code: "JOB-E2E-001" });
@@ -42,7 +42,7 @@ test.describe.serial("Story 1: Withdrawal financials", () => {
   });
 
   test("1a — product starts with correct stock", async ({ request }) => {
-    const products = await apiGet(request, ctx.token, "/api/products");
+    const products = await apiGet(request, ctx.token, "/api/catalog/skus");
     const p = products.find((x: any) => x.id === productId);
     expect(p.quantity).toBe(PRODUCT.quantity);
     expect(p.price).toBe(PRODUCT.price);
@@ -63,7 +63,7 @@ test.describe.serial("Story 1: Withdrawal financials", () => {
     expect(item.subtotal).toBeCloseTo(PRODUCT.price * WITHDRAW_QTY, 2);
     expect(withdrawal.cost_total).toBeCloseTo(PRODUCT.cost * WITHDRAW_QTY, 2);
 
-    const products = await apiGet(request, ctx.token, "/api/products");
+    const products = await apiGet(request, ctx.token, "/api/catalog/skus");
     const p = products.find((x: any) => x.id === productId);
     expect(p.quantity).toBe(PRODUCT.quantity - WITHDRAW_QTY);
 

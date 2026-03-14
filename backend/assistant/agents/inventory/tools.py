@@ -29,7 +29,7 @@ from catalog.application.queries import (
     list_low_stock as catalog_list_low_stock,
 )
 from catalog.application.queries import (
-    list_skus as catalog_list_products,
+    list_skus as catalog_list_skus,
 )
 from catalog.application.queries import (
     list_vendors as catalog_list_vendors,
@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 async def _search_products(args: dict) -> str:
     query = (args.get("query") or "").strip()
     limit = min(int(args.get("limit") or 20), 50)
-    items = await catalog_list_products(search=query, limit=limit)
+    items = await catalog_list_skus(search=query, limit=limit)
     out = [
         {
             "sku": p.sku,
@@ -111,7 +111,7 @@ async def _get_product_details(args: dict) -> str:
 async def _get_inventory_stats() -> str:
     total_skus = await catalog_count_all()
     low_count = await catalog_count_low_stock()
-    products = await catalog_list_products()
+    products = await catalog_list_skus()
     total_value = round(sum(p.quantity * p.cost for p in products), 2)
     out_of_stock = sum(1 for p in products if p.quantity == 0)
     return json.dumps(
@@ -154,7 +154,7 @@ async def _list_departments() -> str:
             {
                 "name": d.name,
                 "code": code,
-                "product_count": d.sku_count,
+                "sku_count": d.sku_count,
                 "next_sku": next_sku,
             }
         )
@@ -247,7 +247,7 @@ async def _get_reorder_suggestions(args: dict) -> str:
 
 async def _get_department_health() -> str:
     depts = await catalog_list_departments()
-    all_products = await catalog_list_products()
+    all_products = await catalog_list_skus()
     by_dept: dict[str, list] = defaultdict(list)
     for p in all_products:
         if p.category_id:
@@ -262,7 +262,7 @@ async def _get_department_health() -> str:
             {
                 "name": d.name,
                 "code": d.code,
-                "product_count": len(dept_products),
+                "sku_count": len(dept_products),
                 "out_of_stock": out_of_stock,
                 "low_stock": low_stock,
                 "healthy": healthy,
@@ -312,7 +312,7 @@ async def _get_department_activity(args: dict) -> str:
     dept = await catalog_get_dept_by_code(dept_code)
     if not dept:
         return json.dumps({"error": f"Department '{dept_code}' not found or has no products"})
-    products = await catalog_list_products(category_id=dept.id)
+    products = await catalog_list_skus(category_id=dept.id)
     if not products:
         return json.dumps({"error": f"Department '{dept_code}' not found or has no products"})
     product_ids = [p.id for p in products]
@@ -323,7 +323,7 @@ async def _get_department_activity(args: dict) -> str:
         {
             "dept_code": dept_code,
             "period_days": days,
-            "product_count": len(products),
+            "sku_count": len(products),
             "low_stock_count": low_stock_count,
             "withdrawals": {"units": total_withdrawn},
         }
@@ -333,7 +333,7 @@ async def _get_department_activity(args: dict) -> str:
 async def _forecast_stockout(args: dict) -> str:
     limit = min(int(args.get("limit") or 15), 50)
     since = (datetime.now(UTC) - timedelta(days=30)).isoformat()
-    products = await catalog_list_products()
+    products = await catalog_list_skus()
     in_stock = [p for p in products if p.quantity > 0]
     in_stock.sort(key=lambda p: p.quantity)
     in_stock = in_stock[:200]
@@ -372,7 +372,7 @@ async def _get_slow_movers(args: dict) -> str:
     limit = min(int(args.get("limit") or 20), 100)
     days = min(int(args.get("days") or 30), 365)
     since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
-    products = await catalog_list_products()
+    products = await catalog_list_skus()
     in_stock = [p for p in products if p.quantity > 0]
     if not in_stock:
         return json.dumps({"period_days": days, "count": 0, "slow_movers": []})

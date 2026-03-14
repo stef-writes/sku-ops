@@ -14,14 +14,6 @@ from finance.ports.invoice_repo_port import InvoiceRepoPort
 logger = logging.getLogger(__name__)
 
 
-async def _get_invoice(
-    invoice_id: str,
-    invoice_repo: InvoiceRepoPort = _default_invoice_repo,
-) -> InvoiceWithDetails | None:
-    """Fetch an invoice by ID. Returns None if not found."""
-    return await invoice_repo.get_by_id(invoice_id)
-
-
 # ---------------------------------------------------------------------------
 # Xero sync
 # ---------------------------------------------------------------------------
@@ -32,7 +24,7 @@ async def sync_invoice(
     invoice_repo: InvoiceRepoPort = _default_invoice_repo,
 ) -> dict:
     """Sync a single invoice to Xero. Returns a result dict."""
-    inv = await _get_invoice(inv_id, invoice_repo)
+    inv = await invoice_repo.get_by_id(inv_id)
     if not inv:
         return {"invoice_id": inv_id, "error": "Invoice not found", "success": False}
 
@@ -106,7 +98,7 @@ async def repost_cogs_for_invoice(
     invoice_repo: InvoiceRepoPort = _default_invoice_repo,
 ) -> dict:
     """Re-post the COGS manual journal for an invoice whose line items changed after sync."""
-    inv = await _get_invoice(inv_id, invoice_repo)
+    inv = await invoice_repo.get_by_id(inv_id)
     if not inv:
         return {"invoice_id": inv_id, "error": "Invoice not found", "success": False}
     if not inv.xero_invoice_id:

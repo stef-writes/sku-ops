@@ -18,7 +18,6 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from assistant.agents.core.tokens import budget_tool_result, count_tokens
-from assistant.agents.routing.dag_templates import match_report  # noqa: F401
 from assistant.agents.routing.dag_types import (
     DAGNode,
     DAGResult,

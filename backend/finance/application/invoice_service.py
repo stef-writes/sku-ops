@@ -5,10 +5,6 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from finance.application.invoice_sync import (
-    repost_cogs_for_invoice,
-    sync_invoice,
-)
 from finance.domain.invoice import InvoiceLineItem, InvoiceWithDetails, compute_due_date
 from finance.infrastructure.invoice_repo import (
     insert_invoice_row,
@@ -44,8 +40,6 @@ __all__ = [
     "get_invoice",
     "list_invoices",
     "mark_paid_for_withdrawal",
-    "repost_cogs_for_invoice",
-    "sync_invoice",
     "update_invoice",
 ]
 

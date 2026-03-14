@@ -39,7 +39,7 @@ test.describe.serial("Story 2: Invoice & payment cycle", () => {
 
     const pIds: string[] = [];
     for (const p of PRODUCTS) {
-      const created = await apiPost(req, t, "/api/products", { ...p, department_id: deptId });
+      const created = await apiPost(req, t, "/api/catalog/skus", { ...p, category_id: deptId });
       pIds.push(created.id);
     }
     await apiPost(req, t, "/api/jobs", { code: "JOB-INV-001" });

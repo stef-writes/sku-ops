@@ -25,12 +25,12 @@ from pydantic import BaseModel
 
 from shared.api.deps import CurrentUserDep
 from shared.infrastructure.config import (
-    DEFAULT_ORG_ID,
     JWT_ACCESS_EXPIRATION_MINUTES,
     JWT_ALGORITHM,
     JWT_SECRET,
 )
 from shared.infrastructure.database import get_connection
+from shared.kernel.constants import DEFAULT_ORG_ID
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

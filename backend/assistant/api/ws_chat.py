@@ -54,13 +54,13 @@ from assistant.application import session_store
 from assistant.application.assistant import recall_memory, schedule_memory_extraction
 from shared.infrastructure.config import (
     ANTHROPIC_AVAILABLE,
-    DEFAULT_ORG_ID,
     JWT_ALGORITHM,
     JWT_SECRET,
     OPENROUTER_AVAILABLE,
     SESSION_COST_CAP,
 )
 from shared.infrastructure.logging_config import org_id_var, user_id_var
+from shared.kernel.constants import DEFAULT_ORG_ID
 
 logger = logging.getLogger(__name__)
 

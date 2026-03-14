@@ -11,7 +11,7 @@ Call run_sync() from a scheduler or manually via the /api/xero/sync endpoint.
 import logging
 
 from finance.adapters.invoicing_factory import get_invoicing_gateway
-from finance.application.invoice_service import repost_cogs_for_invoice, sync_invoice
+from finance.application.invoice_sync import repost_cogs_for_invoice, sync_invoice
 from finance.application.org_settings_service import get_org_settings
 from finance.application.po_sync_service import sync_po_bill
 from finance.domain.xero_settings import XeroSettings

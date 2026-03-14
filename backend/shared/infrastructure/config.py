@@ -56,9 +56,6 @@ is_test = _is("test")
 # Derived: any non-dev deployment
 is_deployed = is_staging or is_production
 
-# Re-export from kernel so infra/app layers can import from here too
-from shared.kernel.constants import DEFAULT_ORG_ID  # noqa: F401, E402
-
 # Database
 DATABASE_URL = os.environ.get("DATABASE_URL") or (
     "sqlite:///:memory:" if is_test else "sqlite:///./data/sku_ops.db"

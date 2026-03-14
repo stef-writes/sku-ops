@@ -28,9 +28,9 @@ test.describe.serial("Story 4: Stock adjustments", () => {
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
     ctx = await freshSeed(page.request);
-    const product = await apiPost(page.request, ctx.token, "/api/products", {
+    const product = await apiPost(page.request, ctx.token, "/api/catalog/skus", {
       ...PRODUCT,
-      department_id: ctx.categoryIds["PNT"],
+      category_id: ctx.categoryIds["PNT"],
     });
     productId = product.id;
     await page.close();
@@ -42,7 +42,7 @@ test.describe.serial("Story 4: Stock adjustments", () => {
       reason: "Correction",
     });
 
-    const products = await apiGet(request, ctx.token, "/api/products");
+    const products = await apiGet(request, ctx.token, "/api/catalog/skus");
     const p = products.find((x: any) => x.id === productId);
     expect(p.quantity).toBe(PRODUCT.quantity + 10);
 
@@ -60,7 +60,7 @@ test.describe.serial("Story 4: Stock adjustments", () => {
       reason: "Damage",
     });
 
-    const products = await apiGet(request, ctx.token, "/api/products");
+    const products = await apiGet(request, ctx.token, "/api/catalog/skus");
     const p = products.find((x: any) => x.id === productId);
     expect(p.quantity).toBe(PRODUCT.quantity + 10 - 3);
 

@@ -37,10 +37,9 @@ test.describe.serial("Story 3: PO receiving and stock", () => {
     const vendors = await apiGet(req, t, "/api/vendors");
     vendorName = vendors[0].name;
 
-    const product = await apiPost(req, t, "/api/products", {
+    const product = await apiPost(req, t, "/api/catalog/skus", {
       ...PRODUCT,
-      department_id: ctx.categoryIds["HDW"],
-      vendor_id: vendors[0].id,
+      category_id: ctx.categoryIds["HDW"],
     });
     productId = product.id;
     await page.close();
@@ -52,7 +51,7 @@ test.describe.serial("Story 3: PO receiving and stock", () => {
   });
 
   test("3b — create PO and receive items increases stock", async ({ request }) => {
-    const products = await apiGet(request, ctx.token, "/api/products");
+    const products = await apiGet(request, ctx.token, "/api/catalog/skus");
     const p = products.find((x: any) => x.id === productId);
     const stockBefore = p.quantity;
 
@@ -73,7 +72,7 @@ test.describe.serial("Story 3: PO receiving and stock", () => {
       items: po.items.map((i: any) => ({ id: i.id, received_qty: PO_QTY })),
     });
 
-    const productsAfter = await apiGet(request, ctx.token, "/api/products");
+    const productsAfter = await apiGet(request, ctx.token, "/api/catalog/skus");
     const pAfter = productsAfter.find((x: any) => x.id === productId);
     expect(pAfter.quantity).toBe(stockBefore + PO_QTY);
 
@@ -87,7 +86,7 @@ test.describe.serial("Story 3: PO receiving and stock", () => {
   });
 
   test("3c — low stock resolved after receiving", async ({ request, page }) => {
-    const products = await apiGet(request, ctx.token, "/api/products");
+    const products = await apiGet(request, ctx.token, "/api/catalog/skus");
     const p = products.find((x: any) => x.id === productId);
     expect(p.quantity).toBeGreaterThan(p.min_stock);
 

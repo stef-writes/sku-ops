@@ -13,7 +13,6 @@ from fastapi import FastAPI
 
 from scheduler import xero_sync_loop
 from shared.infrastructure.config import (
-    DEFAULT_ORG_ID,
     RESET_DB,
     cors_warn_in_deployed,
     is_deployed,
@@ -22,6 +21,7 @@ from shared.infrastructure.config import (
 from shared.infrastructure.database import close_db, init_db
 from shared.infrastructure.logging_config import org_id_var
 from shared.infrastructure.redis import close_redis, init_redis, is_redis_available
+from shared.kernel.constants import DEFAULT_ORG_ID
 
 logger = logging.getLogger(__name__)
 

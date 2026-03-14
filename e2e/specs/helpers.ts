@@ -84,8 +84,6 @@ export async function navigateTo(page: Page, navLabel: string) {
 export interface SeedContext {
   token: string;
   categoryIds: Record<string, string>; // code → id
-  /** @deprecated use categoryIds */
-  deptIds: Record<string, string>;
   contractorId: string;
 }
 
@@ -96,5 +94,5 @@ export async function freshSeed(request: APIRequestContext): Promise<SeedContext
   const categoryIds: Record<string, string> = {};
   for (const c of categories) categoryIds[c.code] = c.id;
   const contractors = await apiGet(request, token, "/api/contractors");
-  return { token, categoryIds, deptIds: categoryIds, contractorId: contractors[0].id };
+  return { token, categoryIds, contractorId: contractors[0].id };
 }

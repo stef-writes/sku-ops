@@ -5,7 +5,7 @@ Pub/Sub channel so every worker receives them.  Without Redis the hub falls
 back to in-process asyncio queues (fine for single-worker dev/test).
 
 Domain types (``Event``, ``SHUTDOWN``, ``is_shutdown``) live in
-``kernel.events`` — re-exported here for backward compatibility.
+``shared.kernel.events`` — import from there directly.
 """
 
 from __future__ import annotations
@@ -16,19 +16,14 @@ import json
 import logging
 from typing import Any
 
-from shared.kernel.events import SHUTDOWN, Event, is_shutdown
+from shared.kernel.events import SHUTDOWN, Event
 
 logger = logging.getLogger(__name__)
 
-# Re-export so existing ``from shared.infrastructure.event_hub import Event``
-# continues to work.
 __all__ = [
-    "SHUTDOWN",
-    "Event",
     "activate_redis",
     "emit",
     "emit_sync",
-    "is_shutdown",
     "subscribe",
     "unsubscribe",
 ]

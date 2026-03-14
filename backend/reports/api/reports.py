@@ -1,24 +1,23 @@
-"""Sales, inventory, and financial report routes.
-
-Thin controllers — all computation delegated to reports/application/report_queries.py.
-"""
+"""Sales, inventory, and financial report routes."""
 
 import logging
 
 from fastapi import APIRouter, HTTPException
 
-from reports.application.report_queries import (
+from reports.application.financial_reports import (
     ar_aging_report,
-    inventory_report,
     job_pl_report,
     kpi_report,
     pl_report,
-    product_activity_report,
     product_margins_report,
-    product_performance_report,
-    reorder_urgency_report,
     sales_report,
     trends_report,
+)
+from reports.application.inventory_reports import (
+    inventory_report,
+    product_activity_report,
+    product_performance_report,
+    reorder_urgency_report,
 )
 from shared.api.deps import AdminDep
 

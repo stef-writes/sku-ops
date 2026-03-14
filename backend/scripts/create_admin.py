@@ -36,8 +36,8 @@ from datetime import UTC, datetime
 async def main(
     user_id_arg: str, email: str, name: str, role: str, org_id: str, password: str = ""
 ) -> None:
-    from shared.infrastructure.config import DEFAULT_ORG_ID
     from shared.infrastructure.db import close_db, get_connection, init_db
+    from shared.kernel.constants import DEFAULT_ORG_ID
 
     resolved_org = org_id or DEFAULT_ORG_ID
     await init_db()

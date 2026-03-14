@@ -10,9 +10,9 @@ from finance.application.invoice_service import (
     delete_draft_invoice,
     get_invoice,
     list_invoices,
-    sync_invoice,
     update_invoice,
 )
+from finance.application.invoice_sync import sync_invoice
 from finance.domain.invoice import InvoiceCreate, InvoiceSyncXeroBulk, InvoiceUpdate
 from shared.api.deps import AdminDep
 from shared.infrastructure.middleware.audit import audit_log

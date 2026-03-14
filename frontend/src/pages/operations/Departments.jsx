@@ -173,7 +173,7 @@ const Departments = () => {
               <div className="space-y-2 pt-4 border-t border-border">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Package className="w-4 h-4" />
-                  <span>{dept.sku_count || dept.product_count || 0} SKUs</span>
+                  <span>{dept.sku_count || 0} SKUs</span>
                 </div>
                 {skuOverview?.departments?.find((d) => d.id === dept.id)?.next_sku && (
                   <p className="text-xs font-mono text-muted-foreground">
