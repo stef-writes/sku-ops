@@ -1,8 +1,7 @@
 """User repository — pure persistence for the users table.
 
-Owns all direct SQL access to the users table. Auth routes, contractor
-service, and any other consumer that needs user lookups must go through
-this repo or an application facade.
+Owns all direct SQL access to the users table. Auth routes and any other
+consumer that needs user lookups must go through this module.
 """
 
 from shared.infrastructure.database import get_connection

@@ -23,21 +23,15 @@ import jwt as pyjwt
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from identity.infrastructure.user_repo import (
-    fetch_by_email as _fetch_user_by_email_repo,
-)
-from identity.infrastructure.user_repo import (
-    fetch_by_id as _fetch_user_by_id_repo,
-)
-from identity.infrastructure.user_repo import (
-    insert_user as _insert_user_repo,
-)
 from shared.api.deps import CurrentUserDep
 from shared.infrastructure.config import (
     JWT_ACCESS_EXPIRATION_MINUTES,
     JWT_ALGORITHM,
     JWT_SECRET,
 )
+from shared.infrastructure.user_repo import fetch_by_email as _fetch_user_by_email_repo
+from shared.infrastructure.user_repo import fetch_by_id as _fetch_user_by_id_repo
+from shared.infrastructure.user_repo import insert_user as _insert_user_repo
 from shared.kernel.constants import DEFAULT_ORG_ID
 
 router = APIRouter(prefix="/auth", tags=["auth"])

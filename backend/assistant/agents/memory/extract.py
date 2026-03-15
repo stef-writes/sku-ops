@@ -9,8 +9,8 @@ import logging
 
 import anthropic
 
+import shared.infrastructure.config as _cfg
 from assistant.agents.memory.store import save
-from shared.infrastructure.config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL
 from shared.infrastructure.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ async def extract_and_save(
     if not history or len(history) < 4:
         return
     try:
-        if not ANTHROPIC_API_KEY:
+        if not _cfg.ANTHROPIC_API_KEY:
             return
 
         turns = []
@@ -42,9 +42,9 @@ async def extract_and_save(
         if len(turns) < 2:
             return
 
-        client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+        client = anthropic.AsyncAnthropic(api_key=_cfg.ANTHROPIC_API_KEY)
         response = await client.messages.create(
-            model=ANTHROPIC_MODEL,
+            model=_cfg.ANTHROPIC_MODEL,
             max_tokens=512,
             system=_EXTRACT_SYSTEM,
             messages=[{"role": "user", "content": "\n\n".join(turns)}],

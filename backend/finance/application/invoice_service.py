@@ -29,7 +29,6 @@ from operations.application.queries import (
     link_withdrawal_to_invoice,
     unlink_withdrawals_from_invoice,
 )
-from operations.domain.enums import PaymentStatus
 from shared.infrastructure.database import get_org_id, transaction
 from shared.infrastructure.domain_events import dispatch
 from shared.kernel.domain_events import InvoiceApproved, InvoiceCreated, InvoiceDeleted
@@ -91,7 +90,7 @@ async def _validate_withdrawals_for_invoice(
         w = await get_withdrawal_by_id(wid)
         if not w:
             raise ValueError(f"Withdrawal {wid} not found")
-        if w.payment_status != PaymentStatus.UNPAID:
+        if w.payment_status != "unpaid":
             raise ValueError(f"Withdrawal {wid} is not unpaid")
         if w.invoice_id:
             raise ValueError(f"Withdrawal {wid} is already on invoice")
