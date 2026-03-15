@@ -42,7 +42,11 @@ COPY backend/ .
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    TIKTOKEN_CACHE_DIR="/app/.tiktoken"
+
+# Pre-download tiktoken encoding data to avoid runtime network calls
+RUN python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
 
 RUN chown -R appuser:appgroup /app
 
