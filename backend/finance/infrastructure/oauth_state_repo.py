@@ -14,8 +14,8 @@ async def save_oauth_state(state: str) -> None:
     conn = get_connection()
     now = datetime.now(UTC).isoformat()
     await conn.execute(
-        """INSERT INTO oauth_states (state, org_id, created_at) VALUES (?, ?, ?)
-           ON CONFLICT(state) DO UPDATE SET org_id = ?, created_at = ?""",
+        """INSERT INTO oauth_states (state, org_id, created_at) VALUES ($1, $2, $3)
+           ON CONFLICT(state) DO UPDATE SET org_id = $4, created_at = $5""",
         (state, org_id, now, org_id, now),
     )
     await conn.commit()
@@ -23,10 +23,10 @@ async def save_oauth_state(state: str) -> None:
 
 async def pop_oauth_state(state: str) -> str | None:
     conn = get_connection()
-    cursor = await conn.execute("SELECT org_id FROM oauth_states WHERE state = ?", (state,))
+    cursor = await conn.execute("SELECT org_id FROM oauth_states WHERE state = $1", (state,))
     row = await cursor.fetchone()
     if not row:
         return None
-    await conn.execute("DELETE FROM oauth_states WHERE state = ?", (state,))
+    await conn.execute("DELETE FROM oauth_states WHERE state = $1", (state,))
     await conn.commit()
     return row[0]

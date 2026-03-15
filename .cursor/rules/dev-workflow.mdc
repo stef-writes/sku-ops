@@ -8,15 +8,17 @@ alwaysApply: true
 ## Two modes — know which one you need
 
 ### Mode 1: Daily development (default)
-Use this for all feature work. Hot-reload, SQLite, seed scripts work.
+Use this for all feature work. Hot-reload, Postgres via Docker, seed scripts work.
 
 ```bash
-npm run dev          # from project root — starts backend + frontend together
+./bin/dev db             # start dev Postgres (first time only — persists via volume)
+npm run dev              # from project root — starts backend + frontend together
 ```
 
 - Backend: uvicorn with `--reload` on http://localhost:8000
 - Frontend: Vite dev server on http://localhost:3000
-- DB: SQLite (automatic, no setup needed)
+- DB: Postgres via `docker-compose.dev.yml` on localhost:5432
+- `./bin/dev server` and `./bin/dev seed` auto-start Postgres if not running
 - Seed realistic data (run once after first start):
 
 ```bash
@@ -35,17 +37,12 @@ docker compose up --build    # nginx/certbot excluded via override profile
 - `devtools/` scripts are intentionally excluded from the Docker image — run seeds in Mode 1.
 - Docker build context is the workspace root: `docker build -f backend/Dockerfile .`
 
-## Why not Docker for daily dev?
-- `devtools/` (seed scripts) live at the workspace root, outside the Docker build context.
-- SQLite in Mode 1 is fine pre-launch. The schema is identical; only the driver differs.
-- Hot-reload and fast iteration only work natively.
-
 ## Key ports
 | Service  | Mode 1 (native) | Mode 2 (Docker) |
 |----------|-----------------|-----------------|
 | Backend  | :8000           | :8000           |
 | Frontend | :3000           | —               |
-| Postgres | —               | :5433           |
+| Postgres | :5432           | :5433           |
 
 ## Common dev commands
 
@@ -65,6 +62,8 @@ All commands run from the project root via `./bin/dev`:
 ./bin/dev ui               # frontend only (no backend)
 ./bin/dev seed [args]      # run seed_realistic
 ./bin/dev eval [args]      # run LLM evals
+./bin/dev db               # start dev Postgres only
+./bin/dev db:stop          # stop dev Postgres
 ```
 
 Never suggest `pip`, `python -m pytest`, or `ruff` directly. All Python execution goes through `uv` (via `./bin/dev`). The project uses `uv` workspaces — the root `pyproject.toml` manages dev deps, `backend/pyproject.toml` has production deps only.

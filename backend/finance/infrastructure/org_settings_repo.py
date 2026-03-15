@@ -11,7 +11,7 @@ async def get_org_settings() -> OrgSettings:
     org_id = get_org_id()
     conn = get_connection()
     cursor = await conn.execute(
-        "SELECT * FROM org_settings WHERE organization_id = ?",
+        "SELECT * FROM org_settings WHERE organization_id = $1",
         (org_id,),
     )
     row = await cursor.fetchone()
@@ -33,7 +33,7 @@ async def upsert_org_settings(settings: OrgSettings) -> OrgSettings:
                xero_cogs_account_code, xero_inventory_account_code,
                xero_ap_account_code, xero_tracking_category_id,
                xero_tax_type, updated_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
            ON CONFLICT(organization_id) DO UPDATE SET
                auto_invoice = excluded.auto_invoice,
                default_tax_rate = excluded.default_tax_rate,
@@ -78,8 +78,8 @@ async def clear_xero_tokens() -> None:
         """UPDATE org_settings
            SET xero_access_token = NULL, xero_refresh_token = NULL,
                xero_tenant_id = NULL, xero_token_expiry = NULL,
-               updated_at = ?
-           WHERE organization_id = ?""",
+               updated_at = $1
+           WHERE organization_id = $2""",
         (datetime.now(UTC).isoformat(), org_id),
     )
     await conn.commit()

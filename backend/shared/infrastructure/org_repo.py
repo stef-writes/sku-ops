@@ -28,7 +28,7 @@ def _row_to_model(row) -> Organization | None:
 async def get_by_id(org_id: str) -> Organization | None:
     conn = get_connection()
     cursor = await conn.execute(
-        "SELECT id, name, slug, created_at FROM organizations WHERE id = ?",
+        "SELECT id, name, slug, created_at FROM organizations WHERE id = $1",
         (org_id,),
     )
     row = await cursor.fetchone()
@@ -38,7 +38,7 @@ async def get_by_id(org_id: str) -> Organization | None:
 async def get_by_slug(slug: str) -> Organization | None:
     conn = get_connection()
     cursor = await conn.execute(
-        "SELECT id, name, slug, created_at FROM organizations WHERE slug = ?",
+        "SELECT id, name, slug, created_at FROM organizations WHERE slug = $1",
         (slug,),
     )
     row = await cursor.fetchone()
@@ -49,7 +49,7 @@ async def insert(org_dict: dict) -> None:
     conn = get_connection()
     await conn.execute(
         """INSERT INTO organizations (id, name, slug, created_at)
-           VALUES (?, ?, ?, ?)""",
+           VALUES ($1, $2, $3, $4)""",
         (
             org_dict["id"],
             org_dict["name"],

@@ -2,13 +2,24 @@
 set -e
 cd "$(dirname "$0")/.."
 
+_ensure_pg() {
+  if ! docker compose -f docker-compose.dev.yml ps --status running db 2>/dev/null | grep -q db; then
+    echo "Starting dev Postgres..."
+    docker compose -f docker-compose.dev.yml up -d --wait
+  fi
+}
+
+export DATABASE_URL="${DATABASE_URL:-postgresql://sku_ops:localdev@localhost:5432/sku_ops}"
+
 case "${1:-help}" in
   test)
+    _ensure_pg
     echo "Running all tests..."
     uv run pytest "${@:2}"
     npm run test:run --prefix frontend
     ;;
   test:be)
+    _ensure_pg
     echo "Running backend tests..."
     uv run pytest "${@:2}"
     ;;
@@ -45,6 +56,7 @@ case "${1:-help}" in
     cd .devcontainer && docker-compose up -d
     ;;
   server)
+    _ensure_pg
     echo "Starting backend dev server..."
     PYTHONPATH=backend:. uv run uvicorn server:app --reload --host 0.0.0.0 --port 8000 --app-dir backend
     ;;
@@ -53,6 +65,7 @@ case "${1:-help}" in
     npm run dev --prefix frontend
     ;;
   seed)
+    _ensure_pg
     echo "Running seed script..."
     PYTHONPATH=backend:. uv run python -m devtools.scripts.seed_realistic "${@:2}"
     ;;
@@ -67,6 +80,15 @@ case "${1:-help}" in
   verify)
     echo "Running pre-deploy verification..."
     PYTHONPATH=backend:. uv run python backend/scripts/verify_deploy.py "${@:2}"
+    ;;
+  db)
+    echo "Starting dev Postgres..."
+    docker compose -f docker-compose.dev.yml up -d --wait
+    echo "Postgres ready at postgresql://sku_ops:localdev@localhost:5432/sku_ops"
+    ;;
+  db:stop)
+    echo "Stopping dev Postgres..."
+    docker compose -f docker-compose.dev.yml down
     ;;
   help|*)
     echo "sku-ops Dev Commands:"
@@ -83,8 +105,10 @@ case "${1:-help}" in
     echo "  ./bin/dev ui               - Start frontend dev server"
     echo "  ./bin/dev seed [args]      - Run seed_realistic"
     echo "  ./bin/dev eval [args]      - Run LLM evals"
-  echo "  ./bin/dev create-admin     - Create/update admin user in DB"
-  echo "  ./bin/dev verify [args]    - Pre-deploy verification (pass --url to also hit a live server)"
-  echo "  ./bin/dev container        - Start devcontainer"
+    echo "  ./bin/dev create-admin     - Create/update admin user in DB"
+    echo "  ./bin/dev verify [args]    - Pre-deploy verification (pass --url to also hit a live server)"
+    echo "  ./bin/dev container        - Start devcontainer"
+    echo "  ./bin/dev db               - Start dev Postgres only"
+    echo "  ./bin/dev db:stop          - Stop dev Postgres"
     ;;
 esac

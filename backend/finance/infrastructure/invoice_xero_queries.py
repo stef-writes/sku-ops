@@ -13,31 +13,23 @@ async def set_xero_invoice_id(
 ) -> None:
     conn = get_connection()
     org_id = get_org_id()
-    params: list = [
-        xero_invoice_id,
-        xero_cogs_journal_id,
-        datetime.now(UTC).isoformat(),
-        invoice_id,
-    ]
-    where = "WHERE id = ?"
-    where += " AND organization_id = ?"
-    params.append(org_id)
-    upd_q = "UPDATE invoices SET xero_invoice_id = ?, xero_cogs_journal_id = ?, xero_sync_status = 'synced', updated_at = ? "
-    upd_q += where
-    await conn.execute(upd_q, params)
+    await conn.execute(
+        "UPDATE invoices SET xero_invoice_id = $1, xero_cogs_journal_id = $2,"
+        " xero_sync_status = 'synced', updated_at = $3"
+        " WHERE id = $4 AND organization_id = $5",
+        (xero_invoice_id, xero_cogs_journal_id, datetime.now(UTC).isoformat(), invoice_id, org_id),
+    )
     await conn.commit()
 
 
 async def set_xero_sync_status(invoice_id: str, status: str) -> None:
     conn = get_connection()
     org_id = get_org_id()
-    params: list = [status, datetime.now(UTC).isoformat(), invoice_id]
-    where = "WHERE id = ?"
-    where += " AND organization_id = ?"
-    params.append(org_id)
-    upd_q = "UPDATE invoices SET xero_sync_status = ?, updated_at = ? "
-    upd_q += where
-    await conn.execute(upd_q, params)
+    await conn.execute(
+        "UPDATE invoices SET xero_sync_status = $1, updated_at = $2"
+        " WHERE id = $3 AND organization_id = $4",
+        (status, datetime.now(UTC).isoformat(), invoice_id, org_id),
+    )
     await conn.commit()
 
 
@@ -56,7 +48,7 @@ async def list_unsynced_invoices() -> list[Invoice]:
     cursor = await conn.execute(
         """SELECT id, invoice_number, billing_entity, total, status, xero_sync_status, created_at
            FROM invoices
-           WHERE organization_id = ?
+           WHERE organization_id = $1
              AND status IN ('approved', 'sent')
              AND (xero_invoice_id IS NULL OR xero_sync_status = 'syncing')
              AND deleted_at IS NULL
@@ -74,7 +66,7 @@ async def list_invoices_needing_reconciliation() -> list[Invoice]:
         """SELECT id, invoice_number, billing_entity, total, xero_invoice_id, xero_sync_status,
                   (SELECT COUNT(*) FROM invoice_line_items WHERE invoice_id = invoices.id) AS line_count
            FROM invoices
-           WHERE organization_id = ?
+           WHERE organization_id = $1
              AND xero_invoice_id IS NOT NULL
              AND xero_sync_status != 'mismatch'
              AND deleted_at IS NULL
@@ -91,7 +83,7 @@ async def list_failed_invoices() -> list[Invoice]:
     cursor = await conn.execute(
         """SELECT id, invoice_number, billing_entity, total, status, created_at
            FROM invoices
-           WHERE organization_id = ?
+           WHERE organization_id = $1
              AND xero_sync_status = 'failed'
              AND deleted_at IS NULL
            ORDER BY created_at""",
@@ -107,7 +99,7 @@ async def list_mismatch_invoices() -> list[Invoice]:
     cursor = await conn.execute(
         """SELECT id, invoice_number, billing_entity, total, xero_invoice_id, created_at
            FROM invoices
-           WHERE organization_id = ?
+           WHERE organization_id = $1
              AND xero_sync_status = 'mismatch'
              AND deleted_at IS NULL
            ORDER BY created_at""",
@@ -124,7 +116,7 @@ async def list_stale_cogs_invoices() -> list[Invoice]:
         """SELECT id, invoice_number, billing_entity, total, xero_invoice_id, xero_cogs_journal_id,
                   (SELECT COUNT(*) FROM invoice_line_items WHERE invoice_id = invoices.id) AS line_count
            FROM invoices
-           WHERE organization_id = ?
+           WHERE organization_id = $1
              AND xero_sync_status = 'cogs_stale'
              AND xero_invoice_id IS NOT NULL
              AND deleted_at IS NULL

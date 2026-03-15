@@ -42,10 +42,12 @@ async def summary_by_account(
     params: list = [get_org_id()]
     date_filter = ""
     if start_date:
-        date_filter += " AND created_at >= ?"
+        n = len(params) + 1
+        date_filter += f" AND created_at >= ${n}"
         params.append(start_date)
     if end_date:
-        date_filter += " AND created_at <= ?"
+        n = len(params) + 1
+        date_filter += f" AND created_at <= ${n}"
         params.append(end_date)
     dim_filter = _build_dimension_filter(
         params, job_id=job_id, department=department, billing_entity=billing_entity
@@ -54,7 +56,7 @@ async def summary_by_account(
     query = (
         "SELECT account, ROUND(CAST(SUM(amount) AS NUMERIC), 2) AS total"
         " FROM financial_ledger"
-        " WHERE organization_id = ?"
+        " WHERE organization_id = $1"
     )
     query += date_filter + dim_filter
     query += " GROUP BY account"
@@ -71,10 +73,12 @@ async def summary_by_department(
     params: list = [get_org_id()]
     date_filter = ""
     if start_date:
-        date_filter += " AND created_at >= ?"
+        n = len(params) + 1
+        date_filter += f" AND created_at >= ${n}"
         params.append(start_date)
     if end_date:
-        date_filter += " AND created_at <= ?"
+        n = len(params) + 1
+        date_filter += f" AND created_at <= ${n}"
         params.append(end_date)
 
     query = (
@@ -83,7 +87,7 @@ async def summary_by_department(
         " ROUND(CAST(SUM(CASE WHEN account = 'cogs' THEN amount ELSE 0 END) AS NUMERIC), 2) AS cost,"
         " ROUND(CAST(SUM(CASE WHEN account = 'shrinkage' THEN amount ELSE 0 END) AS NUMERIC), 2) AS shrinkage"
         " FROM financial_ledger"
-        " WHERE organization_id = ?"
+        " WHERE organization_id = $1"
         " AND account IN ('revenue', 'cogs', 'shrinkage')"
         " AND department IS NOT NULL"
     )
@@ -122,10 +126,12 @@ async def summary_by_job(
     params: list = [get_org_id()]
     date_filter = ""
     if start_date:
-        date_filter += " AND created_at >= ?"
+        n = len(params) + 1
+        date_filter += f" AND created_at >= ${n}"
         params.append(start_date)
     if end_date:
-        date_filter += " AND created_at <= ?"
+        n = len(params) + 1
+        date_filter += f" AND created_at <= ${n}"
         params.append(end_date)
 
     base = (
@@ -135,7 +141,7 @@ async def summary_by_job(
         " ROUND(CAST(SUM(CASE WHEN account = 'cogs' THEN amount ELSE 0 END) AS NUMERIC), 2) AS cost,"
         " COUNT(DISTINCT reference_id) AS transaction_count"
         " FROM financial_ledger"
-        " WHERE organization_id = ?"
+        " WHERE organization_id = $1"
         " AND account IN ('revenue', 'cogs')"
         " AND job_id IS NOT NULL"
     )
@@ -146,17 +152,22 @@ async def summary_by_job(
     search_params: list = []
     if search:
         term = f"%{search}%"
-        search_clause = " HAVING job_id LIKE ? OR billing_entity LIKE ?"
+        sn = len(params) + 1
+        search_clause = f" HAVING job_id LIKE ${sn} OR billing_entity LIKE ${sn + 1}"
         search_params = [term, term]
 
+    all_count_params = [*params, *search_params]
     count_query = f"SELECT COUNT(*) AS cnt, COALESCE(SUM(revenue), 0) AS total_revenue, COALESCE(SUM(cost), 0) AS total_cost FROM ({base}{search_clause})"
-    count_cursor = await conn.execute(count_query, [*params, *search_params])
+    count_cursor = await conn.execute(count_query, all_count_params)
     agg = dict(await count_cursor.fetchone())
     total = agg["cnt"]
     all_revenue = float(agg["total_revenue"])
     all_cost = float(agg["total_cost"])
 
-    data_query = f"{base}{search_clause} ORDER BY revenue DESC LIMIT ? OFFSET ?"
+    limit_n = len(all_count_params) + 1
+    data_query = (
+        f"{base}{search_clause} ORDER BY revenue DESC LIMIT ${limit_n} OFFSET ${limit_n + 1}"
+    )
     cursor = await conn.execute(data_query, [*params, *search_params, limit, offset])
     rows = await cursor.fetchall()
 
@@ -189,10 +200,12 @@ async def summary_by_billing_entity(
     params: list = [get_org_id()]
     date_filter = ""
     if start_date:
-        date_filter += " AND created_at >= ?"
+        n = len(params) + 1
+        date_filter += f" AND created_at >= ${n}"
         params.append(start_date)
     if end_date:
-        date_filter += " AND created_at <= ?"
+        n = len(params) + 1
+        date_filter += f" AND created_at <= ${n}"
         params.append(end_date)
 
     query = (
@@ -202,7 +215,7 @@ async def summary_by_billing_entity(
         " ROUND(CAST(SUM(CASE WHEN account = 'accounts_receivable' THEN amount ELSE 0 END) AS NUMERIC), 2) AS ar_balance,"
         " COUNT(DISTINCT reference_id) AS transaction_count"
         " FROM financial_ledger"
-        " WHERE organization_id = ?"
+        " WHERE organization_id = $1"
         " AND billing_entity IS NOT NULL"
     )
     query += date_filter
@@ -237,10 +250,12 @@ async def summary_by_contractor(
     params: list = [get_org_id()]
     date_filter = ""
     if start_date:
-        date_filter += " AND fl.created_at >= ?"
+        n = len(params) + 1
+        date_filter += f" AND fl.created_at >= ${n}"
         params.append(start_date)
     if end_date:
-        date_filter += " AND fl.created_at <= ?"
+        n = len(params) + 1
+        date_filter += f" AND fl.created_at <= ${n}"
         params.append(end_date)
 
     query = (
@@ -249,7 +264,7 @@ async def summary_by_contractor(
         " ROUND(CAST(SUM(CASE WHEN fl.account = 'accounts_receivable' THEN fl.amount ELSE 0 END) AS NUMERIC), 2) AS ar_balance,"
         " COUNT(DISTINCT fl.reference_id) AS transaction_count"
         " FROM financial_ledger fl"
-        " WHERE fl.organization_id = ?"
+        " WHERE fl.organization_id = $1"
         " AND fl.contractor_id IS NOT NULL"
     )
     query += date_filter

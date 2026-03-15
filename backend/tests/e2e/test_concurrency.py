@@ -83,7 +83,6 @@ class TestConcurrency:
     def test_parallel_withdrawals_both_fit_stock(self, client, seed_dept_id):
         """Two concurrent withdrawals that both fit within available stock.
 
-        SQLite serializes transactions so one may fail with a transient error.
         We verify that stock is consistent regardless of how many succeeded.
         """
         headers = admin_headers()

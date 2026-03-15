@@ -15,7 +15,7 @@ async def get_next_number(department_code: str) -> int:
     conn = get_connection()
     key = _counter_key(department_code)
     cursor = await conn.execute(
-        "SELECT counter FROM sku_counters WHERE department_code = ?",
+        "SELECT counter FROM sku_counters WHERE department_code = $1",
         (key,),
     )
     row = await cursor.fetchone()
@@ -28,7 +28,7 @@ async def get_all_counters() -> dict:
     org_id = get_org_id()
     prefix = f"{org_id}|"
     cursor = await conn.execute(
-        "SELECT department_code, counter FROM sku_counters WHERE department_code LIKE ?",
+        "SELECT department_code, counter FROM sku_counters WHERE department_code LIKE $1",
         (f"{prefix}%",),
     )
     rows = await cursor.fetchall()
@@ -40,12 +40,12 @@ async def increment_and_get(department_code: str) -> int:
     key = _counter_key(code)
     conn = get_connection()
     await conn.execute(
-        """INSERT INTO sku_counters (department_code, counter) VALUES (?, 1)
+        """INSERT INTO sku_counters (department_code, counter) VALUES ($1, 1)
            ON CONFLICT(department_code) DO UPDATE SET counter = sku_counters.counter + 1""",
         (key,),
     )
     cursor = await conn.execute(
-        "SELECT counter FROM sku_counters WHERE department_code = ?",
+        "SELECT counter FROM sku_counters WHERE department_code = $1",
         (key,),
     )
     row = await cursor.fetchone()

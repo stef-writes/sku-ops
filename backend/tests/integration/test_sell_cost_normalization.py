@@ -159,7 +159,7 @@ async def test_ledger_cogs_entry_has_quantity_and_unit_cost(db):
     cursor = await conn.execute(
         """SELECT quantity, unit, unit_cost, amount
            FROM financial_ledger
-           WHERE reference_id = ? AND account = 'cogs'""",
+           WHERE reference_id = $1 AND account = 'cogs'""",
         (result.id,),
     )
     rows = [dict(r) for r in await cursor.fetchall()]
@@ -214,7 +214,7 @@ async def test_ledger_revenue_entry_has_quantity_and_unit_cost(db):
     conn = get_connection()
     cursor = await conn.execute(
         """SELECT quantity, unit, unit_cost FROM financial_ledger
-           WHERE reference_id = ? AND account = 'revenue'""",
+           WHERE reference_id = $1 AND account = 'revenue'""",
         (result.id,),
     )
     rows = [dict(r) for r in await cursor.fetchall()]

@@ -24,11 +24,17 @@ async def update_fields(
     org_id = get_org_id()
     now = datetime.now(UTC).isoformat()
     updates["updated_at"] = now
-    set_clauses = [f"{k} = ?" for k in updates]
-    params = list(updates.values())
+    n = 1
+    set_clauses = []
+    params = []
+    for k, v in updates.items():
+        set_clauses.append(f"{k} = ${n}")
+        params.append(v)
+        n += 1
     params.append(invoice_id)
-    q = f"UPDATE invoices SET {', '.join(set_clauses)} WHERE id = ?"
-    q += " AND organization_id = ?"
+    q = f"UPDATE invoices SET {', '.join(set_clauses)} WHERE id = ${n}"
+    n += 1
+    q += f" AND organization_id = ${n}"
     params.append(org_id)
     await conn.execute(q, params)
     await conn.commit()
@@ -38,7 +44,7 @@ async def update_fields(
 async def replace_line_items(invoice_id: str, line_items: list[dict]) -> float:
     """Delete existing line items and insert new ones. Returns computed subtotal."""
     conn = get_connection()
-    await conn.execute("DELETE FROM invoice_line_items WHERE invoice_id = ?", (invoice_id,))
+    await conn.execute("DELETE FROM invoice_line_items WHERE invoice_id = $1", (invoice_id,))
     subtotal = 0.0
     for item in line_items:
         amt = round(float(item.get("quantity", 1)) * float(item.get("unit_price", 0)), 2)
@@ -47,7 +53,7 @@ async def replace_line_items(invoice_id: str, line_items: list[dict]) -> float:
         await conn.execute(
             """INSERT INTO invoice_line_items
                (id, invoice_id, description, quantity, unit_price, amount, cost, product_id, job_id, unit, sell_cost)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)""",
             (
                 item_id,
                 invoice_id,
@@ -79,7 +85,7 @@ async def insert_line_items(invoice_id: str, line_items: list[dict]) -> float:
         await conn.execute(
             """INSERT INTO invoice_line_items
                (id, invoice_id, description, quantity, unit_price, amount, cost, product_id, job_id, unit, sell_cost)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)""",
             (
                 str(uuid4()),
                 invoice_id,
@@ -102,7 +108,7 @@ async def insert_line_items(invoice_id: str, line_items: list[dict]) -> float:
 async def link_withdrawal(invoice_id: str, withdrawal_id: str) -> None:
     conn = get_connection()
     await conn.execute(
-        "INSERT OR IGNORE INTO invoice_withdrawals (invoice_id, withdrawal_id) VALUES (?, ?)",
+        "INSERT INTO invoice_withdrawals (invoice_id, withdrawal_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
         (invoice_id, withdrawal_id),
     )
     await conn.commit()
@@ -112,12 +118,12 @@ async def unlink_withdrawals(invoice_id: str) -> list[str]:
     """Remove all withdrawal links for an invoice. Returns the unlinked withdrawal IDs."""
     conn = get_connection()
     cursor = await conn.execute(
-        "SELECT withdrawal_id FROM invoice_withdrawals WHERE invoice_id = ?",
+        "SELECT withdrawal_id FROM invoice_withdrawals WHERE invoice_id = $1",
         (invoice_id,),
     )
     rows = await cursor.fetchall()
     wids = [r[0] for r in rows]
-    await conn.execute("DELETE FROM invoice_withdrawals WHERE invoice_id = ?", (invoice_id,))
+    await conn.execute("DELETE FROM invoice_withdrawals WHERE invoice_id = $1", (invoice_id,))
     await conn.commit()
     return wids
 
@@ -126,7 +132,7 @@ async def soft_delete(invoice_id: str) -> None:
     conn = get_connection()
     now = datetime.now(UTC).isoformat()
     await conn.execute(
-        "UPDATE invoices SET status = 'deleted', deleted_at = ?, updated_at = ? WHERE id = ?",
+        "UPDATE invoices SET status = 'deleted', deleted_at = $1, updated_at = $2 WHERE id = $3",
         (now, now, invoice_id),
     )
     await conn.commit()
@@ -152,7 +158,7 @@ async def insert_invoice_row(
            invoice_date, due_date, payment_terms, billing_address, po_reference, currency,
            approved_by_id, approved_at,
            xero_invoice_id, organization_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)""",
         (
             inv_id,
             invoice_number,
@@ -190,7 +196,7 @@ async def mark_paid_for_withdrawal(withdrawal_id: str) -> None:
     """
     conn = get_connection()
     cursor = await conn.execute(
-        "SELECT invoice_id FROM invoice_withdrawals WHERE withdrawal_id = ?",
+        "SELECT invoice_id FROM invoice_withdrawals WHERE withdrawal_id = $1",
         (withdrawal_id,),
     )
     row = await cursor.fetchone()
@@ -198,7 +204,7 @@ async def mark_paid_for_withdrawal(withdrawal_id: str) -> None:
         return
     now = datetime.now(UTC).isoformat()
     await conn.execute(
-        "UPDATE invoices SET status = 'paid', updated_at = ? WHERE id = ?",
+        "UPDATE invoices SET status = 'paid', updated_at = $1 WHERE id = $2",
         (now, row[0]),
     )
     await conn.commit()
@@ -214,7 +220,7 @@ async def update_invoice_totals(
     conn = get_connection()
     now = datetime.now(UTC).isoformat()
     await conn.execute(
-        "UPDATE invoices SET subtotal = ?, tax = ?, total = ?, updated_at = ? WHERE id = ?",
+        "UPDATE invoices SET subtotal = $1, tax = $2, total = $3, updated_at = $4 WHERE id = $5",
         (subtotal, tax, total, now, invoice_id),
     )
     await conn.commit()
@@ -229,7 +235,7 @@ async def update_invoice_billing(
     """Update billing entity and contact name on an invoice row."""
     conn = get_connection()
     await conn.execute(
-        "UPDATE invoices SET billing_entity = ?, contact_name = ?, updated_at = ? WHERE id = ?",
+        "UPDATE invoices SET billing_entity = $1, contact_name = $2, updated_at = $3 WHERE id = $4",
         (billing_entity, contact_name, updated_at, invoice_id),
     )
     await conn.commit()
@@ -247,11 +253,16 @@ async def update_invoice_fields_dynamic(
         return
     conn = get_connection()
     fields = {**fields, "updated_at": datetime.now(UTC).isoformat()}
-    set_clauses = [f"{k} = ?" for k in fields]
-    params: list = list(fields.values())
+    n = 1
+    set_clauses = []
+    params: list = []
+    for k, v in fields.items():
+        set_clauses.append(f"{k} = ${n}")
+        params.append(v)
+        n += 1
     params.append(invoice_id)
     await conn.execute(
-        f"UPDATE invoices SET {', '.join(set_clauses)} WHERE id = ?",
+        f"UPDATE invoices SET {', '.join(set_clauses)} WHERE id = ${n}",
         params,
     )
     await conn.commit()

@@ -17,8 +17,9 @@ from shared.kernel.errors import ResourceNotFoundError
 async def _seed_vendor(vendor_id="vendor-1", name="Acme Supply"):
     conn = get_connection()
     await conn.execute(
-        """INSERT OR REPLACE INTO vendors (id, name, organization_id, created_at)
-           VALUES (?, ?, 'default', datetime('now'))""",
+        """INSERT INTO vendors (id, name, organization_id, created_at)
+           VALUES ($1, $2, 'default', NOW())
+           ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name""",
         (vendor_id, name),
     )
     await conn.commit()

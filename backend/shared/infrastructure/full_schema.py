@@ -1,7 +1,7 @@
 """Full schema — aggregated from bounded context schema modules.
 
 Single source of truth for the database schema.  Used by the migration runner
-to bootstrap a *fresh* database (SQLite or PostgreSQL) in one shot.
+to bootstrap a *fresh* PostgreSQL database in one shot.
 Each context owns its own table definitions; this module collects them
 in dependency order (shared infra first, then catalog, inventory, etc.).
 """

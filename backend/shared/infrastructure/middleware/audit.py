@@ -62,7 +62,7 @@ async def audit_log(
         await conn.execute(
             """INSERT INTO audit_log (id, user_id, action, resource_type, resource_id,
                details, ip_address, organization_id, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)""",
             (
                 str(uuid.uuid4()),
                 user_id,

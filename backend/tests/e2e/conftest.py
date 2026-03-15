@@ -31,12 +31,12 @@ def _seed_contractor(app_client: TestClient) -> str:
 
     async def _insert():
         conn = get_connection()
-        cursor = await conn.execute("SELECT id FROM users WHERE id = ?", ("contractor-1",))
+        cursor = await conn.execute("SELECT id FROM users WHERE id = $1", ("contractor-1",))
         if await cursor.fetchone():
             return
         await conn.execute(
             "INSERT INTO users (id, email, password, name, role, company, billing_entity, is_active, organization_id, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
+            " VALUES ($1, $2, $3, $4, $5, $6, $7, 1, $8, $9)",
             (
                 "contractor-1",
                 "contractor@test.com",

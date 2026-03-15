@@ -79,8 +79,9 @@ Any mutation that crosses context boundaries or interacts with external systems 
 
 ### Database layer
 
-- **SQLite (dev):** Single connection. `get_connection()` inside `transaction()` returns the ambient connection.
-- **Postgres (prod):** Pool proxy. `get_connection()` inside `transaction()` returns the dedicated transactional connection (not the pool proxy). These are the same object only because of the contextvar Unit of Work — do not call `get_connection()` outside a `transaction()` block in application code.
+- **Postgres everywhere** — dev, test, staging, production. No SQLite. Local dev uses `docker-compose.dev.yml`.
+- **All SQL is native Postgres** — `$1`/`$2` placeholders, `NOW()`, `ON CONFLICT`, `::date` casts. No dialect abstraction.
+- **Pool proxy:** `get_connection()` inside `transaction()` returns the dedicated transactional connection (not the pool proxy). These are the same object only because of the contextvar Unit of Work — do not call `get_connection()` outside a `transaction()` block in application code.
 - **Pool config:** `PG_POOL_MIN`, `PG_POOL_MAX`, `PG_ACQUIRE_TIMEOUT`, `PG_COMMAND_TIMEOUT` — all in `config.py` and `docker-compose.yml`. Always set these explicitly in production.
 
 ### Event system

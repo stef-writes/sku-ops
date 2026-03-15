@@ -25,7 +25,7 @@ async def insert(request: MaterialRequest) -> None:
     await conn.execute(
         """INSERT INTO material_requests (id, contractor_id, contractor_name, items, status, withdrawal_id,
            job_id, service_address, notes, created_at, processed_at, processed_by_id, organization_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)""",
         (
             request.id,
             request.contractor_id,
@@ -49,7 +49,7 @@ async def get_by_id(request_id: str) -> MaterialRequest | None:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        "SELECT * FROM material_requests WHERE id = ? AND (organization_id = ? OR organization_id IS NULL)",
+        "SELECT * FROM material_requests WHERE id = $1 AND (organization_id = $2 OR organization_id IS NULL)",
         (request_id, org_id),
     )
     row = await cursor.fetchone()
@@ -60,7 +60,7 @@ async def list_pending(limit: int = 100) -> list[MaterialRequest]:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        "SELECT * FROM material_requests WHERE status = 'pending' AND (organization_id = ? OR organization_id IS NULL) ORDER BY created_at DESC LIMIT ?",
+        "SELECT * FROM material_requests WHERE status = 'pending' AND (organization_id = $1 OR organization_id IS NULL) ORDER BY created_at DESC LIMIT $2",
         (org_id, limit),
     )
     rows = await cursor.fetchall()
@@ -71,7 +71,7 @@ async def list_by_contractor(contractor_id: str, limit: int = 100) -> list[Mater
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        "SELECT * FROM material_requests WHERE contractor_id = ? AND (organization_id = ? OR organization_id IS NULL) ORDER BY created_at DESC LIMIT ?",
+        "SELECT * FROM material_requests WHERE contractor_id = $1 AND (organization_id = $2 OR organization_id IS NULL) ORDER BY created_at DESC LIMIT $3",
         (contractor_id, org_id, limit),
     )
     rows = await cursor.fetchall()
@@ -86,8 +86,8 @@ async def mark_processed(
 ) -> bool:
     conn = get_connection()
     cursor = await conn.execute(
-        """UPDATE material_requests SET status = 'processed', withdrawal_id = ?, processed_by_id = ?, processed_at = ?
-           WHERE id = ? AND status = 'pending'""",
+        """UPDATE material_requests SET status = 'processed', withdrawal_id = $1, processed_by_id = $2, processed_at = $3
+           WHERE id = $4 AND status = 'pending'""",
         (withdrawal_id, processed_by_id, processed_at, request_id),
     )
     if cursor.rowcount == 0:

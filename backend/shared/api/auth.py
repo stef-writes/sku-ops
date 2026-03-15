@@ -104,7 +104,7 @@ async def _fetch_user_by_email(email: str):
     conn = get_connection()
     cursor = await conn.execute(
         "SELECT id, email, password, name, role, company, billing_entity, phone, "
-        "is_active, organization_id FROM users WHERE email = ?",
+        "is_active, organization_id FROM users WHERE email = $1",
         (email,),
     )
     return await cursor.fetchone()
@@ -114,7 +114,7 @@ async def _fetch_user_by_id(user_id: str):
     conn = get_connection()
     cursor = await conn.execute(
         "SELECT id, email, name, role, company, billing_entity, phone, "
-        "is_active, organization_id FROM users WHERE id = ?",
+        "is_active, organization_id FROM users WHERE id = $1",
         (user_id,),
     )
     return await cursor.fetchone()
@@ -223,7 +223,7 @@ async def register(body: RegisterRequest) -> AuthResponse:
     conn = get_connection()
     await conn.execute(
         "INSERT INTO users (id, email, password, name, role, is_active, organization_id, created_at)"
-        " VALUES (?, ?, ?, ?, 'admin', 1, ?, ?)",
+        " VALUES ($1, $2, $3, $4, 'admin', 1, $5, $6)",
         (user_id, body.email, hashed, body.name, DEFAULT_ORG_ID, now),
     )
     await conn.commit()

@@ -27,7 +27,7 @@ from shared.infrastructure.database import get_connection
 async def _get_entries_for_ref(ref_id: str) -> list[dict]:
     conn = get_connection()
     cursor = await conn.execute(
-        "SELECT account, amount FROM financial_ledger WHERE reference_id = ?",
+        "SELECT account, amount FROM financial_ledger WHERE reference_id = $1",
         (ref_id,),
     )
     return [{"account": r[0], "amount": r[1]} for r in await cursor.fetchall()]

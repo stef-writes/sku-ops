@@ -10,9 +10,11 @@ RUN apt-get update && \
 
 RUN pip install uv
 
+# Copy workspace root + backend member for uv workspace resolution
+COPY pyproject.toml ./pyproject.toml
 COPY uv.lock ./
-COPY backend/pyproject.toml ./pyproject.toml
-RUN uv sync --frozen --no-dev --no-editable
+COPY backend/pyproject.toml ./backend/pyproject.toml
+RUN uv sync --frozen --no-dev --no-editable --package sku-ops-backend
 
 
 FROM python:3.13-slim-bookworm AS runtime
@@ -51,4 +53,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import os,urllib.request; urllib.request.urlopen('http://localhost:' + os.environ.get('PORT','8000') + '/api/health')" || exit 1
 
-CMD ["sh", "-c", "uvicorn server:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WORKERS:-1}"]
+CMD ["sh", "-c", "python -m uvicorn server:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WORKERS:-1}"]

@@ -16,7 +16,7 @@ async def insert(sku: Sku) -> None:
            category_id, category_name, barcode, vendor_barcode,
            base_unit, sell_uom, pack_qty, purchase_uom, purchase_pack_qty,
            organization_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)""",
         (
             sku_dict["id"],
             sku_dict["sku"],
@@ -47,8 +47,10 @@ async def insert(sku: Sku) -> None:
 async def update(sku_id: str, updates: dict) -> Sku | None:
     conn = get_connection()
     org_id = get_org_id()
-    set_parts = ["updated_at = ?"]
+    n = 1
+    set_parts = [f"updated_at = ${n}"]
     values = [updates.get("updated_at", "")]
+    n += 1
     for key in (
         "name",
         "description",
@@ -68,12 +70,13 @@ async def update(sku_id: str, updates: dict) -> Sku | None:
         "purchase_pack_qty",
     ):
         if key in updates and updates[key] is not None:
-            set_parts.append(f"{key} = ?")
+            set_parts.append(f"{key} = ${n}")
             values.append(updates[key])
+            n += 1
     if len(set_parts) <= 1:
         return await get_by_id(sku_id)
     values.append(sku_id)
-    where = "WHERE id = ? AND organization_id = ?"
+    where = f"WHERE id = ${n} AND organization_id = ${n + 1}"
     values.append(org_id)
     query = "UPDATE skus SET "
     query += ", ".join(set_parts)
@@ -88,9 +91,9 @@ async def delete(sku_id: str) -> int:
     org_id = get_org_id()
     now = datetime.now(UTC).isoformat()
     params: list = [now, sku_id]
-    where = "WHERE id = ? AND deleted_at IS NULL AND organization_id = ?"
+    where = "WHERE id = $2 AND deleted_at IS NULL AND organization_id = $3"
     params.append(org_id)
-    query = "UPDATE skus SET deleted_at = ? "
+    query = "UPDATE skus SET deleted_at = $1 "
     query += where
     cursor = await conn.execute(query, params)
     await conn.commit()
@@ -102,9 +105,9 @@ async def atomic_decrement(sku_id: str, quantity: float, updated_at: str) -> Sku
     conn = get_connection()
     org_id = get_org_id()
     params: list = [quantity, updated_at, sku_id, quantity]
-    where = "WHERE id = ? AND quantity >= ? AND organization_id = ?"
+    where = "WHERE id = $3 AND quantity >= $4 AND organization_id = $5"
     params.append(org_id)
-    query = "UPDATE skus SET quantity = quantity - ?, updated_at = ? "
+    query = "UPDATE skus SET quantity = quantity - $1, updated_at = $2 "
     query += where
     cursor = await conn.execute(query, params)
     await conn.commit()
@@ -118,9 +121,9 @@ async def increment_quantity(sku_id: str, quantity: float, updated_at: str) -> N
     conn = get_connection()
     org_id = get_org_id()
     params: list = [quantity, updated_at, sku_id]
-    where = "WHERE id = ? AND organization_id = ?"
+    where = "WHERE id = $3 AND organization_id = $4"
     params.append(org_id)
-    query = "UPDATE skus SET quantity = quantity + ?, updated_at = ? "
+    query = "UPDATE skus SET quantity = quantity + $1, updated_at = $2 "
     query += where
     await conn.execute(query, params)
     await conn.commit()
@@ -131,9 +134,9 @@ async def add_quantity(sku_id: str, quantity: float, updated_at: str) -> Sku | N
     conn = get_connection()
     org_id = get_org_id()
     params: list = [quantity, updated_at, sku_id]
-    where = "WHERE id = ? AND organization_id = ?"
+    where = "WHERE id = $3 AND organization_id = $4"
     params.append(org_id)
-    query = "UPDATE skus SET quantity = quantity + ?, updated_at = ? "
+    query = "UPDATE skus SET quantity = quantity + $1, updated_at = $2 "
     query += where
     await conn.execute(query, params)
     await conn.commit()
@@ -151,9 +154,9 @@ async def atomic_adjust(
     conn = get_connection()
     org_id = get_org_id()
     params: list = [quantity_delta, updated_at, sku_id, quantity_delta]
-    where = "WHERE id = ? AND quantity + ? >= 0 AND organization_id = ?"
+    where = "WHERE id = $3 AND quantity + $4 >= 0 AND organization_id = $5"
     params.append(org_id)
-    query = "UPDATE skus SET quantity = quantity + ?, updated_at = ? "
+    query = "UPDATE skus SET quantity = quantity + $1, updated_at = $2 "
     query += where
     cursor = await conn.execute(query, params)
     await conn.commit()

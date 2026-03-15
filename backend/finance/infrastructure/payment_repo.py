@@ -22,7 +22,7 @@ async def insert(payment: Payment, withdrawal_ids: list[str] | None = None) -> N
     org_id = get_org_id()
     ins_q = "INSERT INTO payments ("
     ins_q += _COLUMNS
-    ins_q += ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ins_q += ") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)"
     await conn.execute(
         ins_q,
         (
@@ -43,7 +43,7 @@ async def insert(payment: Payment, withdrawal_ids: list[str] | None = None) -> N
     )
     for wid in withdrawal_ids or []:
         await conn.execute(
-            "INSERT INTO payment_withdrawals (payment_id, withdrawal_id) VALUES (?, ?)",
+            "INSERT INTO payment_withdrawals (payment_id, withdrawal_id) VALUES ($1, $2)",
             (d["id"], wid),
         )
     await conn.commit()
@@ -54,13 +54,13 @@ async def get_by_id(payment_id: str) -> Payment | None:
     org_id = get_org_id()
     sel_q = "SELECT "
     sel_q += _COLUMNS
-    sel_q += " FROM payments WHERE id = ? AND organization_id = ?"
+    sel_q += " FROM payments WHERE id = $1 AND organization_id = $2"
     cursor = await conn.execute(sel_q, (payment_id, org_id))
     row = await cursor.fetchone()
     p = _row_to_model(row)
     if p:
         wc = await conn.execute(
-            "SELECT withdrawal_id FROM payment_withdrawals WHERE payment_id = ?",
+            "SELECT withdrawal_id FROM payment_withdrawals WHERE payment_id = $1",
             (payment_id,),
         )
         p.withdrawal_ids = [
@@ -80,23 +80,29 @@ async def list_payments(
 ) -> list[Payment]:
     conn = get_connection()
     org_id = get_org_id()
+    n = 1
     sql = "SELECT "
     sql += _COLUMNS
-    sql += " FROM payments WHERE organization_id = ?"
+    sql += f" FROM payments WHERE organization_id = ${n}"
     params: list = [org_id]
+    n += 1
     if invoice_id:
-        sql += " AND invoice_id = ?"
+        sql += f" AND invoice_id = ${n}"
         params.append(invoice_id)
+        n += 1
     if billing_entity_id:
-        sql += " AND billing_entity_id = ?"
+        sql += f" AND billing_entity_id = ${n}"
         params.append(billing_entity_id)
+        n += 1
     if start_date:
-        sql += " AND payment_date >= ?"
+        sql += f" AND payment_date >= ${n}"
         params.append(start_date)
+        n += 1
     if end_date:
-        sql += " AND payment_date <= ?"
+        sql += f" AND payment_date <= ${n}"
         params.append(end_date)
-    sql += " ORDER BY payment_date DESC LIMIT ? OFFSET ?"
+        n += 1
+    sql += f" ORDER BY payment_date DESC LIMIT ${n} OFFSET ${n + 1}"
     params.extend([limit, offset])
     cursor = await conn.execute(sql, params)
     return [_row_to_model(r) for r in await cursor.fetchall()]
@@ -108,7 +114,7 @@ async def list_for_invoice(invoice_id: str) -> list[Payment]:
     sel_q = "SELECT "
     sel_q += _COLUMNS
     sel_q += (
-        " FROM payments WHERE invoice_id = ? AND organization_id = ? ORDER BY payment_date DESC"
+        " FROM payments WHERE invoice_id = $1 AND organization_id = $2 ORDER BY payment_date DESC"
     )
     cursor = await conn.execute(sel_q, (invoice_id, org_id))
     return [_row_to_model(r) for r in await cursor.fetchall()]
@@ -120,7 +126,7 @@ async def list_for_withdrawal(withdrawal_id: str) -> list[Payment]:
     cursor = await conn.execute(
         """SELECT p.* FROM payments p
            JOIN payment_withdrawals pw ON pw.payment_id = p.id
-           WHERE pw.withdrawal_id = ? AND p.organization_id = ?
+           WHERE pw.withdrawal_id = $1 AND p.organization_id = $2
            ORDER BY p.payment_date DESC""",
         (withdrawal_id, org_id),
     )

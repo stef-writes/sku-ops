@@ -255,7 +255,7 @@ class TestInvoiceRepoContract:
                 contractor_id, contractor_name, contractor_company, billing_entity,
                 payment_status, processed_by_id, processed_by_name,
                 organization_id, created_at, invoice_id, paid_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), NULL, NULL)""",
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), NULL, NULL)""",
             (
                 "w-inv-test",
                 '[{"product_id":"p1","sku":"S","name":"X","quantity":2.5,"unit_price":10.0,"cost":5.0,"subtotal":25.0,"cost_total":12.5,"unit":"each"}]',

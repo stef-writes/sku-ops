@@ -56,12 +56,12 @@ async def next_invoice_number() -> str:
     org_id = get_org_id()
     key = f"{org_id}|inv"
     await conn.execute(
-        """INSERT INTO invoice_counters (key, counter) VALUES (?, 1)
+        """INSERT INTO invoice_counters (key, counter) VALUES ($1, 1)
            ON CONFLICT(key) DO UPDATE SET counter = invoice_counters.counter + 1""",
         (key,),
     )
     cursor = await conn.execute(
-        "SELECT counter FROM invoice_counters WHERE key = ?",
+        "SELECT counter FROM invoice_counters WHERE key = $1",
         (key,),
     )
     row = await cursor.fetchone()
@@ -86,7 +86,7 @@ async def insert(invoice: Invoice) -> InvoiceWithDetails | None:
            invoice_date, due_date, payment_terms, billing_address, po_reference, currency,
            approved_by_id, approved_at,
            xero_invoice_id, organization_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)""",
         (
             invoice_id,
             invoice_number,
@@ -127,22 +127,29 @@ async def list_invoices(
 ) -> list:
     conn = get_connection()
     org_id = get_org_id()
-    query = "SELECT * FROM invoices WHERE (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL"
+    n = 1
+    query = f"SELECT * FROM invoices WHERE (organization_id = ${n} OR organization_id IS NULL) AND deleted_at IS NULL"
     params: list = [org_id]
+    n += 1
     if status:
-        query += " AND status = ?"
+        query += f" AND status = ${n}"
         params.append(status)
+        n += 1
     if billing_entity:
-        query += " AND billing_entity = ?"
+        query += f" AND billing_entity = ${n}"
         params.append(billing_entity)
+        n += 1
     if start_date:
-        query += " AND created_at >= ?"
+        query += f" AND created_at >= ${n}"
         params.append(start_date)
+        n += 1
     if end_date:
-        query += " AND created_at <= ?"
+        query += f" AND created_at <= ${n}"
         params.append(end_date)
-    query += " ORDER BY created_at DESC LIMIT ?"
+        n += 1
+    query += f" ORDER BY created_at DESC LIMIT ${n}"
     params.append(limit)
+    n += 1
     cursor = await conn.execute(query, params)
     rows = await cursor.fetchall()
 
@@ -156,7 +163,7 @@ async def list_invoices(
         result.append(inv)
 
     if invoice_ids:
-        placeholders = ",".join("?" for _ in invoice_ids)
+        placeholders = ",".join(f"${i}" for i in range(n, n + len(invoice_ids)))
         count_q = "SELECT invoice_id, COUNT(*) FROM invoice_withdrawals WHERE invoice_id IN ("
         count_q += placeholders
         count_q += ") GROUP BY invoice_id"

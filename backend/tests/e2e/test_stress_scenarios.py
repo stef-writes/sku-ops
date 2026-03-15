@@ -1,21 +1,21 @@
-"""E2E: Stress scenarios targeting precise edge cases in financial and inventory flows.
+"""E2E: Stress scenarios — worst-case user behavior and precise edge cases.
 
-Each test goes beyond simple two-way races to verify exact numerical invariants:
-  - Ledger entry counts are exactly right (not 0, not >1)
-  - Stock quantities match the arithmetic precisely
-  - Status transitions are idempotent under N-way concurrency
+Two test classes:
 
-These tests encode the three bugs found in the architecture audit:
-  1. Bulk mark-paid iterated all pre-fetched withdrawals for ledger, not just changed ones
-  2. Cycle count applied stock adjustments before flipping status (fragile rollback dependency)
-  3. PO receive stock increment verified against both stock table and ledger
+TestStressScenarios
+  N-way concurrency on the same resource, exact numerical invariants on stock
+  and ledger. Encodes the bugs found in the architecture audit.
 
-All tests require Postgres for true concurrent transaction isolation.
+TestAdversarialBehavior
+  Models the worst things a real user (or flaky frontend) can do:
+  rapid retries, contradictory concurrent actions on the same resource,
+  interleaved lifecycle steps, out-of-order operations.
+
+All tests run against Postgres (the only supported backend).
 """
 
 from __future__ import annotations
 
-import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import TYPE_CHECKING, Any
 
@@ -33,9 +33,6 @@ from tests.e2e.helpers import (
 )
 from tests.helpers.auth import admin_headers
 
-_is_sqlite = "sqlite" in os.environ.get("DATABASE_URL", "sqlite")
-pytestmark = pytest.mark.skipif(_is_sqlite, reason="Requires Postgres for transaction isolation")
-
 _N_WORKERS = 5  # concurrency fan-out for high-load tests
 
 
@@ -50,7 +47,7 @@ def _count_ledger(client: TestClient, reference_id: str, reference_type: str) ->
 
         conn = get_connection()
         cursor = await conn.execute(
-            "SELECT COUNT(*) FROM financial_ledger WHERE reference_id = ? AND reference_type = ?",
+            "SELECT COUNT(*) FROM financial_ledger WHERE reference_id = $1 AND reference_type = $2",
             (reference_id, reference_type),
         )
         row = await cursor.fetchone()
@@ -70,7 +67,7 @@ def _count_ledger_by_account(
         conn = get_connection()
         cursor = await conn.execute(
             "SELECT COUNT(*) FROM financial_ledger "
-            "WHERE reference_id = ? AND reference_type = ? AND account = ?",
+            "WHERE reference_id = $1 AND reference_type = $2 AND account = $3",
             (reference_id, reference_type, account),
         )
         row = await cursor.fetchone()
@@ -90,7 +87,7 @@ def _sum_ledger_amount(
         conn = get_connection()
         cursor = await conn.execute(
             "SELECT COALESCE(SUM(amount), 0) FROM financial_ledger "
-            "WHERE reference_id = ? AND reference_type = ? AND account = ?",
+            "WHERE reference_id = $1 AND reference_type = $2 AND account = $3",
             (reference_id, reference_type, account),
         )
         row = await cursor.fetchone()
@@ -422,7 +419,7 @@ class TestStressScenarios:
             conn = get_connection()
             cursor = await conn.execute(
                 "SELECT COUNT(*) FROM financial_ledger "
-                "WHERE reference_type = 'adjustment' AND product_id = ?",
+                "WHERE reference_type = 'adjustment' AND product_id = $1",
                 (product["id"],),
             )
             row = await cursor.fetchone()
@@ -654,3 +651,461 @@ class TestStressScenarios:
             f"per_request={per_request}, expected={initial_qty - successes * per_request}, "
             f"got={final_qty}"
         )
+
+
+# ── Adversarial behavior tests ───────────────────────────────────────────────
+
+
+def _attempt_return(
+    client: TestClient, headers: dict, withdrawal_id: str, product: dict[str, Any], qty: int
+) -> tuple[int, Any]:
+    resp = client.post(
+        "/api/returns",
+        json={
+            "withdrawal_id": withdrawal_id,
+            "items": [
+                {
+                    "product_id": product["id"],
+                    "sku": product["sku"],
+                    "name": product["name"],
+                    "quantity": qty,
+                }
+            ],
+        },
+        headers=headers,
+    )
+    return resp.status_code, resp.json() if resp.status_code == 200 else resp.text
+
+
+def _attempt_delete_invoice(client: TestClient, headers: dict, invoice_id: str) -> int:
+    resp = client.delete(f"/api/invoices/{invoice_id}", headers=headers)
+    return resp.status_code
+
+
+@pytest.mark.timeout(90)
+class TestAdversarialBehavior:
+    """Models the worst user behavior: rapid retries, contradictory actions,
+    interleaved lifecycle steps, out-of-order operations."""
+
+    # ── Pay-while-invoicing: user clicks "pay" while admin creates invoice ───
+
+    def test_mark_paid_while_invoicing_same_withdrawal(
+        self, client: TestClient, seed_dept_id: str
+    ) -> None:
+        """Concurrent mark-paid and invoice-creation on the same unpaid withdrawal.
+
+        Only one lifecycle path should win. The withdrawal should end up either:
+          - invoiced (invoice won) — 0 payment ledger entries, 1 invoice link
+          - paid (mark-paid won) — 1 payment ledger entry, no invoice link
+
+        It must NOT end up both invoiced AND paid with a stale invoice link.
+        """
+        headers = admin_headers()
+        product = create_product(
+            client, headers, dept_id=seed_dept_id, quantity=100, name="ADV-PayInvoiceRace"
+        )
+        wd = create_withdrawal(client, headers, product, quantity=5)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            f_pay = pool.submit(_attempt_mark_paid, client, headers, wd["id"])
+            f_inv = pool.submit(_attempt_create_invoice, client, headers, [wd["id"]])
+            f_pay.result()
+            f_inv.result()
+
+        wd_state = _get_withdrawal(client, wd["id"], headers)
+        status = wd_state["payment_status"]
+        invoice_id = wd_state.get("invoice_id")
+
+        # At most one path should succeed cleanly
+        if status == "paid":
+            payment_entries = _count_ledger_by_account(
+                client, wd["id"], "payment", "accounts_receivable"
+            )
+            assert payment_entries == 1, (
+                f"Paid withdrawal should have exactly 1 payment AR entry, got {payment_entries}"
+            )
+        elif status == "invoiced":
+            assert invoice_id is not None, "Invoiced withdrawal must have an invoice_id"
+            payment_entries = _count_ledger_by_account(
+                client, wd["id"], "payment", "accounts_receivable"
+            )
+            assert payment_entries == 0, (
+                f"Invoiced (not paid) withdrawal should have 0 payment entries, got {payment_entries}"
+            )
+        else:
+            # 'unpaid' is acceptable if both failed due to contention
+            assert status == "unpaid", f"Unexpected payment_status: {status}"
+
+    # ── Rapid mark-paid retries: user mashes the Pay button ──────────────────
+
+    def test_rapid_mark_paid_retries_idempotent(
+        self, client: TestClient, seed_dept_id: str
+    ) -> None:
+        """User clicks Pay 10 times rapidly. Final state: paid, exactly 1 payment entry."""
+        headers = admin_headers()
+        product = create_product(
+            client, headers, dept_id=seed_dept_id, quantity=100, name="ADV-MashPay"
+        )
+        wd = create_withdrawal(client, headers, product, quantity=3)
+
+        n_retries = 10
+        with ThreadPoolExecutor(max_workers=n_retries) as pool:
+            futures = [
+                pool.submit(_attempt_mark_paid, client, headers, wd["id"]) for _ in range(n_retries)
+            ]
+            statuses = [f.result() for f in as_completed(futures)]
+
+        successes = sum(1 for s in statuses if s == 200)
+        assert successes >= 1, "At least one attempt should succeed"
+
+        wd_state = _get_withdrawal(client, wd["id"], headers)
+        assert wd_state["payment_status"] == "paid"
+
+        payment_entries = _count_ledger_by_account(
+            client, wd["id"], "payment", "accounts_receivable"
+        )
+        assert payment_entries == 1, (
+            f"10 rapid retries must produce exactly 1 payment AR entry. Got {payment_entries}"
+        )
+
+    # ── Return-after-pay: user pays then immediately tries to return ─────────
+
+    def test_return_on_paid_withdrawal_restocks_correctly(
+        self, client: TestClient, seed_dept_id: str
+    ) -> None:
+        """User pays a withdrawal, then returns some items.
+        Stock must reflect both the withdrawal decrement and the return increment.
+        Payment status remains paid (payment was already settled).
+        """
+        headers = admin_headers()
+        initial_qty = 100
+        withdraw_qty = 10
+        return_qty = 4
+
+        product = create_product(
+            client, headers, dept_id=seed_dept_id, quantity=initial_qty, name="ADV-ReturnAfterPay"
+        )
+        wd = create_withdrawal(client, headers, product, quantity=withdraw_qty)
+
+        # Pay first
+        resp = client.put(f"/api/withdrawals/{wd['id']}/mark-paid", json={}, headers=headers)
+        assert resp.status_code == 200
+
+        # Return some items
+        ret_status, ret_body = _attempt_return(client, headers, wd["id"], product, return_qty)
+        assert ret_status == 200, f"Return should succeed on paid withdrawal: {ret_body}"
+
+        final_qty = _get_stock_qty(client, product["id"], headers)
+        expected = initial_qty - withdraw_qty + return_qty
+        assert final_qty == pytest.approx(expected), (
+            f"Stock should be {expected} ({initial_qty} - {withdraw_qty} + {return_qty}). Got {final_qty}"
+        )
+
+    # ── Concurrent return + mark-paid on same withdrawal ─────────────────────
+
+    def test_concurrent_return_and_mark_paid(self, client: TestClient, seed_dept_id: str) -> None:
+        """User processes a return while someone else marks the withdrawal paid.
+        Both can succeed (return creates credit note, mark-paid records payment).
+        Stock and ledger must be consistent regardless of ordering.
+        """
+        headers = admin_headers()
+        initial_qty = 100
+        withdraw_qty = 10
+        return_qty = 3
+
+        product = create_product(
+            client, headers, dept_id=seed_dept_id, quantity=initial_qty, name="ADV-ReturnPayRace"
+        )
+        wd = create_withdrawal(client, headers, product, quantity=withdraw_qty)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            f_ret = pool.submit(_attempt_return, client, headers, wd["id"], product, return_qty)
+            f_pay = pool.submit(_attempt_mark_paid, client, headers, wd["id"])
+            ret_status, _ = f_ret.result()
+            pay_status = f_pay.result()
+
+        # Stock: withdrawal took `withdraw_qty`; if return succeeded, `return_qty` restored
+        final_qty = _get_stock_qty(client, product["id"], headers)
+        returned = return_qty if ret_status == 200 else 0
+        expected = initial_qty - withdraw_qty + returned
+        assert final_qty == pytest.approx(expected, abs=0.01), (
+            f"Stock should be {expected}. Got {final_qty}. "
+            f"Return status={ret_status}, pay status={pay_status}"
+        )
+
+        # Ledger: at most 1 payment AR entry
+        payment_entries = _count_ledger_by_account(
+            client, wd["id"], "payment", "accounts_receivable"
+        )
+        assert payment_entries <= 1, f"At most 1 payment AR entry. Got {payment_entries}"
+
+    # ── Invoice-then-immediately-delete: user creates and nukes invoice ──────
+
+    def test_invoice_create_then_concurrent_delete(
+        self, client: TestClient, seed_dept_id: str
+    ) -> None:
+        """User creates an invoice, then immediately fires delete while another
+        request tries to create a second invoice for the same withdrawals.
+        After the dust settles: each withdrawal is on 0 or 1 invoice, never orphaned.
+        """
+        headers = admin_headers()
+        product = create_product(
+            client, headers, dept_id=seed_dept_id, quantity=100, name="ADV-InvDeleteRace"
+        )
+        wd = create_withdrawal(client, headers, product, quantity=5)
+
+        # Create the first invoice
+        inv_status, inv_body = _attempt_create_invoice(client, headers, [wd["id"]])
+        assert inv_status == 200, f"First invoice creation should succeed: {inv_body}"
+        invoice_id = inv_body["id"]
+
+        # Fire delete + re-create concurrently
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            f_del = pool.submit(_attempt_delete_invoice, client, headers, invoice_id)
+            f_create = pool.submit(_attempt_create_invoice, client, headers, [wd["id"]])
+            f_del.result()
+            f_create.result()
+
+        wd_state = _get_withdrawal(client, wd["id"], headers)
+        status = wd_state["payment_status"]
+        inv_link = wd_state.get("invoice_id")
+
+        # Withdrawal must be in a consistent state
+        if status == "invoiced":
+            assert inv_link is not None, "Invoiced withdrawal must have an invoice_id"
+            # Verify the linked invoice actually exists
+            inv_resp = client.get(f"/api/invoices/{inv_link}", headers=headers)
+            assert inv_resp.status_code == 200, (
+                f"Withdrawal links to invoice {inv_link} but that invoice doesn't exist (orphan)"
+            )
+        elif status == "unpaid":
+            # Delete won, re-create either didn't run or also lost
+            pass
+        else:
+            # 'paid' shouldn't happen here since we never called mark-paid
+            pytest.fail(f"Unexpected status {status} — no mark-paid was called")
+
+    # ── Bulk mark-paid interleaved with single mark-paid ─────────────────────
+
+    def test_bulk_and_single_mark_paid_interleaved(
+        self, client: TestClient, seed_dept_id: str
+    ) -> None:
+        """Admin clicks bulk-pay on a list while also clicking single-pay on one of them.
+        All end up paid, each with exactly 1 payment ledger entry.
+        """
+        headers = admin_headers()
+        product = create_product(
+            client, headers, dept_id=seed_dept_id, quantity=200, name="ADV-BulkSingleMix"
+        )
+        wds = [
+            create_withdrawal(client, headers, product, quantity=2, job_id=f"JOB-MIX-{i}")
+            for i in range(3)
+        ]
+        wd_ids = [w["id"] for w in wds]
+        target_id = wd_ids[0]
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            f_bulk = pool.submit(_attempt_bulk_mark_paid, client, headers, wd_ids)
+            f_single = pool.submit(_attempt_mark_paid, client, headers, target_id)
+            f_bulk.result()
+            f_single.result()
+
+        for wd_id in wd_ids:
+            wd_state = _get_withdrawal(client, wd_id, headers)
+            assert wd_state["payment_status"] == "paid", f"Withdrawal {wd_id} should be paid"
+
+            payment_entries = _count_ledger_by_account(
+                client, wd_id, "payment", "accounts_receivable"
+            )
+            assert payment_entries == 1, (
+                f"Withdrawal {wd_id}: interleaved bulk+single must produce exactly 1 payment AR entry. "
+                f"Got {payment_entries}"
+            )
+
+    # ── Withdraw → invoice → pay → return: full lifecycle with ledger check ──
+
+    def test_full_lifecycle_ledger_balance(self, client: TestClient, seed_dept_id: str) -> None:
+        """Walk through the complete lifecycle of a withdrawal and verify that
+        ledger entries are balanced at each step and cumulative totals are exact.
+
+        Steps: create withdrawal → invoice → mark-paid → partial return
+        """
+        headers = admin_headers()
+        product = create_product(
+            client,
+            headers,
+            dept_id=seed_dept_id,
+            quantity=200,
+            price=25.0,
+            cost=10.0,
+            name="ADV-FullLifecycle",
+        )
+        wd = create_withdrawal(client, headers, product, quantity=8)
+        wd_total = wd["total"]
+
+        # Step 1: Verify withdrawal ledger
+        wd_ledger_count = _count_ledger(client, wd["id"], "withdrawal")
+        assert wd_ledger_count == 5, (
+            f"Withdrawal should have 5 ledger entries. Got {wd_ledger_count}"
+        )
+
+        wd_ar = _sum_ledger_amount(client, wd["id"], "withdrawal", "accounts_receivable")
+        assert wd_ar == pytest.approx(wd_total, abs=0.01), (
+            f"Withdrawal AR should equal total {wd_total}. Got {wd_ar}"
+        )
+
+        # Step 2: Invoice
+        inv_status, inv_body = _attempt_create_invoice(client, headers, [wd["id"]])
+        assert inv_status == 200, f"Invoice creation should succeed: {inv_body}"
+        wd_state = _get_withdrawal(client, wd["id"], headers)
+        assert wd_state["payment_status"] == "invoiced"
+
+        # Step 3: Pay
+        pay_status = _attempt_mark_paid(client, headers, wd["id"])
+        assert pay_status == 200
+        wd_state = _get_withdrawal(client, wd["id"], headers)
+        assert wd_state["payment_status"] == "paid"
+
+        payment_ar = _sum_ledger_amount(client, wd["id"], "payment", "accounts_receivable")
+        assert payment_ar == pytest.approx(-wd_total, abs=0.01), (
+            f"Payment AR should be -{wd_total} (reducing receivable). Got {payment_ar}"
+        )
+
+        # Step 4: Partial return (3 of 8)
+        ret_status, _ = _attempt_return(client, headers, wd["id"], product, 3)
+        assert ret_status == 200
+
+        # Stock check: 200 - 8 + 3 = 195
+        final_qty = _get_stock_qty(client, product["id"], headers)
+        assert final_qty == pytest.approx(195.0), f"Stock should be 195. Got {final_qty}"
+
+        # Net AR across all entries for this withdrawal should be:
+        #   +wd_total (withdrawal) -wd_total (payment) = 0 from those two
+        # The return writes its own reference_id (the return's ID), so
+        # withdrawal-scoped AR entries are exactly 0 net after payment.
+        net_ar = wd_ar + payment_ar
+        assert net_ar == pytest.approx(0.0, abs=0.01), (
+            f"Net AR for withdrawal after payment should be 0. Got {net_ar}"
+        )
+
+    # ── Simultaneous withdrawals on same product, different jobs ─────────────
+
+    def test_concurrent_withdrawals_different_jobs_stock_exact(
+        self, client: TestClient, seed_dept_id: str
+    ) -> None:
+        """Multiple users withdraw the same product for different jobs simultaneously.
+        Total stock decrement must equal the sum of all successful withdrawals.
+        Each successful withdrawal must have exactly 5 ledger entries.
+        """
+        headers = admin_headers()
+        initial_qty = 100
+        per_wd = 15
+
+        product = create_product(
+            client, headers, dept_id=seed_dept_id, quantity=initial_qty, name="ADV-MultiJob"
+        )
+
+        def _do_withdrawal(job_suffix: int) -> tuple[int, Any]:
+            resp = client.post(
+                "/api/withdrawals",
+                json={
+                    "items": [
+                        {
+                            "product_id": product["id"],
+                            "sku": product["sku"],
+                            "name": product["name"],
+                            "quantity": per_wd,
+                            "unit_price": product["price"],
+                            "cost": product["cost"],
+                        }
+                    ],
+                    "job_id": f"JOB-MULTI-{job_suffix}",
+                    "service_address": "123 Multi St",
+                },
+                headers=headers,
+            )
+            if resp.status_code == 200:
+                return resp.status_code, resp.json()
+            return resp.status_code, resp.text
+
+        with ThreadPoolExecutor(max_workers=_N_WORKERS) as pool:
+            futures = [pool.submit(_do_withdrawal, i) for i in range(_N_WORKERS)]
+            results = [f.result() for f in as_completed(futures)]
+
+        successes = [(s, b) for s, b in results if s == 200]
+        final_qty = _get_stock_qty(client, product["id"], headers)
+
+        assert final_qty >= 0, f"Stock must never go negative. Got {final_qty}"
+        assert final_qty == pytest.approx(initial_qty - (len(successes) * per_wd), abs=0.01), (
+            f"Stock mismatch: {len(successes)} withdrawals of {per_wd} from {initial_qty}. "
+            f"Expected {initial_qty - len(successes) * per_wd}, got {final_qty}"
+        )
+
+        for _status, body in successes:
+            wd_id = body["id"]
+            ledger_count = _count_ledger(client, wd_id, "withdrawal")
+            assert ledger_count == 5, (
+                f"Withdrawal {wd_id}: expected 5 ledger entries. Got {ledger_count}"
+            )
+
+    # ── Double-return on same withdrawal: return more than was withdrawn ─────
+
+    def test_double_return_cannot_exceed_withdrawal_quantity(
+        self, client: TestClient, seed_dept_id: str
+    ) -> None:
+        """User returns items, then tries to return the same items again.
+        The second return should fail or return fewer items — total returned
+        must never exceed total withdrawn.
+        """
+        headers = admin_headers()
+        product = create_product(
+            client, headers, dept_id=seed_dept_id, quantity=100, name="ADV-DoubleReturn"
+        )
+        wd = create_withdrawal(client, headers, product, quantity=10)
+
+        # First return: 6 items
+        ret1_status, _ = _attempt_return(client, headers, wd["id"], product, 6)
+        assert ret1_status == 200, "First return of 6 should succeed"
+
+        # Second return: try 6 more (only 4 remain)
+        _attempt_return(client, headers, wd["id"], product, 6)
+
+        # Either the second return is rejected or it returns at most 4
+        final_qty = _get_stock_qty(client, product["id"], headers)
+        # Worst valid case: 100 - 10 + 6 + 4 = 100 (if second succeeded partially)
+        # Best case: 100 - 10 + 6 = 96 (second rejected)
+        assert final_qty <= 100, (
+            f"Stock {final_qty} exceeds initial 100 — returned more than was withdrawn"
+        )
+        assert final_qty >= 90, f"Stock {final_qty} below 90 — something was double-decremented"
+
+    # ── Concurrent returns on same withdrawal ────────────────────────────────
+
+    def test_concurrent_returns_same_withdrawal_stock_bounded(
+        self, client: TestClient, seed_dept_id: str
+    ) -> None:
+        """Two concurrent returns for the same items on the same withdrawal.
+        Total stock restored must not exceed what was withdrawn.
+        """
+        headers = admin_headers()
+        product = create_product(
+            client, headers, dept_id=seed_dept_id, quantity=100, name="ADV-ConcurrentReturn"
+        )
+        wd = create_withdrawal(client, headers, product, quantity=10)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            f1 = pool.submit(_attempt_return, client, headers, wd["id"], product, 10)
+            f2 = pool.submit(_attempt_return, client, headers, wd["id"], product, 10)
+            r1_status, _ = f1.result()
+            r2_status, _ = f2.result()
+
+        final_qty = _get_stock_qty(client, product["id"], headers)
+
+        # Stock can be at most 100 (all 10 returned). It must never exceed 100.
+        assert final_qty <= 100, (
+            f"Stock {final_qty} exceeds initial 100 — concurrent returns double-restored. "
+            f"Return 1: {r1_status}, Return 2: {r2_status}"
+        )
+        # At least one return should succeed, restoring to at least 100 - 10 + 10 = 100
+        # or 100 - 10 = 90 if both fail (unlikely but acceptable)
+        assert final_qty >= 90, f"Stock unexpectedly low at {final_qty}"

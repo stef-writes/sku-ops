@@ -1,4 +1,4 @@
-"""Database protocol — interface contract for SQLite and PostgreSQL adapters."""
+"""Database protocol — interface contract for the PostgreSQL adapter."""
 
 from __future__ import annotations
 
@@ -10,12 +10,7 @@ if TYPE_CHECKING:
 
 
 class DictRow(dict):
-    """Dict that also supports integer-index access (row[0], row[1]).
-
-    aiosqlite.Row supported both ``row["col"]`` and ``row[0]``.
-    This preserves backward compat for all existing repo code that uses
-    either access pattern.
-    """
+    """Dict that also supports integer-index access (row[0], row[1])."""
 
     def __init__(self, mapping):
         super().__init__(mapping)
@@ -28,7 +23,7 @@ class DictRow(dict):
 
 
 def to_dict_row(mapping) -> DictRow:
-    """Convert any mapping (dict, asyncpg.Record, aiosqlite.Row) to DictRow."""
+    """Convert any mapping (dict, asyncpg.Record) to DictRow."""
     return DictRow(dict(mapping))
 
 
@@ -46,7 +41,7 @@ class Cursor(Protocol):
 
 @runtime_checkable
 class Connection(Protocol):
-    """Async database connection (single conn or pool proxy)."""
+    """Async database connection (pool proxy or transaction proxy)."""
 
     async def execute(self, sql: str, params: tuple | list = ()) -> Cursor: ...
 
@@ -58,9 +53,9 @@ class Connection(Protocol):
 
 
 class DatabaseBackend(Protocol):
-    """Lifecycle manager for a database backend (SQLite or PostgreSQL)."""
+    """Lifecycle manager for the PostgreSQL backend."""
 
-    dialect: str  # "sqlite" or "postgresql"
+    dialect: str
 
     async def connect(self, url: str) -> None: ...
 

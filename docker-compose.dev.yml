@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: sku_ops
+      POSTGRES_USER: sku_ops
+      POSTGRES_PASSWORD: localdev
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+      - ./devtools/init-test-db.sql:/docker-entrypoint-initdb.d/01-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sku_ops"]
+      interval: 3s
+      timeout: 2s
+      retries: 5
+
+volumes:
+  pgdata_dev:

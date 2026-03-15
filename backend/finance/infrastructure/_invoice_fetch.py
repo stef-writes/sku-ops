@@ -39,7 +39,7 @@ async def get_by_id(invoice_id: str) -> InvoiceWithDetails | None:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        "SELECT * FROM invoices WHERE id = ? AND (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL",
+        "SELECT * FROM invoices WHERE id = $1 AND (organization_id = $2 OR organization_id IS NULL) AND deleted_at IS NULL",
         (invoice_id, org_id),
     )
     row = await cursor.fetchone()
@@ -47,13 +47,13 @@ async def get_by_id(invoice_id: str) -> InvoiceWithDetails | None:
         return None
 
     cursor = await conn.execute(
-        "SELECT * FROM invoice_line_items WHERE invoice_id = ? ORDER BY id",
+        "SELECT * FROM invoice_line_items WHERE invoice_id = $1 ORDER BY id",
         (invoice_id,),
     )
     li_rows = await cursor.fetchall()
 
     cursor = await conn.execute(
-        "SELECT withdrawal_id FROM invoice_withdrawals WHERE invoice_id = ?",
+        "SELECT withdrawal_id FROM invoice_withdrawals WHERE invoice_id = $1",
         (invoice_id,),
     )
     w_rows = await cursor.fetchall()

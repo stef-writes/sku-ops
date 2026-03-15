@@ -13,13 +13,9 @@ async def entries_exist(reference_type: str, reference_id: str) -> bool:
     """Return True if any ledger rows already exist for this reference."""
     c = get_connection()
     org_id = get_org_id()
-    params: list = [reference_type, reference_id]
-    where = "WHERE reference_type = ? AND reference_id = ?"
-    where += " AND organization_id = ?"
-    params.append(org_id)
     cursor = await c.execute(
-        "SELECT 1 FROM financial_ledger " + where + " LIMIT 1",
-        params,
+        "SELECT 1 FROM financial_ledger WHERE reference_type = $1 AND reference_id = $2 AND organization_id = $3 LIMIT 1",
+        [reference_type, reference_id, org_id],
     )
     return (await cursor.fetchone()) is not None
 
@@ -35,7 +31,7 @@ async def insert_entries(entries: list[FinancialEntry]) -> None:
                 department, job_id, billing_entity,
                 contractor_id, vendor_name, product_id, performed_by_user_id,
                 reference_type, reference_id, organization_id, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)""",
             (
                 e.id,
                 e.journal_id,
@@ -64,13 +60,9 @@ async def get_journal(journal_id: str) -> list[dict]:
     """Return all entries for a single journal transaction."""
     conn = get_connection()
     org_id = get_org_id()
-    params: list = [journal_id]
-    where = "WHERE journal_id = ?"
-    where += " AND organization_id = ?"
-    params.append(org_id)
     cursor = await conn.execute(
-        "SELECT * FROM financial_ledger " + where + " ORDER BY id",
-        params,
+        "SELECT * FROM financial_ledger WHERE journal_id = $1 AND organization_id = $2 ORDER BY id",
+        [journal_id, org_id],
     )
     return [dict(r) for r in await cursor.fetchall()]
 
@@ -82,7 +74,7 @@ async def trial_balance() -> dict[str, float]:
     cursor = await conn.execute(
         """SELECT account, ROUND(CAST(SUM(amount) AS NUMERIC), 2) AS balance
            FROM financial_ledger
-           WHERE organization_id = ?
+           WHERE organization_id = $1
            GROUP BY account
            ORDER BY account""",
         (org_id,),

@@ -11,7 +11,7 @@ async def insert_count(count: CycleCount) -> None:
         """INSERT INTO cycle_counts
            (id, organization_id, status, scope, created_by_id, created_by_name,
             committed_by_id, committed_at, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)""",
         (
             d["id"],
             d["organization_id"],
@@ -34,7 +34,7 @@ async def insert_item(item: CycleCountItem) -> None:
         """INSERT INTO cycle_count_items
            (id, cycle_count_id, product_id, sku, product_name,
             snapshot_qty, counted_qty, variance, unit, notes, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)""",
         (
             d["id"],
             d["cycle_count_id"],
@@ -61,8 +61,8 @@ async def update_item_counted(
     conn = get_connection()
     cursor = await conn.execute(
         """UPDATE cycle_count_items
-           SET counted_qty = ?, variance = ?, notes = ?
-           WHERE id = ?
+           SET counted_qty = $1, variance = $2, notes = $3
+           WHERE id = $4
            RETURNING *""",
         (counted_qty, variance, notes, item_id),
     )
@@ -80,8 +80,8 @@ async def commit_count(
     conn = get_connection()
     cursor = await conn.execute(
         """UPDATE cycle_counts
-           SET status = 'committed', committed_by_id = ?, committed_at = ?
-           WHERE id = ? AND status = 'open'""",
+           SET status = 'committed', committed_by_id = $1, committed_at = $2
+           WHERE id = $3 AND status = 'open'""",
         (committed_by_id, committed_at, count_id),
     )
     await conn.commit()
@@ -92,7 +92,7 @@ async def get_count(count_id: str) -> CycleCount | None:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        "SELECT * FROM cycle_counts WHERE id = ? AND organization_id = ?",
+        "SELECT * FROM cycle_counts WHERE id = $1 AND organization_id = $2",
         (count_id, org_id),
     )
     row = await cursor.fetchone()
@@ -104,12 +104,12 @@ async def list_counts(status: str | None = None) -> list[CycleCount]:
     org_id = get_org_id()
     if status:
         cursor = await conn.execute(
-            "SELECT * FROM cycle_counts WHERE organization_id = ? AND status = ? ORDER BY created_at DESC",
+            "SELECT * FROM cycle_counts WHERE organization_id = $1 AND status = $2 ORDER BY created_at DESC",
             (org_id, status),
         )
     else:
         cursor = await conn.execute(
-            "SELECT * FROM cycle_counts WHERE organization_id = ? ORDER BY created_at DESC",
+            "SELECT * FROM cycle_counts WHERE organization_id = $1 ORDER BY created_at DESC",
             (org_id,),
         )
     rows = await cursor.fetchall()
@@ -119,7 +119,7 @@ async def list_counts(status: str | None = None) -> list[CycleCount]:
 async def list_items(cycle_count_id: str) -> list[CycleCountItem]:
     conn = get_connection()
     cursor = await conn.execute(
-        "SELECT * FROM cycle_count_items WHERE cycle_count_id = ? ORDER BY sku ASC",
+        "SELECT * FROM cycle_count_items WHERE cycle_count_id = $1 ORDER BY sku ASC",
         (cycle_count_id,),
     )
     rows = await cursor.fetchall()
@@ -129,7 +129,7 @@ async def list_items(cycle_count_id: str) -> list[CycleCountItem]:
 async def get_item(item_id: str, cycle_count_id: str) -> CycleCountItem | None:
     conn = get_connection()
     cursor = await conn.execute(
-        "SELECT * FROM cycle_count_items WHERE id = ? AND cycle_count_id = ?",
+        "SELECT * FROM cycle_count_items WHERE id = $1 AND cycle_count_id = $2",
         (item_id, cycle_count_id),
     )
     row = await cursor.fetchone()

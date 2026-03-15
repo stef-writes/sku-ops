@@ -18,7 +18,7 @@ async def insert_transaction(tx: StockTransaction) -> None:
     await conn.execute(
         """INSERT INTO stock_transactions (id, product_id, sku, product_name, quantity_delta, quantity_before,
            quantity_after, unit, transaction_type, reference_id, reference_type, reason, user_id, user_name, organization_id, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)""",
         (
             tx.id,
             tx.product_id,
@@ -49,8 +49,8 @@ async def list_by_product(
     org_id = get_org_id()
     cursor = await conn.execute(
         """SELECT * FROM stock_transactions
-           WHERE product_id = ? AND (organization_id = ? OR organization_id IS NULL)
-           ORDER BY created_at DESC LIMIT ?""",
+           WHERE product_id = $1 AND (organization_id = $2 OR organization_id IS NULL)
+           ORDER BY created_at DESC LIMIT $3""",
         (product_id, org_id, limit),
     )
     rows = await cursor.fetchall()

@@ -8,7 +8,7 @@ async def get_period(period_id: str) -> FiscalPeriod | None:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        "SELECT * FROM fiscal_periods WHERE id = ? AND organization_id = ?",
+        "SELECT * FROM fiscal_periods WHERE id = $1 AND organization_id = $2",
         (period_id, org_id),
     )
     row = await cursor.fetchone()
@@ -18,11 +18,14 @@ async def get_period(period_id: str) -> FiscalPeriod | None:
 async def list_periods(status: str | None = None) -> list[FiscalPeriod]:
     conn = get_connection()
     org_id = get_org_id()
-    query = "SELECT * FROM fiscal_periods WHERE organization_id = ?"
+    n = 1
+    query = f"SELECT * FROM fiscal_periods WHERE organization_id = ${n}"
     params: list = [org_id]
+    n += 1
     if status:
-        query += " AND status = ?"
+        query += f" AND status = ${n}"
         params.append(status)
+        n += 1
     query += " ORDER BY start_date DESC"
     cursor = await conn.execute(query, params)
     return [FiscalPeriod.model_validate(dict(r)) for r in await cursor.fetchall()]
@@ -39,7 +42,7 @@ async def insert_period(
     org_id = get_org_id()
     await conn.execute(
         """INSERT INTO fiscal_periods (id, name, start_date, end_date, status, organization_id, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+           VALUES ($1, $2, $3, $4, $5, $6, $7)""",
         (period_id, name, start_date, end_date, "open", org_id, created_at),
     )
     await conn.commit()
@@ -48,7 +51,7 @@ async def insert_period(
 async def close_period(period_id: str, closed_by_id: str, closed_at: str) -> None:
     conn = get_connection()
     await conn.execute(
-        "UPDATE fiscal_periods SET status = 'closed', closed_by_id = ?, closed_at = ? WHERE id = ?",
+        "UPDATE fiscal_periods SET status = 'closed', closed_by_id = $1, closed_at = $2 WHERE id = $3",
         (closed_by_id, closed_at, period_id),
     )
     await conn.commit()
@@ -60,8 +63,8 @@ async def find_closed_period_covering(entry_date: str) -> tuple[str, str] | None
     org_id = get_org_id()
     cursor = await conn.execute(
         """SELECT id, name FROM fiscal_periods
-           WHERE organization_id = ? AND status = 'closed'
-             AND ? >= start_date AND ? <= end_date
+           WHERE organization_id = $1 AND status = 'closed'
+             AND $2 >= start_date AND $3 <= end_date
            LIMIT 1""",
         (org_id, entry_date[:10], entry_date[:10]),
     )

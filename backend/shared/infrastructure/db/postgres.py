@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
@@ -15,35 +14,6 @@ from shared.infrastructure.db.protocol import Connection, DictRow
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Sequence
-
-# ── Placeholder conversion ────────────────────────────────────────────────────
-
-_Q_PLACEHOLDER = re.compile(r"\?")
-
-
-def _convert_placeholders(sql: str) -> str:
-    """Convert SQLite-style ``?`` placeholders to PostgreSQL ``$N``."""
-    counter = 0
-
-    def _replacer(_match: re.Match) -> str:
-        nonlocal counter
-        counter += 1
-        return f"${counter}"
-
-    return _Q_PLACEHOLDER.sub(_replacer, sql)
-
-
-def _convert_sql(sql: str) -> str:
-    """Full SQL dialect conversion: placeholders + syntax sugar."""
-    had_or_ignore = "INSERT OR IGNORE" in sql
-    had_or_replace = "INSERT OR REPLACE" in sql
-    converted = _convert_placeholders(sql)
-    converted = converted.replace("INSERT OR IGNORE", "INSERT")
-    converted = converted.replace("INSERT OR REPLACE", "INSERT")
-    converted = converted.replace("datetime('now')", "NOW()")
-    if (had_or_ignore or had_or_replace) and "ON CONFLICT" not in converted:
-        converted = converted.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
-    return converted
 
 
 # ── Cursor wrapper ────────────────────────────────────────────────────────────
@@ -85,18 +55,16 @@ class PgPoolProxy:
         self._acquire_timeout = acquire_timeout
 
     async def execute(self, sql: str, params: tuple | list = ()) -> PgCursor:
-        converted = _convert_sql(sql)
         async with self._pool.acquire(timeout=self._acquire_timeout) as conn:
-            if converted.lstrip().upper().startswith("SELECT") or "RETURNING" in converted.upper():
-                rows = await conn.fetch(converted, *params)
+            if sql.lstrip().upper().startswith("SELECT") or "RETURNING" in sql.upper():
+                rows = await conn.fetch(sql, *params)
                 return PgCursor(rows)
-            status = await conn.execute(converted, *params)
+            status = await conn.execute(sql, *params)
             return PgCursor([], status or "")
 
     async def executemany(self, sql: str, params_list: Sequence[tuple | list]) -> None:
-        converted = _convert_sql(sql)
         async with self._pool.acquire(timeout=self._acquire_timeout) as conn:
-            await conn.executemany(converted, params_list)
+            await conn.executemany(sql, params_list)
 
     async def commit(self) -> None:
         pass  # autocommit outside transactions
@@ -112,10 +80,7 @@ class PgTransactionProxy:
     """Used inside ``transaction()`` context — single connection, explicit commit.
 
     commit() and rollback() are intentional no-ops here; the context manager in
-    PostgresBackend.transaction() owns the transaction lifecycle.  This avoids
-    double-commit errors when application code calls ``await conn.commit()``
-    inside the ``async with transaction()`` block (matching SQLite's lenient
-    commit semantics).
+    PostgresBackend.transaction() owns the transaction lifecycle.
     """
 
     __slots__ = ("_conn",)
@@ -124,16 +89,14 @@ class PgTransactionProxy:
         self._conn = conn
 
     async def execute(self, sql: str, params: tuple | list = ()) -> PgCursor:
-        converted = _convert_sql(sql)
-        if converted.lstrip().upper().startswith("SELECT") or "RETURNING" in converted.upper():
-            rows = await self._conn.fetch(converted, *params)
+        if sql.lstrip().upper().startswith("SELECT") or "RETURNING" in sql.upper():
+            rows = await self._conn.fetch(sql, *params)
             return PgCursor(rows)
-        status = await self._conn.execute(converted, *params)
+        status = await self._conn.execute(sql, *params)
         return PgCursor([], status or "")
 
     async def executemany(self, sql: str, params_list: Sequence[tuple | list]) -> None:
-        converted = _convert_sql(sql)
-        await self._conn.executemany(converted, params_list)
+        await self._conn.executemany(sql, params_list)
 
     async def commit(self) -> None:
         pass

@@ -32,9 +32,9 @@ Import event types in application and infrastructure layers only. Register handl
 
 The only true port-and-adapter pair in the codebase. `finance/ports/invoicing_gateway.py` (protocol), `finance/infrastructure/xero/` (real adapter), stub adapter for tests. This is the reference implementation for the pattern. Do not create new ports unless all three port-creation criteria are met (see `backend-conventions.mdc`).
 
-## Database backend abstraction
+## Database — Postgres only
 
-`DatabaseBackend` protocol, `SqliteBackend`, `PostgresBackend`. Selected automatically from `DATABASE_URL`. Do not bypass this by importing `sqlite3` or `asyncpg` directly outside of `shared/infrastructure/db/`.
+`PostgresBackend` via asyncpg. No SQLite, no dialect abstraction. All SQL uses native Postgres syntax: `$1`/`$2` placeholders, `NOW()`, `ON CONFLICT`, `::date` casts. Do not import `asyncpg` directly outside of `shared/infrastructure/db/`.
 
 ## Unit of Work (contextvar ambient transactions)
 

@@ -1,4 +1,4 @@
-"""Database package — drop-in replacement for the old database.py module.
+"""Database package — PostgreSQL via asyncpg.
 
 Public API:
     init_db()        — call once at startup
@@ -7,8 +7,6 @@ Public API:
     close_db()       — call once at shutdown
     get_org_id()     — ambient org_id for current request / job
     get_user_id()    — ambient user_id for current request / job
-
-The backend (SQLite vs PostgreSQL) is selected automatically from DATABASE_URL.
 
 Unit of Work: a contextvar stores the ambient transactional connection.
 get_connection() returns it when inside a transaction() block, so repos
@@ -59,10 +57,6 @@ class _ManagedTxProxy:
     async def executemany(self, sql: str, params_list: Sequence[tuple | list]) -> None:
         return await self._conn.executemany(sql, params_list)
 
-    async def executescript(self, sql: str) -> None:
-        if hasattr(self._conn, "executescript"):
-            await self._conn.executescript(sql)
-
     async def commit(self) -> None:
         pass
 
@@ -70,19 +64,15 @@ class _ManagedTxProxy:
         pass
 
 
-def _make_backend(url: str) -> DatabaseBackend:
-    if url.startswith(("postgresql://", "postgres://")):
-        from shared.infrastructure.db.postgres import PostgresBackend
+def _make_backend() -> DatabaseBackend:
+    from shared.infrastructure.db.postgres import PostgresBackend
 
-        return PostgresBackend()
-    from shared.infrastructure.db.sqlite import SqliteBackend
-
-    return SqliteBackend()
+    return PostgresBackend()
 
 
 async def init_db() -> None:
-    """Open connection / pool and run pending migrations."""
-    _state["backend"] = _make_backend(DATABASE_URL)
+    """Open connection pool and run pending migrations."""
+    _state["backend"] = _make_backend()
     await _state["backend"].connect(DATABASE_URL)
 
     from shared.infrastructure.migrations.runner import run_schema
@@ -102,8 +92,7 @@ def get_user_id() -> str:
 
 def get_connection() -> Connection:
     """Return the ambient transactional connection if inside a transaction(),
-    otherwise fall back to the default connection (pool proxy for PG, wrapper
-    for SQLite)."""
+    otherwise fall back to the pool proxy."""
     tx = _tx_conn.get()
     if tx is not None:
         return tx
@@ -138,14 +127,11 @@ async def transaction() -> AsyncIterator[Connection]:
 async def drop_all_tables() -> None:
     """Drop all application tables in reverse FK dependency order.
 
-    Connects to the database if not already initialized. After this call
-    the database is empty — call init_db() to recreate the schema.
-
     Only for use in demo/reset flows. Never call in production
     unless you explicitly intend to wipe all data.
     """
     if _state["backend"] is None:
-        _state["backend"] = _make_backend(DATABASE_URL)
+        _state["backend"] = _make_backend()
         await _state["backend"].connect(DATABASE_URL)
         opened_here = True
     else:
@@ -153,7 +139,6 @@ async def drop_all_tables() -> None:
 
     conn = _state["backend"].connection()
 
-    # Leaf tables first, root tables last (reverse FK dependency order)
     tables = [
         "assistant_messages",
         "vendor_items",
@@ -182,7 +167,7 @@ async def drop_all_tables() -> None:
         "organizations",
     ]
     for table in tables:
-        await conn.execute(f"DROP TABLE IF EXISTS {table}")
+        await conn.execute(f"DROP TABLE IF EXISTS {table} CASCADE")
     await conn.commit()
 
     if opened_here:
@@ -191,7 +176,7 @@ async def drop_all_tables() -> None:
 
 
 async def close_db() -> None:
-    """Close connection / pool on shutdown."""
+    """Close connection pool on shutdown."""
     if _state["backend"]:
         await _state["backend"].close()
         _state["backend"] = None

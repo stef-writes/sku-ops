@@ -20,7 +20,7 @@ async def list_all() -> list[Vendor]:
     org_id = get_org_id()
     cursor = await conn.execute(
         """SELECT id, name, contact_name, email, phone, address, organization_id, created_at FROM vendors
-           WHERE (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL""",
+           WHERE (organization_id = $1 OR organization_id IS NULL) AND deleted_at IS NULL""",
         (org_id,),
     )
     rows = await cursor.fetchall()
@@ -32,7 +32,7 @@ async def get_by_id(vendor_id: str) -> Vendor | None:
     org_id = get_org_id()
     cursor = await conn.execute(
         """SELECT id, name, contact_name, email, phone, address, organization_id, created_at FROM vendors
-           WHERE id = ? AND (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL""",
+           WHERE id = $1 AND (organization_id = $2 OR organization_id IS NULL) AND deleted_at IS NULL""",
         (vendor_id, org_id),
     )
     row = await cursor.fetchone()
@@ -48,7 +48,7 @@ async def find_by_name(name: str) -> Vendor | None:
     org_id = get_org_id()
     cursor = await conn.execute(
         """SELECT id, name, contact_name, email, phone, address, organization_id, created_at FROM vendors
-           WHERE TRIM(LOWER(name)) = ? AND (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL""",
+           WHERE TRIM(LOWER(name)) = $1 AND (organization_id = $2 OR organization_id IS NULL) AND deleted_at IS NULL""",
         (normalized, org_id),
     )
     row = await cursor.fetchone()
@@ -61,7 +61,7 @@ async def insert(vendor: Vendor) -> None:
     org_id = vendor_dict.get("organization_id") or get_org_id()
     await conn.execute(
         """INSERT INTO vendors (id, name, contact_name, email, phone, address, organization_id, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
         (
             vendor_dict["id"],
             vendor_dict["name"],
@@ -88,13 +88,13 @@ async def update(vendor_id: str, vendor_dict: dict) -> Vendor | None:
         vendor_dict.get("address", ""),
         vendor_id,
     ]
-    where = "WHERE id = ? AND organization_id = ?"
+    where = "WHERE id = $6 AND organization_id = $7"
     params.append(org_id)
-    query = "UPDATE vendors SET name = ?, contact_name = ?, email = ?, phone = ?, address = ? "
+    query = "UPDATE vendors SET name = $1, contact_name = $2, email = $3, phone = $4, address = $5 "
     query += where
     await conn.execute(query, params)
     await conn.execute(
-        "UPDATE vendor_items SET vendor_name = ? WHERE vendor_id = ?",
+        "UPDATE vendor_items SET vendor_name = $1 WHERE vendor_id = $2",
         (new_name, vendor_id),
     )
     await conn.commit()
@@ -106,9 +106,9 @@ async def delete(vendor_id: str) -> int:
     org_id = get_org_id()
     now = datetime.now(UTC).isoformat()
     params: list = [now, vendor_id]
-    where = "WHERE id = ? AND deleted_at IS NULL AND organization_id = ?"
+    where = "WHERE id = $2 AND deleted_at IS NULL AND organization_id = $3"
     params.append(org_id)
-    query = "UPDATE vendors SET deleted_at = ? "
+    query = "UPDATE vendors SET deleted_at = $1 "
     query += where
     cursor = await conn.execute(query, params)
     await conn.commit()
@@ -119,7 +119,7 @@ async def count() -> int:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        "SELECT COUNT(*) FROM vendors WHERE (organization_id = ? OR organization_id IS NULL) AND deleted_at IS NULL",
+        "SELECT COUNT(*) FROM vendors WHERE (organization_id = $1 OR organization_id IS NULL) AND deleted_at IS NULL",
         (org_id,),
     )
     row = await cursor.fetchone()

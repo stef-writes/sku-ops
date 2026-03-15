@@ -45,18 +45,24 @@ async def main(
     try:
         conn = get_connection()
 
-        cursor = await conn.execute("SELECT id, role FROM users WHERE email = ?", (email,))
+        cursor = await conn.execute("SELECT id, role FROM users WHERE email = $1", (email,))
         existing = await cursor.fetchone()
 
         if existing:
-            updates = ["name = ?", "role = ?"]
-            params: list = [name, role]
+            n = 1
+            updates = [f"name = ${n}"]
+            params: list = [name]
+            n += 1
+            updates.append(f"role = ${n}")
+            params.append(role)
+            n += 1
             if user_id_arg and existing["id"] != user_id_arg:
-                updates.append("id = ?")
+                updates.append(f"id = ${n}")
                 params.append(user_id_arg)
+                n += 1
             params.append(email)
             await conn.execute(
-                f"UPDATE users SET {', '.join(updates)} WHERE email = ?",
+                f"UPDATE users SET {', '.join(updates)} WHERE email = ${n}",
                 tuple(params),
             )
             await conn.commit()
@@ -86,7 +92,7 @@ async def main(
                 "INSERT INTO users "
                 "(id, email, password, name, role, company, billing_entity, phone, "
                 "is_active, organization_id, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
+                "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10)",
                 (user_id, email, hashed_pw, name, role, "", "", "", resolved_org, now),
             )
             await conn.commit()

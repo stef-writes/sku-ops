@@ -140,8 +140,9 @@ class TestOpenCycleCount:
         """Only products from the scoped department appear in items."""
         conn = get_connection()
         await conn.execute(
-            """INSERT OR REPLACE INTO departments (id, name, code, description, sku_count, created_at)
-               VALUES ('dept-plumbing', 'Plumbing', 'PLU', 'Plumbing', 0, datetime('now'))"""
+            """INSERT INTO departments (id, name, code, description, sku_count, created_at)
+               VALUES ('dept-plumbing', 'Plumbing', 'PLU', 'Plumbing', 0, NOW())
+               ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, code = EXCLUDED.code"""
         )
         await conn.commit()
 
@@ -170,8 +171,9 @@ class TestOpenCycleCount:
     async def test_open_no_scope_includes_all_departments(self):
         conn = get_connection()
         await conn.execute(
-            """INSERT OR REPLACE INTO departments (id, name, code, description, sku_count, created_at)
-               VALUES ('dept-elec', 'Electrical', 'ELE', '', 0, datetime('now'))"""
+            """INSERT INTO departments (id, name, code, description, sku_count, created_at)
+               VALUES ('dept-elec', 'Electrical', 'ELE', '', 0, NOW())
+               ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, code = EXCLUDED.code"""
         )
         await conn.commit()
 

@@ -24,7 +24,7 @@ async def insert(withdrawal: MaterialWithdrawal) -> None:
         """INSERT INTO withdrawals (id, items, job_id, service_address, notes, subtotal, tax, tax_rate, total, cost_total,
            contractor_id, contractor_name, contractor_company, billing_entity, billing_entity_id, payment_status, invoice_id, paid_at,
            processed_by_id, processed_by_name, organization_id, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)""",
         (
             withdrawal.id,
             items_json,
@@ -57,7 +57,7 @@ async def insert(withdrawal: MaterialWithdrawal) -> None:
         await conn.execute(
             """INSERT INTO withdrawal_items
                (id, withdrawal_id, product_id, sku, name, quantity, unit_price, cost, unit, amount, cost_total)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)""",
             (
                 str(uuid4()),
                 withdrawal.id,
@@ -87,24 +87,31 @@ async def list_withdrawals(
 ) -> list[MaterialWithdrawal]:
     conn = get_connection()
     org_id = get_org_id()
-    query = "SELECT * FROM withdrawals WHERE (organization_id = ? OR organization_id IS NULL)"
+    n = 1
+    query = f"SELECT * FROM withdrawals WHERE (organization_id = ${n} OR organization_id IS NULL)"
     params: list = [org_id]
+    n += 1
     if contractor_id:
-        query += " AND contractor_id = ?"
+        query += f" AND contractor_id = ${n}"
         params.append(contractor_id)
+        n += 1
     if payment_status:
-        query += " AND payment_status = ?"
+        query += f" AND payment_status = ${n}"
         params.append(payment_status)
+        n += 1
     if billing_entity:
-        query += " AND billing_entity = ?"
+        query += f" AND billing_entity = ${n}"
         params.append(billing_entity)
+        n += 1
     if start_date:
-        query += " AND created_at >= ?"
+        query += f" AND created_at >= ${n}"
         params.append(start_date)
+        n += 1
     if end_date:
-        query += " AND created_at <= ?"
+        query += f" AND created_at <= ${n}"
         params.append(end_date)
-    query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        n += 1
+    query += f" ORDER BY created_at DESC LIMIT ${n} OFFSET ${n + 1}"
     params.extend([limit, offset])
     cursor = await conn.execute(query, params)
     rows = await cursor.fetchall()
@@ -115,7 +122,7 @@ async def get_by_id(withdrawal_id: str) -> MaterialWithdrawal | None:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        "SELECT * FROM withdrawals WHERE id = ? AND (organization_id = ? OR organization_id IS NULL)",
+        "SELECT * FROM withdrawals WHERE id = $1 AND (organization_id = $2 OR organization_id IS NULL)",
         (withdrawal_id, org_id),
     )
     row = await cursor.fetchone()
@@ -127,8 +134,8 @@ async def mark_paid(withdrawal_id: str, paid_at: str) -> tuple[MaterialWithdrawa
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        "UPDATE withdrawals SET payment_status = 'paid', paid_at = ? "
-        "WHERE id = ? AND payment_status != 'paid' AND organization_id = ?",
+        "UPDATE withdrawals SET payment_status = 'paid', paid_at = $1 "
+        "WHERE id = $2 AND payment_status != 'paid' AND organization_id = $3",
         (paid_at, withdrawal_id, org_id),
     )
     await conn.commit()
@@ -141,12 +148,12 @@ async def bulk_mark_paid(withdrawal_ids: list[str], paid_at: str) -> list[str]:
         return []
     conn = get_connection()
     org_id = get_org_id()
-    placeholders = ",".join("?" * len(withdrawal_ids))
+    placeholders = ",".join(f"${i}" for i in range(2, 2 + len(withdrawal_ids)))
     cursor = await conn.execute(
-        "UPDATE withdrawals SET payment_status = 'paid', paid_at = ? WHERE id IN ("
+        "UPDATE withdrawals SET payment_status = 'paid', paid_at = $1 WHERE id IN ("
         + placeholders
         + ") AND payment_status != 'paid'"
-        " AND (organization_id = ? OR organization_id IS NULL) RETURNING id",
+        f" AND (organization_id = ${2 + len(withdrawal_ids)} OR organization_id IS NULL) RETURNING id",
         [paid_at, *withdrawal_ids, org_id],
     )
     await conn.commit()
@@ -161,8 +168,8 @@ async def link_to_invoice(withdrawal_id: str, invoice_id: str) -> bool:
     """
     conn = get_connection()
     cursor = await conn.execute(
-        "UPDATE withdrawals SET invoice_id = ?, payment_status = 'invoiced' "
-        "WHERE id = ? AND invoice_id IS NULL",
+        "UPDATE withdrawals SET invoice_id = $1, payment_status = 'invoiced' "
+        "WHERE id = $2 AND invoice_id IS NULL",
         (invoice_id, withdrawal_id),
     )
     await conn.commit()
@@ -174,7 +181,7 @@ async def unlink_from_invoice(withdrawal_ids: list[str]) -> None:
     if not withdrawal_ids:
         return
     conn = get_connection()
-    placeholders = ",".join("?" * len(withdrawal_ids))
+    placeholders = ",".join(f"${i}" for i in range(1, 1 + len(withdrawal_ids)))
     await conn.execute(
         f"UPDATE withdrawals SET invoice_id = NULL, payment_status = 'unpaid' WHERE id IN ({placeholders})",
         withdrawal_ids,
@@ -186,7 +193,7 @@ async def mark_paid_by_invoice(invoice_id: str, paid_at: str) -> None:
     """Mark all withdrawals linked to an invoice as paid. Called by finance context via facade."""
     conn = get_connection()
     await conn.execute(
-        "UPDATE withdrawals SET payment_status = 'paid', paid_at = ? WHERE invoice_id = ?",
+        "UPDATE withdrawals SET payment_status = 'paid', paid_at = $1 WHERE invoice_id = $2",
         (paid_at, invoice_id),
     )
     await conn.commit()
@@ -200,18 +207,21 @@ async def units_sold_by_product(
     conn = get_connection()
     org_id = get_org_id()
     params: list = [org_id]
+    n = 2
     date_filter = ""
     if start_date:
-        date_filter += " AND w.created_at >= ?"
+        date_filter += f" AND w.created_at >= ${n}"
         params.append(start_date)
+        n += 1
     if end_date:
-        date_filter += " AND w.created_at <= ?"
+        date_filter += f" AND w.created_at <= ${n}"
         params.append(end_date)
+        n += 1
     query = (
         "SELECT wi.product_id, SUM(wi.quantity) AS total_qty"
         " FROM withdrawal_items wi"
         " JOIN withdrawals w ON wi.withdrawal_id = w.id"
-        " WHERE w.organization_id = ?"
+        " WHERE w.organization_id = $1"
     )
     query += date_filter
     query += " GROUP BY wi.product_id"
@@ -227,13 +237,16 @@ async def payment_status_breakdown(
     conn = get_connection()
     org_id = get_org_id()
     params: list = [org_id]
+    n = 2
     date_filter = ""
     if start_date:
-        date_filter += " AND w.created_at >= ?"
+        date_filter += f" AND w.created_at >= ${n}"
         params.append(start_date)
+        n += 1
     if end_date:
-        date_filter += " AND w.created_at <= ?"
+        date_filter += f" AND w.created_at <= ${n}"
         params.append(end_date)
+        n += 1
     query = (
         "SELECT"
         " CASE"
@@ -243,7 +256,7 @@ async def payment_status_breakdown(
         " END AS status,"
         " ROUND(CAST(SUM(w.total) AS NUMERIC), 2) AS total"
         " FROM withdrawals w"
-        " WHERE w.organization_id = ?"
+        " WHERE w.organization_id = $1"
     )
     query += date_filter
     query += " GROUP BY status"

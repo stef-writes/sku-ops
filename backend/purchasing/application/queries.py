@@ -88,8 +88,8 @@ async def vendor_catalog(vendor_id: str) -> list[dict]:
                   s.category_name AS department
            FROM vendor_items vi
            JOIN skus s ON vi.sku_id = s.id AND s.deleted_at IS NULL
-           WHERE vi.vendor_id = ?
-             AND (vi.organization_id = ? OR vi.organization_id IS NULL)
+           WHERE vi.vendor_id = $1
+             AND (vi.organization_id = $2 OR vi.organization_id IS NULL)
              AND vi.deleted_at IS NULL
            ORDER BY vi.is_preferred DESC, s.name""",
         (vendor_id, org_id),
@@ -111,7 +111,7 @@ async def vendor_performance(
                   ROUND(COALESCE(SUM(total), 0), 2) AS total_spend,
                   SUM(CASE WHEN status = 'received' THEN 1 ELSE 0 END) AS received_count
            FROM purchase_orders
-           WHERE vendor_id = ? AND organization_id = ? AND created_at >= ?""",
+           WHERE vendor_id = $1 AND organization_id = $2 AND created_at >= $3""",
         (vendor_id, org_id, since),
     )
     summary = dict(await cursor.fetchone())
@@ -126,8 +126,8 @@ async def vendor_performance(
                   ) AS fill_rate
            FROM purchase_orders po
            JOIN purchase_order_items poi ON poi.po_id = po.id
-           WHERE po.vendor_id = ? AND po.organization_id = ?
-             AND po.created_at >= ? AND po.received_at IS NOT NULL""",
+           WHERE po.vendor_id = $1 AND po.organization_id = $2
+             AND po.created_at >= $3 AND po.received_at IS NOT NULL""",
         (vendor_id, org_id, since),
     )
     perf = dict(await cursor.fetchone())
@@ -154,8 +154,8 @@ async def purchase_history(vendor_id: str, days: int = 90, limit: int = 20) -> l
         """SELECT id, vendor_name, document_date, total, status,
                   created_at, received_at
            FROM purchase_orders
-           WHERE vendor_id = ? AND organization_id = ? AND created_at >= ?
-           ORDER BY created_at DESC LIMIT ?""",
+           WHERE vendor_id = $1 AND organization_id = $2 AND created_at >= $3
+           ORDER BY created_at DESC LIMIT $4""",
         (vendor_id, org_id, since, limit),
     )
     pos = [dict(r) for r in await cursor.fetchall()]
@@ -163,7 +163,7 @@ async def purchase_history(vendor_id: str, days: int = 90, limit: int = 20) -> l
     for po in pos:
         item_cursor = await conn.execute(
             """SELECT name, ordered_qty, delivered_qty, unit_price, cost, status
-               FROM purchase_order_items WHERE po_id = ?""",
+               FROM purchase_order_items WHERE po_id = $1""",
             (po["id"],),
         )
         po["items"] = [dict(r) for r in await item_cursor.fetchall()]
@@ -182,10 +182,10 @@ async def reorder_with_vendor_context(limit: int = 30) -> list[dict]:
                   s.cost AS current_cost, s.sell_uom, s.category_name AS department
            FROM skus s
            WHERE s.quantity <= s.min_stock
-             AND (s.organization_id = ? OR s.organization_id IS NULL)
+             AND (s.organization_id = $1 OR s.organization_id IS NULL)
              AND s.deleted_at IS NULL
            ORDER BY (s.min_stock - s.quantity) DESC
-           LIMIT ?""",
+           LIMIT $2""",
         (org_id, limit),
     )
     low_stock = [dict(r) for r in await cursor.fetchall()]
@@ -195,8 +195,8 @@ async def reorder_with_vendor_context(limit: int = 30) -> list[dict]:
             """SELECT vi.vendor_id, vi.vendor_name, vi.cost, vi.lead_time_days,
                       vi.moq, vi.is_preferred, vi.purchase_uom, vi.purchase_pack_qty
                FROM vendor_items vi
-               WHERE vi.sku_id = ?
-                 AND (vi.organization_id = ? OR vi.organization_id IS NULL)
+               WHERE vi.sku_id = $1
+                 AND (vi.organization_id = $2 OR vi.organization_id IS NULL)
                  AND vi.deleted_at IS NULL
                ORDER BY vi.is_preferred DESC, vi.cost ASC""",
             (item["sku_id"], org_id),

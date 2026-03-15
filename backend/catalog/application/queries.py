@@ -180,8 +180,8 @@ async def sku_vendor_options(sku_id: str) -> list[dict]:
             """SELECT MAX(po.created_at) AS last_po_date
                FROM purchase_orders po
                JOIN purchase_order_items poi ON poi.po_id = po.id
-               WHERE po.vendor_id = ? AND po.organization_id = ?
-                 AND poi.product_id = ?""",
+               WHERE po.vendor_id = $1 AND po.organization_id = $2
+                 AND poi.product_id = $3""",
             (vi.vendor_id, org_id, sku_id),
         )
         row = await cursor.fetchone()

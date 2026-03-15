@@ -371,7 +371,7 @@ class TestFiscalPeriodEnforcement:
         now = "2025-01-01T00:00:00Z"
         await conn.execute(
             """INSERT INTO fiscal_periods (id, name, start_date, end_date, status, organization_id, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+               VALUES ($1, $2, $3, $4, $5, $6, $7)""",
             (period_id, "Jan 2025", "2025-01-01", "2025-01-31", "closed", "default", now),
         )
         await conn.commit()
@@ -390,7 +390,7 @@ class TestFiscalPeriodEnforcement:
         now = "2025-02-01T00:00:00Z"
         await conn.execute(
             """INSERT INTO fiscal_periods (id, name, start_date, end_date, status, organization_id, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+               VALUES ($1, $2, $3, $4, $5, $6, $7)""",
             (period_id, "Feb 2025", "2025-02-01", "2025-02-28", "open", "default", now),
         )
         await conn.commit()

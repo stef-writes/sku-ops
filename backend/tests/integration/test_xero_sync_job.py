@@ -1,5 +1,5 @@
 """
-Xero sync job integration tests — real DB (in-memory SQLite), stub adapter.
+Xero sync job integration tests — real DB (Postgres), stub adapter.
 
 Every test uses the `db` fixture from conftest.py so the full schema is
 bootstrapped and all repos run for real. The Xero adapter is always the
@@ -229,7 +229,7 @@ class TestSyncStatusGating:
         conn = get_connection()
         # Manually set it as already synced + paid
         await conn.execute(
-            "UPDATE invoices SET xero_invoice_id = 'already-synced', xero_sync_status = 'synced', status = 'paid' WHERE id = ?",
+            "UPDATE invoices SET xero_invoice_id = 'already-synced', xero_sync_status = 'synced', status = 'paid' WHERE id = $1",
             (inv_id,),
         )
         await conn.commit()
@@ -324,7 +324,7 @@ class TestAdjustmentIdempotencyFix:
         conn = get_connection()
         cursor = await conn.execute(
             """SELECT COUNT(*) FROM financial_ledger
-               WHERE reference_type = 'adjustment' AND product_id = ?""",
+               WHERE reference_type = 'adjustment' AND product_id = $1""",
             (product.id,),
         )
         row = await cursor.fetchone()
@@ -371,7 +371,7 @@ class TestAdjustmentIdempotencyFix:
         conn = get_connection()
         cursor = await conn.execute(
             """SELECT DISTINCT reference_id FROM financial_ledger
-               WHERE reference_type = 'adjustment' AND product_id = ?""",
+               WHERE reference_type = 'adjustment' AND product_id = $1""",
             (product.id,),
         )
         rows = await cursor.fetchall()
@@ -535,15 +535,15 @@ class TestCreditNoteSync:
                (id, credit_note_number, invoice_id, return_id, billing_entity,
                 status, subtotal, tax, total, notes, xero_credit_note_id,
                 xero_sync_status, organization_id, created_at, updated_at)
-               VALUES (?, ?, NULL, NULL, 'On Point LLC',
+               VALUES ($1, $2, NULL, NULL, 'On Point LLC',
                        'applied', 30.0, 0.0, 30.0, NULL, NULL,
-                       'pending', 'default', ?, ?)""",
+                       'pending', 'default', $3, $4)""",
             (cn_id, cn_number, now, now),
         )
         await conn.execute(
             """INSERT INTO credit_note_line_items
                (id, credit_note_id, description, quantity, unit_price, amount, cost, product_id)
-               VALUES (?, ?, 'Returned lumber', 3, 10.0, 30.0, 6.0, NULL)""",
+               VALUES ($1, $2, 'Returned lumber', 3, 10.0, 30.0, 6.0, NULL)""",
             (str(uuid4()), cn_id),
         )
         await conn.commit()
@@ -568,9 +568,9 @@ class TestCreditNoteSync:
                (id, credit_note_number, invoice_id, return_id, billing_entity,
                 status, subtotal, tax, total, notes, xero_credit_note_id,
                 xero_sync_status, organization_id, created_at, updated_at)
-               VALUES (?, 'CN-DRAFT', NULL, NULL, 'On Point LLC',
+               VALUES ($1, 'CN-DRAFT', NULL, NULL, 'On Point LLC',
                        'draft', 30.0, 0.0, 30.0, NULL, NULL,
-                       'pending', 'default', ?, ?)""",
+                       'pending', 'default', $2, $3)""",
             (cn_id, now, now),
         )
         await conn.commit()

@@ -14,13 +14,14 @@ async def withdrawal_velocity(
     if not product_ids:
         return {}
     conn = get_connection()
-    placeholders = ",".join("?" * len(product_ids))
+    placeholders = ",".join(f"${i}" for i in range(1, len(product_ids) + 1))
+    since_idx = len(product_ids) + 1
     cur = await conn.execute(
         "SELECT product_id, COALESCE(SUM(ABS(quantity_delta)), 0) as total_used"
         " FROM stock_transactions"
         " WHERE product_id IN ("
         + placeholders
-        + ") AND transaction_type = 'WITHDRAWAL' AND created_at >= ?"
+        + f") AND transaction_type = 'WITHDRAWAL' AND created_at >= ${since_idx}"
         " GROUP BY product_id",
         (*product_ids, since),
     )
@@ -37,7 +38,7 @@ async def daily_withdrawal_activity(
     params: list = [org_id, since]
     product_filter = ""
     if product_id:
-        product_filter = " AND product_id = ?"
+        product_filter = " AND product_id = $3"
         params.append(product_id)
 
     cur = await conn.execute(
@@ -45,9 +46,9 @@ async def daily_withdrawal_activity(
         " COUNT(*) AS transaction_count,"
         " COALESCE(SUM(ABS(quantity_delta)), 0) AS units_moved"
         " FROM stock_transactions"
-        " WHERE (organization_id = ? OR organization_id IS NULL)"
+        " WHERE (organization_id = $1 OR organization_id IS NULL)"
         " AND transaction_type = 'WITHDRAWAL'"
-        " AND created_at >= ?" + product_filter + " GROUP BY day"
+        " AND created_at >= $2" + product_filter + " GROUP BY day"
         " ORDER BY day",
         params,
     )

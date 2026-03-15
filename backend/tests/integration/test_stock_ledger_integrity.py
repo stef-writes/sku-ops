@@ -254,8 +254,9 @@ class TestOrganizationIsolation:
         conn = get_connection()
         for org in ("org-a", "org-b"):
             await conn.execute(
-                "INSERT OR IGNORE INTO departments (id, name, code, description, sku_count, organization_id, created_at) "
-                "VALUES (?, 'Hardware', 'HDW', 'Hardware dept', 0, ?, datetime('now'))",
+                "INSERT INTO departments (id, name, code, description, sku_count, organization_id, created_at) "
+                "VALUES ($1, 'Hardware', 'HDW', 'Hardware dept', 0, $2, NOW()) "
+                "ON CONFLICT DO NOTHING",
                 (f"dept-1-{org}", org),
             )
         await conn.commit()

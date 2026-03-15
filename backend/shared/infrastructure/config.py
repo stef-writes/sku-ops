@@ -5,7 +5,7 @@ Set ENV to control behavior:
   - development  Local dev; permissive defaults, demo creds allowed
   - staging      Preview/tenant deployments; stricter, JWT required, no demo creds unless set
   - production   Live; requires explicit secrets, strict CORS
-  - test         Pytest in-process; stub adapters, in-memory DB (conftest sets this)
+  - test         Pytest in-process; stub adapters, test Postgres DB (conftest sets this)
 
 When ENV is unset, defaults to development.
 """
@@ -56,15 +56,17 @@ is_test = _is("test")
 # Derived: any non-dev deployment
 is_deployed = is_staging or is_production
 
-# Database
-DATABASE_URL = os.environ.get("DATABASE_URL") or (
-    "sqlite:///:memory:" if is_test else "sqlite:///./data/sku_ops.db"
+# Database — Postgres everywhere (dev, test, staging, production).
+# Local dev: ./bin/dev db starts Postgres via docker-compose.dev.yml.
+# Tests: conftest creates a disposable test database.
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL", "postgresql://sku_ops:localdev@localhost:5432/sku_ops"
 )
 
-if is_deployed and not DATABASE_URL.startswith(("postgresql://", "postgres://")):
+if not DATABASE_URL.startswith(("postgresql://", "postgres://")):
     raise RuntimeError(
-        "DATABASE_URL must be a PostgreSQL connection string in staging/production. "
-        "Got a non-PostgreSQL URL. Set DATABASE_URL=postgresql://user:pass@host:5432/db"
+        "DATABASE_URL must be a PostgreSQL connection string. "
+        f"Got: {DATABASE_URL[:30]}... Set DATABASE_URL=postgresql://user:pass@host:5432/db"
     )
 
 # PostgreSQL connection pool — only meaningful when DATABASE_URL is Postgres.

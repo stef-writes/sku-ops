@@ -96,7 +96,7 @@ async def get_contractor_by_id(user_id: str) -> Contractor | None:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        f"SELECT {_SELECT_COLS} FROM users WHERE id = ? AND organization_id = ?",
+        f"SELECT {_SELECT_COLS} FROM users WHERE id = $1 AND organization_id = $2",
         (user_id, org_id),
     )
     row = await cursor.fetchone()
@@ -109,9 +109,9 @@ async def get_users_by_ids(user_ids: list[str]) -> dict[str, Contractor]:
         return {}
     conn = get_connection()
     org_id = get_org_id()
-    placeholders = ",".join("?" * len(user_ids))
+    placeholders = ",".join(f"${i}" for i in range(1, 1 + len(user_ids)))
     cursor = await conn.execute(
-        f"SELECT {_SELECT_COLS} FROM users WHERE id IN ({placeholders}) AND organization_id = ?",
+        f"SELECT {_SELECT_COLS} FROM users WHERE id IN ({placeholders}) AND organization_id = ${1 + len(user_ids)}",
         (*user_ids, org_id),
     )
     rows = await cursor.fetchall()
@@ -128,14 +128,14 @@ async def list_contractors(search: str | None = None) -> list[Contractor]:
     org_id = get_org_id()
     base = (
         f"SELECT {_SELECT_COLS} FROM users"
-        " WHERE role = 'contractor' AND (organization_id = ? OR organization_id IS NULL)"
+        " WHERE role = 'contractor' AND (organization_id = $1 OR organization_id IS NULL)"
     )
     params: list = [org_id]
     if search and search.strip():
         term = f"%{search.strip()}%"
         base += (
-            " AND (name LIKE ? OR email LIKE ? OR company LIKE ?"
-            " OR billing_entity LIKE ? OR phone LIKE ?)"
+            " AND (name LIKE $2 OR email LIKE $3 OR company LIKE $4"
+            " OR billing_entity LIKE $5 OR phone LIKE $6)"
         )
         params.extend([term, term, term, term, term])
     base += " ORDER BY name"
@@ -149,7 +149,7 @@ async def count_contractors() -> int:
     org_id = get_org_id()
     cursor = await conn.execute(
         "SELECT COUNT(*) FROM users WHERE role = 'contractor'"
-        " AND (organization_id = ? OR organization_id IS NULL)",
+        " AND (organization_id = $1 OR organization_id IS NULL)",
         (org_id,),
     )
     row = await cursor.fetchone()
@@ -176,7 +176,7 @@ async def create_contractor(
     conn = get_connection()
     org_id = get_org_id()
 
-    cursor = await conn.execute("SELECT id FROM users WHERE email = ?", (email,))
+    cursor = await conn.execute("SELECT id FROM users WHERE email = $1", (email,))
     if await cursor.fetchone():
         raise ValueError("Email already registered")
 
@@ -193,7 +193,7 @@ async def create_contractor(
         "phone, is_active, organization_id, created_at"
     )
     await conn.execute(
-        f"INSERT INTO users ({cols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        f"INSERT INTO users ({cols}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
         (
             contractor_id,
             email,
@@ -238,19 +238,22 @@ async def update_contractor(
     conn = get_connection()
     set_clauses = []
     values = []
+    n = 1
     for key in ("name", "company", "billing_entity", "phone"):
         val = getattr(updates, key, None)
         if val is not None:
-            set_clauses.append(f"{key} = ?")
+            set_clauses.append(f"{key} = ${n}")
             values.append(val)
+            n += 1
     if updates.is_active is not None:
-        set_clauses.append("is_active = ?")
+        set_clauses.append(f"is_active = ${n}")
         values.append(1 if updates.is_active else 0)
+        n += 1
     if not set_clauses:
         return contractor
     values.extend([contractor_id, org_id])
     await conn.execute(
-        f"UPDATE users SET {', '.join(set_clauses)} WHERE id = ? AND organization_id = ?",
+        f"UPDATE users SET {', '.join(set_clauses)} WHERE id = ${n} AND organization_id = ${n + 1}",
         values,
     )
     await conn.commit()
@@ -268,7 +271,7 @@ async def delete_contractor(contractor_id: str) -> int:
 
     conn = get_connection()
     cursor = await conn.execute(
-        "DELETE FROM users WHERE id = ? AND role = 'contractor' AND organization_id = ?",
+        "DELETE FROM users WHERE id = $1 AND role = 'contractor' AND organization_id = $2",
         (contractor_id, org_id),
     )
     await conn.commit()

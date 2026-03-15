@@ -39,7 +39,7 @@ async def test_create_product(db):
 
     conn = get_connection()
     cursor = await conn.execute(
-        "SELECT * FROM stock_transactions WHERE product_id = ?",
+        "SELECT * FROM stock_transactions WHERE product_id = $1",
         (sku.id,),
     )
     rows = await cursor.fetchall()
@@ -71,7 +71,7 @@ async def test_update_product_changes_department_count(db):
     conn = get_connection()
     await conn.execute(
         """INSERT INTO departments (id, name, code, description, sku_count, created_at)
-           VALUES ('dept-2', 'Plumbing', 'PLU', 'Plumbing', 0, datetime('now'))"""
+           VALUES ('dept-2', 'Plumbing', 'PLU', 'Plumbing', 0, NOW())"""
     )
     await conn.commit()
 

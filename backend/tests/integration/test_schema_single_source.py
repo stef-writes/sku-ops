@@ -4,11 +4,16 @@ Schema single-source-of-truth tests.
 Verifies that the context schema.py files (aggregated via full_schema.py)
 produce a valid, complete database — every expected table is present and
 has the columns its context defines.
+
+Uses a temporary Postgres schema to avoid polluting the test database.
 """
 
-import aiosqlite
+import uuid
+
+import asyncpg
 import pytest
 
+from shared.infrastructure.config import DATABASE_URL
 from shared.infrastructure.full_schema import FULL_SCHEMA
 
 EXPECTED_TABLES = {
@@ -52,25 +57,38 @@ EXPECTED_TABLES = {
 
 
 async def _bootstrap() -> dict[str, list[str]]:
-    """Create in-memory DB from context schemas, return {table: [col_names]}."""
-    db = await aiosqlite.connect(":memory:")
-    for stmt in FULL_SCHEMA:
-        await db.execute(stmt)
-    await db.commit()
+    """Create tables in a temporary Postgres schema, return {table: [col_names]}."""
+    schema_name = f"test_schema_{uuid.uuid4().hex[:8]}"
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        await conn.execute(f"CREATE SCHEMA {schema_name}")
+        await conn.execute(f"SET search_path TO {schema_name}")
 
-    cursor = await db.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
-    )
-    tables = [row[0] for row in await cursor.fetchall()]
+        for stmt in FULL_SCHEMA:
+            await conn.execute(stmt)
 
-    schema: dict[str, list[str]] = {}
-    for table in tables:
-        cursor = await db.execute(f"PRAGMA table_info({table})")
-        cols = await cursor.fetchall()
-        schema[table] = [c[1] for c in cols]
+        rows = await conn.fetch(
+            "SELECT table_name FROM information_schema.tables"
+            " WHERE table_schema = $1 ORDER BY table_name",
+            schema_name,
+        )
+        tables = [r["table_name"] for r in rows]
 
-    await db.close()
-    return schema
+        schema: dict[str, list[str]] = {}
+        for table in tables:
+            col_rows = await conn.fetch(
+                "SELECT column_name FROM information_schema.columns"
+                " WHERE table_schema = $1 AND table_name = $2"
+                " ORDER BY ordinal_position",
+                schema_name,
+                table,
+            )
+            schema[table] = [r["column_name"] for r in col_rows]
+
+        return schema
+    finally:
+        await conn.execute(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE")
+        await conn.close()
 
 
 @pytest.mark.asyncio
@@ -93,20 +111,21 @@ async def test_full_schema_tables_have_columns():
 @pytest.mark.asyncio
 async def test_full_schema_is_idempotent():
     """Running the schema twice must not raise errors (IF NOT EXISTS)."""
-    db = await aiosqlite.connect(":memory:")
-    for stmt in FULL_SCHEMA:
-        await db.execute(stmt)
-    await db.commit()
-    for stmt in FULL_SCHEMA:
-        await db.execute(stmt)
-    await db.commit()
-    await db.close()
+    schema_name = f"test_schema_{uuid.uuid4().hex[:8]}"
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        await conn.execute(f"CREATE SCHEMA {schema_name}")
+        await conn.execute(f"SET search_path TO {schema_name}")
+        for stmt in FULL_SCHEMA:
+            await conn.execute(stmt)
+        for stmt in FULL_SCHEMA:
+            await conn.execute(stmt)
+    finally:
+        await conn.execute(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE")
+        await conn.close()
 
 
 # ── Xero sync column assertions ──────────────────────────────────────────────
-# If these fail it means a schema.py file was edited to remove or rename a
-# column that the Xero sync job depends on. Failing here is far better than
-# discovering a missing column at runtime after a real sync attempt.
 
 
 @pytest.mark.asyncio

@@ -62,6 +62,12 @@ from operations.application.withdrawal_facade import link_to_invoice
 Any cross-context mutation must go through the owning context's application facade. The owning context controls its own state transitions.
 
 
+## Database
+
+Postgres everywhere — dev, test, staging, production. No SQLite. Local dev uses `docker-compose.dev.yml` for a lightweight Postgres container. Tests use a `sku_ops_test` database created by the same container.
+
+All SQL uses native Postgres syntax (`$1`, `$2` placeholders, `NOW()`, `ON CONFLICT`, `::date` casts). There is no dialect abstraction layer.
+
 ## Transaction management
 
 The DB layer uses a contextvar-based Unit of Work:

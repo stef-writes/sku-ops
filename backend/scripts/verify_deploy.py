@@ -79,7 +79,7 @@ def check_config_guards() -> None:
             True,
         ),
         (
-            "Production rejects SQLite DATABASE_URL",
+            "Production rejects non-Postgres DATABASE_URL",
             {"ENV": "production", "JWT_SECRET": "a" * 32, "CORS_ORIGINS": "https://x.com"},
             "DATABASE_URL",
             True,

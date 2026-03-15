@@ -24,7 +24,7 @@ class PgPORepo(PORepoPort):
                (id, vendor_id, vendor_name, document_date, total, status, notes,
                 created_by_id, created_by_name, received_at, received_by_id, received_by_name,
                 created_at, updated_at, organization_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)""",
             (
                 d["id"],
                 d["vendor_id"],
@@ -54,7 +54,7 @@ class PgPORepo(PORepoPort):
                    (id, po_id, name, original_sku, ordered_qty, delivered_qty, unit_price, cost,
                     base_unit, sell_uom, pack_qty, purchase_uom, purchase_pack_qty,
                     suggested_department, status, product_id, organization_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)""",
                 (
                     d["id"],
                     d["po_id"],
@@ -82,12 +82,12 @@ class PgPORepo(PORepoPort):
         org_id = get_org_id()
         if status:
             cursor = await conn.execute(
-                "SELECT * FROM purchase_orders WHERE organization_id = ? AND status = ? ORDER BY created_at DESC",
+                "SELECT * FROM purchase_orders WHERE organization_id = $1 AND status = $2 ORDER BY created_at DESC",
                 (org_id, status),
             )
         else:
             cursor = await conn.execute(
-                "SELECT * FROM purchase_orders WHERE organization_id = ? ORDER BY created_at DESC",
+                "SELECT * FROM purchase_orders WHERE organization_id = $1 ORDER BY created_at DESC",
                 (org_id,),
             )
         rows = await cursor.fetchall()
@@ -97,7 +97,7 @@ class PgPORepo(PORepoPort):
         conn = get_connection()
         org_id = get_org_id()
         cursor = await conn.execute(
-            "SELECT * FROM purchase_orders WHERE id = ? AND organization_id = ?",
+            "SELECT * FROM purchase_orders WHERE id = $1 AND organization_id = $2",
             (po_id, org_id),
         )
         row = await cursor.fetchone()
@@ -106,7 +106,7 @@ class PgPORepo(PORepoPort):
     async def get_po_items(self, po_id: str) -> list[POItemRow]:
         conn = get_connection()
         cursor = await conn.execute(
-            "SELECT * FROM purchase_order_items WHERE po_id = ? ORDER BY id",
+            "SELECT * FROM purchase_order_items WHERE po_id = $1 ORDER BY id",
             (po_id,),
         )
         rows = await cursor.fetchall()
@@ -122,9 +122,9 @@ class PgPORepo(PORepoPort):
         conn = get_connection()
         cursor = await conn.execute(
             """UPDATE purchase_order_items
-               SET status = ?, product_id = COALESCE(?, product_id),
-                   delivered_qty = COALESCE(?, delivered_qty)
-               WHERE id = ? AND status != ?""",
+               SET status = $1, product_id = COALESCE($2, product_id),
+                   delivered_qty = COALESCE($3, delivered_qty)
+               WHERE id = $4 AND status != $5""",
             (status.value, product_id, delivered_qty, item_id, POItemStatus.ARRIVED.value),
         )
         await conn.commit()
@@ -141,11 +141,11 @@ class PgPORepo(PORepoPort):
         conn = get_connection()
         await conn.execute(
             """UPDATE purchase_orders
-               SET status = ?,
-                   received_at = COALESCE(?, received_at),
-                   received_by_id = COALESCE(?, received_by_id),
-                   received_by_name = COALESCE(?, received_by_name)
-               WHERE id = ?""",
+               SET status = $1,
+                   received_at = COALESCE($2, received_at),
+                   received_by_id = COALESCE($3, received_by_id),
+                   received_by_name = COALESCE($4, received_by_name)
+               WHERE id = $5""",
             (status, received_at, received_by_id, received_by_name, po_id),
         )
         await conn.commit()
@@ -157,7 +157,7 @@ class PgPORepo(PORepoPort):
         cursor = await conn.execute(
             """SELECT id, vendor_name, total, document_date, created_at
                FROM purchase_orders
-               WHERE organization_id = ?
+               WHERE organization_id = $1
                  AND status = 'received'
                  AND xero_bill_id IS NULL
                  AND xero_sync_status = 'pending'
@@ -173,7 +173,7 @@ class PgPORepo(PORepoPort):
         cursor = await conn.execute(
             """SELECT id, vendor_name, total, document_date, created_at
                FROM purchase_orders
-               WHERE organization_id = ?
+               WHERE organization_id = $1
                  AND xero_sync_status = 'failed'
                ORDER BY created_at""",
             (org_id,),
@@ -186,7 +186,7 @@ class PgPORepo(PORepoPort):
         conn = get_connection()
         org_id = get_org_id()
         cursor = await conn.execute(
-            "SELECT * FROM purchase_orders WHERE id = ? AND organization_id = ?",
+            "SELECT * FROM purchase_orders WHERE id = $1 AND organization_id = $2",
             (po_id, org_id),
         )
         row = await cursor.fetchone()
@@ -194,14 +194,14 @@ class PgPORepo(PORepoPort):
             return None
         po = dict(row)
         cursor = await conn.execute(
-            "SELECT SUM(cost * COALESCE(delivered_qty, ordered_qty)) FROM purchase_order_items WHERE po_id = ?",
+            "SELECT SUM(cost * COALESCE(delivered_qty, ordered_qty)) FROM purchase_order_items WHERE po_id = $1",
             (po_id,),
         )
         total_row = await cursor.fetchone()
         po["cost_total"] = float(total_row[0] or 0) if total_row else 0.0
         cursor = await conn.execute(
             """SELECT name, COALESCE(delivered_qty, ordered_qty) AS qty, cost
-               FROM purchase_order_items WHERE po_id = ?""",
+               FROM purchase_order_items WHERE po_id = $1""",
             (po_id,),
         )
         item_rows = await cursor.fetchall()
@@ -211,7 +211,7 @@ class PgPORepo(PORepoPort):
     async def set_xero_sync_status(self, po_id: str, status: str, updated_at: str) -> None:
         conn = get_connection()
         await conn.execute(
-            "UPDATE purchase_orders SET xero_sync_status = ?, updated_at = ? WHERE id = ?",
+            "UPDATE purchase_orders SET xero_sync_status = $1, updated_at = $2 WHERE id = $3",
             (status, updated_at, po_id),
         )
         await conn.commit()
@@ -222,7 +222,7 @@ class PgPORepo(PORepoPort):
         org_id = get_org_id()
         cursor = await conn.execute(
             """SELECT status, COUNT(*) as cnt, COALESCE(SUM(total), 0) as total
-               FROM purchase_orders WHERE organization_id = ?
+               FROM purchase_orders WHERE organization_id = $1
                GROUP BY status""",
             (org_id,),
         )
@@ -232,7 +232,7 @@ class PgPORepo(PORepoPort):
     async def set_xero_bill_id(self, po_id: str, xero_bill_id: str, updated_at: str) -> None:
         conn = get_connection()
         await conn.execute(
-            "UPDATE purchase_orders SET xero_bill_id = ?, xero_sync_status = 'synced', updated_at = ? WHERE id = ?",
+            "UPDATE purchase_orders SET xero_bill_id = $1, xero_sync_status = 'synced', updated_at = $2 WHERE id = $3",
             (xero_bill_id, updated_at, po_id),
         )
         await conn.commit()

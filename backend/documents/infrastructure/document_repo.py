@@ -31,7 +31,7 @@ async def insert(doc: Document) -> None:
         parsed = json.dumps(parsed)
     await conn.execute(
         "INSERT INTO documents (" + _COLUMNS + ")"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        " VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
         (
             d["id"],
             d["filename"],
@@ -56,7 +56,7 @@ async def get_by_id(doc_id: str) -> Document | None:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        "SELECT " + _COLUMNS + " FROM documents WHERE id = ? AND organization_id = ?",
+        "SELECT " + _COLUMNS + " FROM documents WHERE id = $1 AND organization_id = $2",
         (doc_id, org_id),
     )
     return _row_to_model(await cursor.fetchone())
@@ -71,18 +71,22 @@ async def list_documents(
 ) -> list[Document]:
     conn = get_connection()
     org_id = get_org_id()
-    sql = "SELECT " + _COLUMNS + " FROM documents WHERE organization_id = ?"
+    sql = "SELECT " + _COLUMNS + " FROM documents WHERE organization_id = $1"
     params: list = [org_id]
+    n = 2
     if status:
-        sql += " AND status = ?"
+        sql += f" AND status = ${n}"
         params.append(status)
+        n += 1
     if vendor_name:
-        sql += " AND LOWER(vendor_name) LIKE ?"
+        sql += f" AND LOWER(vendor_name) LIKE ${n}"
         params.append(f"%{vendor_name.lower()}%")
+        n += 1
     if po_id:
-        sql += " AND po_id = ?"
+        sql += f" AND po_id = ${n}"
         params.append(po_id)
-    sql += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        n += 1
+    sql += f" ORDER BY created_at DESC LIMIT ${n} OFFSET ${n + 1}"
     params.extend([limit, offset])
     cursor = await conn.execute(sql, params)
     return [_row_to_model(r) for r in await cursor.fetchall()]
@@ -92,12 +96,12 @@ async def update_status(doc_id: str, status: str, po_id: str | None = None) -> N
     conn = get_connection()
     if po_id:
         await conn.execute(
-            "UPDATE documents SET status = ?, po_id = ?, updated_at = ? WHERE id = ?",
+            "UPDATE documents SET status = $1, po_id = $2, updated_at = $3 WHERE id = $4",
             (status, po_id, datetime.now(UTC).isoformat(), doc_id),
         )
     else:
         await conn.execute(
-            "UPDATE documents SET status = ?, updated_at = ? WHERE id = ?",
+            "UPDATE documents SET status = $1, updated_at = $2 WHERE id = $3",
             (status, datetime.now(UTC).isoformat(), doc_id),
         )
     await conn.commit()

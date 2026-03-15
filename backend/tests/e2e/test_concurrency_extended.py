@@ -3,13 +3,8 @@
 Each test fires two concurrent requests that target the same resource and
 verifies that database-level guards prevent double-counting, double-ledger
 entries, or duplicate invoices.
-
-NOTE: These tests require proper transaction isolation (Postgres).
-SQLite's single-connection architecture cannot properly isolate concurrent
-transactions, making these tests unreliable on SQLite.
 """
 
-import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
@@ -24,9 +19,6 @@ from tests.e2e.helpers import (
     update_cycle_count_item,
 )
 from tests.helpers.auth import admin_headers
-
-_is_sqlite = "sqlite" in os.environ.get("DATABASE_URL", "sqlite")
-pytestmark = pytest.mark.skipif(_is_sqlite, reason="Requires Postgres for transaction isolation")
 
 
 def _create_po_pending(client, headers, product, *, quantity=10):
@@ -103,13 +95,13 @@ def _query_ledger_entries(client, reference_id, account, reference_type=None):
         if reference_type:
             cursor = await conn.execute(
                 "SELECT COUNT(*), COALESCE(SUM(amount), 0) FROM financial_ledger "
-                "WHERE reference_id = ? AND account = ? AND reference_type = ?",
+                "WHERE reference_id = $1 AND account = $2 AND reference_type = $3",
                 (reference_id, account, reference_type),
             )
         else:
             cursor = await conn.execute(
                 "SELECT COUNT(*), COALESCE(SUM(amount), 0) FROM financial_ledger "
-                "WHERE reference_id = ? AND account = ?",
+                "WHERE reference_id = $1 AND account = $2",
                 (reference_id, account),
             )
         row = await cursor.fetchone()

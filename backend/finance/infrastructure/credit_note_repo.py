@@ -12,11 +12,11 @@ async def _next_credit_note_number() -> str:
     org_id = get_org_id()
     key = f"{org_id}|cn"
     await conn.execute(
-        """INSERT INTO invoice_counters (key, counter) VALUES (?, 1)
+        """INSERT INTO invoice_counters (key, counter) VALUES ($1, 1)
            ON CONFLICT(key) DO UPDATE SET counter = invoice_counters.counter + 1""",
         (key,),
     )
-    cursor = await conn.execute("SELECT counter FROM invoice_counters WHERE key = ?", (key,))
+    cursor = await conn.execute("SELECT counter FROM invoice_counters WHERE key = $1", (key,))
     row = await cursor.fetchone()
     await conn.commit()
     num = row[0] if row else 1
@@ -73,11 +73,10 @@ async def insert_credit_note(
 
     billing_entity = ""
     if invoice_id:
-        inv_params: list = [invoice_id]
-        inv_where = "WHERE id = ?"
-        inv_where += " AND (organization_id = ? OR organization_id IS NULL)"
-        inv_params.append(org_id)
-        cursor = await conn.execute("SELECT billing_entity FROM invoices " + inv_where, inv_params)
+        cursor = await conn.execute(
+            "SELECT billing_entity FROM invoices WHERE id = $1 AND (organization_id = $2 OR organization_id IS NULL)",
+            (invoice_id, org_id),
+        )
         inv_row = await cursor.fetchone()
         if inv_row:
             billing_entity = dict(inv_row).get("billing_entity", "")
@@ -86,7 +85,7 @@ async def insert_credit_note(
         """INSERT INTO credit_notes (id, credit_note_number, invoice_id, return_id,
            billing_entity, status, subtotal, tax, total, notes,
            xero_credit_note_id, organization_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)""",
         (
             cn_id,
             cn_number,
@@ -112,7 +111,7 @@ async def insert_credit_note(
         await conn.execute(
             """INSERT INTO credit_note_line_items
                (id, credit_note_id, description, quantity, unit_price, amount, cost, product_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
             (
                 str(uuid4()),
                 cn_id,
@@ -137,7 +136,7 @@ async def get_by_id(credit_note_id: str) -> CreditNote | None:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        "SELECT * FROM credit_notes WHERE id = ? AND (organization_id = ? OR organization_id IS NULL)",
+        "SELECT * FROM credit_notes WHERE id = $1 AND (organization_id = $2 OR organization_id IS NULL)",
         (credit_note_id, org_id),
     )
     row = await cursor.fetchone()
@@ -148,7 +147,7 @@ async def get_by_id(credit_note_id: str) -> CreditNote | None:
         return None
 
     cursor = await conn.execute(
-        "SELECT * FROM credit_note_line_items WHERE credit_note_id = ? ORDER BY id",
+        "SELECT * FROM credit_note_line_items WHERE credit_note_id = $1 ORDER BY id",
         (credit_note_id,),
     )
     rows = await cursor.fetchall()
@@ -166,24 +165,31 @@ async def list_credit_notes(
 ) -> list[CreditNote]:
     conn = get_connection()
     org_id = get_org_id()
-    query = "SELECT * FROM credit_notes WHERE (organization_id = ? OR organization_id IS NULL)"
+    n = 1
+    query = f"SELECT * FROM credit_notes WHERE (organization_id = ${n} OR organization_id IS NULL)"
     params: list = [org_id]
+    n += 1
     if invoice_id:
-        query += " AND invoice_id = ?"
+        query += f" AND invoice_id = ${n}"
         params.append(invoice_id)
+        n += 1
     if billing_entity:
-        query += " AND billing_entity = ?"
+        query += f" AND billing_entity = ${n}"
         params.append(billing_entity)
+        n += 1
     if status:
-        query += " AND status = ?"
+        query += f" AND status = ${n}"
         params.append(status)
+        n += 1
     if start_date:
-        query += " AND created_at >= ?"
+        query += f" AND created_at >= ${n}"
         params.append(start_date)
+        n += 1
     if end_date:
-        query += " AND created_at <= ?"
+        query += f" AND created_at <= ${n}"
         params.append(end_date)
-    query += " ORDER BY created_at DESC LIMIT ?"
+        n += 1
+    query += f" ORDER BY created_at DESC LIMIT ${n}"
     params.append(limit)
     cursor = await conn.execute(query, params)
     rows = await cursor.fetchall()
@@ -224,7 +230,7 @@ async def apply_credit_note(credit_note_id: str) -> ApplyCreditNoteResult:
     auto_paid = False
     async with transaction() as conn:
         cursor = await conn.execute(
-            "SELECT total, amount_credited, status FROM invoices WHERE id = ?", (inv_id,)
+            "SELECT total, amount_credited, status FROM invoices WHERE id = $1", (inv_id,)
         )
         inv_row = await cursor.fetchone()
         if not inv_row:
@@ -235,19 +241,19 @@ async def apply_credit_note(credit_note_id: str) -> ApplyCreditNoteResult:
         now = datetime.now(UTC).isoformat()
 
         await conn.execute(
-            "UPDATE invoices SET amount_credited = ?, updated_at = ? WHERE id = ?",
+            "UPDATE invoices SET amount_credited = $1, updated_at = $2 WHERE id = $3",
             (new_credited, now, inv_id),
         )
 
         if balance_due <= 0 and inv.get("status") != "paid":
             await conn.execute(
-                "UPDATE invoices SET status = 'paid', updated_at = ? WHERE id = ?",
+                "UPDATE invoices SET status = 'paid', updated_at = $1 WHERE id = $2",
                 (now, inv_id),
             )
             auto_paid = True
 
         await conn.execute(
-            "UPDATE credit_notes SET status = 'applied', updated_at = ? WHERE id = ?",
+            "UPDATE credit_notes SET status = 'applied', updated_at = $1 WHERE id = $2",
             (now, credit_note_id),
         )
 
@@ -262,14 +268,9 @@ async def set_xero_credit_note_id(credit_note_id: str, xero_credit_note_id: str)
     conn = get_connection()
     org_id = get_org_id()
     now = datetime.now(UTC).isoformat()
-    params: list = [xero_credit_note_id, now, credit_note_id]
-    where = "WHERE id = ?"
-    where += " AND organization_id = ?"
-    params.append(org_id)
     await conn.execute(
-        "UPDATE credit_notes SET xero_credit_note_id = ?, xero_sync_status = 'synced', updated_at = ? "
-        + where,
-        params,
+        "UPDATE credit_notes SET xero_credit_note_id = $1, xero_sync_status = 'synced', updated_at = $2 WHERE id = $3 AND organization_id = $4",
+        (xero_credit_note_id, now, credit_note_id, org_id),
     )
     await conn.commit()
 
@@ -278,13 +279,9 @@ async def set_credit_note_sync_status(credit_note_id: str, status: str) -> None:
     conn = get_connection()
     org_id = get_org_id()
     now = datetime.now(UTC).isoformat()
-    params: list = [status, now, credit_note_id]
-    where = "WHERE id = ?"
-    where += " AND organization_id = ?"
-    params.append(org_id)
     await conn.execute(
-        "UPDATE credit_notes SET xero_sync_status = ?, updated_at = ? " + where,
-        params,
+        "UPDATE credit_notes SET xero_sync_status = $1, updated_at = $2 WHERE id = $3 AND organization_id = $4",
+        (status, now, credit_note_id, org_id),
     )
     await conn.commit()
 
@@ -296,7 +293,7 @@ async def list_unsynced_credit_notes() -> list[CreditNote]:
     cursor = await conn.execute(
         """SELECT id, credit_note_number, billing_entity, total, status, created_at
            FROM credit_notes
-           WHERE (organization_id = ? OR organization_id IS NULL)
+           WHERE (organization_id = $1 OR organization_id IS NULL)
              AND status = 'applied'
              AND xero_credit_note_id IS NULL
            ORDER BY created_at""",
@@ -315,7 +312,7 @@ async def list_credit_notes_needing_reconciliation() -> list[CreditNote]:
                   cn.xero_credit_note_id, cn.xero_sync_status,
                   (SELECT COUNT(*) FROM credit_note_line_items WHERE credit_note_id = cn.id) AS line_count
            FROM credit_notes cn
-           WHERE (cn.organization_id = ? OR cn.organization_id IS NULL)
+           WHERE (cn.organization_id = $1 OR cn.organization_id IS NULL)
              AND cn.xero_credit_note_id IS NOT NULL
              AND cn.xero_sync_status != 'mismatch'
            ORDER BY cn.created_at""",
@@ -331,7 +328,7 @@ async def list_failed_credit_notes() -> list[CreditNote]:
     cursor = await conn.execute(
         """SELECT id, credit_note_number, billing_entity, total, status, created_at
            FROM credit_notes
-           WHERE (organization_id = ? OR organization_id IS NULL)
+           WHERE (organization_id = $1 OR organization_id IS NULL)
              AND xero_sync_status = 'failed'
            ORDER BY created_at""",
         (org_id,),
@@ -346,7 +343,7 @@ async def list_mismatch_credit_notes() -> list[CreditNote]:
     cursor = await conn.execute(
         """SELECT id, credit_note_number, billing_entity, total, xero_credit_note_id, created_at
            FROM credit_notes
-           WHERE (organization_id = ? OR organization_id IS NULL)
+           WHERE (organization_id = $1 OR organization_id IS NULL)
              AND xero_sync_status = 'mismatch'
            ORDER BY created_at""",
         (org_id,),

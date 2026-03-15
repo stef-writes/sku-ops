@@ -47,7 +47,7 @@ async def save(user_id: str, session_id: str, artifacts: list[dict]) -> None:
     await conn.executemany(
         """INSERT INTO memory_artifacts
                (id, org_id, user_id, session_id, type, subject, content, tags, created_at, expires_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)""",
         rows,
     )
     await conn.commit()
@@ -65,10 +65,10 @@ async def recall(user_id: str, limit: int = 15) -> str:
     cur = await conn.execute(
         """SELECT type, subject, content, created_at
            FROM memory_artifacts
-           WHERE org_id = ? AND user_id = ?
-             AND (expires_at IS NULL OR expires_at > ?)
+           WHERE org_id = $1 AND user_id = $2
+             AND (expires_at IS NULL OR expires_at > $3)
            ORDER BY created_at DESC
-           LIMIT ?""",
+           LIMIT $4""",
         (org_id, user_id, now, limit),
     )
     rows = await cur.fetchall()

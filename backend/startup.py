@@ -96,12 +96,11 @@ async def lifespan(app: FastAPI):
 
     from shared.infrastructure.config import (
         ANTHROPIC_AVAILABLE,
-        DATABASE_URL,
         OPENAI_AVAILABLE,
         SENTRY_DSN,
     )
 
-    db_type = "postgres" if "postgresql" in (DATABASE_URL or "") else "sqlite"
+    db_type = "postgres"
     logger.info(
         "Application ready — env=%s, db=%s, sentry=%s, ai=%s, embeddings=%s",
         "production" if is_deployed else ("test" if is_test else "development"),

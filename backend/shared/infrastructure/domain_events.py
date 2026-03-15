@@ -119,7 +119,7 @@ async def _already_processed(event_id: str, handler_name: str) -> bool:
 
         conn = get_connection()
         cursor = await conn.execute(
-            "SELECT 1 FROM processed_events WHERE event_id = ? AND handler_name = ?",
+            "SELECT 1 FROM processed_events WHERE event_id = $1 AND handler_name = $2",
             (event_id, handler_name),
         )
         return (await cursor.fetchone()) is not None
@@ -135,8 +135,8 @@ async def _mark_processed(event_id: str, handler_name: str, event_type: str) -> 
 
         conn = get_connection()
         await conn.execute(
-            "INSERT OR IGNORE INTO processed_events (event_id, handler_name, event_type, processed_at) "
-            "VALUES (?, ?, ?, ?)",
+            "INSERT INTO processed_events (event_id, handler_name, event_type, processed_at) "
+            "VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
             (event_id, handler_name, event_type, datetime.now(UTC).isoformat()),
         )
         await conn.commit()
