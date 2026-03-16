@@ -266,8 +266,7 @@ class TestWSChatStreaming:
     @patch("assistant.api.ws_chat.route_query", new_callable=AsyncMock, return_value="unified")
     @patch("assistant.api.ws_chat._agent")
     @patch("assistant.api.ws_chat.ANTHROPIC_AVAILABLE", True)
-    @pytest.mark.usefixtures("_mock_route")
-    def test_session_id_assigned_when_missing(self, mock_agent, client):
+    def test_session_id_assigned_when_missing(self, mock_agent, mock_route, client):
         """When no session_id is provided, one should be auto-assigned."""
         mock_stream = _make_mock_stream(text_chunks=["Hi there!"])
         mock_agent.run_stream_events = mock_stream
@@ -291,8 +290,7 @@ class TestWSChatStreaming:
     @patch("assistant.api.ws_chat.route_query", new_callable=AsyncMock, return_value="unified")
     @patch("assistant.api.ws_chat._agent")
     @patch("assistant.api.ws_chat.ANTHROPIC_AVAILABLE", True)
-    @pytest.mark.usefixtures("_mock_route")
-    def test_session_id_preserved_when_provided(self, mock_agent, client):
+    def test_session_id_preserved_when_provided(self, mock_agent, mock_route, client):
         """When session_id is provided, it should be echoed back."""
         mock_stream = _make_mock_stream(text_chunks=["Hi!"])
         mock_agent.run_stream_events = mock_stream
@@ -315,8 +313,7 @@ class TestWSChatStreaming:
     @patch("assistant.api.ws_chat.route_query", new_callable=AsyncMock, return_value="unified")
     @patch("assistant.api.ws_chat._agent")
     @patch("assistant.api.ws_chat.ANTHROPIC_AVAILABLE", True)
-    @pytest.mark.usefixtures("_mock_route")
-    def test_done_payload_has_usage_fields(self, mock_agent, client):
+    def test_done_payload_has_usage_fields(self, mock_agent, mock_route, client):
         mock_stream = _make_mock_stream(text_chunks=["Report ready."])
         mock_agent.run_stream_events = mock_stream
 
@@ -340,8 +337,7 @@ class TestWSChatErrors:
     @patch("assistant.api.ws_chat.route_query", new_callable=AsyncMock, return_value="unified")
     @patch("assistant.api.ws_chat._agent")
     @patch("assistant.api.ws_chat.ANTHROPIC_AVAILABLE", True)
-    @pytest.mark.usefixtures("_mock_route")
-    def test_agent_exception_returns_chat_error(self, mock_agent, client):
+    def test_agent_exception_returns_chat_error(self, mock_agent, mock_route, client):
         """If the agent raises, client should get a chat.error event."""
 
         async def _failing_stream(*args, **kwargs):
@@ -361,8 +357,7 @@ class TestWSChatErrors:
     @patch("assistant.api.ws_chat.route_query", new_callable=AsyncMock, return_value="unified")
     @patch("assistant.api.ws_chat._agent")
     @patch("assistant.api.ws_chat.ANTHROPIC_AVAILABLE", True)
-    @pytest.mark.usefixtures("_mock_route")
-    def test_duplicate_generation_rejected(self, mock_agent, client):
+    def test_duplicate_generation_rejected(self, mock_agent, mock_route, client):
         """Sending a second chat while one is streaming should return an error."""
 
         async def _slow_stream(*args, **kwargs):

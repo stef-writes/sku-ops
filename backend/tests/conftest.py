@@ -1,9 +1,9 @@
 """Root pytest configuration — environment variables and shared fixtures.
 
 All backend tests run against Postgres. The test database (sku_ops_test)
-is auto-created by ``./bin/dev db``. Fixtures initialize the schema via
-init_db() and seed minimal data. Sub-directory conftest files may add
-fixtures specific to their scope (e.g. HTTP client for api tests).
+is auto-created by ``./bin/dev db``. A single session-scoped TestClient
+boots the ASGI app once; sub-directory conftest files add fixtures
+specific to their scope (e.g. DB seeding, auth helpers).
 """
 
 import os
@@ -19,17 +19,39 @@ os.environ.setdefault(
 
 
 import pytest
-import pytest_asyncio
 
 import finance.application.event_handlers  # noqa: F401 — registers domain event handlers
 import inventory.application.event_handlers  # noqa: F401
 import shared.infrastructure.ws_bridge  # noqa: F401
-from shared.infrastructure.logging_config import org_id_var, user_id_var
 from tests.helpers.events import EventCollector
 
+# ── Session-scoped app client ────────────────────────────────────────────────
 
-async def _truncate_all(conn) -> None:
-    """Truncate all application tables for test isolation."""
+
+@pytest.fixture(scope="session")
+def _app_client():
+    """Session-scoped TestClient — boots the ASGI app once for the entire test run.
+
+    All test directories share this single client so that init_db/close_db
+    lifecycle is consistent (no pool corruption from overlapping lifespans).
+    """
+    from starlette.testclient import TestClient
+
+    from server import app
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        yield client
+
+
+# ── DB seeding helpers (run inside the app event loop via portal.call) ────────
+
+
+async def _truncate_and_seed():
+    """Truncate all tables and seed minimal data for test isolation."""
+    from shared.infrastructure.database import get_connection
+    from shared.infrastructure.logging_config import org_id_var, user_id_var
+
+    conn = get_connection()
     await conn.execute(
         """DO $$
         DECLARE r RECORD;
@@ -41,17 +63,9 @@ async def _truncate_all(conn) -> None:
     )
     await conn.commit()
 
-
-@pytest_asyncio.fixture
-async def db():
-    """Initialize Postgres test DB, seed minimal data. Cleanup on teardown."""
-    from shared.infrastructure.database import close_db, get_connection, init_db
-
-    await init_db()
-    conn = get_connection()
-    await _truncate_all(conn)
     org_id_var.set("default")
     user_id_var.set("user-1")
+
     await conn.execute(
         """INSERT INTO organizations (id, name, slug, created_at)
            VALUES ('default', 'Default', 'default', NOW())
@@ -60,27 +74,31 @@ async def db():
     await conn.execute(
         """INSERT INTO departments (id, name, code, description, sku_count, organization_id, created_at)
            VALUES ('dept-1', 'Hardware', 'HDW', 'Hardware dept', 0, 'default', NOW())
-           ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, code = EXCLUDED.code, description = EXCLUDED.description, sku_count = EXCLUDED.sku_count, organization_id = EXCLUDED.organization_id"""
+           ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, code = EXCLUDED.code,
+           description = EXCLUDED.description, sku_count = EXCLUDED.sku_count,
+           organization_id = EXCLUDED.organization_id"""
     )
     await conn.execute(
         """INSERT INTO users (id, email, password, name, role, is_active, organization_id, created_at)
            VALUES ('user-1', 'test@test.com', 'hash', 'Test User', 'admin', 1, 'default', NOW())
-           ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password, name = EXCLUDED.name, role = EXCLUDED.role, is_active = EXCLUDED.is_active, organization_id = EXCLUDED.organization_id"""
+           ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password,
+           name = EXCLUDED.name, role = EXCLUDED.role, is_active = EXCLUDED.is_active,
+           organization_id = EXCLUDED.organization_id"""
     )
     await conn.execute(
-        """INSERT INTO users (id, email, password, name, role, company, billing_entity, is_active, organization_id, created_at)
-           VALUES ('contractor-1', 'contractor@test.com', 'hash', 'Contractor User', 'contractor', 'ACME', 'ACME Inc', 1, 'default', NOW())
-           ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password, name = EXCLUDED.name, role = EXCLUDED.role, company = EXCLUDED.company, billing_entity = EXCLUDED.billing_entity, is_active = EXCLUDED.is_active, organization_id = EXCLUDED.organization_id"""
+        """INSERT INTO users (id, email, password, name, role, company, billing_entity,
+           is_active, organization_id, created_at)
+           VALUES ('contractor-1', 'contractor@test.com', 'hash', 'Contractor User',
+           'contractor', 'ACME', 'ACME Inc', 1, 'default', NOW())
+           ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password,
+           name = EXCLUDED.name, role = EXCLUDED.role, company = EXCLUDED.company,
+           billing_entity = EXCLUDED.billing_entity, is_active = EXCLUDED.is_active,
+           organization_id = EXCLUDED.organization_id"""
     )
     await conn.commit()
-    yield
-    await close_db()
 
 
-@pytest_asyncio.fixture
-async def _db(db):
-    """Alias for ``db`` — many test files reference this name."""
-    yield
+# ── Shared fixtures ──────────────────────────────────────────────────────────
 
 
 @pytest.fixture
@@ -102,23 +120,3 @@ def event_collector():
 
     with patch("shared.infrastructure.domain_events.dispatch", side_effect=_capturing_dispatch):
         yield collector
-
-
-@pytest_asyncio.fixture
-async def _db_with_bcrypt_user(db):
-    """DB with a user whose password is a real bcrypt hash (for auth endpoint tests)."""
-    import bcrypt
-
-    from shared.infrastructure.database import get_connection
-
-    hashed = bcrypt.hashpw(b"secret123", bcrypt.gensalt()).decode("utf-8")
-    conn = get_connection()
-    await conn.execute(
-        "INSERT INTO users "
-        "(id, email, password, name, role, is_active, organization_id, created_at) "
-        "VALUES ('bcrypt-user-1', 'bcrypt@test.com', $1, 'Bcrypt User', 'admin', 1, 'default', NOW()) "
-        "ON CONFLICT (id) DO UPDATE SET password = EXCLUDED.password",
-        (hashed,),
-    )
-    await conn.commit()
-    yield
