@@ -2379,8 +2379,8 @@ dev = [
 dev = [
     { name = "commitizen", specifier = ">=4.12.1" },
     { name = "cz-conventional-gitmoji", specifier = ">=0.7.0" },
-    { name = "pytest", specifier = ">=8.0,<9" },
-    { name = "pytest-asyncio", specifier = ">=0.23,<0.24" },
+    { name = "pytest", specifier = ">=8.0,<10" },
+    { name = "pytest-asyncio", specifier = ">=0.23,<1.4" },
     { name = "pytest-cov", specifier = ">=6.0" },
     { name = "pytest-timeout", specifier = ">=2.3" },
     { name = "rich", specifier = ">=14.0.0" },

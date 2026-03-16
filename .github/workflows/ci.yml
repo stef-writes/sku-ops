@@ -35,11 +35,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@v5           # v5.3.0
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
-      - uses: astral-sh/setup-uv@v3            # v3.2.0
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
 
