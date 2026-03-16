@@ -14,7 +14,7 @@ sku-ops-backend = { workspace = true }
 dev = [
     "sku-ops-backend",
     "pytest>=8.0,<10",
-    "pytest-asyncio>=0.23,<0.24",
+    "pytest-asyncio>=0.23,<1.4",
     "pytest-cov>=6.0",
     "pytest-timeout>=2.3",
     "ruff>=0.14.0",
