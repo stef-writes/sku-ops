@@ -53,6 +53,7 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     name: str
+    org_id: str = DEFAULT_ORG_ID
 
 
 class UserResponse(BaseModel):
@@ -215,7 +216,7 @@ async def register(body: RegisterRequest) -> AuthResponse:
         email=body.email,
         password_hash=hashed,
         name=body.name,
-        organization_id=DEFAULT_ORG_ID,
+        organization_id=body.org_id,
         created_at=now,
     )
 

@@ -72,13 +72,13 @@ npm run dev              # start backend + frontend (concurrently)
 
 ## Environment
 
-Configuration is environment-aware (`ENV=development|staging|production|test`). See `backend/.env.example` for all available settings.
+Configuration is environment-aware (`ENV=development|test|production`). See `backend/.env.example` for all available settings.
 
-| | Development | Staging | Production |
+| | Development | Test | Production |
 |---|---|---|---|
-| JWT_SECRET | default | required | required |
-| CORS | permissive (*) | required | required |
-| Demo seed | auto | opt-in | disabled |
+| JWT_SECRET | default | default | required |
+| CORS | permissive (*) | permissive (*) | required |
+| Demo seed | auto | disabled | disabled |
 | Database | SQLite file | Postgres | Postgres |
 | Redis | optional | required | required |
 | WORKERS | 1 | 1+ (with Redis) | 2+ (with Redis) |

@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
 
     if cors_warn_in_deployed:
         logger.warning(
-            "CORS_ORIGINS is permissive (*). Set CORS_ORIGINS explicitly for staging/production."
+            "CORS_ORIGINS is permissive (*). Set CORS_ORIGINS explicitly for production."
         )
 
     await init_db()
@@ -87,6 +87,15 @@ async def lifespan(app: FastAPI):
 
     init_tools()
     logger.info("Tool registry initialized")
+
+    try:
+        from assistant.agents.tools.tool_index import get_tool_index
+
+        idx = get_tool_index()
+        await idx.rebuild()
+        logger.info("Tool index rebuilt (%d tools)", len(idx._names))
+    except (RuntimeError, OSError, ValueError) as e:
+        logger.warning("Tool index warm-up skipped: %s", e)
 
     async def _background_warmup() -> None:
         from shared.infrastructure.logging_config import org_id_var

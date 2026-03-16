@@ -48,6 +48,33 @@ class OpenRouterProvider:
 
         return AsyncOpenAI(api_key=self._api_key, base_url=self._base_url)
 
+    def generate_text(
+        self,
+        prompt: str,
+        system_instruction: str | None,
+        model_id: str,
+    ) -> str | None:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=self._api_key, base_url=self._base_url)
+        openrouter_model = model_id.replace(":", "/") if ":" in model_id else model_id
+        try:
+            messages = []
+            if system_instruction:
+                messages.append({"role": "system", "content": system_instruction})
+            messages.append({"role": "user", "content": prompt})
+            resp = client.chat.completions.create(
+                model=openrouter_model,
+                messages=messages,
+                max_tokens=4096,
+            )
+            if resp.choices and resp.choices[0].message.content:
+                return resp.choices[0].message.content
+            return None
+        except Exception as e:
+            logger.warning("OpenRouter generate_text failed: %s", e)
+            return None
+
 
 def _calc(model_id: str, input_tokens: int, output_tokens: int) -> float:
     from assistant.infrastructure.llm.catalog import get_model_pricing

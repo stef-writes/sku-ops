@@ -20,14 +20,13 @@ import numpy as np
 from catalog.application.queries import list_skus
 from catalog.application.queries import list_vendors as _list_vendors
 from purchasing.application.queries import list_pos
-from shared.infrastructure.config import OPENAI_API_KEY
+from shared.infrastructure.config import EMBEDDING_MODEL, OPENAI_API_KEY
 from shared.infrastructure.db import get_org_id
 from shared.infrastructure.logging_config import org_id_var
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_MODEL = "text-embedding-3-small"
-EMBEDDING_DIM = 1536
+EMBEDDING_DIM = 1536  # text-embedding-3-small; adjust if switching to larger model
 
 
 class ProductLike(Protocol):

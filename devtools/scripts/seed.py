@@ -19,6 +19,13 @@ from catalog.application.queries import (
 )
 from catalog.application.sku_lifecycle import create_product_with_sku as lifecycle_create
 from catalog.domain.department import Department
+from devtools.scripts.seed_data import (
+    ADMIN_USER,
+    CONTRACTOR_USER,
+    DEPARTMENTS,
+    TENANT_USERS,
+    TENANTS,
+)
 from documents.application.import_parser import infer_uom, parse_csv_products, suggest_department
 from inventory.application.inventory_service import process_import_stock_changes
 from shared.infrastructure.database import get_connection
@@ -27,33 +34,12 @@ from shared.infrastructure.org_repo import organization_repo
 
 logger = logging.getLogger(__name__)
 
-DEMO_USER_EMAIL = "admin@demo.local"
-DEMO_USER_PASSWORD = "demo123"  # noqa: S105
-DEMO_CONTRACTOR_EMAIL = "contractor@demo.local"
+DEMO_USER_EMAIL = ADMIN_USER.email
+DEMO_USER_PASSWORD = ADMIN_USER.password
 
 DEMO_CSV_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "SY Inventory - Enhanced.csv")
 DEMO_PRODUCT_LIMIT = 2000
 DEMO_PRODUCT_PER_ORG = 80
-
-DEMO_TENANTS = [
-    {"id": "north", "name": "Supply Yard North", "slug": "north"},
-    {"id": "south", "name": "Supply Yard South", "slug": "south"},
-]
-DEMO_USERS_PER_ORG = [
-    {"email": "admin@{slug}.demo", "name": "Admin", "role": "admin"},
-    {"email": "contractor@{slug}.demo", "name": "Contractor", "role": "contractor"},
-]
-
-STANDARD_DEPARTMENTS = [
-    {"name": "Lumber", "code": "LUM", "description": "Wood, plywood, boards"},
-    {"name": "Plumbing", "code": "PLU", "description": "Pipes, fittings, fixtures"},
-    {"name": "Electrical", "code": "ELE", "description": "Wiring, outlets, switches"},
-    {"name": "Paint", "code": "PNT", "description": "Paint, stains, brushes"},
-    {"name": "Tools", "code": "TOL", "description": "Hand tools, power tools"},
-    {"name": "Hardware", "code": "HDW", "description": "Fasteners, hinges, locks"},
-    {"name": "Garden", "code": "GDN", "description": "Plants, soil, fertilizers"},
-    {"name": "Appliances", "code": "APP", "description": "Home appliances"},
-]
 
 
 def hash_password(pw: str) -> str:
@@ -62,7 +48,7 @@ def hash_password(pw: str) -> str:
 
 async def _get_user_by_email(email: str) -> dict | None:
     conn = get_connection()
-    cursor = await conn.execute("SELECT * FROM users WHERE email = ?", (email,))
+    cursor = await conn.execute("SELECT * FROM users WHERE email = $1", (email,))
     row = await cursor.fetchone()
     return dict(row) if row and hasattr(row, "keys") else None
 
@@ -71,7 +57,7 @@ async def _insert_user(user_dict: dict) -> None:
     conn = get_connection()
     await conn.execute(
         "INSERT INTO users (id, email, password, name, role, company, billing_entity, phone, is_active, organization_id, created_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
+        " VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10)",
         (
             user_dict["id"],
             user_dict["email"],
@@ -90,9 +76,9 @@ async def _insert_user(user_dict: dict) -> None:
 
 async def seed_standard_departments(organization_id: str = "default") -> None:
     """Create standard departments if not already present."""
-    for d in STANDARD_DEPARTMENTS:
-        if not await get_department_by_code(d["code"]):
-            dept = Department(name=d["name"], code=d["code"], description=d.get("description", ""))
+    for d in DEPARTMENTS:
+        if not await get_department_by_code(d.code):
+            dept = Department(name=d.name, code=d.code, description=d.description)
             d_dict = dept.model_dump()
             d_dict["organization_id"] = organization_id
             await insert_department(d_dict)
@@ -175,33 +161,33 @@ async def seed_demo_inventory(organization_id: str = "default") -> None:
 async def seed_mock_user(organization_id: str = "default") -> None:
     """Create admin and contractor demo users if they don't exist."""
     try:
-        if not await _get_user_by_email(DEMO_USER_EMAIL):
+        if not await _get_user_by_email(ADMIN_USER.email):
             await _insert_user(
                 {
                     "id": str(uuid4()),
-                    "email": DEMO_USER_EMAIL,
-                    "password": hash_password(DEMO_USER_PASSWORD),
-                    "name": "Demo Admin",
-                    "role": "admin",
+                    "email": ADMIN_USER.email,
+                    "password": hash_password(ADMIN_USER.password),
+                    "name": ADMIN_USER.name,
+                    "role": ADMIN_USER.role,
                     "organization_id": organization_id,
                 }
             )
-            logger.info("Created user: %s", DEMO_USER_EMAIL)
+            logger.info("Created user: %s", ADMIN_USER.email)
 
-        if not await _get_user_by_email(DEMO_CONTRACTOR_EMAIL):
+        if not await _get_user_by_email(CONTRACTOR_USER.email):
             await _insert_user(
                 {
                     "id": str(uuid4()),
-                    "email": DEMO_CONTRACTOR_EMAIL,
-                    "password": hash_password(DEMO_USER_PASSWORD),
-                    "name": "Demo Contractor",
-                    "role": "contractor",
-                    "company": "Demo Co",
-                    "billing_entity": "Demo Co",
+                    "email": CONTRACTOR_USER.email,
+                    "password": hash_password(CONTRACTOR_USER.password),
+                    "name": CONTRACTOR_USER.name,
+                    "role": CONTRACTOR_USER.role,
+                    "company": CONTRACTOR_USER.company,
+                    "billing_entity": CONTRACTOR_USER.billing_entity,
                     "organization_id": organization_id,
                 }
             )
-            logger.info("Created user: %s", DEMO_CONTRACTOR_EMAIL)
+            logger.info("Created user: %s", CONTRACTOR_USER.email)
     except (ValueError, RuntimeError, OSError) as e:
         logger.warning("Mock user seed: %s", e)
 
@@ -209,7 +195,7 @@ async def seed_mock_user(organization_id: str = "default") -> None:
 async def seed_demo_tenants() -> None:
     """Seed multi-tenant demo: North + South orgs with users, departments, products."""
     try:
-        existing = await organization_repo.get_by_slug("north")
+        existing = await organization_repo.get_by_slug(TENANTS[0].slug)
         if existing:
             logger.info("Demo tenants already exist, skipping")
             return
@@ -224,39 +210,38 @@ async def seed_demo_tenants() -> None:
         else:
             rows = []
 
-        for org in DEMO_TENANTS:
-            org_id = org["id"]
+        for tenant in TENANTS:
             await organization_repo.insert(
                 {
-                    "id": org_id,
-                    "name": org["name"],
-                    "slug": org["slug"],
+                    "id": tenant.id,
+                    "name": tenant.name,
+                    "slug": tenant.slug,
                     "created_at": now,
                 }
             )
-            logger.info("Created org: %s", org["name"])
+            logger.info("Created org: %s", tenant.name)
 
-            await seed_standard_departments(org_id)
+            await seed_standard_departments(tenant.id)
 
-            for u in DEMO_USERS_PER_ORG:
-                email = u["email"].format(slug=org["slug"])
+            for u in TENANT_USERS:
+                email = u.email.format(slug=tenant.slug)
                 if not await _get_user_by_email(email):
                     await _insert_user(
                         {
                             "id": str(uuid4()),
                             "email": email,
                             "password": hash_password("demo123"),
-                            "name": u["name"],
-                            "role": u["role"],
-                            "organization_id": org_id,
+                            "name": u.name,
+                            "role": u.role,
+                            "organization_id": tenant.id,
                             "created_at": now,
                         }
                     )
                     logger.info("Created user: %s", email)
 
-            admin_user = await _get_user_by_email(f"admin@{org['slug']}.demo")
+            admin_user = await _get_user_by_email(f"admin@{tenant.slug}.demo")
             if admin_user and rows:
-                org_id_var.set(org_id)
+                org_id_var.set(tenant.id)
                 all_depts_raw = await list_departments()
                 all_depts = [
                     d.model_dump() if hasattr(d, "model_dump") else d for d in all_depts_raw
@@ -298,7 +283,7 @@ async def seed_demo_tenants() -> None:
                         imported += 1
                     except (ValueError, RuntimeError, OSError, KeyError) as e:
                         logger.debug("Demo product skip %s: %s", item.get("name"), e)
-                logger.info("Seeded %d products for %s", imported, org["name"])
+                logger.info("Seeded %d products for %s", imported, tenant.name)
 
         logger.info("Demo tenants seeded successfully")
     except (ValueError, RuntimeError, OSError) as e:

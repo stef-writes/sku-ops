@@ -3,9 +3,9 @@
 Validates JWTs and builds CurrentUser from token claims. No DB
 roundtrip required — all user data comes from the token payload.
 
-AUTH_PROVIDER in config controls the JWT claim shape:
-  supabase  (default) — role in app_metadata.role, user id in sub
-  internal  — role top-level claim, user id in user_id or sub
+Provider is auto-selected by environment:
+  production  → supabase (role in app_metadata.role, user id in sub)
+  dev / test  → internal (role top-level claim, user id in user_id or sub)
 
 In deployed environments, tokens without an explicit organization_id
 claim are rejected with 401. In development/test the DEFAULT_ORG_ID

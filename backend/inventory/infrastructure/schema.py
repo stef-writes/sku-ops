@@ -16,7 +16,7 @@ TABLES: list[str] = [
         reason TEXT,
         user_id TEXT NOT NULL,
         user_name TEXT NOT NULL DEFAULT '',
-        organization_id TEXT,
+        organization_id TEXT NOT NULL,
         created_at TEXT NOT NULL
     )""",
     """CREATE TABLE IF NOT EXISTS cycle_counts (

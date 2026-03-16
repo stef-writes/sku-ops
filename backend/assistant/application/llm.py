@@ -52,8 +52,22 @@ def _detect_media_type(image_bytes: bytes) -> str:
     return "image/jpeg"
 
 
-def generate_text(prompt: str, system_instruction: str | None = None) -> str | None:
-    """Generate text. Returns None if Anthropic is not configured."""
+def generate_text(
+    prompt: str,
+    system_instruction: str | None = None,
+    model_id: str | None = None,
+) -> str | None:
+    """Generate text. Returns None if LLM is not configured.
+
+    When model_id is provided, uses the active LLM provider (OpenRouter or Anthropic).
+    When model_id is None, uses ANTHROPIC_FAST_MODEL via raw client (legacy path).
+    """
+    if model_id:
+        try:
+            provider = get_provider()
+            return provider.generate_text(prompt, system_instruction, model_id)
+        except RuntimeError:
+            pass
     client = _get_client()
     if not client:
         return None

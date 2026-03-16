@@ -59,12 +59,15 @@ async def update_item_counted(
     notes: str | None,
 ) -> CycleCountItem | None:
     conn = get_connection()
+    org_id = get_org_id()
+    # Verify the parent cycle count belongs to this org before mutating the item.
     cursor = await conn.execute(
         """UPDATE cycle_count_items
            SET counted_qty = $1, variance = $2, notes = $3
            WHERE id = $4
+             AND cycle_count_id IN (SELECT id FROM cycle_counts WHERE organization_id = $5)
            RETURNING *""",
-        (counted_qty, variance, notes, item_id),
+        (counted_qty, variance, notes, item_id, org_id),
     )
     row = await cursor.fetchone()
     await conn.commit()
@@ -78,11 +81,12 @@ async def commit_count(
 ) -> bool:
     """Atomically transition status open -> committed. Returns False if already committed."""
     conn = get_connection()
+    org_id = get_org_id()
     cursor = await conn.execute(
         """UPDATE cycle_counts
            SET status = 'committed', committed_by_id = $1, committed_at = $2
-           WHERE id = $3 AND status = 'open'""",
-        (committed_by_id, committed_at, count_id),
+           WHERE id = $3 AND status = 'open' AND organization_id = $4""",
+        (committed_by_id, committed_at, count_id, org_id),
     )
     await conn.commit()
     return cursor.rowcount > 0
@@ -118,9 +122,13 @@ async def list_counts(status: str | None = None) -> list[CycleCount]:
 
 async def list_items(cycle_count_id: str) -> list[CycleCountItem]:
     conn = get_connection()
+    org_id = get_org_id()
     cursor = await conn.execute(
-        "SELECT * FROM cycle_count_items WHERE cycle_count_id = $1 ORDER BY sku ASC",
-        (cycle_count_id,),
+        """SELECT cci.* FROM cycle_count_items cci
+           JOIN cycle_counts cc ON cc.id = cci.cycle_count_id
+           WHERE cci.cycle_count_id = $1 AND cc.organization_id = $2
+           ORDER BY cci.sku ASC""",
+        (cycle_count_id, org_id),
     )
     rows = await cursor.fetchall()
     return [CycleCountItem.model_validate(dict(r)) for r in rows]
@@ -128,9 +136,12 @@ async def list_items(cycle_count_id: str) -> list[CycleCountItem]:
 
 async def get_item(item_id: str, cycle_count_id: str) -> CycleCountItem | None:
     conn = get_connection()
+    org_id = get_org_id()
     cursor = await conn.execute(
-        "SELECT * FROM cycle_count_items WHERE id = $1 AND cycle_count_id = $2",
-        (item_id, cycle_count_id),
+        """SELECT cci.* FROM cycle_count_items cci
+           JOIN cycle_counts cc ON cc.id = cci.cycle_count_id
+           WHERE cci.id = $1 AND cci.cycle_count_id = $2 AND cc.organization_id = $3""",
+        (item_id, cycle_count_id, org_id),
     )
     row = await cursor.fetchone()
     return CycleCountItem.model_validate(dict(row)) if row else None

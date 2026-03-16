@@ -74,6 +74,7 @@ async def _create_request_in_db(product, job_id="JOB-001", service_address="123 
         job_id=job_id,
         service_address=service_address,
         notes="Test request",
+        organization_id="default",
     )
     await material_request_repo.insert(req)
     return req

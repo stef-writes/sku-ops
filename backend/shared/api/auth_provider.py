@@ -3,21 +3,18 @@
 The backend validates JWTs using JWT_SECRET regardless of provider. This
 module handles the differences in claim shape between providers.
 
-Configure with AUTH_PROVIDER env var:
-  supabase  (default) — role in app_metadata.role, user id in sub
-  internal  — role top-level claim, user id in user_id or sub
+Provider selection is automatic:
+  production  → supabase (role in app_metadata.role, user id in sub)
+  dev / test  → internal (role top-level, user id in user_id or sub)
 
-Adding a new provider:
-  1. Add a new branch in resolve_claims() below.
-  2. Add the provider name to AUTH_PROVIDER validation in config.py.
-  3. No other code changes needed — all callers use resolve_claims().
+No runtime flag needed — the environment determines the provider.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from shared.infrastructure.config import AUTH_PROVIDER
+from shared.infrastructure.config import is_production
 
 
 @dataclass(frozen=True)
@@ -37,9 +34,9 @@ def resolve_claims(payload: dict) -> ResolvedClaims:
 
     Raises ValueError if a required claim (role, user_id) is missing.
     """
-    if AUTH_PROVIDER == "internal":
-        return _resolve_internal(payload)
-    return _resolve_supabase(payload)
+    if is_production:
+        return _resolve_supabase(payload)
+    return _resolve_internal(payload)
 
 
 def _resolve_supabase(payload: dict) -> ResolvedClaims:
@@ -65,7 +62,8 @@ def _resolve_supabase(payload: dict) -> ResolvedClaims:
 
     email = payload.get("email") or ""
     name = payload.get("name") or (payload.get("user_metadata") or {}).get("name") or ""
-    org_id = payload.get("organization_id") or None
+    app_meta = payload.get("app_metadata") or {}
+    org_id = app_meta.get("organization_id") or payload.get("organization_id") or None
 
     return ResolvedClaims(
         user_id=user_id,

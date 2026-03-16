@@ -25,10 +25,10 @@ asyncpg + FastAPI + asyncio is exactly the environment contextvars were designed
 Only true port-and-adapter pair. Reference implementation. Do not create new ports unless all three criteria are met (see backend-conventions.mdc).
 
 ## Auth provider abstraction
-`shared/api/auth_provider.py` is the only place JWT claims are extracted. All three auth paths call `resolve_claims(payload)`. Adding a provider = one new branch in that file only.
+`shared/api/auth_provider.py` is the only place JWT claims are extracted. Provider is auto-selected: supabase in production, internal in dev/test. All three auth paths call `resolve_claims(payload)`. Adding a provider = one new branch in that file only.
 
 ## Org isolation
-Every write scoped to `org_id` from `get_org_id()` (ambient contextvar set by auth middleware). `DEFAULT_ORG_ID = "default"` is dev/test tooling only — never on a production code path.
+Every write scoped to `org_id` from `get_org_id()` (ambient contextvar set by auth middleware). `Entity.organization_id` has no default — every domain entity must be constructed with an explicit org_id. `DEFAULT_ORG_ID = "default"` exists only for seed scripts and test fixtures.
 
 ## Structured logging
 Module-level `logger = logging.getLogger(__name__)` everywhere. Mutations log at INFO with `extra={"org_id": ..., "<entity>_id": ..., "action": ...}`. No `print()`.

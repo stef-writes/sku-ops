@@ -86,9 +86,10 @@ async def mark_processed(
     processed_at: str,
 ) -> bool:
     conn = get_connection()
+    org_id = get_org_id()
     cursor = await conn.execute(
         """UPDATE material_requests SET status = $1, withdrawal_id = $2, processed_by_id = $3, processed_at = $4
-           WHERE id = $5 AND status = $6""",
+           WHERE id = $5 AND status = $6 AND organization_id = $7""",
         (
             MaterialRequestStatus.PROCESSED,
             withdrawal_id,
@@ -96,6 +97,7 @@ async def mark_processed(
             processed_at,
             request_id,
             MaterialRequestStatus.PENDING,
+            org_id,
         ),
     )
     if cursor.rowcount == 0:

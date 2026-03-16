@@ -1,4 +1,4 @@
-"""Assistant context schema — agent runs and memory artifacts."""
+"""Assistant context schema — agent runs, memory artifacts, and embeddings."""
 
 TABLES: list[str] = [
     """CREATE TABLE IF NOT EXISTS memory_artifacts (
@@ -16,7 +16,7 @@ TABLES: list[str] = [
     """CREATE TABLE IF NOT EXISTS agent_runs (
         id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL,
-        org_id TEXT NOT NULL DEFAULT 'default',
+        org_id TEXT NOT NULL,
         user_id TEXT,
         agent_name TEXT NOT NULL,
         model TEXT NOT NULL,
@@ -35,6 +35,19 @@ TABLES: list[str] = [
         handoff_from TEXT,
         created_at TEXT NOT NULL
     )""",
+    # Persistent embedding store — pgvector-backed semantic search across
+    # all entity types (products, vendors, POs, jobs, memory artifacts, tools).
+    # Replaces in-memory NumPy matrices with durable, ANN-indexed vectors.
+    """CREATE TABLE IF NOT EXISTS embeddings (
+        id TEXT PRIMARY KEY,
+        org_id TEXT NOT NULL,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        content TEXT NOT NULL,
+        content_hash TEXT NOT NULL,
+        embedding vector(1536) NOT NULL,
+        updated_at TEXT NOT NULL
+    )""",
 ]
 
 INDEXES: list[str] = [
@@ -44,4 +57,8 @@ INDEXES: list[str] = [
     "CREATE INDEX IF NOT EXISTS idx_agent_runs_org ON agent_runs(org_id, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_agent_runs_agent ON agent_runs(agent_name, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_agent_runs_created ON agent_runs(created_at)",
+    # Embedding indexes — HNSW for fast approximate nearest-neighbor search,
+    # plus a B-tree for scoped queries by org + entity type.
+    "CREATE INDEX IF NOT EXISTS idx_embeddings_org_type ON embeddings(org_id, entity_type)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_embeddings_entity ON embeddings(org_id, entity_type, entity_id)",
 ]

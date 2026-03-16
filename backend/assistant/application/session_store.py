@@ -13,6 +13,8 @@ import json
 import logging
 import time
 
+from assistant.application.session_state import SessionState
+
 logger = logging.getLogger(__name__)
 
 _SESSIONS: dict = {}
@@ -20,6 +22,40 @@ _SESSION_TTL = 1800  # 30 min
 _MAX_TURNS = 20  # keep last N user+assistant pairs (= 2N messages)
 
 _KEY_PREFIX = "sku_ops:session:"
+_MAX_ENTITIES = 10
+
+
+def _state_to_json(state: SessionState | None) -> str:
+    if state is None:
+        return "{}"
+    entities = [{"type": e.type, "id": e.id, "label": e.label} for e in state.entities]
+    return json.dumps(
+        {
+            "entities": entities,
+            "last_topic": state.last_topic,
+            "updated_at": state.updated_at.isoformat(),
+        }
+    )
+
+
+def _state_from_json(raw: str | None) -> SessionState | None:
+    if not raw or raw == "{}":
+        return None
+    try:
+        from datetime import UTC, datetime
+
+        data = json.loads(raw)
+        from assistant.application.session_state import EntityRef
+
+        entities = [
+            EntityRef(type=e["type"], id=e["id"], label=e["label"])
+            for e in data.get("entities", [])[:_MAX_ENTITIES]
+        ]
+        updated = data.get("updated_at")
+        dt = datetime.fromisoformat(updated) if updated else datetime.now(UTC)
+        return SessionState(entities=entities, last_topic=data.get("last_topic"), updated_at=dt)
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return None
 
 
 def _redis():
@@ -79,6 +115,69 @@ async def clear(session_id: str) -> None:
         await _redis().delete(f"{_KEY_PREFIX}{session_id}")
         return
     _SESSIONS.pop(session_id, None)
+
+
+async def get_state(session_id: str):
+    """Return session state or None. Requires session_store.state module."""
+    if _use_redis():
+        raw = await _redis().hget(f"{_KEY_PREFIX}{session_id}", "state")
+        if raw is None:
+            return None
+        try:
+            d = json.loads(raw)
+            return _dict_to_session_state(d)
+        except (json.JSONDecodeError, TypeError, KeyError):
+            return None
+    entry = _SESSIONS.get(session_id, {})
+    state = entry.get("state")
+    return state
+
+
+async def update_state(session_id: str, state: SessionState | None) -> None:
+    """Update session state."""
+    if _use_redis():
+        r = _redis()
+        key = f"{_KEY_PREFIX}{session_id}"
+        raw = json.dumps(_session_state_to_dict(state)) if state else "{}"
+        await r.hset(key, "state", raw)
+        await r.expire(key, _SESSION_TTL)
+        return
+    entry = _SESSIONS.setdefault(
+        session_id, {"history": [], "cost_usd": 0.0, "ts": time.monotonic()}
+    )
+    entry["state"] = state
+    entry["ts"] = time.monotonic()
+
+
+def _session_state_to_dict(state) -> dict:
+    from dataclasses import asdict
+
+    return {
+        "entities": [asdict(e) for e in state.entities],
+        "last_topic": state.last_topic,
+        "updated_at": state.updated_at.isoformat() if state.updated_at else None,
+    }
+
+
+def _dict_to_session_state(d: dict):
+    from datetime import UTC, datetime
+
+    from assistant.application.session_state import EntityRef, SessionState
+
+    entities = [EntityRef(**e) for e in d.get("entities", [])]
+    updated = d.get("updated_at")
+    if isinstance(updated, str):
+        try:
+            updated = datetime.fromisoformat(updated)
+        except ValueError:
+            updated = datetime.now(UTC)
+    elif updated is None:
+        updated = datetime.now(UTC)
+    return SessionState(
+        entities=entities[:10],
+        last_topic=d.get("last_topic"),
+        updated_at=updated,
+    )
 
 
 # --------------------------------------------------------------------------

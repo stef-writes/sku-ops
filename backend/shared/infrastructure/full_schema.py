@@ -55,6 +55,9 @@ from purchasing.infrastructure.schema import (
     TABLES as _purchasing_tables,
 )
 from shared.infrastructure.schema import (
+    EXTENSIONS as _shared_extensions,
+)
+from shared.infrastructure.schema import (
     INDEXES as _shared_indexes,
 )
 from shared.infrastructure.schema import (
@@ -88,10 +91,11 @@ _ALL_INDEXES: list[str] = (
     + _assistant_indexes
 )
 
-FULL_SCHEMA: list[str] = _ALL_TABLES + _ALL_INDEXES + _shared_seed
+FULL_SCHEMA: list[str] = _shared_extensions + _ALL_TABLES + _ALL_INDEXES + _shared_seed
 
 # Exported separately so the migration runner can interleave migrations between
 # table creation and index creation (needed when migrations rename columns that
 # existing indexes reference).
+ALL_EXTENSIONS: list[str] = _shared_extensions
 ALL_TABLES: list[str] = _ALL_TABLES
 ALL_INDEXES: list[str] = _ALL_INDEXES

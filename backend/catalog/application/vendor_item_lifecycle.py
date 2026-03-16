@@ -47,8 +47,8 @@ async def add_vendor_item(
         moq=moq,
         is_preferred=is_preferred,
         notes=notes,
+        organization_id=org_id,
     )
-    item.organization_id = org_id
 
     async with transaction():
         if is_preferred:

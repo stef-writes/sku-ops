@@ -2,15 +2,17 @@
 
 Called fire-and-forget via asyncio.create_task(). Never raises — failures are
 logged as warnings and silently discarded so they never affect the user.
+
+Uses the active LLM provider (OpenRouter or Anthropic) when available.
 """
 
+import asyncio
 import json
 import logging
 
-import anthropic
-
-import shared.infrastructure.config as _cfg
+from assistant.agents.core.model_registry import get_model_name
 from assistant.agents.memory.store import save
+from assistant.infrastructure.llm import get_provider
 from shared.infrastructure.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
@@ -30,7 +32,11 @@ async def extract_and_save(
     if not history or len(history) < 4:
         return
     try:
-        if not _cfg.ANTHROPIC_API_KEY:
+        try:
+            provider = get_provider()
+        except RuntimeError:
+            return
+        if not provider.available or provider.provider_name == "stub":
             return
 
         turns = []
@@ -42,15 +48,11 @@ async def extract_and_save(
         if len(turns) < 2:
             return
 
-        client = anthropic.AsyncAnthropic(api_key=_cfg.ANTHROPIC_API_KEY)
-        response = await client.messages.create(
-            model=_cfg.ANTHROPIC_MODEL,
-            max_tokens=512,
-            system=_EXTRACT_SYSTEM,
-            messages=[{"role": "user", "content": "\n\n".join(turns)}],
-        )
-        block = response.content[0]
-        raw = (getattr(block, "text", "") or "").strip()
+        prompt = "\n\n".join(turns)
+        model_id = get_model_name("infra:synthesis")
+        raw = await asyncio.to_thread(provider.generate_text, prompt, _EXTRACT_SYSTEM, model_id)
+        if not raw or not raw.strip():
+            return
 
         if raw.startswith("```"):
             raw = raw.split("```")[1].lstrip("json").strip()

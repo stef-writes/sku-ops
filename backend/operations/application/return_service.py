@@ -65,8 +65,8 @@ async def create_return(
         notes=data.notes,
         processed_by_id=current_user.id,
         processed_by_name=current_user.name,
+        organization_id=org_id,
     )
-    ret.organization_id = org_id
 
     enriched_items: list[ReturnItem] = []
     product_ids: tuple[str, ...] = ()

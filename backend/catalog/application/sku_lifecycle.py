@@ -93,8 +93,8 @@ async def create_sku(
         pack_qty=pack_qty,
         purchase_uom=purchase_uom,
         purchase_pack_qty=purchase_pack_qty,
+        organization_id=org_id,
     )
-    sku.organization_id = org_id
 
     async with transaction():
         await sku_repo.insert(sku)

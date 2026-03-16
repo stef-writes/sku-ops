@@ -64,7 +64,7 @@ Any cross-context mutation must go through the owning context's application faca
 
 ## Database
 
-Postgres everywhere — dev, test, staging, production. No SQLite. Local dev uses `docker-compose.dev.yml` for a lightweight Postgres container. Tests use a `sku_ops_test` database created by the same container.
+Postgres everywhere — dev, test, production. No SQLite. Local dev uses `docker-compose.dev.yml` for a lightweight Postgres container. Tests use a `sku_ops_test` database created by the same container.
 
 All SQL uses native Postgres syntax (`$1`, `$2` placeholders, `NOW()`, `ON CONFLICT`, `::date` casts). There is no dialect abstraction layer.
 
@@ -88,9 +88,9 @@ Do not add `conn` parameters to repos or port signatures. Do not call `get_conne
 
 ## Auth model
 
-JWT validation is stateless — no DB roundtrip per request. `shared/api/auth_deps.py` decodes the token and builds `CurrentUser`. Claim extraction is delegated to `shared/api/auth_provider.py` which is selected by the `AUTH_PROVIDER` config var (`supabase` or `internal`).
+JWT validation is stateless — no DB roundtrip per request. `shared/api/auth_deps.py` decodes the token and builds `CurrentUser`. Claim extraction is delegated to `shared/api/auth_provider.py` which auto-selects the provider: supabase in production, internal in dev/test.
 
-To support a new auth provider: add a branch in `auth_provider.py`, add the name to `_VALID_AUTH_PROVIDERS` in `config.py`. No other files change.
+To support a new auth provider: add a branch in `auth_provider.py`. No other files change.
 
 `CurrentUser.organization_id` is the org isolation key. Every write must be scoped to it. In production, tokens without `organization_id` are rejected at the transport layer. See `deployment-hardening.mdc` for the full auth hardening spec.
 

@@ -39,8 +39,8 @@ async def create_product(
         description=description,
         category_id=category_id,
         category_name=category_name or dept.name,
+        organization_id=org_id,
     )
-    product.organization_id = org_id
 
     async with transaction():
         await product_family_repo.insert(product)

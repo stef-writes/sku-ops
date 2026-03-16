@@ -94,8 +94,8 @@ async def update(vendor_id: str, vendor_dict: dict) -> Vendor | None:
     query += where
     await conn.execute(query, params)
     await conn.execute(
-        "UPDATE vendor_items SET vendor_name = $1 WHERE vendor_id = $2",
-        (new_name, vendor_id),
+        "UPDATE vendor_items SET vendor_name = $1 WHERE vendor_id = $2 AND organization_id = $3",
+        (new_name, vendor_id, org_id),
     )
     await conn.commit()
     return await get_by_id(vendor_id)

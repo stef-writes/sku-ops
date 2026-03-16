@@ -1,0 +1,21 @@
+# Vercel Environment Variables
+#
+# Set these in Vercel dashboard > Project Settings > Environment Variables.
+# All three are REQUIRED for production.
+#
+# These are build-time variables — they are baked into the JS bundle.
+# Changing them requires a redeploy (Vercel > Deployments > Redeploy).
+#
+# See DEPLOY.md for the full deployment guide.
+
+# Backend API URL — all /api calls go here.
+# Must be the Railway deployment URL with no trailing slash.
+VITE_BACKEND_URL=https://your-app.up.railway.app
+
+# Supabase project URL.
+# Find at: Supabase Dashboard > Settings > API > Project URL
+VITE_SUPABASE_URL=https://your-project.supabase.co
+
+# Supabase anonymous key (public, safe for frontend).
+# Find at: Supabase Dashboard > Settings > API > anon public key
+VITE_SUPABASE_ANON_KEY=eyJ...

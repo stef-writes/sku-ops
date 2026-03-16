@@ -105,9 +105,10 @@ class PgPORepo(PORepoPort):
 
     async def get_po_items(self, po_id: str) -> list[POItemRow]:
         conn = get_connection()
+        org_id = get_org_id()
         cursor = await conn.execute(
-            "SELECT * FROM purchase_order_items WHERE po_id = $1 ORDER BY id",
-            (po_id,),
+            "SELECT * FROM purchase_order_items WHERE po_id = $1 AND organization_id = $2 ORDER BY id",
+            (po_id, org_id),
         )
         rows = await cursor.fetchall()
         return [POItemRow.model_validate(dict(r)) for r in rows]
@@ -120,12 +121,13 @@ class PgPORepo(PORepoPort):
         delivered_qty: float | None = None,
     ) -> bool:
         conn = get_connection()
+        org_id = get_org_id()
         cursor = await conn.execute(
             """UPDATE purchase_order_items
                SET status = $1, product_id = COALESCE($2, product_id),
                    delivered_qty = COALESCE($3, delivered_qty)
-               WHERE id = $4 AND status != $5""",
-            (status.value, product_id, delivered_qty, item_id, POItemStatus.ARRIVED.value),
+               WHERE id = $4 AND status != $5 AND organization_id = $6""",
+            (status.value, product_id, delivered_qty, item_id, POItemStatus.ARRIVED.value, org_id),
         )
         await conn.commit()
         return cursor.rowcount > 0
@@ -139,14 +141,15 @@ class PgPORepo(PORepoPort):
         received_by_name: str | None = None,
     ) -> None:
         conn = get_connection()
+        org_id = get_org_id()
         await conn.execute(
             """UPDATE purchase_orders
                SET status = $1,
                    received_at = COALESCE($2, received_at),
                    received_by_id = COALESCE($3, received_by_id),
                    received_by_name = COALESCE($4, received_by_name)
-               WHERE id = $5""",
-            (status, received_at, received_by_id, received_by_name, po_id),
+               WHERE id = $5 AND organization_id = $6""",
+            (status, received_at, received_by_id, received_by_name, po_id, org_id),
         )
         await conn.commit()
 
@@ -210,9 +213,10 @@ class PgPORepo(PORepoPort):
 
     async def set_xero_sync_status(self, po_id: str, status: str, updated_at: str) -> None:
         conn = get_connection()
+        org_id = get_org_id()
         await conn.execute(
-            "UPDATE purchase_orders SET xero_sync_status = $1, updated_at = $2 WHERE id = $3",
-            (status, updated_at, po_id),
+            "UPDATE purchase_orders SET xero_sync_status = $1, updated_at = $2 WHERE id = $3 AND organization_id = $4",
+            (status, updated_at, po_id, org_id),
         )
         await conn.commit()
 
@@ -231,9 +235,10 @@ class PgPORepo(PORepoPort):
 
     async def set_xero_bill_id(self, po_id: str, xero_bill_id: str, updated_at: str) -> None:
         conn = get_connection()
+        org_id = get_org_id()
         await conn.execute(
-            "UPDATE purchase_orders SET xero_bill_id = $1, xero_sync_status = 'synced', updated_at = $2 WHERE id = $3",
-            (xero_bill_id, updated_at, po_id),
+            "UPDATE purchase_orders SET xero_bill_id = $1, xero_sync_status = 'synced', updated_at = $2 WHERE id = $3 AND organization_id = $4",
+            (xero_bill_id, updated_at, po_id, org_id),
         )
         await conn.commit()
 

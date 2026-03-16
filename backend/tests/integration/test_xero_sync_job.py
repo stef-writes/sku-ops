@@ -70,6 +70,7 @@ async def _make_withdrawal(billing_entity="On Point LLC") -> str:
             processed_by_id="user-1",
             processed_by_name="Test",
             created_at="2025-01-01T00:00:00Z",
+            organization_id="default",
         )
     )
     return wid

@@ -135,6 +135,7 @@ async def create_withdrawal(
         payment_status=PaymentStatus.UNPAID,
         processed_by_id=current_user.id,
         processed_by_name=current_user.name,
+        organization_id=org_id,
     )
     withdrawal.compute_totals(tax_rate=tax_rate)
 
@@ -171,7 +172,6 @@ async def create_withdrawal(
             user_name=current_user.name,
         )
 
-        withdrawal.organization_id = org_id
         await withdrawal_repo.insert(withdrawal)
 
         await _record_withdrawal_ledger(

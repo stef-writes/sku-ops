@@ -1,5 +1,8 @@
 # Agent model configuration — change here to swap models without touching agent code.
 # Uses pydantic-ai model strings: "anthropic:<model>", "openai:<model>", "google-gla:<model>", etc.
 # Environment variable AGENT_PRIMARY_MODEL overrides this file.
-
+#
+# synthesis: workflow synthesis (weekly sales, inventory overview).
+# Env override: MODEL_REGISTRY_INFRA_SYNTHESIS=anthropic/claude-haiku-4-5
 primary: "anthropic:claude-sonnet-4-6"
+synthesis: "anthropic:claude-haiku-4-5"

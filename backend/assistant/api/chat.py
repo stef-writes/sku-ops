@@ -80,11 +80,11 @@ async def chat_assistant(
         }
 
     if not history:
-        memory_ctx = await recall_memory(user_id=user_id)
+        memory_ctx = await recall_memory(user_id=user_id, query=(data.message or "").strip())
         if memory_ctx:
+            # Inject as system message (not fake user turn) to avoid confusing the agent
             history = [
-                {"role": "user", "content": memory_ctx},
-                {"role": "assistant", "content": "Context noted from previous sessions."},
+                {"role": "system", "content": memory_ctx},
             ]
 
     ctx = {

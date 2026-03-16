@@ -1,12 +1,36 @@
 ---
-description: Production deployment requirements — Docker, nginx, CORS, pool, auth, observability
-globs: "{backend/Dockerfile,docker-compose.yml,deploy/**}"
+description: Production deployment requirements — Docker, Railway, Vercel, CORS, pool, auth, observability
+globs: "{backend/Dockerfile,docker-compose.yml,deploy/**,railway.toml,vercel.json}"
 alwaysApply: false
 ---
 
 # Deployment Hardening
 
 Deviations are bugs, not preferences.
+
+## Deployment targets
+
+Primary: Railway (backend) + Vercel (frontend) + Supabase (auth + Postgres).
+Alternative: Self-hosted via `docker-compose.yml` (VPS with nginx/certbot).
+
+There are three environments: `development`, `test`, `production`. There is no staging.
+
+## Railway
+- Deployed via `railway.toml` (Dockerfile builder). `docker-compose.yml` is NOT used on Railway.
+- Railway auto-sets `PORT` — the Dockerfile CMD uses `${PORT:-8000}`.
+- Env vars are set in Railway dashboard > Settings > Variables. See `deploy/railway-env.example`.
+- `DATABASE_URL` must use Supabase **direct** connection (port 5432), NOT the pooler (port 6543). asyncpg prepared statements are incompatible with pgbouncer.
+- `JWT_SECRET` must be the Supabase project's JWT secret — not a random value.
+- `CORS_ORIGINS` must include all stable Vercel domains. `CORS_ORIGIN_REGEX` can match preview deploys.
+- `FRONTEND_URL` needed for Xero OAuth redirects.
+- Health check: `GET /api/health` (configured in `railway.toml`).
+
+## Vercel
+- Root `vercel.json` controls monorepo build: `cd frontend && npm ci && npm run build`.
+- Output: `frontend/dist`. SPA rewrite: all routes → `index.html`.
+- Three `VITE_*` env vars are build-time (baked into JS). Changing requires redeploy.
+- Security headers set in `vercel.json`: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`.
+- Immutable cache headers on `/assets/`.
 
 ## Docker
 - Two-stage build: `builder` (compilers, uv sync) → `runtime` (venv only, no headers)
@@ -15,7 +39,7 @@ Deviations are bugs, not preferences.
 - `CMD` calls `uvicorn` directly via activated venv. No `uv run` wrapper in production.
 - `devtools/` never copied into image
 
-## nginx
+## nginx (VPS path only)
 - `keepalive 32` on upstream; all proxy locations use `proxy_http_version 1.1` + `Connection ""`
 - API timeouts: `proxy_connect_timeout 5s`, `proxy_send_timeout 30s`, `proxy_read_timeout 120s`
 - WebSocket timeouts: `proxy_read_timeout 3600s`, `proxy_send_timeout 3600s`
@@ -25,33 +49,40 @@ Deviations are bugs, not preferences.
 - `/metrics` restricted to loopback + RFC1918 only
 
 ## CORS
-`_enforce_cors()` in `config.py` hard-crashes at startup if `CORS_ORIGINS` is `"*"` or empty in staging/production. Not a warning.
+`_enforce_cors()` in `config.py` hard-crashes at startup if `CORS_ORIGINS` is `"*"` or empty in production. Not a warning.
+`CORS_ORIGIN_REGEX` is applied in addition to `CORS_ORIGINS` — useful for Vercel preview deploy URLs.
 
 ## Connection pool
 `PG_POOL_MAX` per worker × `WORKERS` = total Postgres connections. Size accordingly. `PG_ACQUIRE_TIMEOUT` (default 10s) is the starvation circuit-breaker — requests 503 rather than queue. `PG_COMMAND_TIMEOUT` (default 30s) kills runaway queries.
 
 ## Auth
-- Tokens without `organization_id` → 401/4001 at transport layer in deployed envs
-- `JWT_SECRET` must be set and not the dev default in staging/production — startup crashes otherwise
-- `AUTH_PROVIDER` selects claim shape; claim extraction lives only in `shared/api/auth_provider.py`
+- Tokens without `organization_id` → 401/4001 at transport layer in production
+- `JWT_SECRET` must be set and not the dev default in production — startup crashes otherwise
+- For Supabase: `JWT_SECRET` must be the Supabase project's JWT secret (Dashboard > Settings > API)
+- Provider is auto-selected: supabase in production, internal in dev/test. Claim extraction lives only in `shared/api/auth_provider.py`
 
 ## Health probes
 - `/api/health` — liveness, never blocks on DB, must complete < 100ms
 - `/api/ready` — readiness, checks DB pool. Load balancers gate traffic on this, not `/api/health`
 
 ## Observability
-- `SENTRY_DSN` must be set in production. Do not suppress exceptions to reduce Sentry noise — fix the underlying issue.
+- `SENTRY_DSN` should be set in production. Do not suppress exceptions to reduce Sentry noise — fix the underlying issue.
 - Application logs are JSON (configured in `shared/infrastructure/logging_config.py`). Every log line within a request carries `request_id` from the `X-Request-ID` propagation middleware.
 
-## Required production env vars
+## Required production env vars (Railway)
 ```
 ENV=production
-DATABASE_URL=postgresql://...
-JWT_SECRET=<64-char hex>
-CORS_ORIGINS=https://your-domain.com
-REDIS_URL=redis://redis:6379
-SENTRY_DSN=https://...
-AUTH_PROVIDER=supabase
-PG_POOL_MAX=5    # tune: floor(max_pg_connections / WORKERS)
-WORKERS=2
+DATABASE_URL=postgresql://...          # Supabase direct, port 5432
+JWT_SECRET=<supabase-jwt-secret>       # Must match Supabase project
+CORS_ORIGINS=https://your.vercel.app   # All stable Vercel domains
+REDIS_URL=redis://...                  # Required if WORKERS > 1
+FRONTEND_URL=https://your.vercel.app   # For OAuth redirects
+WORKERS=1                              # Increase with Redis
+```
+
+## Required production env vars (Vercel)
+```
+VITE_BACKEND_URL=https://your.railway.app
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJ...
 ```

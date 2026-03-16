@@ -61,6 +61,7 @@ async def _create_po_with_item(
         status=POStatus.ORDERED,
         created_by_id="user-1",
         created_by_name="Test",
+        organization_id="default",
     )
     await po_repo.insert_po(po)
 
@@ -77,6 +78,7 @@ async def _create_po_with_item(
         suggested_department="HDW",
         status=status,
         product_id=product_id,
+        organization_id="default",
     )
     await po_repo.insert_items([item])
     return po, item

@@ -90,7 +90,7 @@ Any mutation that crosses context boundaries or interacts with external systems 
 
 ### Auth provider
 
-`shared/api/auth_provider.py` — single source of truth for JWT claim extraction. Controlled by `AUTH_PROVIDER` env var (`supabase` or `internal`). All three auth entry points call `resolve_claims(payload)`. Do not add claim path-sniffing anywhere else.
+`shared/api/auth_provider.py` — single source of truth for JWT claim extraction. Provider is auto-selected: supabase in production, internal in dev/test. All three auth entry points call `resolve_claims(payload)`. Do not add claim path-sniffing anywhere else.
 
 ### Adapter pattern
 

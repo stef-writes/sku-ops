@@ -56,6 +56,36 @@ class AnthropicProvider:
             logger.warning("anthropic package not installed. Run: pip install anthropic")
             return None
 
+    def generate_text(
+        self,
+        prompt: str,
+        system_instruction: str | None,
+        model_id: str,
+    ) -> str | None:
+        client = self.get_raw_client()
+        if not client:
+            return None
+        bare = (
+            model_id.split("/", 1)[1]
+            if "/" in model_id
+            else model_id.split(":", 1)[1]
+            if ":" in model_id
+            else model_id
+        )
+        try:
+            kwargs = {
+                "model": bare,
+                "max_tokens": 4096,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+            if system_instruction:
+                kwargs["system"] = system_instruction
+            response = client.messages.create(**kwargs)
+            return response.content[0].text
+        except Exception as e:
+            logger.warning("Anthropic generate_text failed: %s", e)
+            return None
+
     @staticmethod
     def _strip_provider_prefix(model_id: str) -> str:
         """'anthropic/claude-sonnet-4-6' -> 'claude-sonnet-4-6'"""

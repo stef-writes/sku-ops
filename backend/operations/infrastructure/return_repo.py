@@ -135,9 +135,10 @@ async def list_by_withdrawal(withdrawal_id: str) -> list[MaterialReturn]:
 async def link_credit_note(return_id: str, credit_note_id: str) -> None:
     """Set the credit_note_id on a return. Called by finance context via facade."""
     conn = get_connection()
+    org_id = get_org_id()
     await conn.execute(
-        "UPDATE returns SET credit_note_id = $1 WHERE id = $2",
-        (credit_note_id, return_id),
+        "UPDATE returns SET credit_note_id = $1 WHERE id = $2 AND organization_id = $3",
+        (credit_note_id, return_id, org_id),
     )
     await conn.commit()
 

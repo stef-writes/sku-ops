@@ -1,0 +1,76 @@
+# Railway Environment Variables
+#
+# Copy these into Railway dashboard > Settings > Variables.
+# Lines starting with # are comments — Railway ignores them.
+#
+# See DEPLOY.md for the full deployment guide.
+
+# ── REQUIRED (app won't start without these) ─────────────────────────────────
+
+# Must be "production" for Railway deployments.
+ENV=production
+
+# Supabase Postgres direct connection string. Use port 5432 (direct), NOT 6543 (pooler).
+# asyncpg uses prepared statements which are incompatible with pgbouncer.
+# Find at: Supabase Dashboard > Settings > Database > Connection String > Direct
+DATABASE_URL=postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres
+
+# Supabase JWT secret — the backend validates Supabase-issued tokens with this.
+# Find at: Supabase Dashboard > Settings > API > JWT Secret
+# WARNING: A random value will reject ALL Supabase tokens. This MUST match.
+JWT_SECRET=
+
+# Comma-separated allowed origins. Must include all stable Vercel domains.
+# Do NOT use "*" — production rejects it.
+# Example: https://your-app.vercel.app,https://your-app-git-main-yourname.vercel.app
+CORS_ORIGINS=https://your-app.vercel.app
+
+# ── RECOMMENDED ───────────────────────────────────────────────────────────────
+
+# Redis — add a Railway Redis service and reference its URL here.
+# Required when WORKERS > 1 (event hub, chat sessions, sync locks).
+# Optional for single-worker mode — subsystems fall back to in-process memory.
+# REDIS_URL=redis://default:password@redis.railway.internal:6379
+
+# Frontend URL — used for OAuth callback redirects (e.g. Xero).
+# Set to your primary Vercel production domain.
+# FRONTEND_URL=https://your-app.vercel.app
+
+# Sentry error tracking. Get a DSN at https://sentry.io
+# SENTRY_DSN=https://...@sentry.io/...
+
+# Uvicorn worker count. Default 1. Set > 1 only with REDIS_URL.
+# Railway auto-sets PORT — do not set PORT manually.
+WORKERS=1
+
+# ── OPTIONAL ──────────────────────────────────────────────────────────────────
+
+# Regex to allow Vercel preview deployment URLs through CORS.
+# Applied in addition to CORS_ORIGINS. Useful so preview deploys work without
+# updating CORS_ORIGINS each time.
+# CORS_ORIGIN_REGEX=https://frontend-.*\.vercel\.app
+
+# AI providers — set at least one to enable AI features.
+# ANTHROPIC_API_KEY=sk-ant-...
+# OPENROUTER_API_KEY=sk-or-...
+# OPENAI_API_KEY=sk-...
+
+# Model overrides (defaults are sensible)
+# ANTHROPIC_MODEL=claude-sonnet-4-6
+# ANTHROPIC_FAST_MODEL=claude-haiku-4-5
+# AGENT_PRIMARY_MODEL=anthropic:claude-sonnet-4-6
+# SESSION_COST_CAP=2.00
+
+# Xero OAuth 2.0 — register at developer.xero.com
+# XERO_CLIENT_ID=
+# XERO_CLIENT_SECRET=
+# XERO_REDIRECT_URI=https://your-railway-app.up.railway.app/api/xero/callback
+
+# Postgres connection pool tuning
+# PG_POOL_MIN=2
+# PG_POOL_MAX=10
+# PG_ACQUIRE_TIMEOUT=10
+# PG_COMMAND_TIMEOUT=30
+
+# Log level
+# LOG_LEVEL=INFO

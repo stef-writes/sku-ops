@@ -50,9 +50,10 @@ async def insert_period(
 
 async def close_period(period_id: str, closed_by_id: str, closed_at: str) -> None:
     conn = get_connection()
+    org_id = get_org_id()
     await conn.execute(
-        "UPDATE fiscal_periods SET status = 'closed', closed_by_id = $1, closed_at = $2 WHERE id = $3",
-        (closed_by_id, closed_at, period_id),
+        "UPDATE fiscal_periods SET status = 'closed', closed_by_id = $1, closed_at = $2 WHERE id = $3 AND organization_id = $4",
+        (closed_by_id, closed_at, period_id, org_id),
     )
     await conn.commit()
 

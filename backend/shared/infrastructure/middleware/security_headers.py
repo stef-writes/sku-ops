@@ -1,7 +1,7 @@
 """Security headers middleware.
 
 Adds defense-in-depth HTTP headers to every response.
-HSTS is only added in deployed environments (staging/production).
+HSTS is only added in production.
 """
 
 from __future__ import annotations

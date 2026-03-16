@@ -5,11 +5,12 @@ import time
 import jwt
 
 from shared.infrastructure.config import JWT_ALGORITHM, JWT_SECRET
+from shared.kernel.constants import DEFAULT_ORG_ID
 
 
 def make_token(
     user_id: str = "user-1",
-    org_id: str = "default",
+    org_id: str = DEFAULT_ORG_ID,
     role: str = "admin",
     name: str = "Test User",
     email: str = "",

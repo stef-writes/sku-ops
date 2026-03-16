@@ -47,3 +47,12 @@ class LLMProvider(Protocol):
         Returns None if the provider doesn't support raw client access.
         """
         ...
+
+    def generate_text(
+        self,
+        prompt: str,
+        system_instruction: str | None,
+        model_id: str,
+    ) -> str | None:
+        """Generate text from prompt. Used by workflows, enrichment. Returns None on failure."""
+        ...

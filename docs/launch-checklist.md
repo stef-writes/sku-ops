@@ -24,7 +24,7 @@ Production readiness checklist for sku-ops. Work through each section before goi
 - [ ] Verify security headers with [securityheaders.com](https://securityheaders.com): `X-Frame-Options`, `CSP`, `HSTS`, `X-Content-Type-Options`
 - [ ] Confirm nginx rate limiting is active (60 req/min API, 10 req/min auth, 20 req/min chat)
 - [ ] Audit git history for committed secrets: `git log --all -p -- '*.env' '*.pem' '*.key'`
-- [ ] Verify `ALLOW_RESET=false` in production (`config.py` enforces this automatically for staging/production)
+- [ ] Verify `ALLOW_RESET=false` in production (`config.py` enforces this automatically for production)
 - [ ] Verify demo seed endpoints are disabled in production
 - [ ] Ensure `.env` files are in `.gitignore` and `.dockerignore`
 

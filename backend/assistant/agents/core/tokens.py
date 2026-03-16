@@ -1,4 +1,4 @@
-"""Token counting and budget management via tiktoken.
+"""Token counting, budget management, and context compression.
 
 Uses cl100k_base encoding as an approximation for both Anthropic and
 OpenRouter models.  Not exact, but close enough for budget decisions.
@@ -126,16 +126,12 @@ def estimate_turn_tokens(
 # ── History compression ───────────────────────────────────────────────────────
 
 
-def compress_history(
-    history: list[dict] | None,
+# Synchronous fallback — drop oldest turns, keep most recent.
+def _compress_truncate(
+    history: list[dict],
     max_tokens: int = 8000,
-) -> list[dict] | None:
-    """Trim conversation history to fit within *max_tokens*.
-
-    Keeps the most recent turns and drops oldest first.
-    """
-    if not history:
-        return history
+) -> list[dict]:
+    """Trim conversation history by dropping oldest turns first."""
     if len(history) <= 4:
         return history
 
@@ -156,3 +152,105 @@ def compress_history(
         budget_remaining -= t
 
     return kept
+
+
+def compress_history(
+    history: list[dict] | None,
+    max_tokens: int = 8000,
+) -> list[dict] | None:
+    """Synchronous compression — truncation only. Use for non-async callers."""
+    if not history:
+        return history
+    return _compress_truncate(history, max_tokens)
+
+
+async def compress_history_async(
+    history: list[dict] | None,
+    max_tokens: int = 8000,
+) -> list[dict] | None:
+    """Async compression with progressive summarization.
+
+    Before dropping old turns, summarizes them with a cheap LLM call so
+    the reasoning chain is preserved.  Falls back to truncation if the
+    LLM is unavailable or fails.
+
+    Strategy:
+        Tier 1 — Last 3 turns (6 messages) kept verbatim
+        Tier 2 — Older turns summarized into ~300 tokens
+        Tier 3 — If summary + recent still too large, truncate recent
+    """
+    if not history:
+        return history
+    if len(history) <= 6:
+        return history
+
+    total = sum(count_tokens(h.get("content", "")) for h in history)
+    if total <= max_tokens:
+        return history
+
+    # Split into recent (keep) and older (summarize)
+    recent = history[-6:]  # last 3 turns
+    older = history[:-6]
+
+    if not older:
+        return _compress_truncate(history, max_tokens)
+
+    # Attempt progressive summarization
+    summary = await _summarize_turns(older)
+    if summary:
+        result = [
+            {"role": "system", "content": f"[Prior conversation summary]: {summary}"},
+            *recent,
+        ]
+        result_tokens = sum(count_tokens(h.get("content", "")) for h in result)
+        if result_tokens <= max_tokens:
+            return result
+        # Summary + recent still too long — trim the recent portion
+        return _compress_truncate(result, max_tokens)
+
+    # LLM unavailable — fall back to truncation
+    return _compress_truncate(history, max_tokens)
+
+
+async def _summarize_turns(turns: list[dict], max_summary_tokens: int = 300) -> str | None:
+    """Summarize conversation turns using a cheap model.
+
+    Returns None if LLM is unavailable. Never raises.
+    """
+    try:
+        from assistant.infrastructure.llm import get_provider
+
+        provider = get_provider()
+        if not provider.available or provider.provider_name == "stub":
+            return None
+
+        from assistant.agents.core.model_registry import get_model_name
+
+        model_id = get_model_name("infra:synthesis")
+
+        # Build a compact representation of the turns
+        lines = []
+        for t in turns:
+            role = (t.get("role") or "user").upper()
+            content = (t.get("content") or "").strip()[:400]
+            if content:
+                lines.append(f"{role}: {content}")
+        if not lines:
+            return None
+
+        import asyncio
+
+        text = "\n".join(lines)
+        result = await asyncio.to_thread(
+            provider.generate_text,
+            text,
+            "Summarize this conversation concisely. Preserve: entity names, "
+            "numbers, decisions made, questions still open, and any user "
+            "preferences expressed. Max 3-4 sentences.",
+            model_id,
+        )
+        return result.strip() if result else None
+
+    except Exception as e:
+        logger.debug("Turn summarization failed (non-critical): %s", e)
+        return None

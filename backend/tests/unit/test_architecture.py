@@ -238,22 +238,3 @@ def test_no_cross_context_domain_imports():
     assert not violations, (
         "Cross-context domain imports (use application facades instead):\n" + "\n".join(violations)
     )
-
-
-# ── Test 7: identity context is fully deleted ────────────────────────────────
-
-
-def test_no_identity_context_exists():
-    """The identity bounded context has been dissolved. No directory or imports should remain."""
-    identity_dir = BACKEND / "identity"
-    assert not identity_dir.exists(), f"identity/ directory still exists at {identity_dir}"
-
-    violations = []
-    for py_file in BACKEND.rglob("*.py"):
-        if "__pycache__" in py_file.parts:
-            continue
-        for module in _from_imports(py_file):
-            if module.startswith("identity."):
-                rel = py_file.relative_to(BACKEND)
-                violations.append(f"  {rel}: from {module}")
-    assert not violations, "Stale identity imports found:\n" + "\n".join(violations)

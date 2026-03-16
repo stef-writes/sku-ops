@@ -29,3 +29,11 @@ class StubProvider:
 
     def get_raw_client(self) -> Any:
         return None
+
+    def generate_text(
+        self,
+        prompt: str,
+        system_instruction: str | None,
+        model_id: str,
+    ) -> str | None:
+        return "Stub synthesis."

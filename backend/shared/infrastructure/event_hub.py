@@ -1,7 +1,7 @@
 """WebSocket / Redis relay hub — internal plumbing for real-time UI notifications.
 
 This module is the transport layer that delivers ``Event`` envelopes to
-connected WebSocket clients. When Redis is available (production/staging) events
+connected WebSocket clients. When Redis is available (production) events
 are published to a Redis Pub/Sub channel so every worker receives them.
 Without Redis the hub falls back to in-process asyncio queues (dev/test).
 

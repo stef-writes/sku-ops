@@ -58,8 +58,8 @@ async def _record_stock_transaction(
         reason=reason,
         user_id=user_id,
         user_name=user_name,
+        organization_id=get_org_id(),
     )
-    tx.organization_id = get_org_id()
     await repo.insert_transaction(tx)
 
 

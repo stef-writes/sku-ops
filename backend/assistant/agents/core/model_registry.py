@@ -14,7 +14,7 @@ import os
 
 from assistant.infrastructure.llm import get_model as _llm_get_model
 from assistant.infrastructure.llm.cost import calc_cost as _cost_calc
-from shared.infrastructure.config import AGENT_PRIMARY_MODEL
+from shared.infrastructure.config import AGENT_PRIMARY_MODEL, INFRA_SYNTHESIS_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -32,12 +32,20 @@ def _agent_model_id() -> str:
     return m
 
 
+def _synthesis_model_id() -> str:
+    m = INFRA_SYNTHESIS_MODEL
+    if ":" in m and "/" not in m:
+        provider, _, model = m.partition(":")
+        return f"{provider}/{model}"
+    return m
+
+
 _DEFAULTS: dict[str, str] = {
     "agent:unified": _agent_model_id(),
     "agent:inventory": _agent_model_id(),
     "agent:ops": _agent_model_id(),
     "agent:finance": _agent_model_id(),
-    "infra:synthesis": "meta-llama/llama-3.3-70b-instruct",
+    "infra:synthesis": _synthesis_model_id(),
 }
 
 

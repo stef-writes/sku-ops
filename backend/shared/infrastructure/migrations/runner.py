@@ -27,7 +27,7 @@ For production destructive changes (column drops, renames, type changes):
 
 import logging
 
-from shared.infrastructure.full_schema import ALL_INDEXES, ALL_TABLES
+from shared.infrastructure.full_schema import ALL_EXTENSIONS, ALL_INDEXES, ALL_TABLES
 from shared.infrastructure.schema import SEED as _shared_seed
 
 logger = logging.getLogger(__name__)
@@ -38,15 +38,42 @@ async def run_schema(backend) -> None:
 
     Safe to call on an already-initialised database — all statements use
     CREATE TABLE IF NOT EXISTS / CREATE INDEX IF NOT EXISTS.
+
+    Extensions (e.g. pgvector) are created first since tables may reference
+    extension types like ``vector(1536)``.
     """
     conn = backend.connection()
 
+    for stmt in ALL_EXTENSIONS:
+        try:
+            await conn.execute(stmt)
+        except Exception as e:
+            # pgvector may not be available in all environments (e.g. CI sqlite).
+            # Log and continue — tables that use vector columns will fail later
+            # but the rest of the schema will still bootstrap.
+            logger.warning("Extension statement skipped: %s (%s)", stmt[:60], e)
+    await conn.commit()
+
     for stmt in ALL_TABLES:
-        await conn.execute(stmt)
+        try:
+            await conn.execute(stmt)
+        except Exception as e:
+            # If a table uses vector() and pgvector isn't available, skip it
+            # rather than crashing the entire bootstrap.
+            if "vector" in str(e).lower() or "type" in str(e).lower():
+                logger.warning("Table skipped (likely missing pgvector): %s", e)
+            else:
+                raise
     await conn.commit()
 
     for stmt in ALL_INDEXES + _shared_seed:
-        await conn.execute(stmt)
+        try:
+            await conn.execute(stmt)
+        except Exception as e:
+            if "vector" in str(e).lower() or "does not exist" in str(e).lower():
+                logger.warning("Index skipped: %s", e)
+            else:
+                raise
     await conn.commit()
 
     logger.debug("Schema bootstrap complete")

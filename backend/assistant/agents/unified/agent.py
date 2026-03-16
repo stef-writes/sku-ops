@@ -17,6 +17,12 @@ from assistant.agents.core.messages import build_message_history
 from assistant.agents.core.model_registry import get_model
 from assistant.agents.core.runner import run_specialist
 from assistant.agents.core.tokens import budget_tool_result
+from assistant.agents.core.tool_results import (
+    ToolResult,
+    blocks_from_inventory_stats,
+    blocks_from_list_data,
+    blocks_from_pl_summary,
+)
 from assistant.agents.finance.analytics_tools import (
     _get_ar_aging,
     _get_contractor_spend,
@@ -75,6 +81,9 @@ from assistant.agents.purchasing.tools import (
     _list_all_vendors,
 )
 from assistant.agents.trend_analyst import agent as _trend_agent_mod
+from assistant.application.workflows.registry import run_workflow
+from assistant.application.workflows.types import WorkflowDeps
+from shared.infrastructure.database import get_org_id
 from shared.infrastructure.prompt_loader import load_prompt
 
 logger = logging.getLogger(__name__)
@@ -120,12 +129,26 @@ def _get_agent() -> Agent[AgentDeps, str]:
     @_agent.tool
     async def get_inventory_stats(ctx: RunContext[AgentDeps]) -> str:
         """Catalogue summary: total_skus, total_cost_value, low_stock_count, out_of_stock_count."""
-        return budget_tool_result(await _get_inventory_stats())
+        raw = await _get_inventory_stats()
+        result = ToolResult(
+            text=budget_tool_result(raw),
+            blocks=blocks_from_inventory_stats(raw),
+        )
+        return result.text
 
     @_agent.tool
     async def list_low_stock(ctx: RunContext[AgentDeps], limit: int = 20) -> str:
         """List products at or below their reorder point."""
-        return budget_tool_result(await _list_low_stock({"limit": limit}))
+        raw = await _list_low_stock({"limit": limit})
+        result = ToolResult(
+            text=budget_tool_result(raw),
+            blocks=blocks_from_list_data(
+                raw,
+                "Low stock products",
+                ["sku", "name", "quantity", "sell_uom", "min_stock", "department"],
+            ),
+        )
+        return result.text
 
     @_agent.tool
     async def list_departments(ctx: RunContext[AgentDeps]) -> str:
@@ -145,7 +168,25 @@ def _get_agent() -> Agent[AgentDeps, str]:
     @_agent.tool
     async def get_reorder_suggestions(ctx: RunContext[AgentDeps], limit: int = 20) -> str:
         """Priority reorder list: low-stock products ranked by urgency."""
-        return budget_tool_result(await _get_reorder_suggestions({"limit": limit}))
+        raw = await _get_reorder_suggestions({"limit": limit})
+        result = ToolResult(
+            text=budget_tool_result(raw),
+            blocks=blocks_from_list_data(
+                raw,
+                "Reorder suggestions",
+                [
+                    "sku",
+                    "name",
+                    "quantity",
+                    "sell_uom",
+                    "min_stock",
+                    "avg_daily_use",
+                    "days_until_stockout",
+                    "urgency",
+                ],
+            ),
+        )
+        return result.text
 
     @_agent.tool
     async def get_department_health(ctx: RunContext[AgentDeps]) -> str:
@@ -226,7 +267,16 @@ def _get_agent() -> Agent[AgentDeps, str]:
     @_agent.tool
     async def get_outstanding_balances(ctx: RunContext[AgentDeps], limit: int = 20) -> str:
         """Unpaid withdrawal balances grouped by billing entity/contractor."""
-        return budget_tool_result(await _get_outstanding_balances({"limit": limit}))
+        raw = await _get_outstanding_balances({"limit": limit})
+        result = ToolResult(
+            text=budget_tool_result(raw),
+            blocks=blocks_from_list_data(
+                raw,
+                "Outstanding balances",
+                ["entity", "balance", "withdrawal_count", "oldest_unpaid"],
+            ),
+        )
+        return result.text
 
     @_agent.tool
     async def get_revenue_summary(ctx: RunContext[AgentDeps], days: int = 30) -> str:
@@ -236,7 +286,12 @@ def _get_agent() -> Agent[AgentDeps, str]:
     @_agent.tool
     async def get_pl_summary(ctx: RunContext[AgentDeps], days: int = 30) -> str:
         """Profit & loss for the last N days: revenue, COGS, gross profit and margin."""
-        return budget_tool_result(await _get_pl_summary({"days": days}))
+        raw = await _get_pl_summary({"days": days})
+        result = ToolResult(
+            text=budget_tool_result(raw),
+            blocks=blocks_from_pl_summary(raw),
+        )
+        return result.text
 
     @_agent.tool
     async def get_finance_top_products(
@@ -371,6 +426,49 @@ def _get_agent() -> Agent[AgentDeps, str]:
     async def search_jobs_semantic(ctx: RunContext[AgentDeps], query: str, limit: int = 10) -> str:
         """Find jobs by concept. Use when looking for 'that big job on Main Street'."""
         return budget_tool_result(await _search_jobs_semantic({"query": query, "limit": limit}))
+
+    # ── Workflow tools (parallel DAG execution) ──────────────────────────────────────
+
+    @_agent.tool
+    async def run_weekly_sales_report(ctx: RunContext[AgentDeps], days: int = 30) -> str:
+        """Generate a full weekly sales report: revenue, P&L, top products, outstanding balances.
+        Use for 'weekly report', 'sales report', 'finance overview'."""
+        trace_id = ctx.deps.trace_id or None
+        deps = WorkflowDeps(
+            org_id=get_org_id(), user_id=ctx.deps.user_id, days=days, trace_id=trace_id
+        )
+        result = await run_workflow("weekly_sales_report", deps)
+        return result.synthesized_markdown
+
+    @_agent.tool
+    async def run_inventory_overview(ctx: RunContext[AgentDeps]) -> str:
+        """Generate a full inventory overview: stats, department health, low stock, slow movers.
+        Use for 'inventory overview', 'what needs attention', 'stock health'."""
+        trace_id = ctx.deps.trace_id or None
+        deps = WorkflowDeps(
+            org_id=get_org_id(), user_id=ctx.deps.user_id, days=30, trace_id=trace_id
+        )
+        result = await run_workflow("inventory_overview", deps)
+        return result.synthesized_markdown
+
+    # ── Entity graph traversal ───────────────────────────────────────────────────
+
+    @_agent.tool
+    async def traverse_entity_graph(
+        ctx: RunContext[AgentDeps],
+        entity_type: str,
+        entity_id: str,
+    ) -> str:
+        """Follow relationships from any entity (sku, vendor, job, invoice, po).
+        Returns connected entities: suppliers, purchase orders, withdrawals, invoices, etc.
+        Use to understand what's connected to an entity before diving into analysis.
+        entity_type: 'sku', 'vendor', 'job', 'invoice', 'po'."""
+        from assistant.application.entity_graph import neighbors as _graph_neighbors
+
+        result = await _graph_neighbors(entity_type, entity_id)
+        if not result:
+            return f"No graph data found for {entity_type}:{entity_id}"
+        return result.format_for_agent()
 
     # ── Sub-agent delegation tools ────────────────────────────────────────────────
 

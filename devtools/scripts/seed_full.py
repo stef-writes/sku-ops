@@ -15,88 +15,21 @@ import random as _random_mod
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+from devtools.scripts.seed_data import (
+    CONTRACTORS,
+    JOBS,
+    LOW_STOCK_NAMES_FULL,
+    PRODUCTS,
+    RETURN_REASONS,
+    VENDORS,
+)
+
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 _rng = _random_mod.Random(42)
 
 TAX_RATE = 0.10
-
-CONTRACTORS = [
-    {
-        "name": "Mike Brennan",
-        "email": "mike@brennanbuilders.com",
-        "company": "Brennan Builders LLC",
-        "billing_entity": "Brennan Builders LLC",
-        "phone": "555-1001",
-    },
-    {
-        "name": "Jessica Tran",
-        "email": "jtran@tranconstruction.com",
-        "company": "Tran Construction Inc",
-        "billing_entity": "Tran Construction Inc",
-        "phone": "555-1002",
-    },
-    {
-        "name": "Carlos Medina",
-        "email": "carlos@medinahomes.com",
-        "company": "Medina Custom Homes",
-        "billing_entity": "Medina Custom Homes",
-        "phone": "555-1003",
-    },
-    {
-        "name": "Anita Kapoor",
-        "email": "anita@kapoorenergy.com",
-        "company": "Kapoor Energy Solutions",
-        "billing_entity": "Kapoor Energy Solutions",
-        "phone": "555-1004",
-    },
-    {
-        "name": "Ray Dubois",
-        "email": "ray@duboismaintenance.com",
-        "company": "DuBois Property Maintenance",
-        "billing_entity": "DuBois Property Maintenance",
-        "phone": "555-1005",
-    },
-    {
-        "name": "Sandra Walsh",
-        "email": "swalsh@walshplumbing.com",
-        "company": "Walsh Plumbing & Heating",
-        "billing_entity": "Walsh Plumbing & Heating",
-        "phone": "555-1006",
-    },
-    {
-        "name": "Derek Okonkwo",
-        "email": "derek@deobuilds.com",
-        "company": "DEO Builds",
-        "billing_entity": "DEO Builds",
-        "phone": "555-1007",
-    },
-    {
-        "name": "Linda Park",
-        "email": "linda@parkrenovations.com",
-        "company": "Park Renovations",
-        "billing_entity": "Park Renovations",
-        "phone": "555-1008",
-    },
-]
-
-JOBS = [
-    {"id": "JOB-2026-0050", "address": "310 Evergreen Terrace"},
-    {"id": "JOB-2026-0051", "address": "742 Willow Springs Rd"},
-    {"id": "JOB-2026-0052", "address": "18 Granite Falls Ct"},
-    {"id": "JOB-2026-0053", "address": "5600 Lakeshore Blvd"},
-    {"id": "JOB-2026-0054", "address": "203 Cedar Ridge Ln"},
-    {"id": "JOB-2026-0055", "address": "880 Industrial Pkwy Unit 4"},
-    {"id": "JOB-2026-0056", "address": "1215 Sycamore Ave"},
-    {"id": "JOB-2026-0057", "address": "44 Harbor View Dr"},
-    {"id": "JOB-2026-0058", "address": "999 Pine Crest Loop"},
-    {"id": "JOB-2026-0059", "address": "66 Brookside Way"},
-    {"id": "JOB-2026-0060", "address": "2300 Mission Hill Rd"},
-    {"id": "JOB-2026-0061", "address": "411 Orchard Park Dr"},
-]
-
-RETURN_REASONS = ["wrong_item", "defective", "overorder", "job_cancelled", "other"]
 
 
 def _round(v: float) -> float:
@@ -180,9 +113,7 @@ async def main():
     conn = get_connection()
     now = datetime.now(UTC)
 
-    # ══════════════════════════════════════════════════════════════════════
-    # 0. RESET — wipe everything and bootstrap org + admin + departments
-    # ══════════════════════════════════════════════════════════════════════
+    # 0. RESET
     logger.info("=== RESET: clearing all tables ===")
     await _clear_all_tables(conn)
 
@@ -197,14 +128,14 @@ async def main():
     await seed_standard_departments(org_id)
 
     async def _get_user(email):
-        cur = await conn.execute("SELECT * FROM users WHERE email = ?", (email,))
+        cur = await conn.execute("SELECT * FROM users WHERE email = $1", (email,))
         row = await cur.fetchone()
         return dict(row) if row and hasattr(row, "keys") else None
 
     async def _insert_user(d):
         await conn.execute(
             "INSERT INTO users (id, email, password, name, role, company, billing_entity, phone, is_active, organization_id, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
+            " VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10)",
             (
                 d["id"],
                 d["email"],
@@ -221,7 +152,7 @@ async def main():
         await conn.commit()
 
     async def _get_user_by_id(uid):
-        cur = await conn.execute("SELECT * FROM users WHERE id = ?", (uid,))
+        cur = await conn.execute("SELECT * FROM users WHERE id = $1", (uid,))
         row = await cur.fetchone()
         return dict(row) if row and hasattr(row, "keys") else None
 
@@ -235,11 +166,7 @@ async def main():
     dept_by_code = {d.code: d for d in departments}
     dept_name_map = {d.id: d.name for d in departments}
 
-    # ══════════════════════════════════════════════════════════════════════
-    # 1. VENDORS (from seed_realistic)
-    # ══════════════════════════════════════════════════════════════════════
-    from devtools.scripts.seed_realistic import PRODUCTS, VENDORS
-
+    # 1. VENDORS
     logger.info("--- Creating vendors ---")
     vendor_ids = []
     for v in VENDORS:
@@ -248,36 +175,38 @@ async def main():
         await vendor_repo.insert(
             {
                 "id": vid,
-                **v,
+                "name": v.name,
+                "contact_name": v.contact_name,
+                "email": v.email,
+                "phone": v.phone,
+                "address": v.address,
                 "created_at": now_iso,
                 "organization_id": org_id,
             }
         )
-        logger.info("  %s", v["name"])
+        logger.info("  %s", v.name)
 
-    # ══════════════════════════════════════════════════════════════════════
-    # 2. PRODUCTS (from seed_realistic)
-    # ══════════════════════════════════════════════════════════════════════
+    # 2. PRODUCTS
     logger.info("--- Creating products ---")
     products_by_name: dict[str, dict] = {}
     all_products: list[dict] = []
 
     for p in PRODUCTS:
-        dept = dept_by_code.get(p["dept"])
+        dept = dept_by_code.get(p.dept)
         if not dept:
             continue
-        vid = vendor_ids[p["vendor"]]
+        vid = vendor_ids[p.vendor]
         try:
             product = await create_product(
                 category_id=dept.id,
                 category_name=dept.name,
-                name=p["name"],
-                price=p["price"],
-                cost=p["cost"],
-                quantity=p["qty"],
-                min_stock=p["min"],
-                base_unit=p["unit"],
-                sell_uom=p["unit"],
+                name=p.name,
+                price=p.price,
+                cost=p.cost,
+                quantity=p.qty,
+                min_stock=p.min,
+                base_unit=p.unit,
+                sell_uom=p.unit,
                 user_id=admin["id"],
                 user_name=admin.get("name", "Admin"),
                 on_stock_import=process_import_stock_changes,
@@ -288,22 +217,20 @@ async def main():
                 "name": product.name,
                 "price": product.price,
                 "cost": product.cost,
-                "quantity": p["qty"],
-                "min_stock": p["min"],
+                "quantity": p.qty,
+                "min_stock": p.min,
                 "department_id": dept.id,
             }
-            if p["name"] not in products_by_name:
-                products_by_name[p["name"]] = prod_dict
+            if p.name not in products_by_name:
+                products_by_name[p.name] = prod_dict
             all_products.append(prod_dict)
-            logger.info("  %s | %s", product.sku, p["name"])
+            logger.info("  %s | %s", product.sku, p.name)
         except (ValueError, RuntimeError, OSError) as e:
-            logger.warning("  Skip %s: %s", p["name"], e)
+            logger.warning("  Skip %s: %s", p.name, e)
 
     logger.info("  %d unique products", len(products_by_name))
 
-    # ══════════════════════════════════════════════════════════════════════
-    # 3. CONTRACTORS (8 new + original demo contractor)
-    # ══════════════════════════════════════════════════════════════════════
+    # 3. CONTRACTORS
     logger.info("--- Creating contractors ---")
     contractor_users = []
 
@@ -315,12 +242,12 @@ async def main():
         uid = str(uuid4())
         user_dict = {
             "id": uid,
-            "email": c["email"],
-            "name": c["name"],
+            "email": c.email,
+            "name": c.name,
             "role": "contractor",
-            "company": c["company"],
-            "billing_entity": c["billing_entity"],
-            "phone": c["phone"],
+            "company": c.company,
+            "billing_entity": c.billing_entity,
+            "phone": c.phone,
             "password": hash_password("demo123"),
             "organization_id": org_id,
             "created_at": now.isoformat(),
@@ -329,11 +256,9 @@ async def main():
         u = await _get_user_by_id(uid)
         if u:
             contractor_users.append(u)
-        logger.info("  %s — %s (%s)", c["name"], c["email"], c["company"])
+        logger.info("  %s — %s (%s)", c.name, c.email, c.company)
 
-    # ══════════════════════════════════════════════════════════════════════
     # 4. WITHDRAWALS — 60 across contractors/jobs over 120 days
-    # ══════════════════════════════════════════════════════════════════════
     logger.info("--- Creating withdrawals ---")
     product_names = list(products_by_name.keys())
     withdrawal_records: list[dict] = []
@@ -363,8 +288,8 @@ async def main():
 
         withdrawal = MaterialWithdrawal(
             items=items,
-            job_id=job["id"],
-            service_address=job["address"],
+            job_id=job.id,
+            service_address=job.address,
             notes="",
             subtotal=0,
             tax=0,
@@ -389,7 +314,7 @@ async def main():
             qty_before = max(0, prod.get("quantity", 0))
             qty_after = max(0, qty_before - item.quantity)
             await conn.execute(
-                "UPDATE skus SET quantity = MAX(0, quantity - ?) WHERE id = ?",
+                "UPDATE skus SET quantity = MAX(0, quantity - $1) WHERE id = $2",
                 (item.quantity, item.product_id),
             )
             tx = StockTransaction(
@@ -401,7 +326,7 @@ async def main():
                 quantity_after=qty_after,
                 unit="each",
                 transaction_type=StockTransactionType.WITHDRAWAL,
-                reason=f"Withdrawal for {job['id']}",
+                reason=f"Withdrawal for {job.id}",
                 user_id=admin["id"],
                 user_name=admin.get("name", ""),
                 reference_id=withdrawal.id,
@@ -431,7 +356,7 @@ async def main():
             items=ledger_items,
             tax=withdrawal.tax,
             total=withdrawal.total,
-            job_id=job["id"],
+            job_id=job.id,
             billing_entity=contractor.get("billing_entity") or "",
             contractor_id=contractor["id"],
             organization_id=org_id,
@@ -455,16 +380,14 @@ async def main():
             logger.info(
                 "  [%d/60] %s | %s | $%.2f",
                 i + 1,
-                job["id"],
+                job.id,
                 contractor.get("company", "")[:25],
                 withdrawal.total,
             )
 
     logger.info("  %d withdrawals created", len(withdrawal_records))
 
-    # ══════════════════════════════════════════════════════════════════════
     # 5. STOCK ADJUSTMENTS — 15 manual adjustments
-    # ══════════════════════════════════════════════════════════════════════
     logger.info("--- Creating stock adjustments ---")
     adj_reasons = ["Physical count correction", "Damaged goods", "Cycle count", "Shrinkage"]
     for _ in range(15):
@@ -490,7 +413,7 @@ async def main():
         adj_created = (now - timedelta(days=_rng.randint(1, 90))).isoformat()
         tx.created_at = adj_created
         await stock_repo.insert_transaction(tx)
-        await conn.execute("UPDATE skus SET quantity = ? WHERE id = ?", (qty_after, prod["id"]))
+        await conn.execute("UPDATE skus SET quantity = $1 WHERE id = $2", (qty_after, prod["id"]))
 
         dept_name = dept_name_map.get(prod.get("department_id"))
         ledger_reason = "damage" if "Damaged" in reason else "shrinkage"
@@ -508,11 +431,9 @@ async def main():
     await conn.commit()
     logger.info("  15 stock adjustments")
 
-    # ══════════════════════════════════════════════════════════════════════
-    # 6. PURCHASE ORDERS — 8 POs with mixed statuses
-    # ══════════════════════════════════════════════════════════════════════
+    # 6. PURCHASE ORDERS — 9 POs with mixed statuses
     logger.info("--- Creating purchase orders ---")
-    cur = await conn.execute("SELECT id, name FROM vendors WHERE organization_id = ?", (org_id,))
+    cur = await conn.execute("SELECT id, name FROM vendors WHERE organization_id = $1", (org_id,))
     vendors = [dict(v) for v in await cur.fetchall()]
 
     po_scenarios = [
@@ -580,7 +501,7 @@ async def main():
             )
             if delivered > 0:
                 await conn.execute(
-                    "UPDATE skus SET quantity = quantity + ? WHERE id = ?",
+                    "UPDATE skus SET quantity = quantity + $1 WHERE id = $2",
                     (delivered, prod["id"]),
                 )
 
@@ -620,9 +541,7 @@ async def main():
 
     await conn.commit()
 
-    # ══════════════════════════════════════════════════════════════════════
     # 7. INVOICES — group older withdrawals by billing entity
-    # ══════════════════════════════════════════════════════════════════════
     logger.info("--- Creating invoices ---")
     by_entity: dict[str, list] = {}
     for wr in withdrawal_records:
@@ -668,7 +587,7 @@ async def main():
                         )
                     if inv.get("id"):
                         await conn.execute(
-                            "UPDATE invoices SET status = 'paid' WHERE id = ?", (inv["id"],)
+                            "UPDATE invoices SET status = 'paid' WHERE id = $1", (inv["id"],)
                         )
                         await conn.commit()
             except (ValueError, RuntimeError, OSError) as e:
@@ -676,9 +595,7 @@ async def main():
 
     logger.info("  %d invoices, %d paid", invoice_count, len(paid_withdrawal_ids))
 
-    # ══════════════════════════════════════════════════════════════════════
     # 8. RETURNS — 5 partial returns against older withdrawals
-    # ══════════════════════════════════════════════════════════════════════
     logger.info("--- Creating returns ---")
     return_candidates = [w for w in withdrawal_records if w["days_ago"] > 5]
     _rng.shuffle(return_candidates)
@@ -706,7 +623,7 @@ async def main():
             contractor_id=contractor["id"],
             contractor_name=contractor.get("name", ""),
             billing_entity=contractor.get("billing_entity") or contractor.get("company", ""),
-            job_id=wr["job"]["id"],
+            job_id=wr["job"].id,
             items=return_items,
             processed_by_id=admin["id"],
             processed_by_name=admin.get("name", ""),
@@ -718,7 +635,7 @@ async def main():
 
         for ri in return_items:
             await conn.execute(
-                "UPDATE skus SET quantity = quantity + ? WHERE id = ?",
+                "UPDATE skus SET quantity = quantity + $1 WHERE id = $2",
                 (ri.quantity, ri.product_id),
             )
         await conn.commit()
@@ -743,7 +660,7 @@ async def main():
             items=ledger_items,
             tax=ret.tax,
             total=ret.total,
-            job_id=wr["job"]["id"],
+            job_id=wr["job"].id,
             billing_entity=contractor.get("billing_entity") or "",
             contractor_id=contractor["id"],
             organization_id=org_id,
@@ -755,9 +672,7 @@ async def main():
             "  Return | %s | $%.2f | %s", contractor.get("company", "")[:25], ret.total, items_str
         )
 
-    # ══════════════════════════════════════════════════════════════════════
     # 9. MATERIAL REQUESTS — 8 (pending / approved / fulfilled)
-    # ══════════════════════════════════════════════════════════════════════
     logger.info("--- Creating material requests ---")
     mr_count = 0
     for i in range(8):
@@ -796,8 +711,8 @@ async def main():
             contractor_name=contractor.get("name", ""),
             items=items,
             status=status,
-            job_id=job["id"],
-            service_address=job["address"],
+            job_id=job.id,
+            service_address=job.address,
             notes=_rng.choice(["", "Urgent", "Need by tomorrow", "For phase 2", ""]),
             processed_at=processed_at,
             processed_by_id=processed_by,
@@ -810,13 +725,11 @@ async def main():
 
     logger.info("  %d material requests", mr_count)
 
-    # ══════════════════════════════════════════════════════════════════════
     # 10. CREDIT NOTES — one per return
-    # ══════════════════════════════════════════════════════════════════════
     logger.info("--- Creating credit notes ---")
     cur = await conn.execute(
         "SELECT id, billing_entity, subtotal, tax, total, items, withdrawal_id "
-        "FROM returns WHERE organization_id = ? AND credit_note_id IS NULL",
+        "FROM returns WHERE organization_id = $1 AND credit_note_id IS NULL",
         (org_id,),
     )
     return_rows = await cur.fetchall()
@@ -827,7 +740,7 @@ async def main():
 
         invoice_id = None
         cur2 = await conn.execute(
-            "SELECT invoice_id FROM withdrawals WHERE id = ?", (r["withdrawal_id"],)
+            "SELECT invoice_id FROM withdrawals WHERE id = $1", (r["withdrawal_id"],)
         )
         w_row = await cur2.fetchone()
         if w_row:
@@ -853,31 +766,19 @@ async def main():
         except (ValueError, RuntimeError, OSError) as e:
             logger.warning("  Credit note skip: %s", e)
 
-    # ══════════════════════════════════════════════════════════════════════
-    # 11. LOW-STOCK ALERTS — force a few products critically low
-    # ══════════════════════════════════════════════════════════════════════
+    # 11. LOW-STOCK ALERTS
     logger.info("--- Setting low-stock alerts ---")
-    low_stock_names = [
-        "4x8 3/4in Sanded Plywood",
-        "GFCI Outlet 15A White",
-        "5 Gal Interior Eggshell White",
-        "20V Cordless Drill Kit",
-        "SharkBite 1/2in Push Fitting",
-        "Deadbolt Single Cyl Satin Nickel",
-    ]
-    for name in low_stock_names:
+    for name in LOW_STOCK_NAMES_FULL:
         prod = products_by_name.get(name)
         if prod:
             low_qty = _rng.randint(1, prod["min_stock"])
-            await conn.execute("UPDATE skus SET quantity = ? WHERE id = ?", (low_qty, prod["id"]))
+            await conn.execute("UPDATE skus SET quantity = $1 WHERE id = $2", (low_qty, prod["id"]))
             logger.info(
                 "  %s | %s → qty=%d (min=%d)", prod["sku"], name, low_qty, prod["min_stock"]
             )
     await conn.commit()
 
-    # ══════════════════════════════════════════════════════════════════════
     # SUMMARY
-    # ══════════════════════════════════════════════════════════════════════
     counts = {}
     for table in [
         "users",
@@ -896,7 +797,7 @@ async def main():
     ]:
         try:
             cur = await conn.execute(
-                "SELECT COUNT(*) FROM " + table + " WHERE organization_id = ?", (org_id,)
+                "SELECT COUNT(*) FROM " + table + " WHERE organization_id = $1", (org_id,)
             )
             counts[table] = (await cur.fetchone())[0]
         except (RuntimeError, OSError):
@@ -912,7 +813,7 @@ async def main():
     logger.info("    %-40s Admin", "admin@demo.local")
     logger.info("    %-40s Demo Contractor", "contractor@demo.local")
     for c in CONTRACTORS:
-        logger.info("    %-40s %s", c["email"], c["company"])
+        logger.info("    %-40s %s", c.email, c.company)
     logger.info("=" * 60)
 
     return counts

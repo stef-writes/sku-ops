@@ -130,6 +130,10 @@ INDEXES: list[str] = [
     "CREATE INDEX IF NOT EXISTS idx_fiscal_periods_org ON fiscal_periods(organization_id, status)",
 ]
 
+EXTENSIONS: list[str] = [
+    "CREATE EXTENSION IF NOT EXISTS vector",
+]
+
 SEED: list[str] = [
     "INSERT INTO organizations (id, name, slug, created_at) VALUES ('default', 'Default', 'default', '2024-01-01T00:00:00+00:00') ON CONFLICT DO NOTHING",
 ]

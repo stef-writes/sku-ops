@@ -82,12 +82,12 @@ async def update(dept_id: str, name: str, description: str) -> Department | None
     query += where
     await conn.execute(query, params)
     await conn.execute(
-        "UPDATE skus SET category_name = $1 WHERE category_id = $2",
-        (name, dept_id),
+        "UPDATE skus SET category_name = $1 WHERE category_id = $2 AND organization_id = $3",
+        (name, dept_id, org_id),
     )
     await conn.execute(
-        "UPDATE products SET category_name = $1 WHERE category_id = $2",
-        (name, dept_id),
+        "UPDATE products SET category_name = $1 WHERE category_id = $2 AND organization_id = $3",
+        (name, dept_id, org_id),
     )
     await conn.commit()
     return await get_by_id(dept_id)

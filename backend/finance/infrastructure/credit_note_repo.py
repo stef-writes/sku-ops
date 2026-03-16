@@ -232,8 +232,10 @@ async def apply_credit_note(credit_note_id: str) -> ApplyCreditNoteResult:
     cn_total = float(cn.total)
 
     conn = get_connection()
+    org_id = get_org_id()
     cursor = await conn.execute(
-        "SELECT total, amount_credited, status FROM invoices WHERE id = $1", (inv_id,)
+        "SELECT total, amount_credited, status FROM invoices WHERE id = $1 AND organization_id = $2",
+        (inv_id, org_id),
     )
     inv_row = await cursor.fetchone()
     if not inv_row:
@@ -244,21 +246,21 @@ async def apply_credit_note(credit_note_id: str) -> ApplyCreditNoteResult:
     now = datetime.now(UTC).isoformat()
 
     await conn.execute(
-        "UPDATE invoices SET amount_credited = $1, updated_at = $2 WHERE id = $3",
-        (new_credited, now, inv_id),
+        "UPDATE invoices SET amount_credited = $1, updated_at = $2 WHERE id = $3 AND organization_id = $4",
+        (new_credited, now, inv_id, org_id),
     )
 
     auto_paid = False
     if balance_due <= 0 and inv.get("status") != InvoiceStatus.PAID:
         await conn.execute(
-            "UPDATE invoices SET status = $1, updated_at = $2 WHERE id = $3",
-            (InvoiceStatus.PAID, now, inv_id),
+            "UPDATE invoices SET status = $1, updated_at = $2 WHERE id = $3 AND organization_id = $4",
+            (InvoiceStatus.PAID, now, inv_id, org_id),
         )
         auto_paid = True
 
     await conn.execute(
-        "UPDATE credit_notes SET status = $1, updated_at = $2 WHERE id = $3",
-        (CreditNoteStatus.APPLIED, now, credit_note_id),
+        "UPDATE credit_notes SET status = $1, updated_at = $2 WHERE id = $3 AND organization_id = $4",
+        (CreditNoteStatus.APPLIED, now, credit_note_id, org_id),
     )
 
     updated = await get_by_id(credit_note_id)

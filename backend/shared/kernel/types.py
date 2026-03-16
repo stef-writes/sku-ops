@@ -9,8 +9,6 @@ from decimal import ROUND_HALF_EVEN, Decimal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, computed_field, field_validator
 
-from shared.kernel.constants import DEFAULT_ORG_ID
-
 
 def round_money(value: float) -> float:
     """Round to 2 decimal places using banker's rounding (IEEE 754 standard).
@@ -82,7 +80,7 @@ class CurrentUser(BaseModel):
     email: str
     name: str
     role: str
-    organization_id: str = DEFAULT_ORG_ID
+    organization_id: str
     company: str = ""
     billing_entity: str = ""
     phone: str = ""

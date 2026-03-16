@@ -36,13 +36,18 @@ PROJECT_ROOT = _find_backend_root()
 _requested_env = os.environ.get("ENV", "").lower().strip()
 _ENV = _requested_env or "development"
 
-# Load backend/.env only for local-style runs. This keeps developer ergonomics
-# for dev/test while making production rely strictly on injected vars.
-_env_file = PROJECT_ROOT / ".env"
-if _ENV in {"development", "test"} and _env_file.exists():
+# Load .env for local-style runs. Root .env first (shared: API keys, Docker vars),
+# then backend/.env (backend-specific overrides). Production relies on injected vars.
+if _ENV in {"development", "test"}:
     from dotenv import load_dotenv
 
-    load_dotenv(_env_file)
+    _repo_root = PROJECT_ROOT.parent
+    _root_env = _repo_root / ".env"
+    if _root_env.exists():
+        load_dotenv(_root_env)
+    _backend_env = PROJECT_ROOT / ".env"
+    if _backend_env.exists():
+        load_dotenv(_backend_env)
 
 
 def _is(env: str) -> bool:
@@ -170,12 +175,8 @@ if is_production and _allow_public_auth_explicit:
 ALLOW_PUBLIC_AUTH = _allow_public_auth_explicit or is_development or is_test
 
 # ── Auth provider ─────────────────────────────────────────────────────────────
-_VALID_AUTH_PROVIDERS = {"supabase", "internal"}
-AUTH_PROVIDER = os.environ.get("AUTH_PROVIDER", "supabase").lower().strip()
-if AUTH_PROVIDER not in _VALID_AUTH_PROVIDERS:
-    raise RuntimeError(
-        f"AUTH_PROVIDER must be one of {sorted(_VALID_AUTH_PROVIDERS)}, got '{AUTH_PROVIDER}'"
-    )
+# Supabase in production, internal (flat JWT claims) in dev/test.
+# No runtime flag — the environment determines the provider automatically.
 
 # ── AI providers ──────────────────────────────────────────────────────────────
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
@@ -193,6 +194,12 @@ OPENAI_AVAILABLE = bool(OPENAI_API_KEY)
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "").strip()
 OPENROUTER_BASE_URL = os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").strip()
 OPENROUTER_AVAILABLE = bool(OPENROUTER_API_KEY)
+
+# Embeddings (OpenAI-compatible API: tool index, domain search, query router).
+# Set EMBEDDING_MODEL to change model; default text-embedding-3-small.
+EMBEDDING_MODEL = (
+    os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small").strip() or "text-embedding-3-small"
+)
 
 
 # ── Agent model ───────────────────────────────────────────────────────────────
@@ -217,6 +224,30 @@ def _load_agent_model() -> str:
 
 
 AGENT_PRIMARY_MODEL: str = _load_agent_model()
+
+
+def _load_synthesis_model() -> str:
+    """Load synthesis model for workflows (weekly sales, inventory overview)."""
+    env_override = os.environ.get("MODEL_REGISTRY_INFRA_SYNTHESIS", "").strip()
+    if env_override:
+        return env_override
+    try:
+        import yaml
+
+        _yaml_path = PROJECT_ROOT / "assistant" / "config" / "models.yaml"
+        if _yaml_path.exists():
+            data = yaml.safe_load(_yaml_path.read_text()) or {}
+            model = (data.get("synthesis") or "").strip()
+            if model:
+                return model
+    except (OSError, ValueError, KeyError):
+        logging.getLogger(__name__).warning(
+            "Failed to parse synthesis from models.yaml", exc_info=True
+        )
+    return "anthropic:claude-haiku-4-5"
+
+
+INFRA_SYNTHESIS_MODEL: str = _load_synthesis_model()
 LLM_SETUP_URL = "https://console.anthropic.com/"
 SESSION_COST_CAP = float(os.environ.get("SESSION_COST_CAP", "2.00"))
 
@@ -254,7 +285,7 @@ def startup_summary() -> dict:
 
     return {
         "env": ENV,
-        "auth_provider": AUTH_PROVIDER,
+        "auth_provider": "supabase" if is_production else "internal",
         "db": db_display,
         "cors": CORS_ORIGINS if not cors_is_permissive else "*",
         "redis": "yes" if REDIS_URL else "no",

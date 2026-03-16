@@ -7,15 +7,12 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
  */
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
-// Lazy-load Supabase SDK only when configured. The module name is constructed
-// dynamically so Rollup/Vite won't try to resolve it at build time.
 let _supabase = null;
-const _pkg = ["@supabase", "supabase-js"].join("/");
 
 export const getSupabase = async () => {
   if (!_supabase && isSupabaseConfigured) {
-    const mod = await import(/* @vite-ignore */ _pkg);
-    _supabase = mod.createClient(supabaseUrl, supabaseAnonKey);
+    const { createClient } = await import("@supabase/supabase-js");
+    _supabase = createClient(supabaseUrl, supabaseAnonKey);
   }
   return _supabase;
 };

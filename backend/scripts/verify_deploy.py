@@ -86,7 +86,7 @@ def check_config_guards() -> None:
         ),
         (
             "Development allows permissive defaults",
-            {"ENV": "development"},
+            {"ENV": "development", "DATABASE_URL": "postgresql://x:x@localhost:5433/x"},
             None,
             False,
         ),
@@ -125,13 +125,13 @@ def check_config_guards() -> None:
 
 
 def check_supabase_jwt_shape() -> None:
-    """Mint a Supabase-shaped JWT and verify auth_deps decodes it correctly."""
+    """Mint a Supabase-shaped JWT and verify auth_provider decodes it correctly."""
     _section("Supabase JWT decode (shape compatibility)")
 
     try:
         import jwt
 
-        from shared.api.auth_deps import _extract_role
+        from shared.api.auth_provider import _resolve_internal, _resolve_supabase
         from shared.infrastructure.config import JWT_ALGORITHM, JWT_SECRET
     except ImportError as e:
         _fail("Import failed", str(e))
@@ -141,10 +141,10 @@ def check_supabase_jwt_shape() -> None:
     supabase_payload = {
         "sub": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
         "email": "admin@example.com",
-        "app_metadata": {"role": "admin"},
+        "app_metadata": {"role": "admin", "organization_id": "default"},
         "user_metadata": {"name": "Test Admin"},
         "aud": "authenticated",
-        "role": "authenticated",  # Supabase sets this — NOT the app role
+        "role": "authenticated",
         "exp": int(time.time()) + 3600,
     }
     token = jwt.encode(supabase_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
@@ -153,20 +153,24 @@ def check_supabase_jwt_shape() -> None:
         payload = jwt.decode(
             token, JWT_SECRET, algorithms=[JWT_ALGORITHM], options={"verify_aud": False}
         )
-        role = _extract_role(payload)
-        name = payload.get("name") or (payload.get("user_metadata") or {}).get("name") or ""
-        user_id = payload.get("user_id") or payload.get("sub")
+        claims = _resolve_supabase(payload)
 
-        assert role == "admin", f"Expected role='admin', got {role!r}"
-        assert name == "Test Admin", f"Expected name='Test Admin', got {name!r}"
-        assert user_id == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", f"Wrong user_id: {user_id!r}"
-        _ok("Supabase token: role extracted from app_metadata.role", f"role={role!r}")
-        _ok("Supabase token: name extracted from user_metadata.name", f"name={name!r}")
-        _ok("Supabase token: user_id taken from sub claim", f"sub={user_id[:8]}...")
+        assert claims.role == "admin", f"Expected role='admin', got {claims.role!r}"
+        assert claims.name == "Test Admin", f"Expected name='Test Admin', got {claims.name!r}"
+        assert claims.user_id == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", (
+            f"Wrong user_id: {claims.user_id!r}"
+        )
+        assert claims.organization_id == "default", (
+            f"Expected organization_id='default', got {claims.organization_id!r}"
+        )
+        _ok("Supabase token: role extracted from app_metadata.role", f"role={claims.role!r}")
+        _ok("Supabase token: name extracted from user_metadata.name", f"name={claims.name!r}")
+        _ok("Supabase token: user_id taken from sub claim", f"sub={claims.user_id[:8]}...")
+        _ok("Supabase token: organization_id from app_metadata", f"org={claims.organization_id!r}")
     except Exception as e:
         _fail("Supabase token decode failed", str(e))
 
-    # Case 2: Token missing role claim → must 401
+    # Case 2: Token missing role claim → must raise ValueError
     no_role_payload = {
         "sub": "test-uuid",
         "email": "norole@example.com",
@@ -180,10 +184,12 @@ def check_supabase_jwt_shape() -> None:
         payload = jwt.decode(
             no_role_token, JWT_SECRET, algorithms=[JWT_ALGORITHM], options={"verify_aud": False}
         )
-        _extract_role(payload)
-        _fail("Token missing role: should raise 401 but did not")
-    except Exception:
-        _ok("Token missing app_metadata.role raises 401")
+        _resolve_supabase(payload)
+        _fail("Token missing role: should raise ValueError but did not")
+    except ValueError:
+        _ok("Token missing app_metadata.role raises ValueError")
+    except Exception as e:
+        _fail("Token missing role raised unexpected error", str(e))
 
     # Case 3: Dev-issued token (role at top level) still works
     dev_payload = {
@@ -200,13 +206,13 @@ def check_supabase_jwt_shape() -> None:
         payload = jwt.decode(
             dev_token, JWT_SECRET, algorithms=[JWT_ALGORITHM], options={"verify_aud": False}
         )
-        role = _extract_role(payload)
-        assert role == "admin"
+        claims = _resolve_internal(payload)
+        assert claims.role == "admin"
         _ok("Dev-issued token (role at top level) still decodes correctly")
     except Exception as e:
         _fail("Dev token decode failed", str(e))
 
-    # Case 4: Expired token → must 401
+    # Case 4: Expired token → must raise ExpiredSignatureError
     expired_payload = {**supabase_payload, "exp": int(time.time()) - 10}
     expired_token = jwt.encode(expired_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
     try:
@@ -369,7 +375,7 @@ def check_live_server(base_url: str) -> None:
             version = data.get("version", "?")
             _ok("/api/health returns 200", f"env={env}, version={version}")
             if env == "development":
-                _warn("Server reports env=development — expected production or staging")
+                _warn("Server reports env=development — expected production")
     except Exception as e:
         _fail("/api/health unreachable", str(e))
         return

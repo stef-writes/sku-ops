@@ -1,4 +1,8 @@
-# Deployment Guide
+# Deployment Guide (VPS / Self-Hosted)
+
+> **This guide is for VPS self-hosted deployments only.**
+> For the primary deployment path (Railway + Vercel + Supabase), see [DEPLOY.md](../DEPLOY.md).
+> For per-client setup, see [docs/deploy-client.md](deploy-client.md).
 
 ## Branch Strategy
 

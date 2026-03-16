@@ -65,7 +65,6 @@ services:
         condition: service_started
     environment:
       ENV: ${ENV:-development}
-      AUTH_PROVIDER: ${AUTH_PROVIDER:-supabase}
       DATABASE_URL: postgresql://sku_ops:${POSTGRES_PASSWORD}@db:5432/sku_ops
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}

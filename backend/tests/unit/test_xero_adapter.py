@@ -47,6 +47,7 @@ def _expired_settings() -> OrgSettings:
 def _invoice(xero_invoice_id=None) -> InvoiceWithDetails:
     return InvoiceWithDetails(
         id="inv-local-1",
+        organization_id="default",
         invoice_number="INV-00001",
         billing_entity="On Point LLC",
         status="approved",
@@ -87,6 +88,7 @@ def _po(xero_bill_id=None) -> dict:
 def _credit_note() -> CreditNote:
     return CreditNote(
         id="cn-local-1",
+        organization_id="default",
         credit_note_number="CN-00001",
         billing_entity="On Point LLC",
         status="applied",

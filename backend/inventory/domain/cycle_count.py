@@ -26,8 +26,13 @@ class CycleCount(Entity):
 
 
 class CycleCountItem(Entity):
-    """One product line within a cycle count session."""
+    """One product line within a cycle count session.
 
+    Inherits org context from its parent CycleCount — the cycle_count_items
+    table does not store organization_id independently.
+    """
+
+    organization_id: str = ""
     cycle_count_id: str
     product_id: str
     sku: str

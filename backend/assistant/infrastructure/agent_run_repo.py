@@ -69,14 +69,18 @@ async def list_runs(
     *,
     agent_name: str | None = None,
     session_id: str | None = None,
-    org_id: str | None = None,
     minutes: int = 60,
     limit: int = 50,
 ) -> list[dict]:
     conn = get_connection()
+    org_id = get_org_id()
+    n = 1
     clauses = [f"created_at >= NOW() - INTERVAL '{minutes} minutes'"]
     params: list = []
-    n = 1
+
+    clauses.append(f"org_id = ${n}")
+    params.append(org_id)
+    n += 1
 
     if agent_name:
         clauses.append(f"agent_name = ${n}")
@@ -86,15 +90,9 @@ async def list_runs(
         clauses.append(f"session_id = ${n}")
         params.append(session_id)
         n += 1
-    if org_id:
-        clauses.append(f"org_id = ${n}")
-        params.append(org_id)
-        n += 1
 
-    where = " AND ".join(clauses)
     params.append(limit)
-    query = "SELECT * FROM agent_runs WHERE "
-    query += where
+    query = "SELECT * FROM agent_runs WHERE " + " AND ".join(clauses)
     query += f" ORDER BY created_at DESC LIMIT ${n}"
     cur = await conn.execute(query, params)
     return [dict(r) for r in await cur.fetchall()]
@@ -102,7 +100,8 @@ async def list_runs(
 
 async def get_stats(*, hours: int = 24) -> dict:
     conn = get_connection()
-    since_expr = f"created_at >= NOW() - INTERVAL '{hours} hours'"
+    org_id = get_org_id()
+    since_expr = f"org_id = $1 AND created_at >= NOW() - INTERVAL '{hours} hours'"
 
     cur = await conn.execute(
         "SELECT"
@@ -117,7 +116,7 @@ async def get_stats(*, hours: int = 24) -> dict:
         " FROM agent_runs"
         " WHERE " + since_expr + " GROUP BY agent_name"
         " ORDER BY runs DESC",
-        [],
+        [org_id],
     )
     by_agent = await cur.fetchall()
 
@@ -131,14 +130,14 @@ async def get_stats(*, hours: int = 24) -> dict:
         " SUM(CASE WHEN error IS NOT NULL THEN 1 ELSE 0 END) as total_errors"
         " FROM agent_runs"
         " WHERE " + since_expr,
-        [],
+        [org_id],
     )
     totals = await cur.fetchone()
 
     cur = await conn.execute(
         "SELECT model, COUNT(*) as runs, SUM(cost_usd) as cost"
         " FROM agent_runs WHERE " + since_expr + " GROUP BY model ORDER BY cost DESC",
-        [],
+        [org_id],
     )
     by_model = await cur.fetchall()
 
@@ -152,9 +151,10 @@ async def get_stats(*, hours: int = 24) -> dict:
 
 async def get_session_trace(session_id: str) -> list[dict]:
     conn = get_connection()
+    org_id = get_org_id()
     cur = await conn.execute(
-        "SELECT * FROM agent_runs WHERE session_id = $1 ORDER BY created_at ASC",
-        (session_id,),
+        "SELECT * FROM agent_runs WHERE session_id = $1 AND org_id = $2 ORDER BY created_at ASC",
+        (session_id, org_id),
     )
     rows: list[dict] = [dict(r) for r in await cur.fetchall()]
     for r in rows:
@@ -165,7 +165,8 @@ async def get_session_trace(session_id: str) -> list[dict]:
 
 async def get_cost_breakdown(*, days: int = 7, group_by: str = "agent") -> list[dict]:
     conn = get_connection()
-    since_expr = f"created_at >= NOW() - INTERVAL '{days} days'"
+    org_id = get_org_id()
+    since_expr = f"org_id = $1 AND created_at >= NOW() - INTERVAL '{days} days'"
     day_expr = "(created_at)::date"
 
     col = {"agent": "agent_name", "model": "model", "org": "org_id"}.get(group_by, "agent_name")
@@ -188,5 +189,5 @@ async def get_cost_breakdown(*, days: int = 7, group_by: str = "agent") -> list[
     query += ", "
     query += day_expr
     query += " ORDER BY day DESC, cost DESC"
-    cur = await conn.execute(query, [])
+    cur = await conn.execute(query, [org_id])
     return [dict(r) for r in await cur.fetchall()]

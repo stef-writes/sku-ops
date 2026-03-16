@@ -26,7 +26,6 @@ from typing import TYPE_CHECKING
 
 from shared.infrastructure.config import DATABASE_URL
 from shared.infrastructure.logging_config import org_id_var, user_id_var
-from shared.kernel.constants import DEFAULT_ORG_ID
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Sequence
@@ -82,7 +81,7 @@ async def init_db() -> None:
 
 def get_org_id() -> str:
     """Return the ambient org_id for the current request or job context."""
-    return org_id_var.get(DEFAULT_ORG_ID)
+    return org_id_var.get("")
 
 
 def get_user_id() -> str:

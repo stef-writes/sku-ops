@@ -205,6 +205,7 @@ class TestWithdrawalInvariants:
             cost_total=0,
             contractor_id="c1",
             processed_by_id="u1",
+            organization_id="default",
         )
 
     def test_compute_totals_with_fractional_items(self):
@@ -301,7 +302,9 @@ class TestContractorContext:
             service_address="123 Main",
         )
         ctx = ContractorContext(id="")
-        user = CurrentUser(id="u1", email="a@b.com", name="A", role="admin")
+        user = CurrentUser(
+            id="u1", email="a@b.com", name="A", role="admin", organization_id="default"
+        )
 
         with pytest.raises(ValueError, match=r"contractor\.id"):
             asyncio.get_event_loop().run_until_complete(create_withdrawal(data, ctx, user))

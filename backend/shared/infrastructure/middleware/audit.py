@@ -71,7 +71,7 @@ async def audit_log(
                 resource_id,
                 details_str,
                 ip,
-                org_id or "default",
+                org_id or "",
                 now,
             ),
         )
