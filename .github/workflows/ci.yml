@@ -39,7 +39,7 @@ jobs:
         with:
           python-version: "3.13"
 
-      - uses: astral-sh/setup-uv@v3            # v3.2.0
+      - uses: astral-sh/setup-uv@v7            # v3.2.0
         with:
           enable-cache: true
 
