@@ -27,7 +27,7 @@ For production destructive changes (column drops, renames, type changes):
 
 import logging
 
-from shared.infrastructure.full_schema import ALL_EXTENSIONS, ALL_INDEXES, ALL_TABLES
+from shared.infrastructure.full_schema import ALL_EXTENSIONS, ALL_INDEXES, ALL_TABLES, ALL_VIEWS
 from shared.infrastructure.schema import SEED as _shared_seed
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ async def run_schema(backend) -> None:
                 raise
     await conn.commit()
 
-    for stmt in ALL_INDEXES + _shared_seed:
+    for stmt in ALL_INDEXES:
         try:
             await conn.execute(stmt)
         except Exception as e:
@@ -74,6 +74,19 @@ async def run_schema(backend) -> None:
                 logger.warning("Index skipped: %s", e)
             else:
                 raise
+    await conn.commit()
+
+    # Views run after tables + indexes (they reference tables across contexts).
+    # CREATE OR REPLACE VIEW is idempotent.
+    for stmt in ALL_VIEWS:
+        try:
+            await conn.execute(stmt)
+        except Exception as e:
+            logger.warning("View creation skipped: %s", e)
+    await conn.commit()
+
+    for stmt in _shared_seed:
+        await conn.execute(stmt)
     await conn.commit()
 
     logger.debug("Schema bootstrap complete")

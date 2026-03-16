@@ -28,7 +28,13 @@ from shared.kernel.types import CurrentUser
 
 
 def _user():
-    return CurrentUser(id="user-1", email="test@test.com", name="Test User", role="admin")
+    return CurrentUser(
+        id="user-1",
+        email="test@test.com",
+        name="Test User",
+        role="admin",
+        organization_id="default",
+    )
 
 
 async def _create_test_product(
@@ -152,267 +158,300 @@ class TestResolvePOItemCost:
 # ── Integration: receive updates stock ───────────────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_receive_updates_stock(db):
+def test_receive_updates_stock(call):
     """Receiving items increments product quantity."""
-    product = await _create_test_product(quantity=100.0)
-    po, item = await _create_po_with_item(product_id=product.id, cost=7.0, ordered_qty=50)
 
-    result = await receive_po_items(
-        po_id=po.id,
-        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=50)],
-        deps=_stub_deps(),
-        current_user=_user(),
-    )
+    async def _body():
+        product = await _create_test_product(quantity=100.0)
+        po, item = await _create_po_with_item(product_id=product.id, cost=7.0, ordered_qty=50)
 
-    assert result.matched == 1
-    assert result.errors == 0
+        result = await receive_po_items(
+            po_id=po.id,
+            item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=50)],
+            deps=_stub_deps(),
+            current_user=_user(),
+        )
 
-    updated = await sku_repo.get_by_id(product.id)
-    assert updated.quantity == pytest.approx(150.0)
+        assert result.matched == 1
+        assert result.errors == 0
+
+        updated = await sku_repo.get_by_id(product.id)
+        assert updated.quantity == pytest.approx(150.0)
+
+    call(_body)
 
 
-@pytest.mark.asyncio
-async def test_receive_weighted_average_cost(db):
+def test_receive_weighted_average_cost(call):
     """WAC: existing cost=$8 qty=100, receive cost=$12 qty=50 → WAC=$9.33."""
-    product = await _create_test_product(quantity=100.0, cost=8.0)
-    po, item = await _create_po_with_item(product_id=product.id, cost=12.0, ordered_qty=50)
 
-    await receive_po_items(
-        po_id=po.id,
-        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=50)],
-        deps=_stub_deps(),
-        current_user=_user(),
-    )
+    async def _body():
+        product = await _create_test_product(quantity=100.0, cost=8.0)
+        po, item = await _create_po_with_item(product_id=product.id, cost=12.0, ordered_qty=50)
 
-    updated = await sku_repo.get_by_id(product.id)
-    expected_wac = (100 * 8 + 50 * 12) / 150
-    assert updated.cost == pytest.approx(expected_wac, abs=0.01)
+        await receive_po_items(
+            po_id=po.id,
+            item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=50)],
+            deps=_stub_deps(),
+            current_user=_user(),
+        )
+
+        updated = await sku_repo.get_by_id(product.id)
+        expected_wac = (100 * 8 + 50 * 12) / 150
+        assert updated.cost == pytest.approx(expected_wac, abs=0.01)
+
+    call(_body)
 
 
-@pytest.mark.asyncio
-async def test_receive_cost_fallback_from_unit_price(db):
+def test_receive_cost_fallback_from_unit_price(call):
     """When item has unit_price but no cost, cost_total and ledger must still be non-zero."""
-    product = await _create_test_product(quantity=100.0, cost=8.0)
-    po, item = await _create_po_with_item(
-        product_id=product.id,
-        cost=None,
-        unit_price=10.0,
-        ordered_qty=50,
-    )
 
-    result = await receive_po_items(
-        po_id=po.id,
-        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=50)],
-        deps=_stub_deps(),
-        current_user=_user(),
-    )
+    async def _body():
+        product = await _create_test_product(quantity=100.0, cost=8.0)
+        po, item = await _create_po_with_item(
+            product_id=product.id,
+            cost=None,
+            unit_price=10.0,
+            ordered_qty=50,
+        )
 
-    assert result.cost_total > 0, "cost_total should use unit_price fallback"
-    assert result.cost_total == pytest.approx(7.0 * 50)
+        result = await receive_po_items(
+            po_id=po.id,
+            item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=50)],
+            deps=_stub_deps(),
+            current_user=_user(),
+        )
 
-    conn = get_connection()
-    cursor = await conn.execute(
-        "SELECT SUM(amount) FROM financial_ledger WHERE reference_id = $1 AND account = 'inventory'",
-        (po.id,),
-    )
-    row = await cursor.fetchone()
-    assert row[0] is not None and row[0] > 0, "Ledger INVENTORY entry should be non-zero"
+        assert result.cost_total > 0, "cost_total should use unit_price fallback"
+        assert result.cost_total == pytest.approx(7.0 * 50)
+
+        conn = get_connection()
+        cursor = await conn.execute(
+            "SELECT SUM(amount) FROM financial_ledger WHERE reference_id = $1 AND account = 'inventory'",
+            (po.id,),
+        )
+        row = await cursor.fetchone()
+        assert row[0] is not None and row[0] > 0, "Ledger INVENTORY entry should be non-zero"
+
+    call(_body)
 
 
-@pytest.mark.asyncio
-async def test_receive_creates_stock_transaction(db):
+def test_receive_creates_stock_transaction(call):
     """Receiving should create a RECEIVING stock transaction."""
-    product = await _create_test_product(quantity=100.0)
-    po, item = await _create_po_with_item(product_id=product.id, cost=7.0, ordered_qty=25)
 
-    await receive_po_items(
-        po_id=po.id,
-        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=25)],
-        deps=_stub_deps(),
-        current_user=_user(),
-    )
+    async def _body():
+        product = await _create_test_product(quantity=100.0)
+        po, item = await _create_po_with_item(product_id=product.id, cost=7.0, ordered_qty=25)
 
-    txs = await stock_repo.list_by_product(product.id, limit=50)
-    receiving_txs = [t for t in txs if t.transaction_type == "receiving"]
-    assert len(receiving_txs) >= 1
-    assert receiving_txs[0].quantity_delta == pytest.approx(25.0)
-    assert receiving_txs[0].reference_id == po.id
+        await receive_po_items(
+            po_id=po.id,
+            item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=25)],
+            deps=_stub_deps(),
+            current_user=_user(),
+        )
+
+        txs = await stock_repo.list_by_product(product.id, limit=50)
+        receiving_txs = [t for t in txs if t.transaction_type == "receiving"]
+        assert len(receiving_txs) >= 1
+        assert receiving_txs[0].quantity_delta == pytest.approx(25.0)
+        assert receiving_txs[0].reference_id == po.id
+
+    call(_body)
 
 
-@pytest.mark.asyncio
-async def test_receive_creates_ledger_entries(db):
+def test_receive_creates_ledger_entries(call):
     """Receiving should create INVENTORY + ACCOUNTS_PAYABLE entries in the financial ledger."""
-    product = await _create_test_product(quantity=100.0)
-    po, item = await _create_po_with_item(product_id=product.id, cost=6.0, ordered_qty=20)
 
-    await receive_po_items(
-        po_id=po.id,
-        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=20)],
-        deps=_stub_deps(),
-        current_user=_user(),
-    )
+    async def _body():
+        product = await _create_test_product(quantity=100.0)
+        po, item = await _create_po_with_item(product_id=product.id, cost=6.0, ordered_qty=20)
 
-    conn = get_connection()
-    cursor = await conn.execute(
-        "SELECT account, ROUND(CAST(SUM(amount) AS NUMERIC), 2) FROM financial_ledger WHERE reference_id = $1 GROUP BY account",
-        (po.id,),
-    )
-    rows = {r[0]: r[1] for r in await cursor.fetchall()}
+        await receive_po_items(
+            po_id=po.id,
+            item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=20)],
+            deps=_stub_deps(),
+            current_user=_user(),
+        )
 
-    expected = 6.0 * 20
-    assert "inventory" in rows, "Should have INVENTORY ledger entry"
-    assert "accounts_payable" in rows, "Should have AP ledger entry"
-    assert rows["inventory"] == pytest.approx(expected)
-    assert rows["accounts_payable"] == pytest.approx(expected)
+        conn = get_connection()
+        cursor = await conn.execute(
+            "SELECT account, ROUND(CAST(SUM(amount) AS NUMERIC), 2) FROM financial_ledger WHERE reference_id = $1 GROUP BY account",
+            (po.id,),
+        )
+        rows = {r[0]: r[1] for r in await cursor.fetchall()}
+
+        expected = 6.0 * 20
+        assert "inventory" in rows, "Should have INVENTORY ledger entry"
+        assert "accounts_payable" in rows, "Should have AP ledger entry"
+        assert rows["inventory"] == pytest.approx(expected)
+        assert rows["accounts_payable"] == pytest.approx(expected)
+
+    call(_body)
 
 
-@pytest.mark.asyncio
-async def test_receive_po_status_becomes_received(db):
+def test_receive_po_status_becomes_received(call):
     """All items received → PO status = 'received'."""
-    product = await _create_test_product(quantity=100.0)
-    po, item = await _create_po_with_item(product_id=product.id, cost=5.0, ordered_qty=10)
 
-    result = await receive_po_items(
-        po_id=po.id,
-        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=10)],
-        deps=_stub_deps(),
-        current_user=_user(),
-    )
+    async def _body():
+        product = await _create_test_product(quantity=100.0)
+        po, item = await _create_po_with_item(product_id=product.id, cost=5.0, ordered_qty=10)
 
-    assert result.status == "received"
+        result = await receive_po_items(
+            po_id=po.id,
+            item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=10)],
+            deps=_stub_deps(),
+            current_user=_user(),
+        )
+
+        assert result.status == "received"
+
+    call(_body)
 
 
-@pytest.mark.asyncio
-async def test_receive_rejects_ordered_items(db):
+def test_receive_rejects_ordered_items(call):
     """Items still in 'ordered' status (not yet at dock) should be rejected."""
-    product = await _create_test_product(quantity=100.0)
-    po, item = await _create_po_with_item(
-        product_id=product.id,
-        cost=5.0,
-        ordered_qty=10,
-        status=POItemStatus.ORDERED,
-    )
 
-    result = await receive_po_items(
-        po_id=po.id,
-        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=10)],
-        deps=_stub_deps(),
-        current_user=_user(),
-    )
+    async def _body():
+        product = await _create_test_product(quantity=100.0)
+        po, item = await _create_po_with_item(
+            product_id=product.id,
+            cost=5.0,
+            ordered_qty=10,
+            status=POItemStatus.ORDERED,
+        )
 
-    assert result.errors == 1
-    assert result.matched == 0
-    assert "not yet marked" in result.error_details[0].error
+        result = await receive_po_items(
+            po_id=po.id,
+            item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=10)],
+            deps=_stub_deps(),
+            current_user=_user(),
+        )
+
+        assert result.errors == 1
+        assert result.matched == 0
+        assert "not yet marked" in result.error_details[0].error
+
+    call(_body)
 
 
 # ── Override fields from review modal ──────────────────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_receive_cost_override_affects_wac(db):
+def test_receive_cost_override_affects_wac(call):
     """When the review modal overrides cost, the WAC should use the overridden value."""
-    product = await _create_test_product(quantity=100.0, cost=8.0)
-    po, item = await _create_po_with_item(product_id=product.id, cost=6.0, ordered_qty=50)
 
-    result = await receive_po_items(
-        po_id=po.id,
-        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=50, cost=20.0)],
-        deps=_stub_deps(),
-        current_user=_user(),
-    )
+    async def _body():
+        product = await _create_test_product(quantity=100.0, cost=8.0)
+        po, item = await _create_po_with_item(product_id=product.id, cost=6.0, ordered_qty=50)
 
-    assert result.matched == 1
-    updated = await sku_repo.get_by_id(product.id)
-    expected_wac = (100 * 8 + 50 * 20) / 150
-    assert updated.cost == pytest.approx(expected_wac, abs=0.01)
+        result = await receive_po_items(
+            po_id=po.id,
+            item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=50, cost=20.0)],
+            deps=_stub_deps(),
+            current_user=_user(),
+        )
+
+        assert result.matched == 1
+        updated = await sku_repo.get_by_id(product.id)
+        expected_wac = (100 * 8 + 50 * 20) / 150
+        assert updated.cost == pytest.approx(expected_wac, abs=0.01)
+
+    call(_body)
 
 
-@pytest.mark.asyncio
-async def test_receive_creates_product_with_overridden_name(db):
+def test_receive_creates_product_with_overridden_name(call):
     """When no product match, overrides (name, department) apply to the new product."""
-    po, item = await _create_po_with_item(
-        product_id=None,
-        cost=5.0,
-        ordered_qty=10,
-        name="Generic Widget",
-    )
 
-    result = await receive_po_items(
-        po_id=po.id,
-        item_updates=[
-            ReceiveItemUpdate(
-                id=item.id,
-                delivered_qty=10,
-                name="Corrected Widget Name",
-                suggested_department="HDW",
-            )
-        ],
-        deps=_stub_deps(),
-        current_user=_user(),
-    )
+    async def _body():
+        po, item = await _create_po_with_item(
+            product_id=None,
+            cost=5.0,
+            ordered_qty=10,
+            name="Generic Widget",
+        )
 
-    assert result.received == 1
-    assert result.errors == 0
+        result = await receive_po_items(
+            po_id=po.id,
+            item_updates=[
+                ReceiveItemUpdate(
+                    id=item.id,
+                    delivered_qty=10,
+                    name="Corrected Widget Name",
+                    suggested_department="HDW",
+                )
+            ],
+            deps=_stub_deps(),
+            current_user=_user(),
+        )
 
-    conn = get_connection()
-    cursor = await conn.execute(
-        "SELECT name FROM skus WHERE id = (SELECT product_id FROM purchase_order_items WHERE id = $1)",
-        (item.id,),
-    )
-    row = await cursor.fetchone()
-    assert row is not None
-    assert row[0] == "Corrected Widget Name"
+        assert result.received == 1
+        assert result.errors == 0
+
+        conn = get_connection()
+        cursor = await conn.execute(
+            "SELECT name FROM skus WHERE id = (SELECT product_id FROM purchase_order_items WHERE id = $1)",
+            (item.id,),
+        )
+        row = await cursor.fetchone()
+        assert row is not None
+        assert row[0] == "Corrected Widget Name"
+
+    call(_body)
 
 
-@pytest.mark.asyncio
-async def test_receive_product_id_override_matches_explicit(db):
+def test_receive_product_id_override_matches_explicit(call):
     """When the review modal sets product_id, it should be used instead of auto-match."""
-    product_a = await _create_test_product(name="Widget A", quantity=50.0, cost=10.0)
-    product_b = await _create_test_product(name="Widget B", quantity=30.0, cost=12.0)
-    po, item = await _create_po_with_item(
-        product_id=product_a.id,
-        cost=8.0,
-        ordered_qty=20,
-    )
 
-    result = await receive_po_items(
-        po_id=po.id,
-        item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=20, product_id=product_b.id)],
-        deps=_stub_deps(),
-        current_user=_user(),
-    )
+    async def _body():
+        product_a = await _create_test_product(name="Widget A", quantity=50.0, cost=10.0)
+        product_b = await _create_test_product(name="Widget B", quantity=30.0, cost=12.0)
+        po, item = await _create_po_with_item(
+            product_id=product_a.id,
+            cost=8.0,
+            ordered_qty=20,
+        )
 
-    assert result.matched == 1
-    updated_b = await sku_repo.get_by_id(product_b.id)
-    assert updated_b.quantity == pytest.approx(50.0)
+        result = await receive_po_items(
+            po_id=po.id,
+            item_updates=[ReceiveItemUpdate(id=item.id, delivered_qty=20, product_id=product_b.id)],
+            deps=_stub_deps(),
+            current_user=_user(),
+        )
 
-    updated_a = await sku_repo.get_by_id(product_a.id)
-    assert updated_a.quantity == pytest.approx(50.0)
+        assert result.matched == 1
+        updated_b = await sku_repo.get_by_id(product_b.id)
+        assert updated_b.quantity == pytest.approx(50.0)
+
+        updated_a = await sku_repo.get_by_id(product_a.id)
+        assert updated_a.quantity == pytest.approx(50.0)
+
+    call(_body)
 
 
-@pytest.mark.asyncio
-async def test_receive_items_with_typed_input(db):
+def test_receive_items_with_typed_input(call):
     """receive_po_items accepts ReceiveItemUpdate objects and correctly updates stock."""
-    product = await _create_test_product(name="Typed Input Product", quantity=20.0, cost=5.0)
-    po, item = await _create_po_with_item(product_id=product.id, cost=6.0, ordered_qty=15)
 
-    update = ReceiveItemUpdate(
-        id=item.id,
-        delivered_qty=15,
-        cost=6.0,
-    )
+    async def _body():
+        product = await _create_test_product(name="Typed Input Product", quantity=20.0, cost=5.0)
+        po, item = await _create_po_with_item(product_id=product.id, cost=6.0, ordered_qty=15)
 
-    result = await receive_po_items(
-        po_id=po.id,
-        item_updates=[update],
-        deps=_stub_deps(),
-        current_user=_user(),
-    )
+        update = ReceiveItemUpdate(
+            id=item.id,
+            delivered_qty=15,
+            cost=6.0,
+        )
 
-    assert result.matched == 1
-    assert result.errors == 0
-    assert result.cost_total == pytest.approx(6.0 * 15)
+        result = await receive_po_items(
+            po_id=po.id,
+            item_updates=[update],
+            deps=_stub_deps(),
+            current_user=_user(),
+        )
 
-    updated = await sku_repo.get_by_id(product.id)
-    assert updated.quantity == pytest.approx(35.0)
+        assert result.matched == 1
+        assert result.errors == 0
+        assert result.cost_total == pytest.approx(6.0 * 15)
+
+        updated = await sku_repo.get_by_id(product.id)
+        assert updated.quantity == pytest.approx(35.0)
+
+    call(_body)

@@ -34,7 +34,9 @@ def admin_headers() -> dict:
 
 
 def contractor_headers() -> dict:
-    token = make_token("contractor-1", role="contractor", email="contractor@test.com")
+    token = make_token(
+        "contractor-1", role="contractor", name="Contractor User", email="contractor@test.com"
+    )
     return {"Authorization": f"Bearer {token}"}
 
 

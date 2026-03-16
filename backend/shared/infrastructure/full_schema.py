@@ -66,6 +66,9 @@ from shared.infrastructure.schema import (
 from shared.infrastructure.schema import (
     TABLES as _shared_tables,
 )
+from shared.infrastructure.schema import (
+    VIEWS as _shared_views,
+)
 
 _ALL_TABLES: list[str] = (
     _shared_tables
@@ -91,7 +94,9 @@ _ALL_INDEXES: list[str] = (
     + _assistant_indexes
 )
 
-FULL_SCHEMA: list[str] = _shared_extensions + _ALL_TABLES + _ALL_INDEXES + _shared_seed
+FULL_SCHEMA: list[str] = (
+    _shared_extensions + _ALL_TABLES + _ALL_INDEXES + _shared_views + _shared_seed
+)
 
 # Exported separately so the migration runner can interleave migrations between
 # table creation and index creation (needed when migrations rename columns that
@@ -99,3 +104,4 @@ FULL_SCHEMA: list[str] = _shared_extensions + _ALL_TABLES + _ALL_INDEXES + _shar
 ALL_EXTENSIONS: list[str] = _shared_extensions
 ALL_TABLES: list[str] = _ALL_TABLES
 ALL_INDEXES: list[str] = _ALL_INDEXES
+ALL_VIEWS: list[str] = _shared_views
