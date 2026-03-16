@@ -46,7 +46,7 @@ async def list_unsynced_invoices() -> list[Invoice]:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        """SELECT id, invoice_number, billing_entity, total, status, xero_sync_status, created_at
+        """SELECT id, invoice_number, billing_entity, total, status, xero_sync_status, organization_id, created_at
            FROM invoices
            WHERE organization_id = $1
              AND status IN ('approved', 'sent')
@@ -63,7 +63,7 @@ async def list_invoices_needing_reconciliation() -> list[Invoice]:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        """SELECT id, invoice_number, billing_entity, total, xero_invoice_id, xero_sync_status,
+        """SELECT id, invoice_number, billing_entity, total, xero_invoice_id, xero_sync_status, organization_id,
                   (SELECT COUNT(*) FROM invoice_line_items WHERE invoice_id = invoices.id) AS line_count
            FROM invoices
            WHERE organization_id = $1
@@ -81,7 +81,7 @@ async def list_failed_invoices() -> list[Invoice]:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        """SELECT id, invoice_number, billing_entity, total, status, created_at
+        """SELECT id, invoice_number, billing_entity, total, status, organization_id, created_at
            FROM invoices
            WHERE organization_id = $1
              AND xero_sync_status = 'failed'
@@ -97,7 +97,7 @@ async def list_mismatch_invoices() -> list[Invoice]:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        """SELECT id, invoice_number, billing_entity, total, xero_invoice_id, created_at
+        """SELECT id, invoice_number, billing_entity, total, xero_invoice_id, organization_id, created_at
            FROM invoices
            WHERE organization_id = $1
              AND xero_sync_status = 'mismatch'
@@ -113,7 +113,7 @@ async def list_stale_cogs_invoices() -> list[Invoice]:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        """SELECT id, invoice_number, billing_entity, total, xero_invoice_id, xero_cogs_journal_id,
+        """SELECT id, invoice_number, billing_entity, total, xero_invoice_id, xero_cogs_journal_id, organization_id,
                   (SELECT COUNT(*) FROM invoice_line_items WHERE invoice_id = invoices.id) AS line_count
            FROM invoices
            WHERE organization_id = $1

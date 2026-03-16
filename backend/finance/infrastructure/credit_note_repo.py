@@ -297,7 +297,7 @@ async def list_unsynced_credit_notes() -> list[CreditNote]:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        """SELECT id, credit_note_number, billing_entity, total, status, created_at
+        """SELECT id, credit_note_number, billing_entity, total, status, organization_id, created_at
            FROM credit_notes
            WHERE (organization_id = $1 OR organization_id IS NULL)
              AND status = 'applied'
@@ -315,7 +315,7 @@ async def list_credit_notes_needing_reconciliation() -> list[CreditNote]:
     org_id = get_org_id()
     cursor = await conn.execute(
         """SELECT cn.id, cn.credit_note_number, cn.billing_entity, cn.total,
-                  cn.xero_credit_note_id, cn.xero_sync_status,
+                  cn.xero_credit_note_id, cn.xero_sync_status, cn.organization_id,
                   (SELECT COUNT(*) FROM credit_note_line_items WHERE credit_note_id = cn.id) AS line_count
            FROM credit_notes cn
            WHERE (cn.organization_id = $1 OR cn.organization_id IS NULL)
@@ -332,7 +332,7 @@ async def list_failed_credit_notes() -> list[CreditNote]:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        """SELECT id, credit_note_number, billing_entity, total, status, created_at
+        """SELECT id, credit_note_number, billing_entity, total, status, organization_id, created_at
            FROM credit_notes
            WHERE (organization_id = $1 OR organization_id IS NULL)
              AND xero_sync_status = 'failed'
@@ -347,7 +347,7 @@ async def list_mismatch_credit_notes() -> list[CreditNote]:
     conn = get_connection()
     org_id = get_org_id()
     cursor = await conn.execute(
-        """SELECT id, credit_note_number, billing_entity, total, xero_credit_note_id, created_at
+        """SELECT id, credit_note_number, billing_entity, total, xero_credit_note_id, organization_id, created_at
            FROM credit_notes
            WHERE (organization_id = $1 OR organization_id IS NULL)
              AND xero_sync_status = 'mismatch'
